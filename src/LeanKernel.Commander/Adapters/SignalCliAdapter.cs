@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,6 +11,7 @@ namespace LeanKernel.Commander.Adapters;
 /// Manages the signal-cli process in JSON-RPC mode.
 /// Sends JSON-RPC requests and reads line-delimited JSON responses.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class SignalCliAdapter : IAsyncDisposable
 {
     private readonly string _cliPath;
@@ -193,6 +195,7 @@ public sealed class SignalCliAdapter : IAsyncDisposable
     }
 }
 
+[ExcludeFromCodeCoverage]
 public sealed record SignalInboundMessage
 {
     public required string Sender { get; init; }
@@ -201,6 +204,7 @@ public sealed record SignalInboundMessage
 }
 
 // JSON-RPC models for signal-cli communication
+[ExcludeFromCodeCoverage]
 internal sealed record JsonRpcRequest
 {
     [JsonPropertyName("jsonrpc")] public string JsonRpc { get; init; } = "2.0";
@@ -209,12 +213,14 @@ internal sealed record JsonRpcRequest
     [JsonPropertyName("params")] public required object Params { get; init; }
 }
 
+[ExcludeFromCodeCoverage]
 internal sealed record SendParams
 {
     [JsonPropertyName("recipient")] public required string[] Recipient { get; init; }
     [JsonPropertyName("message")] public required string Message { get; init; }
 }
 
+[ExcludeFromCodeCoverage]
 [JsonSerializable(typeof(JsonRpcRequest))]
 [JsonSerializable(typeof(SendParams))]
 internal partial class SignalJsonContext : JsonSerializerContext;

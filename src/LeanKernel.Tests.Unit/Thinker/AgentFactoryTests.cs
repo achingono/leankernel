@@ -38,6 +38,30 @@ public class AgentFactoryTests
         Assert.Same(mockClient, factory.ChatClient);
     }
 
+    [Fact]
+    public void CreateInstrumentedAgent_WithoutDiagnostics_ReturnsSameAsCreateAgent()
+    {
+        var mockClient = new TestChatClient();
+        var factory = new AgentFactory(mockClient, NullLogger<AgentFactory>.Instance);
+
+        // No diagnostics middleware — instrumented agent should still work
+        var agent = factory.CreateInstrumentedAgent("You are LeanKernel.");
+
+        Assert.NotNull(agent);
+    }
+
+    [Fact]
+    public async Task CreateAgent_RunAsync_ReturnsResponse()
+    {
+        var mockClient = new TestChatClient();
+        var factory = new AgentFactory(mockClient, NullLogger<AgentFactory>.Instance);
+
+        var agent = factory.CreateAgent("test instructions");
+        var response = await agent.RunAsync("Hello", cancellationToken: CancellationToken.None);
+
+        Assert.Equal("test response", response.Text);
+    }
+
     /// <summary>
     /// Minimal test double for IChatClient — avoids external dependencies in unit tests.
     /// </summary>

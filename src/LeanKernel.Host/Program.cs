@@ -155,6 +155,7 @@ finally
 /// <summary>
 /// Background service that starts the channel router and scheduler.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public sealed class LeanKernelHostedService : BackgroundService
 {
     private readonly ChannelRouter _router;

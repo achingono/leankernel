@@ -96,6 +96,7 @@ internal sealed record EmbeddingData
     [JsonPropertyName("embedding")] public float[] Embedding { get; init; } = [];
 }
 
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 [JsonSerializable(typeof(EmbeddingRequest))]
 [JsonSerializable(typeof(EmbeddingResponse))]
 internal partial class EmbeddingJsonContext : JsonSerializerContext;

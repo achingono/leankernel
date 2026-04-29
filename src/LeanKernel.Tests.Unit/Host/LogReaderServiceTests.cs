@@ -66,6 +66,67 @@ public class LogReaderServiceTests : IDisposable
         Assert.True(result.Lines.Count <= 2);
     }
 
+    [Fact]
+    public async Task Search_CombinedQueryAndLevel()
+    {
+        var result = await _service.SearchAsync(query: "connect", level: "ERR");
+        Assert.Single(result.Lines);
+        Assert.Contains("LiteLLM", result.Lines[0].Content);
+    }
+
+    [Fact]
+    public async Task Search_WithSince_TimeOnlyNotFiltered()
+    {
+        // Lines have time-only format [HH:mm:ss] which ExtractTimestamp returns null for
+        var result = await _service.SearchAsync(since: "2026-04-28T00:00:00Z");
+        Assert.True(result.Lines.Count >= 1);
+    }
+
+    [Fact]
+    public void ListLogFiles_NoLogDirectory_ReturnsEmpty()
+    {
+        var tmpDir2 = Path.Combine(Path.GetTempPath(), $"LeanKernel-nologdir-{Guid.NewGuid():N}");
+        var wikiDir2 = Path.Combine(tmpDir2, "wiki");
+        Directory.CreateDirectory(wikiDir2);
+        try
+        {
+            var config = Options.Create(new LeanKernelConfig { Wiki = new WikiConfig { BasePath = wikiDir2 } });
+            var service = new LogReaderService(config);
+            var files = service.ListLogFiles();
+            Assert.Empty(files);
+        }
+        finally { try { Directory.Delete(tmpDir2, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Search_SkipsBlankLines()
+    {
+        var logDir = Path.Combine(_tempDir, "logs");
+        File.WriteAllText(Path.Combine(logDir, "LeanKernel-20260430.log"),
+            "[12:00:00 INF] Valid line\n\n   \n[12:00:01 INF] Another line\n");
+
+        var config = Options.Create(new LeanKernelConfig { Wiki = new WikiConfig { BasePath = Path.Combine(_tempDir, "wiki") } });
+        var service = new LogReaderService(config);
+        var result = await service.SearchAsync();
+
+        // Blank lines should be skipped
+        Assert.All(result.Lines, l => Assert.False(string.IsNullOrWhiteSpace(l.Content)));
+    }
+
+    [Fact]
+    public async Task Search_TotalFiles_ReportsCorrectCount()
+    {
+        var result = await _service.SearchAsync();
+        Assert.Equal(1, result.TotalFiles);
+    }
+
+    [Fact]
+    public async Task Search_LinesHaveFileAttribute()
+    {
+        var result = await _service.SearchAsync();
+        Assert.All(result.Lines, l => Assert.NotEmpty(l.File));
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, true); } catch { }

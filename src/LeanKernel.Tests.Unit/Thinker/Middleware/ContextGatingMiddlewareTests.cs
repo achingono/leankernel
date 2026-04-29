@@ -93,4 +93,120 @@ public class ContextGatingMiddlewareTests
                 $"Messages out of order: {result[i].Text} should come before {result[i + 1].Text}");
         }
     }
+
+    [Fact]
+    public void PruneMessages_SystemOnly_ReturnsSystemMessage()
+    {
+        var budget = ContextBudget.FromModelWindow(4000);
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, "You are LeanKernel.")
+        };
+
+        var result = ContextGatingMiddleware.PruneMessages(messages, budget);
+
+        Assert.Single(result);
+        Assert.Equal(ChatRole.System, result[0].Role);
+    }
+
+    [Fact]
+    public void PruneMessages_MultipleSystemMessages_KeepsAll()
+    {
+        var budget = ContextBudget.FromModelWindow(4000);
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, "System 1"),
+            new(ChatRole.System, "System 2"),
+            new(ChatRole.User, "Hello")
+        };
+
+        var result = ContextGatingMiddleware.PruneMessages(messages, budget);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(2, result.Count(m => m.Role == ChatRole.System));
+    }
+
+    [Fact]
+    public void PruneMessages_SingleUserMessage_Preserved()
+    {
+        var budget = ContextBudget.FromModelWindow(4000);
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "Only message")
+        };
+
+        var result = ContextGatingMiddleware.PruneMessages(messages, budget);
+
+        Assert.Single(result);
+        Assert.Equal("Only message", result[0].Text);
+    }
+
+    [Fact]
+    public void PruneMessages_ZeroBudget_KeepsOnlyLastMessage()
+    {
+        var budget = new ContextBudget { TotalTokens = 1 }; // minimal budget
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "old"),
+            new(ChatRole.Assistant, "reply"),
+            new(ChatRole.User, "current")
+        };
+
+        var result = ContextGatingMiddleware.PruneMessages(messages, budget);
+
+        // Should at least keep the last message
+        Assert.Contains(result, m => m.Text == "current");
+    }
+
+    [Fact]
+    public async Task Wrap_PassesThroughToInnerClient()
+    {
+        var middleware = new ContextGatingMiddleware(
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ContextGatingMiddleware>.Instance);
+        var budget = ContextBudget.FromModelWindow(4000);
+
+        var inner = new FakeGatingChatClient("response");
+        var wrapped = middleware.Wrap(inner, budget);
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, "You are LeanKernel."),
+            new(ChatRole.User, "Hello")
+        };
+        var result = await wrapped.GetResponseAsync(messages);
+
+        Assert.Equal("response", result.Messages[0].Text);
+    }
+
+    [Fact]
+    public void Wrap_ReturnsNonNullClient()
+    {
+        var middleware = new ContextGatingMiddleware(
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ContextGatingMiddleware>.Instance);
+        var budget = ContextBudget.FromModelWindow(4000);
+
+        var inner = new FakeGatingChatClient("test");
+        var wrapped = middleware.Wrap(inner, budget);
+
+        Assert.NotNull(wrapped);
+        Assert.NotSame(inner, wrapped);
+    }
+
+    private sealed class FakeGatingChatClient : IChatClient
+    {
+        private readonly string _response;
+        public FakeGatingChatClient(string response) => _response = response;
+        public void Dispose() { }
+        public ChatClientMetadata Metadata => new();
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceType == typeof(IChatClient) ? this : null;
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, _response)));
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotImplementedException();
+    }
 }

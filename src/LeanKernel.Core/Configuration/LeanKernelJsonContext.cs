@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using LeanKernel.Core.Models;
@@ -8,6 +9,7 @@ namespace LeanKernel.Core.Configuration;
 /// System.Text.Json source generation context for all LeanKernel models.
 /// Eliminates runtime reflection for serialization — keeps the binary lean.
 /// </summary>
+[ExcludeFromCodeCoverage]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = true,

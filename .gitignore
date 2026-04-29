@@ -60,3 +60,7 @@ data/logs/
 
 # Signal
 signal-config/
+
+# Code coverage
+coverage-results/
+coverage-report/

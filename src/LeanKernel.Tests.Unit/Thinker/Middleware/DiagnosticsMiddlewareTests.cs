@@ -34,6 +34,23 @@ public class DiagnosticsMiddlewareTests
         Assert.NotSame(agent, wrapped);
     }
 
+    [Fact]
+    public async Task Wrap_AgentRunAsync_CompletesSuccessfully()
+    {
+        var middleware = new DiagnosticsMiddleware(
+            NullLogger<DiagnosticsMiddleware>.Instance);
+
+        var mockClient = new TestChatClient();
+        var agent = new ChatClientAgent(mockClient, instructions: "test");
+        var wrapped = middleware.Wrap(agent);
+
+        // Run the wrapped agent
+        var response = await wrapped.RunAsync("Hello", cancellationToken: CancellationToken.None);
+
+        Assert.NotNull(response);
+        Assert.Equal("test", response.Text);
+    }
+
     private sealed class TestChatClient : IChatClient
     {
         public void Dispose() { }

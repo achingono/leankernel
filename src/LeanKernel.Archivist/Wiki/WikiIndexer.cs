@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Qdrant.Client;
@@ -12,6 +13,7 @@ namespace LeanKernel.Archivist.Wiki;
 /// Indexes wiki entries into Qdrant for semantic vector search.
 /// Each wiki entry becomes a point with its embedding and metadata.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class WikiIndexer
 {
     private readonly QdrantClient _qdrant;

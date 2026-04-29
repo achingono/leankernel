@@ -1,9 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace LeanKernel.Plugins.Sdk;
 
 /// <summary>
 /// Annotate ITool implementations with this attribute for compile-time
 /// discovery by the ToolRegistryGenerator source generator.
 /// </summary>
+[ExcludeFromCodeCoverage]
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
 public sealed class ToolMetadataAttribute : Attribute
 {

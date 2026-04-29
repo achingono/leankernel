@@ -27,4 +27,17 @@ public class SignalChannelTests
         await channel.StopAsync(CancellationToken.None);
         await channel.DisposeAsync();
     }
+
+    [Fact]
+    public async Task SignalChannel_SendAsync_NoAdapter_NoThrow()
+    {
+        var config = Microsoft.Extensions.Options.Options.Create(new Core.Configuration.LeanKernelConfig
+        {
+            Signal = new Core.Configuration.SignalConfig { Enabled = false }
+        });
+        var channel = new SignalChannel(config, new Microsoft.Extensions.Logging.Abstractions.NullLogger<SignalChannel>());
+
+        // Without starting, adapter is null — SendAsync should handle gracefully
+        await channel.SendAsync("recipient", "message", CancellationToken.None);
+    }
 }
