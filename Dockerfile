@@ -1,0 +1,47 @@
+# ── Build stage ──────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy csproj files first for layer caching
+COPY src/LeanKernel.Core/LeanKernel.Core.csproj LeanKernel.Core/
+COPY src/LeanKernel.Commander/LeanKernel.Commander.csproj LeanKernel.Commander/
+COPY src/LeanKernel.Thinker/LeanKernel.Thinker.csproj LeanKernel.Thinker/
+COPY src/LeanKernel.Archivist/LeanKernel.Archivist.csproj LeanKernel.Archivist/
+COPY src/LeanKernel.Scheduler/LeanKernel.Scheduler.csproj LeanKernel.Scheduler/
+COPY src/LeanKernel.Plugins/LeanKernel.Plugins.csproj LeanKernel.Plugins/
+COPY src/LeanKernel.Generators/LeanKernel.Generators.csproj LeanKernel.Generators/
+COPY src/LeanKernel.Host/LeanKernel.Host.csproj LeanKernel.Host/
+COPY src/LeanKernel.sln .
+RUN dotnet restore LeanKernel.sln
+
+# Copy everything and build
+COPY src/ .
+RUN dotnet publish LeanKernel.Host/LeanKernel.Host.csproj \
+    -c Release \
+    -o /app/publish \
+    --no-restore
+
+# ── Runtime stage ────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+
+# Install curl for healthchecks
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -s /bin/bash LeanKernel
+USER LeanKernel
+
+COPY --from=build /app/publish .
+
+# Create data directories
+RUN mkdir -p /home/LeanKernel/data/wiki /home/LeanKernel/data/sessions /home/LeanKernel/data/logs
+
+ENV DOTNET_ENVIRONMENT=Production
+EXPOSE 5080
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
+    CMD curl -f http://localhost:5080/health || exit 1
+
+ENTRYPOINT ["dotnet", "LeanKernel.Host.dll"]

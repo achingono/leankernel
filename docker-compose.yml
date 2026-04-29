@@ -1,0 +1,98 @@
+# docker-compose.yml — LeanKernel AI Agent
+# Services: Engine (.NET 10), LiteLLM (model proxy), Qdrant (vector DB)
+
+services:
+  # ── LeanKernel Engine (Core Application) ───────────────────────────
+  LeanKernel-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: LeanKernel-engine
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - LEANKERNEL__LiteLlm__BaseUrl=http://litellm:4000
+      - LEANKERNEL__LiteLlm__ApiKey=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
+      - LEANKERNEL__Qdrant__Host=qdrant
+      - LEANKERNEL__Qdrant__Port=6334
+      - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
+      - LEANKERNEL__Wiki__BasePath=/app/data/wiki
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - ./data/wiki:/app/data/wiki
+      - ./data/sessions:/app/data/sessions
+      - ./data/logs:/app/data/logs
+      - signal-config:/home/LeanKernel/.local/share/signal-cli
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    ports:
+      - "${LEANKERNEL_HEALTH_PORT:-5080}:5080"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── LiteLLM Proxy (Model Router) ─────────────────────────────
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.83.7-stable
+    container_name: LeanKernel-litellm
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
+      - LITELLM_SALT_KEY=${LITELLM_SALT_KEY:-LeanKernel-salt-change-me}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ./config/litellm/config.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Qdrant (Vector Store) ─────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.17.1
+    container_name: LeanKernel-qdrant
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  signal-config:
+    driver: local
