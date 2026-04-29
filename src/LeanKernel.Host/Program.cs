@@ -73,6 +73,7 @@ try
 
     // Thinker
     builder.Services.AddSingleton<KernelFactory>();
+    builder.Services.AddSingleton<AgentFactory>();
     builder.Services.AddSingleton<IThinkerService, ThinkerService>();
     builder.Services.AddSingleton<PromptAssembler>();
 
