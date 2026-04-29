@@ -1,8 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.SemanticKernel;
+using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
+using LeanKernel.Thinker.SemanticKernel;
 
 namespace LeanKernel.Thinker;
 
@@ -16,6 +19,7 @@ public sealed class ThinkerService : IThinkerService
     private readonly IContextGatekeeper _gatekeeper;
     private readonly ISessionStore _sessions;
     private readonly IWikiStore _wiki;
+    private readonly KernelFactory _kernelFactory;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -23,12 +27,14 @@ public sealed class ThinkerService : IThinkerService
         IContextGatekeeper gatekeeper,
         ISessionStore sessions,
         IWikiStore wiki,
+        KernelFactory kernelFactory,
         IOptions<LeanKernelConfig> config,
         ILogger<ThinkerService> logger)
     {
         _gatekeeper = gatekeeper;
         _sessions = sessions;
         _wiki = wiki;
+        _kernelFactory = kernelFactory;
         _config = config.Value;
         _logger = logger;
     }
@@ -52,15 +58,22 @@ public sealed class ThinkerService : IThinkerService
         var context = await _gatekeeper.GateContextAsync(message, budget, sessionId, ct);
 
         _logger.LogInformation(
-            "Context assembled: ~{Tokens} tokens, {Excluded} exclusions",
-            context.EstimatedTotalTokens, context.ExclusionLog.Count);
+            "Context assembled: ~{Tokens} tokens, {Wiki} wiki, {Turns} turns, {Excluded} exclusions",
+            context.EstimatedTotalTokens, context.WikiLeanKernels.Count,
+            context.History.Count, context.ExclusionLog.Count);
 
         // 4. Call LLM via Semantic Kernel
-        // TODO: Phase 2 — wire up SK kernel invocation
-        var response = $"[LeanKernel stub] Received: \"{Truncate(message.Content, 60)}\" — " +
-                       $"Context: {context.WikiLeanKernels.Count} wiki LeanKernels, " +
-                       $"{context.History.Count} history turns, " +
-                       $"~{context.EstimatedTotalTokens} tokens";
+        string response;
+        try
+        {
+            var kernel = _kernelFactory.Build();
+            response = await LiteLlmConnector.InvokeAsync(kernel, context, message.Content, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "LLM invocation failed — returning error message");
+            response = "I'm sorry, I encountered an error processing your request. Please try again.";
+        }
 
         // 5. Record outbound turn
         await _sessions.AppendTurnAsync(sessionId, new ConversationTurn
@@ -71,11 +84,21 @@ public sealed class ThinkerService : IThinkerService
         }, ct);
 
         // 6. Extract and persist 5W1H facts from the exchange
-        // TODO: Phase 2 — WikiExtractor to extract facts from response
+        try
+        {
+            var sourceId = $"conversation:{DateTimeOffset.UtcNow:yyyy-MM-ddTHH:mm:ss}";
+            var facts = WikiExtractor.ExtractFacts(message.Content, response, sourceId);
+            if (facts.Count > 0)
+            {
+                await _wiki.IngestFactsAsync(facts, ct);
+                _logger.LogDebug("Extracted {Count} wiki entries from conversation", facts.Count);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fact extraction failed — continuing without persistence");
+        }
 
         return response;
     }
-
-    private static string Truncate(string text, int max) =>
-        text.Length <= max ? text : text[..max] + "...";
 }
