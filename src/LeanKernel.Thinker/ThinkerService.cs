@@ -76,11 +76,25 @@ public sealed class ThinkerService : IThinkerService
             var tools = _toolAdapter.BuildTools();
             var agent = _agentFactory.CreateAgent(instructions, tools);
 
-            // Build history messages from gated context
+            // Build history messages from gated context using SessionExtensions
             var messages = BuildMessages(context.History, message.Content);
-            var agentResponse = await agent.RunAsync(messages, cancellationToken: ct);
+            var agentSession = await agent.CreateSessionAsync(ct);
+            var agentResponse = await agent.RunAsync(messages, agentSession, cancellationToken: ct);
 
             response = agentResponse.Text ?? string.Empty;
+
+            // Persist diagnostics metadata from middleware StateBag
+            if (agentSession?.StateBag is { } bag)
+            {
+                // Known middleware keys set by DiagnosticsMiddleware
+                string[] diagKeys = ["last_duration_ms", "last_message_count", "last_tool_calls"];
+                foreach (var key in diagKeys)
+                {
+                    var val = bag.GetValue<string>(key);
+                    if (val is not null)
+                        await _sessions.SetMetadataAsync(sessionId, key, val, ct);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -117,17 +131,15 @@ public sealed class ThinkerService : IThinkerService
 
     /// <summary>
     /// Convert gated conversation history + current query into ChatMessage list.
+    /// Uses <see cref="SessionExtensions"/> for ConversationTurn → ChatMessage mapping.
     /// The system message is handled by the agent's <c>instructions</c> parameter.
     /// </summary>
     internal static IEnumerable<ChatMessage> BuildMessages(
         IReadOnlyList<ConversationTurn> history,
         string currentQuery)
     {
-        foreach (var turn in history)
-        {
-            var role = turn.Role == "user" ? ChatRole.User : ChatRole.Assistant;
-            yield return new ChatMessage(role, turn.Content);
-        }
+        foreach (var msg in history.ToChatMessages())
+            yield return msg;
 
         yield return new ChatMessage(ChatRole.User, currentQuery);
     }

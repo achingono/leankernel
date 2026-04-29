@@ -75,6 +75,7 @@ public sealed class SessionStore : ISessionStore
             return Task.FromResult<IReadOnlyList<string>>([]);
 
         var sessions = Directory.GetFiles(_basePath, "*.json")
+            .Where(f => !f.EndsWith(".meta.json"))
             .Select(Path.GetFileNameWithoutExtension)
             .Where(name => name is not null)
             .Cast<string>()
@@ -84,6 +85,44 @@ public sealed class SessionStore : ISessionStore
         return Task.FromResult<IReadOnlyList<string>>(sessions);
     }
 
+    public async Task SetMetadataAsync(string sessionId, string key, string value, CancellationToken ct)
+    {
+        var meta = await LoadMetadataAsync(sessionId, ct);
+        meta[key] = value;
+        await SaveMetadataAsync(sessionId, meta, ct);
+    }
+
+    public async Task<string?> GetMetadataAsync(string sessionId, string key, CancellationToken ct)
+    {
+        var meta = await LoadMetadataAsync(sessionId, ct);
+        return meta.GetValueOrDefault(key);
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> GetAllMetadataAsync(string sessionId, CancellationToken ct)
+    {
+        return await LoadMetadataAsync(sessionId, ct);
+    }
+
+    private async Task<Dictionary<string, string>> LoadMetadataAsync(string sessionId, CancellationToken ct)
+    {
+        var path = GetMetadataPath(sessionId);
+        if (!File.Exists(path)) return new Dictionary<string, string>();
+
+        await using var stream = File.OpenRead(path);
+        return await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(stream, JsonOptions, ct)
+            ?? new Dictionary<string, string>();
+    }
+
+    private async Task SaveMetadataAsync(string sessionId, Dictionary<string, string> meta, CancellationToken ct)
+    {
+        var path = GetMetadataPath(sessionId);
+        await using var stream = File.Create(path);
+        await JsonSerializer.SerializeAsync(stream, meta, JsonOptions, ct);
+    }
+
     private string GetSessionPath(string sessionId) =>
         Path.Combine(_basePath, $"{sessionId}.json");
+
+    private string GetMetadataPath(string sessionId) =>
+        Path.Combine(_basePath, $"{sessionId}.meta.json");
 }
