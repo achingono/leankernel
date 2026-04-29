@@ -2,6 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LeanKernel.Core\LeanKernel.Core.csproj" />
+    <ProjectReference Include="..\LeanKernel.Archivist\LeanKernel.Archivist.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NCrontab" Version="3.4.0" />
   </ItemGroup>
 
   <PropertyGroup>

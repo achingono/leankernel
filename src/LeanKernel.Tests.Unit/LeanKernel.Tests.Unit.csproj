@@ -28,6 +28,8 @@
     <ProjectReference Include="..\LeanKernel.Archivist\LeanKernel.Archivist.csproj" />
     <ProjectReference Include="..\LeanKernel.Thinker\LeanKernel.Thinker.csproj" />
     <ProjectReference Include="..\LeanKernel.Commander\LeanKernel.Commander.csproj" />
+    <ProjectReference Include="..\LeanKernel.Scheduler\LeanKernel.Scheduler.csproj" />
+    <ProjectReference Include="..\LeanKernel.Plugins\LeanKernel.Plugins.csproj" />
   </ItemGroup>
 
 </Project>
