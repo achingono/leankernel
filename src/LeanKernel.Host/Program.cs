@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Serilog;
 using LeanKernel.Archivist;
 using LeanKernel.Archivist.Embedding;
 using LeanKernel.Archivist.Sessions;
@@ -7,6 +8,7 @@ using LeanKernel.Commander;
 using LeanKernel.Commander.Adapters;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
+using LeanKernel.Host;
 using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
 using LeanKernel.Scheduler;
@@ -14,66 +16,100 @@ using LeanKernel.Thinker;
 using LeanKernel.Thinker.Agents;
 using LeanKernel.Thinker.SemanticKernel;
 
-var builder = Host.CreateApplicationBuilder(args);
+// Configure Serilog early for bootstrap logging
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-// Bind configuration
-builder.Services.Configure<LeanKernelConfig>(
-    builder.Configuration.GetSection(LeanKernelConfig.SectionName));
-
-// Core services
-builder.Services.AddSingleton<IWikiStore, WikiStore>();
-builder.Services.AddSingleton<ISessionStore>(sp =>
+try
 {
-    var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
-    var sessionsPath = Path.Combine(
-        Path.GetDirectoryName(config.Wiki.BasePath) ?? "/app/data",
-        "sessions");
-    return new SessionStore(sessionsPath, sp.GetRequiredService<ILogger<SessionStore>>());
-});
-builder.Services.AddSingleton<IEmbeddingService, EmbeddingService>();
-builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>((sp, client) =>
+    var builder = Host.CreateApplicationBuilder(args);
+
+    // Serilog — structured logging to console + rolling file
+    builder.Services.AddSerilog((services, lc) => lc
+        .ReadFrom.Configuration(builder.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .WriteTo.Console(
+            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
+        .WriteTo.File(
+            path: Path.Combine(
+                builder.Configuration["LeanKernel:Wiki:BasePath"] is string p
+                    ? Path.Combine(Path.GetDirectoryName(p) ?? "/app/data", "..", "logs")
+                    : "/app/data/logs",
+                "LeanKernel-.log"),
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 14,
+            fileSizeLimitBytes: 10_000_000));
+
+    // Bind configuration
+    builder.Services.Configure<LeanKernelConfig>(
+        builder.Configuration.GetSection(LeanKernelConfig.SectionName));
+
+    // Core services
+    builder.Services.AddSingleton<IWikiStore, WikiStore>();
+    builder.Services.AddSingleton<ISessionStore>(sp =>
+    {
+        var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
+        var sessionsPath = Path.Combine(
+            Path.GetDirectoryName(config.Wiki.BasePath) ?? "/app/data",
+            "sessions");
+        return new SessionStore(sessionsPath, sp.GetRequiredService<ILogger<SessionStore>>());
+    });
+    builder.Services.AddSingleton<IEmbeddingService, EmbeddingService>();
+    builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>((sp, client) =>
+    {
+        var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
+        client.BaseAddress = new Uri(config.LiteLlm.BaseUrl);
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {config.LiteLlm.ApiKey}");
+    });
+
+    // Archivist
+    builder.Services.AddSingleton<WikiIndexer>();
+    builder.Services.AddSingleton<WikiCompiler>();
+    builder.Services.AddSingleton<ConversationCompactor>();
+    builder.Services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
+
+    // Thinker
+    builder.Services.AddSingleton<KernelFactory>();
+    builder.Services.AddSingleton<IThinkerService, ThinkerService>();
+    builder.Services.AddSingleton<PromptAssembler>();
+
+    // Multi-Agent Orchestration
+    builder.Services.AddSingleton<WorkerAgent, ResearchWorker>();
+    builder.Services.AddSingleton<WorkerAgent, CodeWorker>();
+    builder.Services.AddSingleton<WorkerAgent, ScheduleWorker>();
+    builder.Services.AddSingleton<IAgentOrchestrator, AgentOrchestrator>();
+
+    // Commander — channels
+    builder.Services.AddSingleton<IChannel, SignalChannel>();
+    builder.Services.AddSingleton<ChannelRouter>();
+
+    // Plugins
+    builder.Services.AddSingleton<ITool, WikiQueryTool>();
+    builder.Services.AddSingleton<IToolRegistry, PluginHost>();
+
+    // Scheduler
+    builder.Services.AddSingleton<IScheduler, CronScheduler>();
+
+    // Hosted service — main entry point
+    builder.Services.AddHostedService<LeanKernelHostedService>();
+
+    // Health checks
+    builder.Services.AddHealthChecks()
+        .AddCheck<LeanKernelHealthCheck>("LeanKernel");
+
+    var host = builder.Build();
+    host.Run();
+}
+catch (Exception ex)
 {
-    var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
-    client.BaseAddress = new Uri(config.LiteLlm.BaseUrl);
-    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {config.LiteLlm.ApiKey}");
-});
-
-// Archivist
-builder.Services.AddSingleton<WikiIndexer>();
-builder.Services.AddSingleton<WikiCompiler>();
-builder.Services.AddSingleton<ConversationCompactor>();
-builder.Services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
-
-// Thinker
-builder.Services.AddSingleton<KernelFactory>();
-builder.Services.AddSingleton<IThinkerService, ThinkerService>();
-builder.Services.AddSingleton<PromptAssembler>();
-
-// Multi-Agent Orchestration
-builder.Services.AddSingleton<WorkerAgent, ResearchWorker>();
-builder.Services.AddSingleton<WorkerAgent, CodeWorker>();
-builder.Services.AddSingleton<WorkerAgent, ScheduleWorker>();
-builder.Services.AddSingleton<IAgentOrchestrator, AgentOrchestrator>();
-
-// Commander — channels
-builder.Services.AddSingleton<IChannel, SignalChannel>();
-builder.Services.AddSingleton<ChannelRouter>();
-
-// Plugins
-builder.Services.AddSingleton<ITool, WikiQueryTool>();
-builder.Services.AddSingleton<IToolRegistry, PluginHost>();
-
-// Scheduler
-builder.Services.AddSingleton<IScheduler, CronScheduler>();
-
-// Hosted service — main entry point
-builder.Services.AddHostedService<LeanKernelHostedService>();
-
-// Health check endpoint
-builder.Services.AddHealthChecks();
-
-var host = builder.Build();
-host.Run();
+    Log.Fatal(ex, "LeanKernel terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 
 /// <summary>
 /// Background service that starts the channel router and scheduler.
