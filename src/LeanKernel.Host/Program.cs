@@ -16,7 +16,6 @@ using LeanKernel.Plugins.BuiltIn;
 using LeanKernel.Scheduler;
 using LeanKernel.Thinker;
 using LeanKernel.Thinker.Agents;
-using LeanKernel.Thinker.SemanticKernel;
 
 // Configure Serilog early for bootstrap logging
 Log.Logger = new LoggerConfiguration()
@@ -72,11 +71,10 @@ try
     builder.Services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
 
     // Thinker
-    builder.Services.AddSingleton<KernelFactory>();
     builder.Services.AddSingleton<AgentFactory>();
     builder.Services.AddSingleton<ToolFunctionAdapter>();
-    builder.Services.AddSingleton<IThinkerService, ThinkerService>();
     builder.Services.AddSingleton<PromptAssembler>();
+    builder.Services.AddSingleton<IThinkerService, ThinkerService>();
 
     // Multi-Agent Orchestration
     builder.Services.AddSingleton<WorkerAgent, ResearchWorker>();

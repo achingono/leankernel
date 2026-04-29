@@ -1,17 +1,17 @@
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.SemanticKernel;
 using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
-using LeanKernel.Thinker.SemanticKernel;
 
 namespace LeanKernel.Thinker;
 
 /// <summary>
 /// Main reasoning loop. Takes a message, obtains gated context
-/// from the Archivist, sends to LLM via Semantic Kernel, and
+/// from the Archivist, sends to LLM via MAF ChatClientAgent, and
 /// persists learned facts back to the wiki.
 /// </summary>
 public sealed class ThinkerService : IThinkerService
@@ -19,7 +19,9 @@ public sealed class ThinkerService : IThinkerService
     private readonly IContextGatekeeper _gatekeeper;
     private readonly ISessionStore _sessions;
     private readonly IWikiStore _wiki;
-    private readonly KernelFactory _kernelFactory;
+    private readonly AgentFactory _agentFactory;
+    private readonly ToolFunctionAdapter _toolAdapter;
+    private readonly PromptAssembler _promptAssembler;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -27,14 +29,18 @@ public sealed class ThinkerService : IThinkerService
         IContextGatekeeper gatekeeper,
         ISessionStore sessions,
         IWikiStore wiki,
-        KernelFactory kernelFactory,
+        AgentFactory agentFactory,
+        ToolFunctionAdapter toolAdapter,
+        PromptAssembler promptAssembler,
         IOptions<LeanKernelConfig> config,
         ILogger<ThinkerService> logger)
     {
         _gatekeeper = gatekeeper;
         _sessions = sessions;
         _wiki = wiki;
-        _kernelFactory = kernelFactory;
+        _agentFactory = agentFactory;
+        _toolAdapter = toolAdapter;
+        _promptAssembler = promptAssembler;
         _config = config.Value;
         _logger = logger;
     }
@@ -62,12 +68,19 @@ public sealed class ThinkerService : IThinkerService
             context.EstimatedTotalTokens, context.WikiLeanKernels.Count,
             context.History.Count, context.ExclusionLog.Count);
 
-        // 4. Call LLM via Semantic Kernel
+        // 4. Call LLM via MAF ChatClientAgent
         string response;
         try
         {
-            var kernel = _kernelFactory.Build();
-            response = await LiteLlmConnector.InvokeAsync(kernel, context, message.Content, ct);
+            var instructions = _promptAssembler.AssembleSystemMessage(context);
+            var tools = _toolAdapter.BuildTools();
+            var agent = _agentFactory.CreateAgent(instructions, tools);
+
+            // Build history messages from gated context
+            var messages = BuildMessages(context.History, message.Content);
+            var agentResponse = await agent.RunAsync(messages, cancellationToken: ct);
+
+            response = agentResponse.Text ?? string.Empty;
         }
         catch (Exception ex)
         {
@@ -100,5 +113,22 @@ public sealed class ThinkerService : IThinkerService
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Convert gated conversation history + current query into ChatMessage list.
+    /// The system message is handled by the agent's <c>instructions</c> parameter.
+    /// </summary>
+    internal static IEnumerable<ChatMessage> BuildMessages(
+        IReadOnlyList<ConversationTurn> history,
+        string currentQuery)
+    {
+        foreach (var turn in history)
+        {
+            var role = turn.Role == "user" ? ChatRole.User : ChatRole.Assistant;
+            yield return new ChatMessage(role, turn.Content);
+        }
+
+        yield return new ChatMessage(ChatRole.User, currentQuery);
     }
 }

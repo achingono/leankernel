@@ -1,96 +1,78 @@
+using Microsoft.Extensions.AI;
 using LeanKernel.Core.Models;
-using LeanKernel.Thinker.SemanticKernel;
+using LeanKernel.Thinker;
 
 namespace LeanKernel.Tests.Unit.Thinker;
 
-public class LiteLlmConnectorTests
+/// <summary>
+/// Tests for ThinkerService.BuildMessages — the method that converts
+/// gated ConversationContext into MEAI ChatMessage format.
+/// (Replaces former LiteLlmConnectorTests)
+/// </summary>
+public class ThinkerServiceBuildMessagesTests
 {
     [Fact]
-    public void BuildChatHistory_IncludesSystemPrompt()
+    public void BuildMessages_EmptyHistory_ReturnsSingleUserMessage()
     {
-        var context = CreateMinimalContext("You are LeanKernel.");
-        var history = LiteLlmConnector.BuildChatHistory(context, "Hello");
+        var messages = ThinkerService.BuildMessages([], "Hello").ToList();
 
-        Assert.True(history.Count >= 2); // system + user
-        Assert.Equal(Microsoft.SemanticKernel.ChatCompletion.AuthorRole.System, history[0].Role);
-        Assert.Contains("You are LeanKernel.", history[0].Content);
+        Assert.Single(messages);
+        Assert.Equal(ChatRole.User, messages[0].Role);
+        Assert.Equal("Hello", messages[0].Text);
     }
 
     [Fact]
-    public void BuildChatHistory_InjectsWikiLeanKernels()
+    public void BuildMessages_WithHistory_IncludesAllTurns()
     {
-        var context = CreateMinimalContext("System prompt");
-        context = context with
+        var history = new List<ConversationTurn>
         {
-            WikiLeanKernels =
-            [
-                new RelevanceScore
-                {
-                    EntryId = "who-alice",
-                    Content = "[Who:Alice] Engineer at Acme",
-                    EstimatedTokens = 10,
-                    Score = 0.9
-                }
-            ]
+            new() { Role = "user", Content = "Hi", Timestamp = DateTimeOffset.UtcNow.AddMinutes(-5) },
+            new() { Role = "assistant", Content = "Hello!", Timestamp = DateTimeOffset.UtcNow.AddMinutes(-4) }
         };
 
-        var history = LiteLlmConnector.BuildChatHistory(context, "Tell me about Alice");
-        var systemMsg = history[0].Content;
+        var messages = ThinkerService.BuildMessages(history, "How are you?").ToList();
 
-        Assert.Contains("Alice", systemMsg);
-        Assert.Contains("Relevant Knowledge", systemMsg);
+        // 2 history turns + current query = 3
+        Assert.Equal(3, messages.Count);
+        Assert.Equal(ChatRole.User, messages[0].Role);
+        Assert.Equal("Hi", messages[0].Text);
+        Assert.Equal(ChatRole.Assistant, messages[1].Role);
+        Assert.Equal("Hello!", messages[1].Text);
+        Assert.Equal(ChatRole.User, messages[2].Role);
+        Assert.Equal("How are you?", messages[2].Text);
     }
 
     [Fact]
-    public void BuildChatHistory_IncludesConversationHistory()
+    public void BuildMessages_CurrentQueryIsLast()
     {
-        var context = CreateMinimalContext("System") with
+        var history = new List<ConversationTurn>
         {
-            History =
-            [
-                new ConversationTurn { Role = "user", Content = "Hi", Timestamp = DateTimeOffset.UtcNow.AddMinutes(-5) },
-                new ConversationTurn { Role = "assistant", Content = "Hello!", Timestamp = DateTimeOffset.UtcNow.AddMinutes(-4) }
-            ]
+            new() { Role = "user", Content = "Previous", Timestamp = DateTimeOffset.UtcNow }
         };
 
-        var history = LiteLlmConnector.BuildChatHistory(context, "How are you?");
+        var messages = ThinkerService.BuildMessages(history, "What time is it?").ToList();
 
-        // system + 2 history turns + current user query = 4
-        Assert.Equal(4, history.Count);
+        var last = messages[^1];
+        Assert.Equal(ChatRole.User, last.Role);
+        Assert.Equal("What time is it?", last.Text);
     }
 
     [Fact]
-    public void BuildChatHistory_CurrentQueryIsLast()
+    public void BuildMessages_PreservesRoleMapping()
     {
-        var context = CreateMinimalContext("System");
-        var history = LiteLlmConnector.BuildChatHistory(context, "What time is it?");
-
-        var lastMsg = history[^1];
-        Assert.Equal(Microsoft.SemanticKernel.ChatCompletion.AuthorRole.User, lastMsg.Role);
-        Assert.Equal("What time is it?", lastMsg.Content);
-    }
-
-    [Fact]
-    public void BuildChatHistory_IncludesToolNames()
-    {
-        var context = CreateMinimalContext("System") with
+        var history = new List<ConversationTurn>
         {
-            ActiveToolNames = ["web_search", "wiki_query"]
+            new() { Role = "user", Content = "msg1", Timestamp = DateTimeOffset.UtcNow },
+            new() { Role = "assistant", Content = "msg2", Timestamp = DateTimeOffset.UtcNow },
+            new() { Role = "user", Content = "msg3", Timestamp = DateTimeOffset.UtcNow }
         };
 
-        var history = LiteLlmConnector.BuildChatHistory(context, "Search for X");
-        var systemMsg = history[0].Content;
+        var messages = ThinkerService.BuildMessages(history, "msg4").ToList();
 
-        Assert.Contains("web_search", systemMsg);
-        Assert.Contains("Available Tools", systemMsg);
+        Assert.Equal(4, messages.Count);
+        Assert.Equal(ChatRole.User, messages[0].Role);
+        Assert.Equal(ChatRole.Assistant, messages[1].Role);
+        Assert.Equal(ChatRole.User, messages[2].Role);
+        Assert.Equal(ChatRole.User, messages[3].Role);
     }
-
-    private static ConversationContext CreateMinimalContext(string systemPrompt) => new()
-    {
-        SystemPrompt = systemPrompt,
-        History = [],
-        WikiLeanKernels = [],
-        RetrievedLeanKernels = [],
-        ActiveToolNames = []
-    };
 }

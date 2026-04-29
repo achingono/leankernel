@@ -1,8 +1,7 @@
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
-using LeanKernel.Thinker.SemanticKernel;
 
 namespace LeanKernel.Thinker.Agents;
 
@@ -13,16 +12,19 @@ namespace LeanKernel.Thinker.Agents;
 /// </summary>
 public sealed class AgentOrchestrator : IAgentOrchestrator
 {
-    private readonly KernelFactory _kernelFactory;
+    private readonly AgentFactory _agentFactory;
+    private readonly PromptAssembler _promptAssembler;
     private readonly Dictionary<string, WorkerAgent> _workers = [];
     private readonly ILogger<AgentOrchestrator> _logger;
 
     public AgentOrchestrator(
-        KernelFactory kernelFactory,
+        AgentFactory agentFactory,
+        PromptAssembler promptAssembler,
         IEnumerable<WorkerAgent> workers,
         ILogger<AgentOrchestrator> logger)
     {
-        _kernelFactory = kernelFactory;
+        _agentFactory = agentFactory;
+        _promptAssembler = promptAssembler;
         foreach (var worker in workers)
             _workers[worker.Definition.Name] = worker;
         _logger = logger;
@@ -33,7 +35,6 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         ConversationContext context,
         CancellationToken ct)
     {
-        // Analyze complexity: if simple, handle directly; if complex, delegate
         var complexity = AnalyzeComplexity(message.Content);
 
         if (complexity == TaskComplexity.Simple)
@@ -42,7 +43,6 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             return await InvokeDirectAsync(context, message.Content, ct);
         }
 
-        // Complex: decompose into sub-tasks and delegate to workers
         _logger.LogInformation("Complex query detected — orchestrating workers");
         var plan = DecomposeTask(message.Content);
 
@@ -63,7 +63,6 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             }
         }
 
-        // Synthesize results
         return results.Count > 0
             ? string.Join("\n\n", results)
             : await InvokeDirectAsync(context, message.Content, ct);
@@ -88,8 +87,10 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
     {
         try
         {
-            var kernel = _kernelFactory.Build();
-            return await LiteLlmConnector.InvokeAsync(kernel, context, query, ct);
+            var instructions = _promptAssembler.AssembleSystemMessage(context);
+            var agent = _agentFactory.CreateAgent(instructions);
+            var response = await agent.RunAsync(query, cancellationToken: ct);
+            return response.Text ?? string.Empty;
         }
         catch (Exception ex)
         {
@@ -100,27 +101,22 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
 
     /// <summary>
     /// Simple heuristic complexity analysis.
-    /// Future: use a lightweight classifier model.
     /// </summary>
     internal static TaskComplexity AnalyzeComplexity(string query)
     {
         var lower = query.ToLowerInvariant();
 
-        // Multi-step indicators
         if (lower.Contains(" and then ") || lower.Contains(" after that "))
             return TaskComplexity.Complex;
 
-        // Research indicators
         if (lower.Contains("research") || lower.Contains("compare") ||
             lower.Contains("analyze") || lower.Contains("investigate"))
             return TaskComplexity.Complex;
 
-        // Code generation
         if (lower.Contains("write code") || lower.Contains("create a program") ||
             lower.Contains("implement"))
             return TaskComplexity.Complex;
 
-        // Length heuristic: very long queries are likely complex
         if (query.Length > 500)
             return TaskComplexity.Complex;
 
@@ -129,7 +125,6 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
 
     /// <summary>
     /// Decompose a complex task into worker assignments.
-    /// Returns (workerName, subTask) pairs.
     /// </summary>
     internal static List<(string Worker, string Task)> DecomposeTask(string query)
     {
@@ -145,7 +140,6 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         if (lower.Contains("schedule") || lower.Contains("remind") || lower.Contains("calendar"))
             plan.Add(("schedule", query));
 
-        // Default: if no specific worker matched, send to research
         if (plan.Count == 0)
             plan.Add(("research", query));
 

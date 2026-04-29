@@ -1,8 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 using LeanKernel.Core.Models;
-using LeanKernel.Thinker.SemanticKernel;
 
 namespace LeanKernel.Thinker.Agents;
 
@@ -10,20 +7,21 @@ namespace LeanKernel.Thinker.Agents;
 /// Base worker agent. Stateless, single-purpose, lean.
 /// Each worker operates with a constrained context budget and
 /// a specialized system prompt for its domain.
+/// Uses MAF ChatClientAgent via AgentFactory for LLM calls.
 /// </summary>
 public class WorkerAgent
 {
     public AgentDefinition Definition { get; }
-    protected readonly KernelFactory KernelFactory;
+    protected readonly AgentFactory AgentFactory;
     protected readonly ILogger Logger;
 
     public WorkerAgent(
         AgentDefinition definition,
-        KernelFactory kernelFactory,
+        AgentFactory agentFactory,
         ILogger logger)
     {
         Definition = definition;
-        KernelFactory = kernelFactory;
+        AgentFactory = agentFactory;
         Logger = logger;
     }
 
@@ -37,17 +35,9 @@ public class WorkerAgent
 
         try
         {
-            var kernel = KernelFactory.Build();
-            var chatService = kernel.GetRequiredService<IChatCompletionService>();
-
-            var history = new ChatHistory();
-            history.AddSystemMessage(Definition.SystemPrompt);
-            history.AddUserMessage(task);
-
-            var response = await chatService.GetChatMessageContentAsync(
-                history, cancellationToken: ct);
-
-            return response.Content ?? "No response generated.";
+            var agent = AgentFactory.CreateAgent(Definition.SystemPrompt);
+            var response = await agent.RunAsync(task, cancellationToken: ct);
+            return response.Text ?? "No response generated.";
         }
         catch (Exception ex)
         {
@@ -62,7 +52,7 @@ public class WorkerAgent
 /// </summary>
 public sealed class ResearchWorker : WorkerAgent
 {
-    public ResearchWorker(KernelFactory kernelFactory, ILogger<ResearchWorker> logger)
+    public ResearchWorker(AgentFactory agentFactory, ILogger<ResearchWorker> logger)
         : base(
             new AgentDefinition
             {
@@ -72,7 +62,7 @@ public sealed class ResearchWorker : WorkerAgent
                 MaxContextTokens = 4_000,
                 Categories = ["research", "information", "search"]
             },
-            kernelFactory,
+            agentFactory,
             logger)
     { }
 }
@@ -82,7 +72,7 @@ public sealed class ResearchWorker : WorkerAgent
 /// </summary>
 public sealed class CodeWorker : WorkerAgent
 {
-    public CodeWorker(KernelFactory kernelFactory, ILogger<CodeWorker> logger)
+    public CodeWorker(AgentFactory agentFactory, ILogger<CodeWorker> logger)
         : base(
             new AgentDefinition
             {
@@ -92,7 +82,7 @@ public sealed class CodeWorker : WorkerAgent
                 MaxContextTokens = 8_000,
                 Categories = ["code", "programming", "development"]
             },
-            kernelFactory,
+            agentFactory,
             logger)
     { }
 }
@@ -102,7 +92,7 @@ public sealed class CodeWorker : WorkerAgent
 /// </summary>
 public sealed class ScheduleWorker : WorkerAgent
 {
-    public ScheduleWorker(KernelFactory kernelFactory, ILogger<ScheduleWorker> logger)
+    public ScheduleWorker(AgentFactory agentFactory, ILogger<ScheduleWorker> logger)
         : base(
             new AgentDefinition
             {
@@ -112,7 +102,7 @@ public sealed class ScheduleWorker : WorkerAgent
                 MaxContextTokens = 2_000,
                 Categories = ["schedule", "calendar", "reminder"]
             },
-            kernelFactory,
+            agentFactory,
             logger)
     { }
 }

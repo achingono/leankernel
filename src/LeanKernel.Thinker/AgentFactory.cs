@@ -56,13 +56,13 @@ public sealed class AgentFactory
     /// </summary>
     public ChatClientAgent CreateAgent(
         string instructions,
-        IList<AITool>? tools = null)
+        IReadOnlyList<AITool>? tools = null)
     {
         _logger.LogDebug("Creating agent: instructions={Length} chars, tools={ToolCount}",
             instructions.Length, tools?.Count ?? 0);
 
         return new ChatClientAgent(_chatClient,
             instructions: instructions,
-            tools: tools);
+            tools: tools?.ToList());
     }
 }
