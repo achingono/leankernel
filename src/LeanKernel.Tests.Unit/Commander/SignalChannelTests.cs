@@ -1,0 +1,30 @@
+using LeanKernel.Commander;
+using LeanKernel.Commander.Adapters;
+
+namespace LeanKernel.Tests.Unit.Commander;
+
+public class SignalChannelTests
+{
+    [Fact]
+    public void SignalChannel_HasCorrectChannelId()
+    {
+        var config = Microsoft.Extensions.Options.Options.Create(new Core.Configuration.LeanKernelConfig());
+        var channel = new SignalChannel(config, new Microsoft.Extensions.Logging.Abstractions.NullLogger<SignalChannel>());
+        Assert.Equal("signal", channel.ChannelId);
+    }
+
+    [Fact]
+    public async Task SignalChannel_DisabledConfig_DoesNotThrow()
+    {
+        var config = Microsoft.Extensions.Options.Options.Create(new Core.Configuration.LeanKernelConfig
+        {
+            Signal = new Core.Configuration.SignalConfig { Enabled = false }
+        });
+        var channel = new SignalChannel(config, new Microsoft.Extensions.Logging.Abstractions.NullLogger<SignalChannel>());
+
+        // Should not throw when signal is disabled
+        await channel.StartAsync(CancellationToken.None);
+        await channel.StopAsync(CancellationToken.None);
+        await channel.DisposeAsync();
+    }
+}

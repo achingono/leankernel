@@ -11,6 +11,7 @@ using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
 using LeanKernel.Scheduler;
 using LeanKernel.Thinker;
+using LeanKernel.Thinker.SemanticKernel;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -37,21 +38,18 @@ builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>((sp, client)
 });
 
 // Archivist
+builder.Services.AddSingleton<WikiIndexer>();
+builder.Services.AddSingleton<WikiCompiler>();
+builder.Services.AddSingleton<ConversationCompactor>();
 builder.Services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
 
 // Thinker
+builder.Services.AddSingleton<KernelFactory>();
 builder.Services.AddSingleton<IThinkerService, ThinkerService>();
 builder.Services.AddSingleton<PromptAssembler>();
 
 // Commander — channels
-builder.Services.AddSingleton<IChannel>(sp =>
-{
-    var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
-    return new SignalChannel(
-        config.Signal.CliPath,
-        config.Signal.Account,
-        sp.GetRequiredService<ILogger<SignalChannel>>());
-});
+builder.Services.AddSingleton<IChannel, SignalChannel>();
 builder.Services.AddSingleton<ChannelRouter>();
 
 // Plugins

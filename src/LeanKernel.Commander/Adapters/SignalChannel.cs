@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
@@ -12,25 +14,64 @@ public sealed class SignalChannel : IChannel
 {
     public string ChannelId => "signal";
 
-    private readonly string _cliPath;
-    private readonly string _account;
+    private readonly LeanKernelConfig _config;
     private readonly ILogger<SignalChannel> _logger;
+    private SignalCliAdapter? _adapter;
 
     public event Func<LeanKernelMessage, CancellationToken, Task>? OnMessageReceived;
 
-    public SignalChannel(string cliPath, string account, ILogger<SignalChannel> logger)
+    public SignalChannel(IOptions<LeanKernelConfig> config, ILogger<SignalChannel> logger)
     {
-        _cliPath = cliPath;
-        _account = account;
+        _config = config.Value;
         _logger = logger;
     }
 
-    public Task StartAsync(CancellationToken ct)
+    public async Task StartAsync(CancellationToken ct)
     {
-        // TODO: Phase 3 — Start signal-cli JSON-RPC process and listen for messages
-        _logger.LogInformation("Signal channel starting (account: {Account})", _account);
-        _logger.LogWarning("Signal channel is a stub — Phase 3 implementation pending");
-        return Task.CompletedTask;
+        if (!_config.Signal.Enabled)
+        {
+            _logger.LogInformation("Signal channel disabled in configuration");
+            return;
+        }
+
+        _adapter = new SignalCliAdapter(
+            _config.Signal.CliPath,
+            _config.Signal.Account,
+            _logger);
+
+        _adapter.OnMessage += msg =>
+        {
+            var normalized = MessageNormalizer.Normalize(
+                channelId: "signal",
+                senderId: msg.Sender,
+                rawContent: msg.Body);
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (OnMessageReceived is not null)
+                        await OnMessageReceived(normalized, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error handling Signal message from {Sender}", msg.Sender);
+                }
+            }, ct);
+        };
+
+        _adapter.OnError += error =>
+            _logger.LogWarning("Signal adapter error: {Error}", error);
+
+        try
+        {
+            await _adapter.StartAsync(ct);
+            _logger.LogInformation("Signal channel started (account: {Account})", _config.Signal.Account);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start Signal channel — running in degraded mode");
+        }
     }
 
     public Task StopAsync(CancellationToken ct)
@@ -39,17 +80,22 @@ public sealed class SignalChannel : IChannel
         return Task.CompletedTask;
     }
 
-    public Task SendAsync(string recipientId, string content, CancellationToken ct)
+    public async Task SendAsync(string recipientId, string content, CancellationToken ct)
     {
-        // TODO: Phase 3 — Send via signal-cli
-        _logger.LogInformation("Signal send to {Recipient}: {Content}",
-            recipientId, content.Length > 80 ? content[..80] + "..." : content);
-        return Task.CompletedTask;
+        if (_adapter is null)
+        {
+            _logger.LogWarning("Signal adapter not initialized — message not sent");
+            return;
+        }
+
+        await _adapter.SendMessageAsync(recipientId, content, ct);
+        _logger.LogDebug("Signal message sent to {Recipient}", recipientId);
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
+        if (_adapter is not null)
+            await _adapter.DisposeAsync();
         _logger.LogDebug("Signal channel disposed");
-        return ValueTask.CompletedTask;
     }
 }
