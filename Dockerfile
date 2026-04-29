@@ -39,9 +39,10 @@ COPY --from=build /app/publish .
 RUN mkdir -p /home/LeanKernel/data/wiki /home/LeanKernel/data/sessions /home/LeanKernel/data/logs
 
 ENV DOTNET_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:5080
 EXPOSE 5080
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
-    CMD curl -f http://localhost:5080/health || exit 1
+    CMD curl -f http://localhost:5080/api/health || exit 1
 
 ENTRYPOINT ["dotnet", "LeanKernel.Host.dll"]

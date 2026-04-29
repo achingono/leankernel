@@ -2,49 +2,52 @@
 
 <div class="LeanKernel-layout">
     <!-- Sidebar Navigation -->
-    <nav class="LeanKernel-sidebar @(SidebarCollapsed ? "collapsed" : "")">
+    <nav class="LeanKernel-sidebar @(SidebarCollapsed ? "collapsed" : "")" aria-label="Main navigation">
         <div class="sidebar-header">
-            <span class="LeanKernel-logo">◆</span>
+            <span class="LeanKernel-logo" aria-hidden="true">◆</span>
             @if (!SidebarCollapsed)
             {
                 <span class="LeanKernel-title">LeanKernel</span>
             }
-            <button class="sidebar-toggle" @onclick="ToggleSidebar">
+            <button class="sidebar-toggle"
+                    @onclick="ToggleSidebar"
+                    aria-label="@(SidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")"
+                    aria-expanded="@(!SidebarCollapsed)">
                 @(SidebarCollapsed ? "▶" : "◀")
             </button>
         </div>
 
-        <div class="sidebar-nav">
-            <NavLink href="/" class="nav-item" Match="NavLinkMatch.All">
-                <span class="nav-icon">⬡</span>
+        <div class="sidebar-nav" role="list">
+            <NavLink href="/" class="nav-item" Match="NavLinkMatch.All" role="listitem" aria-label="Dashboard">
+                <span class="nav-icon" aria-hidden="true">⬡</span>
                 @if (!SidebarCollapsed) { <span>Dashboard</span> }
             </NavLink>
-            <NavLink href="/chat" class="nav-item">
-                <span class="nav-icon">◈</span>
+            <NavLink href="/chat" class="nav-item" role="listitem" aria-label="Chat">
+                <span class="nav-icon" aria-hidden="true">◈</span>
                 @if (!SidebarCollapsed) { <span>Chat</span> }
             </NavLink>
-            <NavLink href="/wiki" class="nav-item">
-                <span class="nav-icon">◇</span>
+            <NavLink href="/wiki" class="nav-item" role="listitem" aria-label="Wiki">
+                <span class="nav-icon" aria-hidden="true">◇</span>
                 @if (!SidebarCollapsed) { <span>Wiki</span> }
             </NavLink>
-            <NavLink href="/logs" class="nav-item">
-                <span class="nav-icon">▣</span>
+            <NavLink href="/logs" class="nav-item" role="listitem" aria-label="Logs">
+                <span class="nav-icon" aria-hidden="true">▣</span>
                 @if (!SidebarCollapsed) { <span>Logs</span> }
             </NavLink>
-            <NavLink href="/files" class="nav-item">
-                <span class="nav-icon">▤</span>
+            <NavLink href="/files" class="nav-item" role="listitem" aria-label="Files">
+                <span class="nav-icon" aria-hidden="true">▤</span>
                 @if (!SidebarCollapsed) { <span>Files</span> }
             </NavLink>
-            <NavLink href="/settings" class="nav-item">
-                <span class="nav-icon">⚙</span>
+            <NavLink href="/settings" class="nav-item" role="listitem" aria-label="Settings">
+                <span class="nav-icon" aria-hidden="true">⚙</span>
                 @if (!SidebarCollapsed) { <span>Settings</span> }
             </NavLink>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <main class="LeanKernel-main">
-        <div class="noise-overlay"></div>
+    <main class="LeanKernel-main" role="main">
+        <div class="noise-overlay" aria-hidden="true"></div>
         @Body
     </main>
 </div>

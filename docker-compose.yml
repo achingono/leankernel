@@ -10,6 +10,7 @@ services:
     container_name: LeanKernel-engine
     environment:
       - DOTNET_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5080
       - LEANKERNEL__LiteLlm__BaseUrl=http://litellm:4000
       - LEANKERNEL__LiteLlm__ApiKey=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
       - LEANKERNEL__Qdrant__Host=qdrant
@@ -28,7 +29,7 @@ services:
       litellm:
         condition: service_healthy
     ports:
-      - "${LEANKERNEL_HEALTH_PORT:-5080}:5080"
+      - "${LEANKERNEL_PORT:-5080}:5080"            # Web UI + API + OpenAI-compatible
     restart: unless-stopped
     deploy:
       resources:
@@ -37,7 +38,7 @@ services:
         reservations:
           memory: 256M
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5080/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3

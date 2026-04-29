@@ -86,8 +86,11 @@ cp .env.example .env
 # 2. Start all services
 docker compose up -d
 
-# 3. Check health
-curl http://localhost:5080/health
+# 3. Open Web UI
+open http://localhost:5080
+
+# 4. Check health
+curl http://localhost:5080/api/health
 ```
 
 ### Local Development
@@ -134,7 +137,11 @@ LeanKernel/
     ├── LeanKernel.Scheduler/        # Cron-based proactive tasks
     ├── LeanKernel.Plugins/          # Tool/plugin system
     ├── LeanKernel.Generators/       # Roslyn source generators
-    ├── LeanKernel.Host/             # Application entry point
+    ├── LeanKernel.Host/             # Web app: API controllers + Blazor UI
+    │   ├── Controllers/        #   REST API + OpenAI-compatible endpoints
+    │   ├── Services/           #   LogReader, FileBrowser
+    │   ├── Components/         #   Blazor pages + layout
+    │   └── wwwroot/css/        #   Cyber/Technical premium theme
     └── LeanKernel.Tests.Unit/       # Unit tests
 ```
 
@@ -177,6 +184,58 @@ LeanKernel uses a lightweight orchestrator that analyzes query complexity:
   - **ResearchWorker** — web search + summarization (4K token budget)
   - **CodeWorker** — code generation (8K token budget)
   - **ScheduleWorker** — calendar/reminder management (2K token budget)
+
+## Web UI
+
+LeanKernel includes a **Blazor Server** web interface with a premium **Cyber/Technical** aesthetic. Access at `http://localhost:5080`.
+
+| Page | Purpose |
+|------|---------|
+| **Dashboard** (`/`) | Health cards, uptime, wiki stats, system overview |
+| **Chat** (`/chat`) | Interactive chat with expandable tool diagnostics & thinking traces |
+| **Wiki** (`/wiki`) | 5W1H dimension tabs, search, entry detail with confidence bars |
+| **Logs** (`/logs`) | Real-time log viewer with level/search filters |
+| **Files** (`/files`) | Sandboxed data directory browser with file preview |
+| **Settings** (`/settings`) | Configuration viewer per section |
+
+### Design Theme
+- Dark base (`#0a0a0f`), neon primary (`#00ff88`), secondary (`#00d4ff`)
+- Glassmorphism panels with backdrop blur, noise overlay grain
+- Staggered entrance animations, respects `prefers-reduced-motion`
+- Full keyboard navigation + ARIA labels
+
+## API
+
+### Internal API (used by Web UI)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/stats` | GET | System statistics |
+| `/api/config` | GET | Configuration (secrets masked) |
+| `/api/chat/sessions` | GET | List chat sessions |
+| `/api/chat/sessions/{id}` | GET | Session message history |
+| `/api/chat/message` | POST | Send a message |
+| `/api/wiki/dimensions` | GET | Wiki dimension counts |
+| `/api/wiki/entries?dimension=` | GET | List wiki entries |
+| `/api/wiki/search?q=` | GET | Search wiki |
+| `/api/logs?level=&q=` | GET | Search logs |
+| `/api/files/browse?path=` | GET | Browse data directory |
+| `/api/files/read?path=` | GET | Read file contents |
+
+### OpenAI-Compatible API
+
+Connect any OpenAI SDK client to LeanKernel:
+
+```bash
+# Chat completion (routes through LeanKernel's full pipeline)
+curl http://localhost:5080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "LeanKernel", "messages": [{"role": "user", "content": "Hello"}]}'
+
+# List models
+curl http://localhost:5080/v1/models
+```
 
 ## Plugin System
 
