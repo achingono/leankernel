@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
@@ -16,20 +17,20 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 {
     private readonly IWikiStore _wiki;
     private readonly ISessionStore _sessions;
-    private readonly IEmbeddingService _embeddings;
+    private readonly WikiIndexer _indexer;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ContextGatekeeper> _logger;
 
     public ContextGatekeeper(
         IWikiStore wiki,
         ISessionStore sessions,
-        IEmbeddingService embeddings,
+        WikiIndexer indexer,
         IOptions<LeanKernelConfig> config,
         ILogger<ContextGatekeeper> logger)
     {
         _wiki = wiki;
         _sessions = sessions;
-        _embeddings = embeddings;
+        _indexer = indexer;
         _config = config.Value;
         _logger = logger;
     }
@@ -147,9 +148,16 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         ContextBudget budget,
         CancellationToken ct)
     {
-        // TODO: Phase 1 implementation — query Qdrant for semantically similar entries
-        await Task.CompletedTask;
-        return [];
+        try
+        {
+            var results = await _indexer.SearchAsync(query.Content, limit: 10, ct);
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Vector search failed — falling back to wiki-only context");
+            return [];
+        }
     }
 
     private List<RelevanceScore> RankLeanKernels(
