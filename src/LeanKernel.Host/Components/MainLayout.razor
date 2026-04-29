@@ -1,0 +1,56 @@
+@inherits LayoutComponentBase
+
+<div class="LeanKernel-layout">
+    <!-- Sidebar Navigation -->
+    <nav class="LeanKernel-sidebar @(SidebarCollapsed ? "collapsed" : "")">
+        <div class="sidebar-header">
+            <span class="LeanKernel-logo">◆</span>
+            @if (!SidebarCollapsed)
+            {
+                <span class="LeanKernel-title">LeanKernel</span>
+            }
+            <button class="sidebar-toggle" @onclick="ToggleSidebar">
+                @(SidebarCollapsed ? "▶" : "◀")
+            </button>
+        </div>
+
+        <div class="sidebar-nav">
+            <NavLink href="/" class="nav-item" Match="NavLinkMatch.All">
+                <span class="nav-icon">⬡</span>
+                @if (!SidebarCollapsed) { <span>Dashboard</span> }
+            </NavLink>
+            <NavLink href="/chat" class="nav-item">
+                <span class="nav-icon">◈</span>
+                @if (!SidebarCollapsed) { <span>Chat</span> }
+            </NavLink>
+            <NavLink href="/wiki" class="nav-item">
+                <span class="nav-icon">◇</span>
+                @if (!SidebarCollapsed) { <span>Wiki</span> }
+            </NavLink>
+            <NavLink href="/logs" class="nav-item">
+                <span class="nav-icon">▣</span>
+                @if (!SidebarCollapsed) { <span>Logs</span> }
+            </NavLink>
+            <NavLink href="/files" class="nav-item">
+                <span class="nav-icon">▤</span>
+                @if (!SidebarCollapsed) { <span>Files</span> }
+            </NavLink>
+            <NavLink href="/settings" class="nav-item">
+                <span class="nav-icon">⚙</span>
+                @if (!SidebarCollapsed) { <span>Settings</span> }
+            </NavLink>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="LeanKernel-main">
+        <div class="noise-overlay"></div>
+        @Body
+    </main>
+</div>
+
+@code {
+    private bool SidebarCollapsed { get; set; }
+
+    private void ToggleSidebar() => SidebarCollapsed = !SidebarCollapsed;
+}

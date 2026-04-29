@@ -1,0 +1,232 @@
+@page "/settings"
+@inject HttpClient Http
+@rendermode InteractiveServer
+
+<div class="page-header">
+    <h1><span class="text-neon">⚙</span> Settings</h1>
+    <p class="subtitle">Configuration & administration</p>
+</div>
+
+@if (Config is not null)
+{
+    <div class="content-grid stagger-in">
+        <!-- LiteLLM -->
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">LiteLLM</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Base URL</span>
+                    <input class="setting-input" value="@Config.LiteLlm?.BaseUrl" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">API Key</span>
+                    <input class="setting-input" value="@Config.LiteLlm?.ApiKey" readonly type="password" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Default Model</span>
+                    <input class="setting-input" value="@Config.LiteLlm?.DefaultModel" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Embedding Model</span>
+                    <input class="setting-input" value="@Config.LiteLlm?.EmbeddingModel" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Context Window</span>
+                    <input class="setting-input" value="@Config.LiteLlm?.ContextWindowTokens" readonly />
+                </div>
+            </div>
+        </div>
+
+        <!-- Qdrant -->
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">Qdrant</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Host</span>
+                    <input class="setting-input" value="@Config.Qdrant?.Host" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Port</span>
+                    <input class="setting-input" value="@Config.Qdrant?.Port" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Collection</span>
+                    <input class="setting-input" value="@Config.Qdrant?.CollectionName" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Embedding Dim</span>
+                    <input class="setting-input" value="@Config.Qdrant?.EmbeddingDimension" readonly />
+                </div>
+            </div>
+        </div>
+
+        <!-- Signal -->
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">Signal</h3>
+                <div class="setting-row">
+                    <span class="setting-label">CLI Path</span>
+                    <input class="setting-input" value="@Config.Signal?.CliPath" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Account</span>
+                    <input class="setting-input" value="@Config.Signal?.Account" readonly type="password" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Enabled</span>
+                    <span class="status-badge @(Config.Signal?.Enabled == true ? "status-healthy" : "status-warning")">
+                        @(Config.Signal?.Enabled == true ? "● On" : "○ Off")
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wiki -->
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">Wiki</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Base Path</span>
+                    <input class="setting-input" value="@Config.Wiki?.BasePath" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Max Facts/Entry</span>
+                    <input class="setting-input" value="@Config.Wiki?.MaxFactsPerEntry" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Stale Fact Days</span>
+                    <input class="setting-input" value="@Config.Wiki?.StaleFactDays" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Min Confidence</span>
+                    <input class="setting-input" value="@Config.Wiki?.MinConfidenceThreshold" readonly />
+                </div>
+            </div>
+        </div>
+
+        <!-- Context Gatekeeper -->
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">Context Gatekeeper</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Semantic Weight</span>
+                    <input class="setting-input" value="@Config.Context?.SemanticSimilarityWeight" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Recency Weight</span>
+                    <input class="setting-input" value="@Config.Context?.RecencyDecayWeight" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Dimension Weight</span>
+                    <input class="setting-input" value="@Config.Context?.DimensionMatchWeight" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Frequency Weight</span>
+                    <input class="setting-input" value="@Config.Context?.InteractionFrequencyWeight" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Min Relevance</span>
+                    <input class="setting-input" value="@Config.Context?.MinRelevanceThreshold" readonly />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Max Turns</span>
+                    <input class="setting-input" value="@Config.Context?.MaxConversationTurns" readonly />
+                </div>
+            </div>
+        </div>
+
+        <!-- Scheduler -->
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">Scheduler</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Enabled</span>
+                    <span class="status-badge @(Config.Scheduler?.Enabled == true ? "status-healthy" : "status-warning")">
+                        @(Config.Scheduler?.Enabled == true ? "● On" : "○ Off")
+                    </span>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Wiki Maintenance</span>
+                    <input class="setting-input text-mono" value="@Config.Scheduler?.WikiMaintenanceCron" readonly />
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="glass-card" style="text-align: center; padding: 3rem;">
+        <p class="text-muted">Loading configuration...</p>
+    </div>
+}
+
+@code {
+    private ConfigResponse? Config;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Config = await Http.GetFromJsonAsync<ConfigResponse>("api/config");
+        }
+        catch { }
+    }
+
+    private record ConfigResponse
+    {
+        public LiteLlmDto? LiteLlm { get; init; }
+        public QdrantDto? Qdrant { get; init; }
+        public SignalDto? Signal { get; init; }
+        public WikiDto? Wiki { get; init; }
+        public ContextDto? Context { get; init; }
+        public SchedulerDto? Scheduler { get; init; }
+    }
+
+    private record LiteLlmDto
+    {
+        public string? BaseUrl { get; init; }
+        public string? ApiKey { get; init; }
+        public string? DefaultModel { get; init; }
+        public string? EmbeddingModel { get; init; }
+        public int ContextWindowTokens { get; init; }
+    }
+
+    private record QdrantDto
+    {
+        public string? Host { get; init; }
+        public int Port { get; init; }
+        public string? CollectionName { get; init; }
+        public int EmbeddingDimension { get; init; }
+    }
+
+    private record SignalDto
+    {
+        public string? CliPath { get; init; }
+        public string? Account { get; init; }
+        public bool Enabled { get; init; }
+    }
+
+    private record WikiDto
+    {
+        public string? BasePath { get; init; }
+        public int MaxFactsPerEntry { get; init; }
+        public int StaleFactDays { get; init; }
+        public double MinConfidenceThreshold { get; init; }
+    }
+
+    private record ContextDto
+    {
+        public double SemanticSimilarityWeight { get; init; }
+        public double RecencyDecayWeight { get; init; }
+        public double DimensionMatchWeight { get; init; }
+        public double InteractionFrequencyWeight { get; init; }
+        public double MinRelevanceThreshold { get; init; }
+        public int MaxConversationTurns { get; init; }
+    }
+
+    private record SchedulerDto
+    {
+        public bool Enabled { get; init; }
+        public string? WikiMaintenanceCron { get; init; }
+    }
+}

@@ -69,6 +69,21 @@ public sealed class SessionStore : ISessionStore
         await JsonSerializer.SerializeAsync(stream, compacted, JsonOptions, ct);
     }
 
+    public Task<IReadOnlyList<string>> ListSessionsAsync(CancellationToken ct)
+    {
+        if (!Directory.Exists(_basePath))
+            return Task.FromResult<IReadOnlyList<string>>([]);
+
+        var sessions = Directory.GetFiles(_basePath, "*.json")
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(name => name is not null)
+            .Cast<string>()
+            .OrderDescending()
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<string>>(sessions);
+    }
+
     private string GetSessionPath(string sessionId) =>
         Path.Combine(_basePath, $"{sessionId}.json");
 }

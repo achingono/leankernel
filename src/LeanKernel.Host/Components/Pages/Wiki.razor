@@ -1,0 +1,210 @@
+@page "/wiki"
+@inject HttpClient Http
+@rendermode InteractiveServer
+
+<div class="page-header">
+    <h1><span class="text-neon">◇</span> Wiki</h1>
+    <p class="subtitle">5W1H knowledge base browser</p>
+</div>
+
+<!-- Dimension tabs -->
+<div class="dimension-tabs">
+    @foreach (var dim in AllDimensions)
+    {
+        <button class="dimension-tab @(dim == ActiveDimension ? "active" : "")"
+                @onclick="() => SelectDimension(dim)">
+            @dim @(DimensionCounts.GetValueOrDefault(dim, 0))
+        </button>
+    }
+</div>
+
+<!-- Search -->
+<div class="search-box">
+    <span class="search-icon">⌕</span>
+    <input class="search-input"
+           @bind="SearchQuery"
+           @bind:event="oninput"
+           @bind:after="OnSearch"
+           placeholder="Search wiki entries..." />
+</div>
+
+<!-- Entry list -->
+<div class="content-grid stagger-in">
+    @if (SelectedEntry is not null)
+    {
+        <!-- Entry detail -->
+        <div class="glass-card" style="grid-column: 1 / -1;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                <div>
+                    <h2>@SelectedEntry.Subject</h2>
+                    <span class="dimension-tab active" style="font-size: 0.7rem;">@SelectedEntry.Dimension</span>
+                </div>
+                <button class="btn-ghost" @onclick="() => SelectedEntry = null">✕ Close</button>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <span class="text-muted" style="font-size: 0.8rem;">
+                    ID: <span class="text-mono text-cyan">@SelectedEntry.Id</span>
+                    · Accessed: @SelectedEntry.AccessCount times
+                    · Last: @SelectedEntry.LastAccessed.ToString("yyyy-MM-dd HH:mm")
+                </span>
+            </div>
+
+            <h3 class="text-cyan" style="margin-bottom: 0.75rem;">Facts (@SelectedEntry.Facts.Count)</h3>
+            <table class="LeanKernel-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50%;">Claim</th>
+                        <th>Confidence</th>
+                        <th>Source</th>
+                        <th>Last Confirmed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var fact in SelectedEntry.Facts)
+                    {
+                        <tr>
+                            <td>@fact.Claim</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div class="confidence-bar" style="width: 80px;">
+                                        <div class="confidence-fill @GetConfidenceClass(fact.Confidence)"
+                                             style="width: @(fact.Confidence * 100)%"></div>
+                                    </div>
+                                    <span class="text-mono" style="font-size: 0.75rem;">@fact.Confidence.ToString("P0")</span>
+                                </div>
+                            </td>
+                            <td class="text-muted" style="font-size: 0.8rem;">@(fact.Source ?? "—")</td>
+                            <td class="text-muted" style="font-size: 0.8rem;">@fact.LastConfirmed.ToString("MM/dd HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (SelectedEntry.Relations.Count > 0)
+            {
+                <h3 class="text-cyan" style="margin: 1rem 0 0.5rem;">Relations</h3>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    @foreach (var rel in SelectedEntry.Relations)
+                    {
+                        <span class="status-badge status-healthy" style="cursor: pointer;">@rel</span>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        @foreach (var entry in Entries)
+        {
+            <div class="glass-card" style="cursor: pointer;" @onclick="() => SelectEntry(entry)">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <h3>@entry.Subject</h3>
+                    <span class="dimension-tab active" style="font-size: 0.65rem; padding: 0.15rem 0.5rem;">@entry.Dimension</span>
+                </div>
+                <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.5rem;">
+                    @entry.Facts.Count facts · @entry.AccessCount accesses
+                </p>
+                @if (entry.Facts.Count > 0)
+                {
+                    <p style="font-size: 0.85rem; margin-top: 0.5rem; color: var(--text-secondary);">
+                        @entry.Facts[0].Claim
+                    </p>
+                }
+            </div>
+        }
+
+        @if (Entries.Count == 0)
+        {
+            <div class="glass-card" style="text-align: center; grid-column: 1 / -1; padding: 3rem;">
+                <p class="text-muted">No entries found</p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private static readonly string[] AllDimensions = ["all", "who", "what", "where", "when", "why", "how"];
+    private string ActiveDimension = "all";
+    private string SearchQuery = "";
+    private List<WikiEntryDto> Entries = [];
+    private WikiEntryDto? SelectedEntry;
+    private Dictionary<string, int> DimensionCounts = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDimensionCounts();
+        await LoadEntries();
+    }
+
+    private async Task LoadDimensionCounts()
+    {
+        try
+        {
+            var dims = await Http.GetFromJsonAsync<List<DimSummary>>("api/wiki/dimensions");
+            if (dims is not null)
+            {
+                DimensionCounts["all"] = dims.Sum(d => d.Count);
+                foreach (var d in dims)
+                    DimensionCounts[d.Dimension ?? ""] = d.Count;
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadEntries()
+    {
+        try
+        {
+            var url = "api/wiki/entries";
+            var query = new List<string>();
+
+            if (ActiveDimension != "all")
+                query.Add($"dimension={ActiveDimension}");
+            if (!string.IsNullOrWhiteSpace(SearchQuery))
+                query.Add($"q={Uri.EscapeDataString(SearchQuery)}");
+
+            if (query.Count > 0)
+                url += "?" + string.Join("&", query);
+
+            Entries = await Http.GetFromJsonAsync<List<WikiEntryDto>>(url) ?? [];
+        }
+        catch { Entries = []; }
+    }
+
+    private async Task SelectDimension(string dim)
+    {
+        ActiveDimension = dim;
+        SelectedEntry = null;
+        await LoadEntries();
+    }
+
+    private void SelectEntry(WikiEntryDto entry) => SelectedEntry = entry;
+
+    private async Task OnSearch() => await LoadEntries();
+
+    private static string GetConfidenceClass(double confidence) =>
+        confidence >= 0.7 ? "confidence-high" :
+        confidence >= 0.4 ? "confidence-medium" : "confidence-low";
+
+    private record DimSummary { public string? Dimension { get; init; } public int Count { get; init; } }
+
+    private record WikiEntryDto
+    {
+        public string Id { get; init; } = "";
+        public string Dimension { get; init; } = "";
+        public string Subject { get; init; } = "";
+        public List<WikiFactDto> Facts { get; init; } = [];
+        public List<string> Relations { get; init; } = [];
+        public DateTimeOffset LastAccessed { get; init; }
+        public int AccessCount { get; init; }
+    }
+
+    private record WikiFactDto
+    {
+        public string Claim { get; init; } = "";
+        public double Confidence { get; init; }
+        public string? Source { get; init; }
+        public DateTimeOffset LastConfirmed { get; init; }
+    }
+}

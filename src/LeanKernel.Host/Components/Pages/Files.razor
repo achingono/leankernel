@@ -1,0 +1,176 @@
+@page "/files"
+@inject HttpClient Http
+@rendermode InteractiveServer
+
+<div class="page-header">
+    <h1><span class="text-neon">▤</span> Files</h1>
+    <p class="subtitle">Data directory browser</p>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; height: calc(100vh - 12rem);">
+    <!-- File tree -->
+    <div class="glass-card" style="overflow-y: auto;">
+        <!-- Breadcrumb -->
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; align-items: center;">
+            <button class="btn-ghost" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"
+                    @onclick="NavigateUp" disabled="@(CurrentPath == "")">
+                ↑ Up
+            </button>
+            <span class="text-mono text-muted" style="font-size: 0.8rem;">
+                /@CurrentPath
+            </span>
+        </div>
+
+        <ul class="file-tree">
+            @if (BrowseResult?.Entries is not null)
+            {
+                @foreach (var item in BrowseResult.Entries)
+                {
+                    <li class="file-item" @onclick="() => OnItemClick(item)">
+                        <span class="file-icon">@(item.IsDirectory ? "📁" : GetFileIcon(item.Name))</span>
+                        <span>@item.Name</span>
+                        @if (!item.IsDirectory)
+                        {
+                            <span class="file-size">@FormatSize(item.Size)</span>
+                        }
+                    </li>
+                }
+
+                @if (BrowseResult.Entries.Count == 0)
+                {
+                    <li style="padding: 1rem; color: var(--text-muted); text-align: center;">Empty directory</li>
+                }
+            }
+        </ul>
+    </div>
+
+    <!-- File preview -->
+    <div class="glass-card" style="overflow: auto;">
+        @if (FileContent is not null)
+        {
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h3>@FileContent.Path</h3>
+                    <span class="text-muted" style="font-size: 0.8rem;">@FormatSize(FileContent.Size)</span>
+                </div>
+                <button class="btn-ghost" @onclick="() => FileContent = null">✕</button>
+            </div>
+            <div class="log-viewer" style="max-height: none;">
+                <pre style="margin: 0; white-space: pre-wrap;">@FileContent.Content</pre>
+            </div>
+        }
+        else if (FileError is not null)
+        {
+            <div style="text-align: center; padding: 2rem; color: var(--neon-danger);">@FileError</div>
+        }
+        else
+        {
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">
+                Select a file to preview
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string CurrentPath = "";
+    private FileBrowseResultDto? BrowseResult;
+    private FileReadResultDto? FileContent;
+    private string? FileError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Browse("");
+    }
+
+    private async Task Browse(string path)
+    {
+        try
+        {
+            CurrentPath = path;
+            FileContent = null;
+            FileError = null;
+            var url = string.IsNullOrEmpty(path) ? "api/files/browse" : $"api/files/browse?path={Uri.EscapeDataString(path)}";
+            BrowseResult = await Http.GetFromJsonAsync<FileBrowseResultDto>(url);
+        }
+        catch (Exception ex)
+        {
+            FileError = ex.Message;
+        }
+    }
+
+    private async Task OnItemClick(FileItemDto item)
+    {
+        if (item.IsDirectory)
+        {
+            await Browse(item.Path);
+        }
+        else
+        {
+            await ReadFile(item.Path);
+        }
+    }
+
+    private async Task ReadFile(string path)
+    {
+        try
+        {
+            FileError = null;
+            FileContent = await Http.GetFromJsonAsync<FileReadResultDto>($"api/files/read?path={Uri.EscapeDataString(path)}");
+        }
+        catch (Exception ex)
+        {
+            FileError = ex.Message;
+            FileContent = null;
+        }
+    }
+
+    private async Task NavigateUp()
+    {
+        if (string.IsNullOrEmpty(CurrentPath)) return;
+        var parent = Path.GetDirectoryName(CurrentPath)?.Replace('\\', '/') ?? "";
+        await Browse(parent);
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes switch
+        {
+            < 1024 => $"{bytes} B",
+            < 1_048_576 => $"{bytes / 1024.0:F1} KB",
+            _ => $"{bytes / 1_048_576.0:F1} MB"
+        };
+
+    private static string GetFileIcon(string name) =>
+        Path.GetExtension(name).ToLower() switch
+        {
+            ".json" => "📄",
+            ".yaml" or ".yml" => "⚙️",
+            ".log" => "📋",
+            ".md" => "📝",
+            ".cs" => "💎",
+            ".sh" => "🔧",
+            _ => "📄"
+        };
+
+    private record FileBrowseResultDto
+    {
+        public string CurrentPath { get; init; } = "";
+        public List<FileItemDto> Entries { get; init; } = [];
+    }
+
+    private record FileItemDto
+    {
+        public string Name { get; init; } = "";
+        public string Path { get; init; } = "";
+        public bool IsDirectory { get; init; }
+        public long Size { get; init; }
+    }
+
+    private record FileReadResultDto
+    {
+        public string? Path { get; init; }
+        public string? Content { get; init; }
+        public long Size { get; init; }
+        public string? Extension { get; init; }
+    }
+}

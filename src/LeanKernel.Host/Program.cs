@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Options;
 using Serilog;
 using LeanKernel.Archivist;
@@ -9,6 +10,7 @@ using LeanKernel.Commander.Adapters;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Host;
+using LeanKernel.Host.Services;
 using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
 using LeanKernel.Scheduler;
@@ -23,7 +25,7 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    var builder = Host.CreateApplicationBuilder(args);
+    var builder = WebApplication.CreateBuilder(args);
 
     // Serilog — structured logging to console + rolling file
     builder.Services.AddSerilog((services, lc) => lc
@@ -34,10 +36,9 @@ try
             outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
         .WriteTo.File(
             path: Path.Combine(
-                builder.Configuration["LeanKernel:Wiki:BasePath"] is string p
-                    ? Path.Combine(Path.GetDirectoryName(p) ?? "/app/data", "..", "logs")
-                    : "/app/data/logs",
-                "LeanKernel-.log"),
+                Path.GetDirectoryName(
+                    builder.Configuration["LeanKernel:Wiki:BasePath"] ?? "/app/data/wiki") ?? "/app/data",
+                "logs", "LeanKernel-.log"),
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 14,
             fileSizeLimitBytes: 10_000_000));
@@ -92,15 +93,51 @@ try
     // Scheduler
     builder.Services.AddSingleton<IScheduler, CronScheduler>();
 
-    // Hosted service — main entry point
+    // Web API services
+    builder.Services.AddSingleton<LogReaderService>();
+    builder.Services.AddSingleton<FileBrowserService>();
+
+    // ASP.NET Core
+    builder.Services.AddControllers();
+    builder.Services.AddRazorComponents()
+        .AddInteractiveServerComponents();
+
+    // HttpClient for Blazor components to call our own API
+    builder.Services.AddScoped(sp =>
+    {
+        var nav = sp.GetRequiredService<NavigationManager>();
+        return new HttpClient { BaseAddress = new Uri(nav.BaseUri) };
+    });
+
+    // Background service — channels + scheduler
     builder.Services.AddHostedService<LeanKernelHostedService>();
 
     // Health checks
     builder.Services.AddHealthChecks()
         .AddCheck<LeanKernelHealthCheck>("LeanKernel");
 
-    var host = builder.Build();
-    host.Run();
+    // CORS for local development
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+    });
+
+    var app = builder.Build();
+
+    app.UseCors();
+    app.UseStaticFiles();
+    app.UseAntiforgery();
+
+    // API routes
+    app.MapControllers();
+    app.MapHealthChecks("/api/health");
+
+    // Blazor
+    app.MapRazorComponents<LeanKernel.Host.Components.App>()
+        .AddInteractiveServerRenderMode();
+
+    app.Run();
 }
 catch (Exception ex)
 {

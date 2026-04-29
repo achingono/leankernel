@@ -1,0 +1,199 @@
+@page "/chat"
+@inject HttpClient Http
+@rendermode InteractiveServer
+
+<div class="page-header">
+    <h1><span class="text-neon">◈</span> Chat</h1>
+    <p class="subtitle">Conversation interface with tool diagnostics</p>
+</div>
+
+<div class="chat-container">
+    <!-- Session selector -->
+    <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center;">
+        <select class="setting-input" style="max-width: 300px;" @onchange="OnSessionChanged">
+            <option value="">New Conversation</option>
+            @foreach (var session in Sessions)
+            {
+                <option value="@session" selected="@(session == CurrentSession)">@session</option>
+            }
+        </select>
+        <button class="btn-ghost" @onclick="LoadSessions">↻ Refresh</button>
+    </div>
+
+    <!-- Messages -->
+    <div class="chat-messages glass-card" style="flex: 1; overflow-y: auto;" @ref="messagesContainer">
+        @foreach (var msg in Messages)
+        {
+            <div>
+                <div class="chat-bubble @msg.Role">
+                    @msg.Content
+                </div>
+                @if (msg.Role == "assistant")
+                {
+                    <button class="diagnostic-toggle" @onclick="() => msg.ShowDiagnostics = !msg.ShowDiagnostics">
+                        @(msg.ShowDiagnostics ? "▼ Hide diagnostics" : "▶ Show diagnostics")
+                    </button>
+                    @if (msg.ShowDiagnostics)
+                    {
+                        <div class="diagnostic-panel">
+                            <div class="diagnostic-row">
+                                <span class="diagnostic-label">Timestamp</span>
+                                <span class="diagnostic-value">@msg.Timestamp.ToString("HH:mm:ss.fff")</span>
+                            </div>
+                            <div class="diagnostic-row">
+                                <span class="diagnostic-label">Session</span>
+                                <span class="diagnostic-value">@(CurrentSession ?? "web")</span>
+                            </div>
+                            <div class="diagnostic-row">
+                                <span class="diagnostic-label">Compacted</span>
+                                <span class="diagnostic-value">@msg.IsCompacted</span>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        }
+
+        @if (IsLoading)
+        {
+            <div class="chat-bubble assistant" style="opacity: 0.6;">
+                <span class="text-neon">●</span> Thinking...
+            </div>
+        }
+    </div>
+
+    <!-- Input -->
+    <div class="chat-input-area">
+        <input class="chat-input"
+               @bind="InputText"
+               @bind:event="oninput"
+               @onkeydown="OnKeyDown"
+               placeholder="Type a message..."
+               disabled="@IsLoading" />
+        <button class="btn-primary" @onclick="SendMessage" disabled="@(IsLoading || string.IsNullOrWhiteSpace(InputText))">
+            Send
+        </button>
+    </div>
+</div>
+
+@code {
+    private List<ChatMessage> Messages = [];
+    private List<string> Sessions = [];
+    private string? CurrentSession;
+    private string InputText = "";
+    private bool IsLoading;
+    private ElementReference messagesContainer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSessions();
+    }
+
+    private async Task LoadSessions()
+    {
+        try
+        {
+            Sessions = await Http.GetFromJsonAsync<List<string>>("api/chat/sessions") ?? [];
+        }
+        catch { }
+    }
+
+    private async Task OnSessionChanged(ChangeEventArgs e)
+    {
+        CurrentSession = e.Value?.ToString();
+        Messages.Clear();
+
+        if (!string.IsNullOrEmpty(CurrentSession))
+        {
+            try
+            {
+                var result = await Http.GetFromJsonAsync<SessionResponse>($"api/chat/sessions/{CurrentSession}");
+                if (result?.Turns is not null)
+                {
+                    Messages = result.Turns.Select(t => new ChatMessage
+                    {
+                        Role = t.Role ?? "user",
+                        Content = t.Content ?? "",
+                        Timestamp = t.Timestamp,
+                        IsCompacted = t.IsCompacted
+                    }).ToList();
+                }
+            }
+            catch { }
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(InputText) || IsLoading) return;
+
+        var userMsg = InputText.Trim();
+        InputText = "";
+
+        Messages.Add(new ChatMessage
+        {
+            Role = "user",
+            Content = userMsg,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/chat/message", new
+            {
+                content = userMsg,
+                senderId = "web-user",
+                sessionId = CurrentSession
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ChatResponse>();
+                if (result is not null)
+                {
+                    Messages.Add(new ChatMessage
+                    {
+                        Role = "assistant",
+                        Content = result.Response ?? "",
+                        Timestamp = result.Timestamp
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Messages.Add(new ChatMessage
+            {
+                Role = "assistant",
+                Content = $"Error: {ex.Message}",
+                Timestamp = DateTimeOffset.UtcNow
+            });
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private class ChatMessage
+    {
+        public string Role { get; set; } = "";
+        public string Content { get; set; } = "";
+        public DateTimeOffset Timestamp { get; set; }
+        public bool IsCompacted { get; set; }
+        public bool ShowDiagnostics { get; set; }
+    }
+
+    private record SessionResponse { public List<TurnData>? Turns { get; init; } }
+    private record TurnData { public string? Role { get; init; } public string? Content { get; init; } public DateTimeOffset Timestamp { get; init; } public bool IsCompacted { get; init; } }
+    private record ChatResponse { public string? Response { get; init; } public DateTimeOffset Timestamp { get; init; } }
+}
