@@ -11,6 +11,7 @@ using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
 using LeanKernel.Scheduler;
 using LeanKernel.Thinker;
+using LeanKernel.Thinker.Agents;
 using LeanKernel.Thinker.SemanticKernel;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -47,6 +48,12 @@ builder.Services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
 builder.Services.AddSingleton<KernelFactory>();
 builder.Services.AddSingleton<IThinkerService, ThinkerService>();
 builder.Services.AddSingleton<PromptAssembler>();
+
+// Multi-Agent Orchestration
+builder.Services.AddSingleton<WorkerAgent, ResearchWorker>();
+builder.Services.AddSingleton<WorkerAgent, CodeWorker>();
+builder.Services.AddSingleton<WorkerAgent, ScheduleWorker>();
+builder.Services.AddSingleton<IAgentOrchestrator, AgentOrchestrator>();
 
 // Commander — channels
 builder.Services.AddSingleton<IChannel, SignalChannel>();
