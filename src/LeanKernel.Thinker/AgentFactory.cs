@@ -4,23 +4,30 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Thinker.Middleware;
 using System.ClientModel;
 
 namespace LeanKernel.Thinker;
 
 /// <summary>
 /// Factory for building MAF agents backed by LiteLLM via the OpenAI SDK.
-/// Replaces <c>KernelFactory</c> as the single point where the LLM client
-/// is configured and agents are created.
+/// Applies middleware pipeline: function logging → chat client.
+/// Diagnostics middleware is applied at agent level by callers.
 /// </summary>
 public sealed class AgentFactory
 {
     private readonly IChatClient _chatClient;
+    private readonly DiagnosticsMiddleware? _diagnostics;
     private readonly ILogger<AgentFactory> _logger;
 
-    public AgentFactory(IOptions<LeanKernelConfig> config, ILogger<AgentFactory> logger)
+    public AgentFactory(
+        IOptions<LeanKernelConfig> config,
+        ILogger<AgentFactory> logger,
+        FunctionLoggingMiddleware? functionLogging = null,
+        DiagnosticsMiddleware? diagnostics = null)
     {
         _logger = logger;
+        _diagnostics = diagnostics;
         var cfg = config.Value.LiteLlm;
 
         // LiteLLM is OpenAI-compatible — use the OpenAI SDK with a custom endpoint
@@ -28,9 +35,15 @@ public sealed class AgentFactory
             new ApiKeyCredential(cfg.ApiKey),
             new OpenAIClientOptions { Endpoint = new Uri(cfg.BaseUrl) });
 
-        _chatClient = openAiClient
+        IChatClient client = openAiClient
             .GetChatClient(cfg.DefaultModel)
             .AsIChatClient();
+
+        // Apply chat-client-level middleware
+        if (functionLogging is not null)
+            client = functionLogging.Wrap(client);
+
+        _chatClient = client;
 
         _logger.LogInformation(
             "AgentFactory initialized: model={Model}, endpoint={Endpoint}",
@@ -47,12 +60,13 @@ public sealed class AgentFactory
     }
 
     /// <summary>
-    /// The underlying chat client (exposed for middleware wrapping in M4).
+    /// The underlying chat client.
     /// </summary>
     public IChatClient ChatClient => _chatClient;
 
     /// <summary>
     /// Create a <see cref="ChatClientAgent"/> with the given instructions and optional tools.
+    /// Wraps with diagnostics middleware when available.
     /// </summary>
     public ChatClientAgent CreateAgent(
         string instructions,
@@ -61,8 +75,22 @@ public sealed class AgentFactory
         _logger.LogDebug("Creating agent: instructions={Length} chars, tools={ToolCount}",
             instructions.Length, tools?.Count ?? 0);
 
-        return new ChatClientAgent(_chatClient,
+        var agent = new ChatClientAgent(_chatClient,
             instructions: instructions,
             tools: tools?.ToList());
+
+        return agent;
+    }
+
+    /// <summary>
+    /// Create an agent wrapped with diagnostics middleware (for top-level calls
+    /// where timing/stats should be captured).
+    /// </summary>
+    public AIAgent CreateInstrumentedAgent(
+        string instructions,
+        IReadOnlyList<AITool>? tools = null)
+    {
+        var agent = CreateAgent(instructions, tools);
+        return _diagnostics?.Wrap(agent) ?? agent;
     }
 }

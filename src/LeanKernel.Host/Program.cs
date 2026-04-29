@@ -71,6 +71,9 @@ try
     builder.Services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
 
     // Thinker
+    builder.Services.AddSingleton<LeanKernel.Thinker.Middleware.FunctionLoggingMiddleware>();
+    builder.Services.AddSingleton<LeanKernel.Thinker.Middleware.DiagnosticsMiddleware>();
+    builder.Services.AddSingleton<LeanKernel.Thinker.Middleware.ContextGatingMiddleware>();
     builder.Services.AddSingleton<AgentFactory>();
     builder.Services.AddSingleton<ToolFunctionAdapter>();
     builder.Services.AddSingleton<PromptAssembler>();
