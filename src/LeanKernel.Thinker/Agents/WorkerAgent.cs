@@ -8,11 +8,12 @@ namespace LeanKernel.Thinker.Agents;
 /// Each worker operates with a constrained context budget and
 /// a specialized system prompt for its domain.
 /// Uses MAF ChatClientAgent via AgentFactory for LLM calls.
+/// Workers can be exposed as AIFunction tools via Agent-as-Tool pattern.
 /// </summary>
 public class WorkerAgent
 {
     public AgentDefinition Definition { get; }
-    protected readonly AgentFactory AgentFactory;
+    public AgentFactory AgentFactory { get; }
     protected readonly ILogger Logger;
 
     public WorkerAgent(

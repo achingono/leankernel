@@ -1,3 +1,4 @@
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Interfaces;
@@ -6,9 +7,10 @@ using LeanKernel.Core.Models;
 namespace LeanKernel.Thinker.Agents;
 
 /// <summary>
-/// Multi-agent orchestrator. Analyzes the complexity of a query and either
-/// handles it directly or delegates to specialized worker agents, each with
-/// constrained context budgets.
+/// Multi-agent orchestrator using MAF patterns:
+/// - Simple queries: direct agent call
+/// - Complex queries: Agent-as-Tool pattern (workers exposed as AIFunction tools
+///   on a coordinator agent that the LLM can invoke as needed)
 /// </summary>
 public sealed class AgentOrchestrator : IAgentOrchestrator
 {
@@ -43,29 +45,9 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             return await InvokeDirectAsync(context, message.Content, ct);
         }
 
-        _logger.LogInformation("Complex query detected — orchestrating workers");
-        var plan = DecomposeTask(message.Content);
-
-        var results = new List<string>();
-        foreach (var (workerName, subTask) in plan)
-        {
-            if (_workers.TryGetValue(workerName, out var worker))
-            {
-                var subBudget = ContextBudget.FromModelWindow(
-                    worker.Definition.MaxContextTokens);
-                var result = await worker.ExecuteAsync(subTask, subBudget, ct);
-                results.Add($"[{workerName}] {result}");
-            }
-            else
-            {
-                _logger.LogWarning("Unknown worker: {Worker}", workerName);
-                results.Add($"[{workerName}] Worker not available");
-            }
-        }
-
-        return results.Count > 0
-            ? string.Join("\n\n", results)
-            : await InvokeDirectAsync(context, message.Content, ct);
+        // Complex: use Agent-as-Tool pattern — coordinator agent with workers as tools
+        _logger.LogInformation("Complex query — using Agent-as-Tool delegation");
+        return await InvokeWithWorkersAsync(context, message.Content, ct);
     }
 
     public async Task<string> DelegateToWorkerAsync(
@@ -78,6 +60,60 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             return $"Error: worker '{workerName}' not found";
 
         return await worker.ExecuteAsync(task, budget, ct);
+    }
+
+    /// <summary>
+    /// Create a coordinator agent with workers exposed as AIFunction tools.
+    /// The LLM decides which workers to invoke based on the task.
+    /// </summary>
+    private async Task<string> InvokeWithWorkersAsync(
+        ConversationContext context,
+        string query,
+        CancellationToken ct)
+    {
+        try
+        {
+            var instructions = _promptAssembler.AssembleSystemMessage(context);
+
+            // Build worker tools using Agent-as-Tool pattern
+            var workerTools = BuildWorkerTools();
+            var agent = _agentFactory.CreateInstrumentedAgent(instructions, workerTools);
+
+            var response = await agent.RunAsync(query, cancellationToken: ct);
+            return response.Text ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Agent-as-Tool orchestration failed — falling back to direct");
+            return await InvokeDirectAsync(context, query, ct);
+        }
+    }
+
+    /// <summary>
+    /// Build AIFunction tools from worker agents using Agent-as-Tool pattern.
+    /// Each worker becomes a callable function that the coordinator agent can invoke.
+    /// </summary>
+    internal IReadOnlyList<AITool> BuildWorkerTools()
+    {
+        var tools = new List<AITool>();
+
+        foreach (var (name, worker) in _workers)
+        {
+            // Create a dedicated agent for this worker
+            var workerAgent = _agentFactory.CreateAgent(worker.Definition.SystemPrompt);
+
+            // Convert agent to an AIFunction tool
+            var tool = workerAgent.AsAIFunction(new AIFunctionFactoryOptions
+            {
+                Name = name,
+                Description = worker.Definition.Description
+            });
+
+            tools.Add(tool);
+        }
+
+        _logger.LogDebug("Built {Count} worker tools via Agent-as-Tool", tools.Count);
+        return tools;
     }
 
     private async Task<string> InvokeDirectAsync(

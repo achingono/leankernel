@@ -84,6 +84,7 @@ try
     builder.Services.AddSingleton<WorkerAgent, CodeWorker>();
     builder.Services.AddSingleton<WorkerAgent, ScheduleWorker>();
     builder.Services.AddSingleton<IAgentOrchestrator, AgentOrchestrator>();
+    builder.Services.AddSingleton<LeanKernel.Thinker.Workflows.LeanKernelWorkflowBuilder>();
 
     // Commander — channels
     builder.Services.AddSingleton<IChannel, SignalChannel>();
