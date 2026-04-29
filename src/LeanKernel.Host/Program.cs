@@ -26,6 +26,22 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    // Runtime config overlay persisted by onboarding
+    var configuredWikiPath = builder.Configuration["LeanKernel:Wiki:BasePath"] ?? "/app/data/wiki";
+    var configuredDataDir = Path.GetFullPath(Path.GetDirectoryName(configuredWikiPath) ?? "/app/data");
+    Directory.CreateDirectory(configuredDataDir);
+
+    var runtimeConfigPath = Path.Combine(configuredDataDir, "runtime-settings.json");
+    var onboardingStatePath = Path.Combine(configuredDataDir, "onboarding-state.json");
+    builder.Configuration.AddJsonFile(runtimeConfigPath, optional: true, reloadOnChange: true);
+
+    builder.Services.AddSingleton(new LeanKernelHostPaths
+    {
+        DataDirectory = configuredDataDir,
+        RuntimeConfigPath = runtimeConfigPath,
+        OnboardingStatePath = onboardingStatePath
+    });
+
     // Serilog — structured logging to console + rolling file
     builder.Services.AddSerilog((services, lc) => lc
         .ReadFrom.Configuration(builder.Configuration)
@@ -63,6 +79,7 @@ try
         client.BaseAddress = new Uri(config.LiteLlm.BaseUrl);
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {config.LiteLlm.ApiKey}");
     });
+    builder.Services.AddHttpClient("onboarding-probe");
 
     // Archivist
     builder.Services.AddSingleton<WikiIndexer>();
@@ -100,6 +117,9 @@ try
     // Web API services
     builder.Services.AddSingleton<LogReaderService>();
     builder.Services.AddSingleton<FileBrowserService>();
+    builder.Services.AddSingleton<IOnboardingStateStore, OnboardingStateStore>();
+    builder.Services.AddSingleton<IRuntimeLeanKernelConfigStore, RuntimeLeanKernelConfigStore>();
+    builder.Services.AddSingleton<IOnboardingOrchestrator, OnboardingOrchestrator>();
 
     // ASP.NET Core
     builder.Services.AddControllers();
@@ -158,19 +178,40 @@ finally
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public sealed class LeanKernelHostedService : BackgroundService
 {
-    private readonly ChannelRouter _router;
+    private readonly IServiceProvider _services;
+    private readonly IOnboardingStateStore _onboardingState;
     private readonly ILogger<LeanKernelHostedService> _logger;
 
-    public LeanKernelHostedService(ChannelRouter router, ILogger<LeanKernelHostedService> logger)
+    public LeanKernelHostedService(
+        IServiceProvider services,
+        IOnboardingStateStore onboardingState,
+        ILogger<LeanKernelHostedService> logger)
     {
-        _router = router;
+        _services = services;
+        _onboardingState = onboardingState;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         _logger.LogInformation("LeanKernel engine starting...");
-        await _router.StartAsync(ct);
+        var waitingLogged = false;
+        while (!ct.IsCancellationRequested && !await _onboardingState.IsCompletedAsync(ct))
+        {
+            if (!waitingLogged)
+            {
+                _logger.LogInformation("Onboarding not complete yet; channel startup deferred");
+                waitingLogged = true;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+
+        if (ct.IsCancellationRequested)
+            return;
+
+        var router = _services.GetRequiredService<ChannelRouter>();
+        await router.StartAsync(ct);
         _logger.LogInformation("LeanKernel engine running. Waiting for messages.");
 
         try
@@ -182,6 +223,6 @@ public sealed class LeanKernelHostedService : BackgroundService
             _logger.LogInformation("LeanKernel engine shutting down...");
         }
 
-        await _router.StopAsync(ct);
+        await router.StopAsync(ct);
     }
 }

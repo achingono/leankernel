@@ -83,15 +83,20 @@ Each fact carries confidence scores, source citations, and is automatically extr
 ```bash
 # 1. Clone and configure
 cp .env.example .env
-# Edit .env with your API keys and Signal number
+# Edit .env with provider keys (Signal optional)
 
 # 2. Start all services
 docker compose up -d
 
-# 3. Open Web UI
+# 3. Open Web UI and run onboarding wizard
 open http://localhost:5080
 
-# 4. Check health
+# 4. Complete one-shot onboarding
+# - Configure LiteLLM/Qdrant/wiki/scheduler/signal
+# - Run built-in validation probes
+# - Click "Complete Onboarding"
+
+# 5. Check health
 curl http://localhost:5080/api/health
 ```
 
@@ -201,6 +206,7 @@ LeanKernel includes a **Blazor Server** web interface with a premium **Cyber/Tec
 
 | Page | Purpose |
 |------|---------|
+| **Onboarding** (`/onboarding`) | First-run blocking setup wizard with dependency validation and go-live completion |
 | **Dashboard** (`/`) | Health cards, uptime, wiki stats, system overview |
 | **Chat** (`/chat`) | Interactive chat with expandable tool diagnostics & thinking traces |
 | **Wiki** (`/wiki`) | 5W1H dimension tabs, search, entry detail with confidence bars |

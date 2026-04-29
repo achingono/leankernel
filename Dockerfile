@@ -11,15 +11,13 @@ COPY src/LeanKernel.Scheduler/LeanKernel.Scheduler.csproj LeanKernel.Scheduler/
 COPY src/LeanKernel.Plugins/LeanKernel.Plugins.csproj LeanKernel.Plugins/
 COPY src/LeanKernel.Generators/LeanKernel.Generators.csproj LeanKernel.Generators/
 COPY src/LeanKernel.Host/LeanKernel.Host.csproj LeanKernel.Host/
-COPY src/LeanKernel.sln .
-RUN dotnet restore LeanKernel.sln
+RUN dotnet restore LeanKernel.Host/LeanKernel.Host.csproj
 
 # Copy everything and build
 COPY src/ .
 RUN dotnet publish LeanKernel.Host/LeanKernel.Host.csproj \
     -c Release \
-    -o /app/publish \
-    --no-restore
+    -o /app/publish
 
 # ── Runtime stage ────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

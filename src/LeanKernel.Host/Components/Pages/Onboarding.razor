@@ -1,0 +1,342 @@
+@page "/onboarding"
+@using System.Diagnostics.CodeAnalysis
+@attribute [ExcludeFromCodeCoverage]
+@inject HttpClient Http
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<div class="page-header">
+    <h1><span class="text-neon">◎</span> Onboarding</h1>
+    <p class="subtitle">One-shot setup to get LeanKernel configured and operational</p>
+</div>
+
+@if (IsLoading)
+{
+    <div class="glass-card" style="text-align: center; padding: 2.5rem;">
+        <p class="text-muted">Loading onboarding state...</p>
+    </div>
+}
+else if (Completed)
+{
+    <div class="glass-card stagger-in">
+        <h3 class="text-neon" style="margin-bottom: 0.75rem;">✓ Onboarding complete</h3>
+        <p class="text-muted" style="margin-bottom: 1rem;">@StatusMessage</p>
+        <button class="btn-primary" @onclick='() => Nav.NavigateTo("/")'>Enter Dashboard</button>
+    </div>
+}
+else
+{
+    <div class="content-grid stagger-in">
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">1) LiteLLM</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Base URL</span>
+                    <input class="setting-input" @bind="Draft.LiteLlm.BaseUrl" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">API Key</span>
+                    <input class="setting-input" type="password" @bind="Draft.LiteLlm.ApiKey" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Default Model</span>
+                    <input class="setting-input" @bind="Draft.LiteLlm.DefaultModel" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Embedding Model</span>
+                    <input class="setting-input" @bind="Draft.LiteLlm.EmbeddingModel" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Context Window</span>
+                    <input class="setting-input" type="number" min="1024" step="1024" @bind="Draft.LiteLlm.ContextWindowTokens" />
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">2) Vector + Wiki</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Qdrant Host</span>
+                    <input class="setting-input" @bind="Draft.Qdrant.Host" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Qdrant Port</span>
+                    <input class="setting-input" type="number" min="1" @bind="Draft.Qdrant.Port" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Collection</span>
+                    <input class="setting-input" @bind="Draft.Qdrant.CollectionName" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Embedding Dim</span>
+                    <input class="setting-input" type="number" min="1" @bind="Draft.Qdrant.EmbeddingDimension" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Wiki Path</span>
+                    <input class="setting-input text-mono" @bind="Draft.Wiki.BasePath" />
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">3) Signal (optional)</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Enabled</span>
+                    <input type="checkbox" @bind="Draft.Signal.Enabled" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Account</span>
+                    <input class="setting-input" @bind="Draft.Signal.Account" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">CLI Path</span>
+                    <input class="setting-input text-mono" @bind="Draft.Signal.CliPath" />
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">4) Scheduler</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Enabled</span>
+                    <input type="checkbox" @bind="Draft.Scheduler.Enabled" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Wiki Maintenance Cron</span>
+                    <input class="setting-input text-mono" @bind="Draft.Scheduler.WikiMaintenanceCron" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card" style="margin-top: 1.5rem;">
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <button class="btn-ghost" @onclick="SaveDraft" disabled="@IsBusy">Save Draft</button>
+            <button class="btn-primary" @onclick="Validate" disabled="@IsBusy">Run Validation</button>
+            <button class="btn-primary" style="background: var(--neon-secondary);" @onclick="Complete" disabled="@IsBusy">Complete Onboarding</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(StatusMessage))
+        {
+            <p class="text-muted" style="margin-top: 0.75rem;">@StatusMessage</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <p style="margin-top: 0.75rem; color: var(--neon-danger);">@ErrorMessage</p>
+        }
+    </div>
+
+    @if (Validation is not null)
+    {
+        <div class="glass-card" style="margin-top: 1.5rem;">
+            <h3 class="text-cyan" style="margin-bottom: 0.75rem;">Validation Results</h3>
+            @foreach (var step in Validation.Steps)
+            {
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label">@step.Step</span>
+                    <span class="diagnostic-value">
+                        <span class="status-badge @(step.Success ? "status-healthy" : "status-error")">
+                            @(step.Success ? "● PASS" : "● FAIL")
+                        </span>
+                        <span style="margin-left: 0.5rem;">@step.Message</span>
+                    </span>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private bool IsLoading = true;
+    private bool IsBusy;
+    private bool Completed;
+    private string? StatusMessage;
+    private string? ErrorMessage;
+    private OnboardingDraftDto Draft { get; set; } = new();
+    private OnboardingValidationDto? Validation;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+        try
+        {
+            var status = await Http.GetFromJsonAsync<OnboardingStatusDto>("api/onboarding/status");
+            Completed = status?.Completed == true;
+
+            var draft = await Http.GetFromJsonAsync<OnboardingDraftDto>("api/onboarding/draft");
+            if (draft is not null)
+                Draft = draft;
+
+            StatusMessage = Completed
+                ? $"Completed at {status?.CompletedAt?.ToLocalTime():yyyy-MM-dd HH:mm:ss}"
+                : "Save your configuration, validate dependencies, then complete onboarding.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load onboarding state: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task SaveDraft()
+    {
+        await RunBusyAsync(SaveDraftInternal);
+    }
+
+    private async Task Validate()
+    {
+        await RunBusyAsync(async () =>
+        {
+            if (!await SaveDraftInternal())
+                return;
+
+            var response = await Http.PostAsync("api/onboarding/validate", content: null);
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = $"Validation request failed ({(int)response.StatusCode})";
+                return;
+            }
+
+            Validation = await response.Content.ReadFromJsonAsync<OnboardingValidationDto>();
+            StatusMessage = Validation?.Success == true
+                ? "All checks passed. You can complete onboarding."
+                : "Some checks failed. Fix issues and retry.";
+            ErrorMessage = null;
+        });
+    }
+
+    private async Task Complete()
+    {
+        await RunBusyAsync(async () =>
+        {
+            if (!await SaveDraftInternal())
+                return;
+
+            var response = await Http.PostAsync("api/onboarding/complete", content: null);
+            var completion = await response.Content.ReadFromJsonAsync<OnboardingCompletionDto>();
+
+            Validation = completion?.Validation;
+            if (response.IsSuccessStatusCode && completion?.Success == true)
+            {
+                Completed = true;
+                StatusMessage = completion.Message;
+                ErrorMessage = null;
+                return;
+            }
+
+            ErrorMessage = completion?.Message ?? $"Completion failed ({(int)response.StatusCode})";
+        });
+    }
+
+    private async Task<bool> SaveDraftInternal()
+    {
+        var response = await Http.PutAsJsonAsync("api/onboarding/draft", Draft);
+        if (!response.IsSuccessStatusCode)
+        {
+            ErrorMessage = $"Draft save failed ({(int)response.StatusCode})";
+            return false;
+        }
+
+        StatusMessage = "Draft configuration saved.";
+        ErrorMessage = null;
+        return true;
+    }
+
+    private async Task RunBusyAsync(Func<Task> action)
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private sealed record OnboardingStatusDto
+    {
+        public bool Completed { get; init; }
+        public DateTimeOffset? CompletedAt { get; init; }
+    }
+
+    private sealed record OnboardingValidationStepDto
+    {
+        public string Step { get; init; } = "";
+        public bool Success { get; init; }
+        public string Message { get; init; } = "";
+    }
+
+    private sealed record OnboardingValidationDto
+    {
+        public bool Success { get; init; }
+        public List<OnboardingValidationStepDto> Steps { get; init; } = [];
+    }
+
+    private sealed record OnboardingCompletionDto
+    {
+        public bool Success { get; init; }
+        public string Message { get; init; } = "";
+        public OnboardingValidationDto? Validation { get; init; }
+    }
+
+    private sealed class OnboardingDraftDto
+    {
+        public LiteLlmDto LiteLlm { get; init; } = new();
+        public QdrantDto Qdrant { get; init; } = new();
+        public SignalDto Signal { get; init; } = new();
+        public WikiDto Wiki { get; init; } = new();
+        public SchedulerDto Scheduler { get; init; } = new();
+    }
+
+    private sealed class LiteLlmDto
+    {
+        public string BaseUrl { get; set; } = "http://litellm:4000";
+        public string ApiKey { get; set; } = "sk-LeanKernel-local";
+        public string DefaultModel { get; set; } = "gpt-4o-mini";
+        public string EmbeddingModel { get; set; } = "text-embedding-3-small";
+        public int ContextWindowTokens { get; set; } = 128000;
+    }
+
+    private sealed class QdrantDto
+    {
+        public string Host { get; set; } = "qdrant";
+        public int Port { get; set; } = 6334;
+        public string CollectionName { get; set; } = "LEANKERNEL_wiki";
+        public int EmbeddingDimension { get; set; } = 1536;
+    }
+
+    private sealed class SignalDto
+    {
+        public string CliPath { get; set; } = "/usr/local/bin/signal-cli";
+        public string Account { get; set; } = "";
+        public bool Enabled { get; set; } = true;
+    }
+
+    private sealed class WikiDto
+    {
+        public string BasePath { get; set; } = "/app/data/wiki";
+        public int MaxFactsPerEntry { get; set; } = 20;
+        public int StaleFactDays { get; set; } = 30;
+        public double MinConfidenceThreshold { get; set; } = 0.5;
+    }
+
+    private sealed class SchedulerDto
+    {
+        public bool Enabled { get; set; } = true;
+        public string WikiMaintenanceCron { get; set; } = "0 3 * * *";
+    }
+}

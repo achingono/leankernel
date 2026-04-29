@@ -33,9 +33,9 @@ public sealed class WikiIndexer
         _logger = logger;
     }
 
-    public async Task EnsureCollectionAsync(CancellationToken ct)
+    public async Task<bool> EnsureCollectionAsync(CancellationToken ct)
     {
-        if (_collectionReady) return;
+        if (_collectionReady) return true;
 
         try
         {
@@ -53,17 +53,18 @@ public sealed class WikiIndexer
                 _logger.LogInformation("Created Qdrant collection: {Collection}", _config.Qdrant.CollectionName);
             }
             _collectionReady = true;
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not connect to Qdrant — vector search disabled");
+            return false;
         }
     }
 
     public async Task IndexEntryAsync(WikiEntry entry, CancellationToken ct)
     {
-        await EnsureCollectionAsync(ct);
-        if (!_collectionReady) return;
+        if (!await EnsureCollectionAsync(ct)) return;
 
         var text = FormatForEmbedding(entry);
         var embedding = await _embeddings.EmbedAsync(text, ct);
@@ -95,8 +96,7 @@ public sealed class WikiIndexer
 
     public async Task<List<RelevanceScore>> SearchAsync(string query, int limit, CancellationToken ct)
     {
-        await EnsureCollectionAsync(ct);
-        if (!_collectionReady) return [];
+        if (!await EnsureCollectionAsync(ct)) return [];
 
         var embedding = await _embeddings.EmbedAsync(query, ct);
 
@@ -118,8 +118,7 @@ public sealed class WikiIndexer
 
     public async Task DeleteEntryAsync(string entryId, CancellationToken ct)
     {
-        await EnsureCollectionAsync(ct);
-        if (!_collectionReady) return;
+        if (!await EnsureCollectionAsync(ct)) return;
 
         var pointId = GeneratePointId(entryId);
         await _qdrant.DeleteAsync(

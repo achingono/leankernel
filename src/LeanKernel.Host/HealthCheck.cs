@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 
@@ -9,27 +10,34 @@ namespace LeanKernel.Host;
 /// </summary>
 public sealed class LeanKernelHealthCheck : IHealthCheck
 {
-    private readonly IOptions<LeanKernelConfig> _config;
+    private readonly Func<LeanKernelConfig> _getConfig;
+
+    [ActivatorUtilitiesConstructor]
+    public LeanKernelHealthCheck(IOptionsMonitor<LeanKernelConfig> config)
+    {
+        _getConfig = () => config.CurrentValue;
+    }
 
     public LeanKernelHealthCheck(IOptions<LeanKernelConfig> config)
     {
-        _config = config;
+        _getConfig = () => config.Value;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken ct = default)
     {
+        var config = _getConfig();
         var data = new Dictionary<string, object>
         {
-            ["wiki_path"] = _config.Value.Wiki.BasePath,
-            ["litellm_url"] = _config.Value.LiteLlm.BaseUrl,
-            ["qdrant_host"] = _config.Value.Qdrant.Host,
+            ["wiki_path"] = config.Wiki.BasePath,
+            ["litellm_url"] = config.LiteLlm.BaseUrl,
+            ["qdrant_host"] = config.Qdrant.Host,
             ["uptime"] = (DateTime.UtcNow - _startTime).ToString()
         };
 
         // Check wiki directory exists and is writable
-        var wikiPath = _config.Value.Wiki.BasePath;
+        var wikiPath = config.Wiki.BasePath;
         if (!Directory.Exists(wikiPath))
         {
             return HealthCheckResult.Degraded("Wiki directory not found", data: data);
