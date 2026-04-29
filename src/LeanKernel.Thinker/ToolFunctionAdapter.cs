@@ -7,7 +7,7 @@ namespace LeanKernel.Thinker;
 /// <summary>
 /// Bridges LeanKernel's framework-agnostic <see cref="ITool"/> / <see cref="IToolRegistry"/>
 /// to MAF's <see cref="AITool"/> via <see cref="AIFunctionFactory"/>.
-/// Replaces <c>ToolFunctionBinder</c> (Semantic Kernel).
+/// Replaces the former SK-based ToolFunctionBinder.
 /// </summary>
 public sealed class ToolFunctionAdapter
 {

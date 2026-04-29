@@ -9,7 +9,7 @@ LeanKernel is organized into three decoupled subsystems:
 | Component | Role |
 |-----------|------|
 | **Commander** | Channel adapters (Signal, future Telegram/Discord). Routes messages. |
-| **Thinker** | LLM reasoning via Semantic Kernel. Prompt assembly, tool dispatch, agent orchestration. |
+| **Thinker** | LLM reasoning via Microsoft Agent Framework. Prompt assembly, tool dispatch, agent orchestration. |
 | **Archivist** | Memory & context gatekeeper. 5W1H wiki, vector search, deny-by-default context gating. |
 
 ### Component Diagram
@@ -69,7 +69,9 @@ Each fact carries confidence scores, source citations, and is automatically extr
 | Layer | Technology | Version |
 |-------|-----------|---------|
 | Runtime | .NET 10 / C# 14 | 10.0 |
-| Orchestration | Microsoft Semantic Kernel | 1.74.0 |
+| Orchestration | Microsoft Agent Framework | 1.3.0 |
+| AI Abstractions | Microsoft.Extensions.AI | 10.5.0 |
+| OpenAI SDK | OpenAI | 2.10.0 |
 | LLM Proxy | LiteLLM | v1.83.7-stable |
 | Vector DB | Qdrant | v1.17.1 |
 | Messaging | signal-cli | latest |
@@ -177,13 +179,21 @@ model_list:
 
 ## Multi-Agent System
 
-LeanKernel uses a lightweight orchestrator that analyzes query complexity:
+LeanKernel uses the **MAF Agent-as-Tool** pattern — specialized worker agents are exposed as `AIFunction` tools on a coordinator agent. The LLM natively decides which specialists to invoke:
 
-- **Simple queries** → direct LLM invocation (no overhead)
-- **Complex queries** → decomposed and delegated to specialized workers:
+- **Simple queries** → direct `ChatClientAgent.RunAsync()` (no overhead)
+- **Complex queries** → coordinator agent delegates to worker tools:
   - **ResearchWorker** — web search + summarization (4K token budget)
   - **CodeWorker** — code generation (8K token budget)
   - **ScheduleWorker** — calendar/reminder management (2K token budget)
+
+### MAF Middleware Pipeline
+
+| Layer | Middleware | Purpose |
+|-------|-----------|---------|
+| IChatClient | `ContextGatingMiddleware` | Prunes messages to token budget before LLM call |
+| IChatClient | `FunctionLoggingMiddleware` | Logs tool invocations and results |
+| Agent Run | `DiagnosticsMiddleware` | Timing, token counts, tool call stats → StateBag |
 
 ## Web UI
 
