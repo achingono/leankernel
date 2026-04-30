@@ -46,6 +46,26 @@ public class OnboardingStateStoreTests : IDisposable
         Assert.True(state.Completed);
     }
 
+    [Fact]
+    public async Task MarkInProgressAsync_WhenNotCompleted_UpdatesState()
+    {
+        await _store.MarkInProgressAsync(CancellationToken.None);
+        var state = await _store.GetAsync(CancellationToken.None);
+        Assert.False(state.Completed);
+    }
+
+    [Fact]
+    public async Task GetAsync_InvalidJson_ReturnsDefaultState()
+    {
+        var path = Path.Combine(_tempDir, "onboarding-state.json");
+        await File.WriteAllTextAsync(path, "{ invalid json", CancellationToken.None);
+
+        var state = await _store.GetAsync(CancellationToken.None);
+
+        Assert.False(state.Completed);
+        Assert.Null(state.CompletedAt);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDir))

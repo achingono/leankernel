@@ -31,6 +31,13 @@
                     @if (!SidebarCollapsed) { <span>Onboarding</span> }
                 </NavLink>
             }
+            else if (!IsAuthenticated)
+            {
+                <NavLink href="/login" class="nav-item" role="listitem" aria-label="Login">
+                    <span class="nav-icon" aria-hidden="true">🔒</span>
+                    @if (!SidebarCollapsed) { <span>Login</span> }
+                </NavLink>
+            }
             else
             {
                 <NavLink href="/" class="nav-item" Match="NavLinkMatch.All" role="listitem" aria-label="Dashboard">
@@ -57,6 +64,12 @@
                     <span class="nav-icon" aria-hidden="true">⚙</span>
                     @if (!SidebarCollapsed) { <span>Settings</span> }
                 </NavLink>
+
+                <div class="nav-spacer"></div>
+                <button class="nav-item nav-logout" @onclick="LogoutAsync" aria-label="Logout">
+                    <span class="nav-icon" aria-hidden="true">⏻</span>
+                    @if (!SidebarCollapsed) { <span>Logout</span> }
+                </button>
             }
         </div>
     </nav>
@@ -71,21 +84,22 @@
 @code {
     private bool SidebarCollapsed { get; set; }
     private bool OnboardingIncomplete { get; set; }
+    private bool IsAuthenticated { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         Nav.LocationChanged += HandleLocationChanged;
-        await RefreshOnboardingStateAsync();
+        await RefreshStateAsync();
     }
 
     private void ToggleSidebar() => SidebarCollapsed = !SidebarCollapsed;
 
     private async void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        await RefreshOnboardingStateAsync();
+        await RefreshStateAsync();
     }
 
-    private async Task RefreshOnboardingStateAsync()
+    private async Task RefreshStateAsync()
     {
         try
         {
@@ -97,14 +111,44 @@
             OnboardingIncomplete = true;
         }
 
+        if (!OnboardingIncomplete)
+        {
+            try
+            {
+                var authStatus = await Http.GetFromJsonAsync<AuthStatusDto>("api/auth/status");
+                IsAuthenticated = authStatus?.Authenticated ?? false;
+            }
+            catch
+            {
+                IsAuthenticated = false;
+            }
+        }
+
         var relativePath = Nav.ToBaseRelativePath(Nav.Uri).Split('?', 2)[0];
         if (OnboardingIncomplete &&
             !relativePath.StartsWith("onboarding", StringComparison.OrdinalIgnoreCase))
         {
             Nav.NavigateTo("/onboarding");
         }
+        else if (!OnboardingIncomplete && !IsAuthenticated &&
+                 !relativePath.StartsWith("login", StringComparison.OrdinalIgnoreCase) &&
+                 !relativePath.StartsWith("onboarding", StringComparison.OrdinalIgnoreCase))
+        {
+            Nav.NavigateTo("/login");
+        }
 
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LogoutAsync()
+    {
+        try
+        {
+            await Http.PostAsync("api/auth/logout", null);
+        }
+        catch { }
+        IsAuthenticated = false;
+        Nav.NavigateTo("/login");
     }
 
     public void Dispose()
@@ -115,5 +159,12 @@
     private sealed record OnboardingStatusDto
     {
         public bool Completed { get; init; }
+    }
+
+    private sealed record AuthStatusDto
+    {
+        public string Mode { get; init; } = "";
+        public bool Configured { get; init; }
+        public bool Authenticated { get; init; }
     }
 }

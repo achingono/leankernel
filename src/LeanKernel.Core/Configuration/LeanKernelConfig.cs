@@ -13,6 +13,46 @@ public sealed class LeanKernelConfig
     public WikiConfig Wiki { get; set; } = new();
     public ContextConfig Context { get; set; } = new();
     public SchedulerConfig Scheduler { get; set; } = new();
+    public AuthConfig Auth { get; set; } = new();
+}
+
+public enum AuthMode { LocalPasscode, Oidc, Disabled }
+
+public sealed class AuthConfig
+{
+    public AuthMode Mode { get; set; } = AuthMode.LocalPasscode;
+    public int SessionDurationMinutes { get; set; } = 480;
+    public int TokenDefaultExpirationDays { get; set; } = 90;
+    public string[] AllowedOrigins { get; set; } = [];
+    public LocalPasscodeConfig Local { get; set; } = new();
+    public OidcConfig Oidc { get; set; } = new();
+    public RateLimitConfig RateLimit { get; set; } = new();
+}
+
+public sealed class LocalPasscodeConfig
+{
+    public int MinLength { get; set; } = 8;
+    public int MaxFailedAttempts { get; set; } = 5;
+    public int LockoutMinutes { get; set; } = 15;
+}
+
+public sealed class OidcConfig
+{
+    public string Authority { get; set; } = "";
+    public string ClientId { get; set; } = "";
+    public string ClientSecret { get; set; } = "";
+    public string CallbackPath { get; set; } = "/auth/oidc/callback";
+    public string[] Scopes { get; set; } = ["openid", "profile", "email"];
+    public string AdminSubjectClaim { get; set; } = "";
+    public string AdminClaimType { get; set; } = "sub";
+}
+
+public sealed class RateLimitConfig
+{
+    public int LoginPerMinutePerIp { get; set; } = 5;
+    public int LoginPerHourPerIp { get; set; } = 20;
+    public int LoginPerMinuteGlobal { get; set; } = 50;
+    public int TokenCreationPerHour { get; set; } = 10;
 }
 
 public sealed class LiteLlmConfig

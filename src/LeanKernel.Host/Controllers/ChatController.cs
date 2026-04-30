@@ -1,11 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
+using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
 [ApiController]
 [Route("api/chat")]
+[Authorize(Policy = AuthConstants.PolicyAdminOnly)]
 public sealed class ChatController : ControllerBase
 {
     private readonly ISessionStore _sessions;

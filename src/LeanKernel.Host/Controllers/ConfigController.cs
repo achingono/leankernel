@@ -1,11 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
 [ApiController]
 [Route("api/config")]
+[Authorize(Policy = AuthConstants.PolicyAdminOnly)]
 public sealed class ConfigController : ControllerBase
 {
     private readonly IOptions<LeanKernelConfig> _config;

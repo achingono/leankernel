@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LeanKernel.Host.Services;
+using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
 [ApiController]
 [Route("api/logs")]
+[Authorize(Policy = AuthConstants.PolicyAdminOnly)]
 public sealed class LogsController : ControllerBase
 {
     private readonly LogReaderService _logReader;

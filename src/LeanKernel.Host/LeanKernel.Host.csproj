@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-LeanKernel.Host-78661395-eb1c-42f2-af91-bcbacaa164a1</UserSecretsId>
+    <InternalsVisibleTo>LeanKernel.Tests.Unit</InternalsVisibleTo>
   </PropertyGroup>
 
   <ItemGroup>

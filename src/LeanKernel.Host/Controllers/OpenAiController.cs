@@ -1,8 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
+using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
@@ -12,6 +14,7 @@ namespace LeanKernel.Host.Controllers;
 /// </summary>
 [ApiController]
 [Route("v1")]
+[Authorize(Policy = AuthConstants.PolicyApiAccess)]
 public sealed class OpenAiController : ControllerBase
 {
     private readonly IThinkerService _thinker;

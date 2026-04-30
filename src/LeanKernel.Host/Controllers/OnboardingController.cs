@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LeanKernel.Host.Services;
+using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
 [ApiController]
 [Route("api/onboarding")]
+[Authorize(Policy = AuthConstants.PolicyAdminOnly)]
 public sealed class OnboardingController : ControllerBase
 {
     private readonly IOnboardingOrchestrator _orchestrator;
@@ -15,6 +18,7 @@ public sealed class OnboardingController : ControllerBase
     }
 
     [HttpGet("status")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetStatus(CancellationToken ct)
     {
         return Ok(await _orchestrator.GetStatusAsync(ct));

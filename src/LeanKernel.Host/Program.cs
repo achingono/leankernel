@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using Serilog;
 using LeanKernel.Archivist;
@@ -11,11 +12,13 @@ using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Host;
 using LeanKernel.Host.Services;
+using LeanKernel.Host.Services.Auth;
 using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
 using LeanKernel.Scheduler;
 using LeanKernel.Thinker;
 using LeanKernel.Thinker.Agents;
+using LeanKernel.Thinker.Workflows;
 
 // Configure Serilog early for bootstrap logging
 Log.Logger = new LoggerConfiguration()
@@ -121,6 +124,17 @@ try
     builder.Services.AddSingleton<IRuntimeLeanKernelConfigStore, RuntimeLeanKernelConfigStore>();
     builder.Services.AddSingleton<IOnboardingOrchestrator, OnboardingOrchestrator>();
 
+    // Authentication & Authorization
+    builder.Services.AddLeanKernelAuth(builder.Configuration);
+
+    // Forwarded headers (for reverse proxy HTTPS detection)
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+
     // ASP.NET Core
     builder.Services.AddControllers();
     builder.Services.AddRazorComponents()
@@ -140,17 +154,34 @@ try
     builder.Services.AddHealthChecks()
         .AddCheck<LeanKernelHealthCheck>("LeanKernel");
 
-    // CORS for local development
+    // CORS — same-origin by default; explicit origins when configured
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
-            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+        {
+            var authConfig = builder.Configuration.GetSection("LeanKernel:Auth").Get<AuthConfig>();
+            var origins = authConfig?.AllowedOrigins ?? [];
+            if (origins.Length > 0)
+            {
+                policy.WithOrigins(origins)
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials();
+            }
+            else
+            {
+                // Same-origin only (no cross-origin requests)
+                policy.SetIsOriginAllowed(_ => false);
+            }
+        });
     });
 
     var app = builder.Build();
 
+    app.UseForwardedHeaders();
     app.UseCors();
     app.UseStaticFiles();
+    app.UseLeanKernelAuth();
     app.UseAntiforgery();
 
     // API routes

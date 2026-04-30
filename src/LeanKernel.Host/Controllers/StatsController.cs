@@ -1,13 +1,16 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
+using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
 [ApiController]
 [Route("api/stats")]
+[Authorize(Policy = AuthConstants.PolicyAdminOnly)]
 public sealed class StatsController : ControllerBase
 {
     private static readonly DateTime StartTime = DateTime.UtcNow;

@@ -34,6 +34,32 @@ public class OnboardingControllerTests
     }
 
     [Fact]
+    public async Task GetDraft_ReturnsOk()
+    {
+        var orchestrator = Substitute.For<IOnboardingOrchestrator>();
+        orchestrator.GetDraftAsync(Arg.Any<CancellationToken>())
+            .Returns(new OnboardingConfigInput());
+
+        var controller = new OnboardingController(orchestrator);
+        var result = await controller.GetDraft(CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task Validate_ReturnsOk()
+    {
+        var orchestrator = Substitute.For<IOnboardingOrchestrator>();
+        orchestrator.ValidateAsync(Arg.Any<CancellationToken>())
+            .Returns(new OnboardingValidationResult());
+
+        var controller = new OnboardingController(orchestrator);
+        var result = await controller.Validate(CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
     public async Task Complete_FailedValidation_ReturnsBadRequest()
     {
         var orchestrator = Substitute.For<IOnboardingOrchestrator>();

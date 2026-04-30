@@ -1,0 +1,81 @@
+@page "/login"
+@using System.Diagnostics.CodeAnalysis
+@attribute [ExcludeFromCodeCoverage]
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <span class="LeanKernel-logo">◆</span>
+            <h1>LeanKernel</h1>
+            <p class="login-subtitle">Enter your passcode to continue</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="login-error" role="alert">@ErrorMessage</div>
+        }
+
+        <form @onsubmit="HandleLogin">
+            <div class="login-field">
+                <input type="password"
+                       @bind="Passcode"
+                       placeholder="Passcode"
+                       autofocus
+                       disabled="@IsLoading"
+                       aria-label="Passcode" />
+            </div>
+            <button type="submit" class="login-button" disabled="@IsLoading">
+                @if (IsLoading) { <span>Authenticating...</span> }
+                else { <span>Login</span> }
+            </button>
+        </form>
+    </div>
+</div>
+
+@code {
+    private string Passcode { get; set; } = "";
+    private string? ErrorMessage { get; set; }
+    private bool IsLoading { get; set; }
+
+    private async Task HandleLogin()
+    {
+        if (string.IsNullOrWhiteSpace(Passcode))
+        {
+            ErrorMessage = "Please enter your passcode";
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/auth/login", new { passcode = Passcode });
+            if (response.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                ErrorMessage = body?.Error ?? "Authentication failed";
+            }
+        }
+        catch
+        {
+            ErrorMessage = "Unable to connect. Please try again.";
+        }
+        finally
+        {
+            IsLoading = false;
+            Passcode = "";
+        }
+    }
+
+    private sealed record ErrorResponse
+    {
+        public string Error { get; init; } = "";
+    }
+}

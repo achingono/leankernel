@@ -1,11 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
+using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
 [ApiController]
 [Route("api/wiki")]
+[Authorize(Policy = AuthConstants.PolicyAdminOnly)]
 public sealed class WikiController : ControllerBase
 {
     private readonly IWikiStore _wiki;

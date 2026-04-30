@@ -14,17 +14,20 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
     private readonly IOnboardingStateStore _stateStore;
     private readonly IRuntimeLeanKernelConfigStore _runtimeConfigStore;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly Func<LeanKernelConfig, CancellationToken, Task<OnboardingStepResult>> _qdrantValidator;
     private readonly ILogger<OnboardingOrchestrator> _logger;
 
     public OnboardingOrchestrator(
         IOnboardingStateStore stateStore,
         IRuntimeLeanKernelConfigStore runtimeConfigStore,
         IHttpClientFactory httpClientFactory,
-        ILogger<OnboardingOrchestrator> logger)
+        ILogger<OnboardingOrchestrator> logger,
+        Func<LeanKernelConfig, CancellationToken, Task<OnboardingStepResult>>? qdrantValidator = null)
     {
         _stateStore = stateStore;
         _runtimeConfigStore = runtimeConfigStore;
         _httpClientFactory = httpClientFactory;
+        _qdrantValidator = qdrantValidator ?? ValidateQdrantAsync;
         _logger = logger;
     }
 
@@ -71,7 +74,7 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
                 await ValidateFilesystemAsync(cfg, ct),
                 await ValidateLiteLlmModelsAsync(cfg, ct),
                 await ValidateEmbeddingEndpointAsync(cfg, ct),
-                await ValidateQdrantAsync(cfg, ct),
+                await _qdrantValidator(cfg, ct),
                 ValidateSignal(cfg)
             ]
         };
