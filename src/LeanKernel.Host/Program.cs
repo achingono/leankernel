@@ -126,6 +126,7 @@ try
 
     // Authentication & Authorization
     builder.Services.AddLeanKernelAuth(builder.Configuration);
+    builder.Services.AddLeanKernelOidc(builder.Configuration);
 
     // Forwarded headers (for reverse proxy HTTPS detection)
     builder.Services.Configure<ForwardedHeadersOptions>(options =>

@@ -7,6 +7,13 @@ namespace LeanKernel.Tests.Unit.Host;
 
 public class OnboardingControllerTests
 {
+    private static IOnboardingStateStore CreateIncompleteStore()
+    {
+        var store = Substitute.For<IOnboardingStateStore>();
+        store.IsCompletedAsync(Arg.Any<CancellationToken>()).Returns(false);
+        return store;
+    }
+
     [Fact]
     public async Task GetStatus_ReturnsOk()
     {
@@ -14,7 +21,7 @@ public class OnboardingControllerTests
         orchestrator.GetStatusAsync(Arg.Any<CancellationToken>())
             .Returns(new OnboardingStatus { Completed = false, UpdatedAt = DateTimeOffset.UtcNow });
 
-        var controller = new OnboardingController(orchestrator);
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore());
         var result = await controller.GetStatus(CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -27,7 +34,7 @@ public class OnboardingControllerTests
         orchestrator.SaveDraftAsync(Arg.Any<OnboardingConfigInput>(), Arg.Any<CancellationToken>())
             .Returns(new OnboardingStatus { Completed = false, UpdatedAt = DateTimeOffset.UtcNow });
 
-        var controller = new OnboardingController(orchestrator);
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore());
         var result = await controller.SaveDraft(new OnboardingConfigInput(), CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -40,7 +47,7 @@ public class OnboardingControllerTests
         orchestrator.GetDraftAsync(Arg.Any<CancellationToken>())
             .Returns(new OnboardingConfigInput());
 
-        var controller = new OnboardingController(orchestrator);
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore());
         var result = await controller.GetDraft(CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -53,7 +60,7 @@ public class OnboardingControllerTests
         orchestrator.ValidateAsync(Arg.Any<CancellationToken>())
             .Returns(new OnboardingValidationResult());
 
-        var controller = new OnboardingController(orchestrator);
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore());
         var result = await controller.Validate(CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -72,7 +79,7 @@ public class OnboardingControllerTests
                 Validation = new OnboardingValidationResult()
             });
 
-        var controller = new OnboardingController(orchestrator);
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore());
         var result = await controller.Complete(CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
@@ -107,7 +114,7 @@ public class OnboardingControllerTests
                 }
             });
 
-        var controller = new OnboardingController(orchestrator);
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore());
         var result = await controller.Complete(CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);

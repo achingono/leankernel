@@ -164,6 +164,46 @@ LEANKERNEL__Qdrant__Host=localhost
 LEANKERNEL__Signal__Enabled=false
 ```
 
+### Authentication
+
+LeanKernel requires authentication by default. During onboarding, you set an admin passcode.
+
+```bash
+# Auth modes (set via config or environment)
+LEANKERNEL__Auth__Mode=LocalPasscode    # Default: passcode + API tokens
+LEANKERNEL__Auth__Mode=Oidc             # OpenID Connect (external IdP)
+LEANKERNEL__Auth__Mode=Disabled         # Dev only (ASPNETCORE_ENVIRONMENT=Development)
+```
+
+**API Token Usage** (for programmatic access to `/v1/*` endpoints):
+
+```bash
+# Create a token via the web UI or API
+curl -X POST http://localhost:5080/api/auth/tokens \
+  -H "Cookie: LEANKERNEL_session=..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "CI Pipeline"}'
+
+# Use the token for API access
+curl http://localhost:5080/v1/chat/completions \
+  -H "Authorization: Bearer sk-LeanKernel-<your-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "LeanKernel", "messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+**OIDC Configuration** (for enterprise SSO):
+
+```bash
+LEANKERNEL__Auth__Mode=Oidc
+LEANKERNEL__Auth__Oidc__Authority=https://your-idp.example.com
+LEANKERNEL__Auth__Oidc__ClientId=LeanKernel-app
+LEANKERNEL__Auth__Oidc__ClientSecret=your-secret
+LEANKERNEL__Auth__Oidc__AdminSubjectClaim=user@example.com
+LEANKERNEL__Auth__Oidc__AdminClaimType=email
+```
+
+See `docs/prd-authentication.md` for the full authentication PRD.
+
 ### LiteLLM Model Routing
 
 Configure `config/litellm/config.yaml` to route to different providers:
@@ -206,6 +246,7 @@ LeanKernel includes a **Blazor Server** web interface with a premium **Cyber/Tec
 
 | Page | Purpose |
 |------|---------|
+| **Login** (`/login`) | Passcode authentication gate |
 | **Onboarding** (`/onboarding`) | First-run blocking setup wizard with dependency validation and go-live completion |
 | **Dashboard** (`/`) | Health cards, uptime, wiki stats, system overview |
 | **Chat** (`/chat`) | Interactive chat with expandable tool diagnostics & thinking traces |
@@ -224,33 +265,44 @@ LeanKernel includes a **Blazor Server** web interface with a premium **Cyber/Tec
 
 ### Internal API (used by Web UI)
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check |
-| `/api/stats` | GET | System statistics |
-| `/api/config` | GET | Configuration (secrets masked) |
-| `/api/chat/sessions` | GET | List chat sessions |
-| `/api/chat/sessions/{id}` | GET | Session message history |
-| `/api/chat/message` | POST | Send a message |
-| `/api/wiki/dimensions` | GET | Wiki dimension counts |
-| `/api/wiki/entries?dimension=` | GET | List wiki entries |
-| `/api/wiki/search?q=` | GET | Search wiki |
-| `/api/logs?level=&q=` | GET | Search logs |
-| `/api/files/browse?path=` | GET | Browse data directory |
-| `/api/files/read?path=` | GET | Read file contents |
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/health` | GET | Anonymous | Health check |
+| `/api/auth/status` | GET | Anonymous | Auth mode and state |
+| `/api/auth/login` | POST | Anonymous | Passcode login |
+| `/api/auth/bootstrap` | POST | Anonymous* | Initial passcode setup (one-time) |
+| `/api/auth/logout` | POST | Cookie | End session |
+| `/api/auth/me` | GET | Admin | Current principal info |
+| `/api/auth/passcode` | POST | Admin | Change passcode |
+| `/api/auth/tokens` | GET/POST | Admin | List/create API tokens |
+| `/api/auth/tokens/{id}` | DELETE | Admin | Revoke token |
+| `/api/auth/revoke-sessions` | POST | Admin | Invalidate all sessions |
+| `/api/stats` | GET | Admin | System statistics |
+| `/api/config` | GET | Admin | Configuration (secrets masked) |
+| `/api/chat/sessions` | GET | Admin | List chat sessions |
+| `/api/chat/sessions/{id}` | GET | Admin | Session message history |
+| `/api/chat/message` | POST | Admin | Send a message |
+| `/api/wiki/dimensions` | GET | Admin | Wiki dimension counts |
+| `/api/wiki/entries?dimension=` | GET | Admin | List wiki entries |
+| `/api/wiki/search?q=` | GET | Admin | Search wiki |
+| `/api/logs?level=&q=` | GET | Admin | Search logs |
+| `/api/files/browse?path=` | GET | Admin | Browse data directory |
+| `/api/files/read?path=` | GET | Admin | Read file contents |
 
 ### OpenAI-Compatible API
 
-Connect any OpenAI SDK client to LeanKernel:
+Connect any OpenAI SDK client to LeanKernel (requires API token):
 
 ```bash
 # Chat completion (routes through LeanKernel's full pipeline)
 curl http://localhost:5080/v1/chat/completions \
+  -H "Authorization: Bearer sk-LeanKernel-<your-token>" \
   -H "Content-Type: application/json" \
   -d '{"model": "LeanKernel", "messages": [{"role": "user", "content": "Hello"}]}'
 
 # List models
-curl http://localhost:5080/v1/models
+curl http://localhost:5080/v1/models \
+  -H "Authorization: Bearer sk-LeanKernel-<your-token>"
 ```
 
 ## Plugin System

@@ -110,6 +110,27 @@ else
                 </div>
             </div>
         </div>
+
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">5) Authentication</h3>
+                <p class="text-muted" style="margin-bottom: 0.75rem; font-size: 0.85rem;">
+                    Set your admin passcode. This will be required to access LeanKernel after onboarding.
+                </p>
+                <div class="setting-row">
+                    <span class="setting-label">Admin Passcode</span>
+                    <input class="setting-input" type="password" @bind="Passcode" placeholder="Min 8 characters" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Confirm Passcode</span>
+                    <input class="setting-input" type="password" @bind="PasscodeConfirm" placeholder="Repeat passcode" />
+                </div>
+                @if (!string.IsNullOrWhiteSpace(PasscodeError))
+                {
+                    <p style="color: var(--neon-danger); font-size: 0.85rem; margin-top: 0.5rem;">@PasscodeError</p>
+                }
+            </div>
+        </div>
     </div>
 
     <div class="glass-card" style="margin-top: 1.5rem;">
@@ -154,6 +175,9 @@ else
     private bool Completed;
     private string? StatusMessage;
     private string? ErrorMessage;
+    private string Passcode = "";
+    private string PasscodeConfirm = "";
+    private string? PasscodeError;
     private OnboardingDraftDto Draft { get; set; } = new();
     private OnboardingValidationDto? Validation;
 
@@ -220,6 +244,21 @@ else
     {
         await RunBusyAsync(async () =>
         {
+            // Validate passcode
+            PasscodeError = null;
+            if (string.IsNullOrWhiteSpace(Passcode) || Passcode.Length < 8)
+            {
+                PasscodeError = "Passcode must be at least 8 characters.";
+                ErrorMessage = "Please set an admin passcode before completing.";
+                return;
+            }
+            if (Passcode != PasscodeConfirm)
+            {
+                PasscodeError = "Passcodes do not match.";
+                ErrorMessage = "Please confirm your passcode.";
+                return;
+            }
+
             if (!await SaveDraftInternal())
                 return;
 
@@ -229,6 +268,15 @@ else
             Validation = completion?.Validation;
             if (response.IsSuccessStatusCode && completion?.Success == true)
             {
+                // Set the initial passcode via auth bootstrap
+                var authResponse = await Http.PostAsJsonAsync("api/auth/bootstrap", new { passcode = Passcode });
+                if (!authResponse.IsSuccessStatusCode)
+                {
+                    ErrorMessage = "Onboarding completed but passcode setup failed. You may need to set it manually.";
+                    Completed = true;
+                    return;
+                }
+
                 Completed = true;
                 StatusMessage = completion.Message;
                 ErrorMessage = null;

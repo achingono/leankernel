@@ -167,8 +167,31 @@ public sealed class AuthController : ControllerBase
             authenticated = User.Identity?.IsAuthenticated ?? false
         });
     }
+
+    /// <summary>
+    /// One-time bootstrap endpoint: sets initial passcode when none exists.
+    /// Only works during onboarding (no passcode configured yet).
+    /// </summary>
+    [HttpPost("bootstrap")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Bootstrap([FromBody] BootstrapRequest request, CancellationToken ct)
+    {
+        if (_passcode.IsConfigured)
+            return BadRequest(new { error = "Passcode already configured. Use the change endpoint instead." });
+
+        if (string.IsNullOrWhiteSpace(request.Passcode) ||
+            request.Passcode.Length < _config.Value.Auth.Local.MinLength)
+        {
+            return BadRequest(new { error = $"Passcode must be at least {_config.Value.Auth.Local.MinLength} characters" });
+        }
+
+        await _passcode.SetAsync(request.Passcode, ct);
+        _logger.LogInformation("Initial passcode set via bootstrap");
+        return Ok(new { message = "Passcode configured successfully" });
+    }
 }
 
 public sealed record LoginRequest(string Passcode);
 public sealed record ChangePasscodeRequest(string CurrentPasscode, string NewPasscode);
 public sealed record CreateTokenRequest(string Name, int? ExpirationDays = null);
+public sealed record BootstrapRequest(string Passcode);
