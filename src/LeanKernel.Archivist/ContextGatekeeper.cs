@@ -40,6 +40,17 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         string sessionId,
         CancellationToken ct)
     {
+        // Default: unrestricted access for backward compatibility
+        return await GateContextAsync(query, budget, sessionId, ["*"], ct);
+    }
+
+    public async Task<ConversationContext> GateContextAsync(
+        LeanKernelMessage query,
+        ContextBudget budget,
+        string sessionId,
+        IReadOnlyList<string> agentKnowledgeTags,
+        CancellationToken ct)
+    {
         var exclusionLog = new List<string>();
 
         // Phase 1: Classify intent → determine active 5W1H dimensions
@@ -48,7 +59,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 
         // Phase 2: Retrieve candidate LeanKernels from wiki + vector store
         var wikiCandidates = await RetrieveWikiLeanKernelsAsync(query, activeDimensions, budget, ct);
-        var vectorCandidates = await RetrieveVectorLeanKernelsAsync(query, budget, ct);
+        var vectorCandidates = await RetrieveVectorLeanKernelsAsync(query, agentKnowledgeTags, budget, ct);
 
         // Phase 3: Competitive ranking — all candidates compete for budget
         var rankedWiki = RankLeanKernels(wikiCandidates, activeDimensions, budget.WikiFactsBudget, exclusionLog);
@@ -144,13 +155,13 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 
     private async Task<List<RelevanceScore>> RetrieveVectorLeanKernelsAsync(
         LeanKernelMessage query,
+        IReadOnlyList<string> agentTags,
         ContextBudget budget,
         CancellationToken ct)
     {
         try
         {
-            // Use wildcard tags for context gatekeeper (full access for internal retrieval)
-            var results = await _knowledgeSearch.SearchAsync(query.Content, ["*"], limit: 10, ct);
+            var results = await _knowledgeSearch.SearchAsync(query.Content, agentTags, limit: 10, ct);
             return results;
         }
         catch (Exception ex)
@@ -168,14 +179,10 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     {
         var cfg = _config.Context;
 
-        // Score each candidate
+        // Score each candidate using source-aware scoring
         var scored = candidates.Select(c => c with
         {
-            Score = RelevanceScore.ComputeScore(
-                c.SemanticSimilarity,
-                c.RecencyDecay,
-                c.DimensionMatch,
-                c.InteractionFrequency)
+            Score = c.ComputeSourceAwareScore()
         })
         .OrderByDescending(c => c.Score)
         .ToList();

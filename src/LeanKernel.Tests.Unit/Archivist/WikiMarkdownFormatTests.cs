@@ -177,6 +177,31 @@ public class WikiMarkdownFormatTests
         Assert.NotNull(parsed);
         Assert.Equal(2, parsed.Relations.Count);
         Assert.Contains("what-project-atlas", parsed.Relations);
+        Assert.Contains("who-bob", parsed.Relations);
+    }
+
+    [Fact]
+    public void ParseMarkdown_SameDimensionRelation_RoundTrips()
+    {
+        // Same-dimension links (./name.md) should round-trip correctly
+        var entry = new WikiEntry
+        {
+            Id = "who-alice",
+            Dimension = WikiDimension.Who,
+            Subject = "Alice",
+            Facts = [new WikiFact { Claim = "Alice works with Bob", Confidence = 0.9, EstimatedTokens = 5 }],
+            Relations = ["who-bob", "what-project-atlas"],
+            LastAccessed = DateTimeOffset.Parse("2024-06-15T10:00:00Z"),
+            AccessCount = 3
+        };
+
+        var md = WikiStore.SerializeToMarkdown(entry);
+        var parsed = WikiStore.ParseMarkdown(md, "fallback");
+
+        Assert.NotNull(parsed);
+        Assert.Equal(2, parsed.Relations.Count);
+        Assert.Contains("who-bob", parsed.Relations);
+        Assert.Contains("what-project-atlas", parsed.Relations);
     }
 
     private static WikiEntry MakeEntry(string id, WikiDimension dim, string subject, string claim) =>

@@ -230,7 +230,7 @@ public sealed class WikiStore : IWikiStore
                 if (relMatch.Success)
                 {
                     var linkPath = relMatch.Groups["path"].Value;
-                    var relationId = ExtractRelationId(linkPath);
+                    var relationId = ExtractRelationId(linkPath, dimension);
                     if (!string.IsNullOrEmpty(relationId))
                         relations.Add(relationId);
                 }
@@ -346,10 +346,10 @@ public sealed class WikiStore : IWikiStore
         return (displayName, linkPath);
     }
 
-    private static string ExtractRelationId(string linkPath)
+    private static string ExtractRelationId(string linkPath, WikiDimension currentDimension)
     {
         // "../what/project-atlas.md" → "what-project-atlas"
-        // "./alice-smith.md" → needs context but we handle simple case
+        // "./alice-smith.md" → "who-alice-smith" (same dimension, prefixed with current)
         var normalized = linkPath.Replace('\\', '/');
         var parts = normalized.Split('/');
         var fileName = Path.GetFileNameWithoutExtension(parts[^1]);
@@ -357,7 +357,8 @@ public sealed class WikiStore : IWikiStore
         if (parts.Length >= 2 && parts[^2] != ".")
             return $"{parts[^2]}-{fileName}";
 
-        return fileName;
+        // Same-dimension link (starts with ./) — prefix with current dimension
+        return $"{currentDimension.ToString().ToLowerInvariant()}-{fileName}";
     }
 
     private static DateTimeOffset ParseDateTimeOffset(string value)

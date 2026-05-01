@@ -113,10 +113,13 @@ try
 
     // Plugins
     builder.Services.AddSingleton<ITool, WikiQueryTool>();
+    builder.Services.AddSingleton<ITool, KnowledgeSearchTool>();
     builder.Services.AddSingleton<IToolRegistry, PluginHost>();
 
     // Scheduler
     builder.Services.AddSingleton<IScheduler, CronScheduler>();
+    builder.Services.AddSingleton<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>();
+    builder.Services.AddSingleton<LeanKernel.Scheduler.ProactiveTaskRunner>();
 
     // Web API services
     builder.Services.AddSingleton<LogReaderService>();
@@ -245,6 +248,10 @@ public sealed class LeanKernelHostedService : BackgroundService
 
         var router = _services.GetRequiredService<ChannelRouter>();
         await router.StartAsync(ct);
+
+        var taskRunner = _services.GetRequiredService<LeanKernel.Scheduler.ProactiveTaskRunner>();
+        await taskRunner.StartAsync(ct);
+
         _logger.LogInformation("LeanKernel engine running. Waiting for messages.");
 
         try

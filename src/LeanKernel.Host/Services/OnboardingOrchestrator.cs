@@ -157,7 +157,9 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
                 WikiMaintenanceCron = NormalizeRequired(
                     draft.Scheduler.WikiMaintenanceCron,
                     current.Scheduler.WikiMaintenanceCron)
-            }
+            },
+            Auth = current.Auth,
+            Knowledge = current.Knowledge
         };
 
         return merged;

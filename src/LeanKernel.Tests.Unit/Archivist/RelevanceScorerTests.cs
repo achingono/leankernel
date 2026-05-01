@@ -92,4 +92,64 @@ public class RelevanceScorerTests
         Assert.True(enriched.Score > 0.0);
         Assert.Equal(0.9, enriched.SemanticSimilarity);
     }
+
+    [Fact]
+    public void ComputeSourceAwareScore_VectorSource_UsesSemanticSimilarityDirectly()
+    {
+        var vectorResult = new RelevanceScore
+        {
+            EntryId = "vec-1",
+            Content = "Vector content",
+            EstimatedTokens = 10,
+            SemanticSimilarity = 0.85,
+            RecencyDecay = 0.0,
+            DimensionMatch = 0.0,
+            InteractionFrequency = 0.0,
+            SourceType = RelevanceSourceType.Vector
+        };
+
+        var score = vectorResult.ComputeSourceAwareScore();
+        Assert.Equal(0.85, score);
+    }
+
+    [Fact]
+    public void ComputeSourceAwareScore_WikiSource_UsesMultiFactorFormula()
+    {
+        var wikiResult = new RelevanceScore
+        {
+            EntryId = "wiki-1",
+            Content = "Wiki content",
+            EstimatedTokens = 10,
+            SemanticSimilarity = 0.8,
+            RecencyDecay = 1.0,
+            DimensionMatch = 1.0,
+            InteractionFrequency = 0.5,
+            SourceType = RelevanceSourceType.Wiki
+        };
+
+        var score = wikiResult.ComputeSourceAwareScore();
+        var expected = (0.8 * 0.40) + (1.0 * 0.20) + (1.0 * 0.25) + (0.5 * 0.15);
+        Assert.Equal(expected, score, precision: 10);
+    }
+
+    [Fact]
+    public void ComputeSourceAwareScore_VectorWithZeroOtherFactors_StillPassesThreshold()
+    {
+        // This was the critical bug: vector results had only SemanticSimilarity,
+        // so multi-factor scoring produced max 0.40, below 0.65 threshold
+        var vectorResult = new RelevanceScore
+        {
+            EntryId = "vec-2",
+            Content = "Important document",
+            EstimatedTokens = 10,
+            SemanticSimilarity = 0.75,
+            RecencyDecay = 0.0,
+            DimensionMatch = 0.0,
+            InteractionFrequency = 0.0,
+            SourceType = RelevanceSourceType.Vector
+        };
+
+        var score = vectorResult.ComputeSourceAwareScore();
+        Assert.True(score >= 0.65, $"Vector score {score} should exceed threshold 0.65");
+    }
 }

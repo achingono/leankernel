@@ -278,7 +278,7 @@ class Indexer:
         self.tag_resolver = TagResolver(TAG_RULES_JSON, default_tags=["general"])
         self.embedding_client = EmbeddingClient(LITELLM_URL, LITELLM_API_KEY, EMBEDDING_MODEL)
         self.unstructured_client = UnstructuredClient(UNSTRUCTURED_API_URL)
-        self.qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+        self.qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, prefer_grpc=True)
         self._ensure_collection()
 
     def _ensure_collection(self):
@@ -340,16 +340,22 @@ class Indexer:
                 logger.warning(f"No content extracted from: {file_path}")
                 return
 
-            # Delete old vectors for this file
-            self._delete_file_vectors(file_path)
+            # Delete old vectors for this file (best-effort during re-index)
+            try:
+                self._delete_file_vectors(file_path)
+            except Exception as e:
+                logger.debug(f"Pre-index delete skipped for {file_path}: {e}")
 
             # Generate embeddings and upsert
             points = []
+            expected_chunks = len(chunks)
+            failed_chunks = 0
             for i, chunk_text_content in enumerate(chunks):
                 try:
                     embedding = await self.embedding_client.embed(chunk_text_content)
                 except Exception as e:
                     logger.error(f"Embedding failed for chunk {i} of {file_path}: {e}")
+                    failed_chunks += 1
                     continue
 
                 point_id = self._generate_point_id(file_path, i)
@@ -372,9 +378,17 @@ class Indexer:
 
                 points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
 
+            if failed_chunks > 0 and not points:
+                logger.error(f"All chunks failed for {file_path}, skipping state update")
+                return
+
             if points:
                 self.qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
-                logger.info(f"Indexed {len(points)} chunks from: {relative_path}")
+                logger.info(f"Indexed {len(points)}/{expected_chunks} chunks from: {relative_path}")
+
+            if failed_chunks > 0:
+                logger.warning(f"Partial indexing for {relative_path}: {failed_chunks}/{expected_chunks} chunks failed, not persisting state")
+                return
 
             self.state.upsert(file_path, file_hash, len(points), tags)
 
@@ -409,13 +423,16 @@ class Indexer:
         return chunk_text(content, CHUNK_SIZE_TOKENS) if content.strip() else []
 
     def delete_file(self, file_path: str):
-        """Remove all vectors for a deleted file."""
-        self._delete_file_vectors(file_path)
-        self.state.remove(file_path)
-        logger.info(f"Removed vectors for: {file_path}")
+        """Remove all vectors for a deleted file. Only removes state on success."""
+        try:
+            self._delete_file_vectors(file_path)
+            self.state.remove(file_path)
+            logger.info(f"Removed vectors for: {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to delete vectors for {file_path}: {e} — state retained for retry")
 
     def _delete_file_vectors(self, file_path: str):
-        """Delete all vectors associated with a file path."""
+        """Delete all vectors associated with a file path. Raises on failure."""
         if file_path.startswith(WIKI_PATH):
             relative_path = "wiki/" + os.path.relpath(file_path, WIKI_PATH)
         elif file_path.startswith(DOCUMENTS_PATH):
@@ -436,7 +453,8 @@ class Indexer:
                 ),
             )
         except Exception as e:
-            logger.debug(f"Delete vectors failed (may not exist): {e}")
+            logger.error(f"Delete vectors failed for {relative_path}: {e}")
+            raise
 
     @staticmethod
     def _generate_point_id(file_path: str, chunk_index: int) -> int:

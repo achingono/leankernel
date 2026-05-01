@@ -40,6 +40,8 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
     {
         if (!_config.Enabled) return [];
 
+        limit = Math.Clamp(limit, 1, 50);
+
         try
         {
             var exists = await _qdrant.CollectionExistsAsync(_config.CollectionName, ct);
@@ -61,7 +63,8 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
                 Content = GetPayloadString(r, "text") ?? "",
                 EstimatedTokens = (int)Math.Ceiling((GetPayloadString(r, "text") ?? "").Length / 4.0),
                 SemanticSimilarity = r.Score,
-                Score = r.Score
+                Score = r.Score,
+                SourceType = RelevanceSourceType.Vector
             }).ToList();
         }
         catch (Exception ex)

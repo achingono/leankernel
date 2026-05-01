@@ -17,4 +17,14 @@ public interface IContextGatekeeper
         ContextBudget budget,
         string sessionId,
         CancellationToken ct);
+
+    /// <summary>
+    /// Build a minimal, budget-aware context window with agent-scoped knowledge access.
+    /// </summary>
+    Task<ConversationContext> GateContextAsync(
+        LeanKernelMessage query,
+        ContextBudget budget,
+        string sessionId,
+        IReadOnlyList<string> agentKnowledgeTags,
+        CancellationToken ct);
 }

@@ -91,6 +91,46 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
         {
             Enabled = source.Scheduler.Enabled,
             WikiMaintenanceCron = source.Scheduler.WikiMaintenanceCron
+        },
+        Auth = new AuthConfig
+        {
+            Mode = source.Auth.Mode,
+            SessionDurationMinutes = source.Auth.SessionDurationMinutes,
+            TokenDefaultExpirationDays = source.Auth.TokenDefaultExpirationDays,
+            AllowedOrigins = source.Auth.AllowedOrigins.ToArray(),
+            Local = new LocalPasscodeConfig
+            {
+                MinLength = source.Auth.Local.MinLength,
+                MaxFailedAttempts = source.Auth.Local.MaxFailedAttempts,
+                LockoutMinutes = source.Auth.Local.LockoutMinutes
+            },
+            Oidc = new OidcConfig
+            {
+                Authority = source.Auth.Oidc.Authority,
+                ClientId = source.Auth.Oidc.ClientId,
+                ClientSecret = source.Auth.Oidc.ClientSecret,
+                CallbackPath = source.Auth.Oidc.CallbackPath,
+                Scopes = source.Auth.Oidc.Scopes.ToArray(),
+                AdminSubjectClaim = source.Auth.Oidc.AdminSubjectClaim,
+                AdminClaimType = source.Auth.Oidc.AdminClaimType
+            },
+            RateLimit = new RateLimitConfig
+            {
+                LoginPerMinutePerIp = source.Auth.RateLimit.LoginPerMinutePerIp,
+                LoginPerHourPerIp = source.Auth.RateLimit.LoginPerHourPerIp,
+                LoginPerMinuteGlobal = source.Auth.RateLimit.LoginPerMinuteGlobal,
+                TokenCreationPerHour = source.Auth.RateLimit.TokenCreationPerHour
+            }
+        },
+        Knowledge = new KnowledgeConfig
+        {
+            Enabled = source.Knowledge.Enabled,
+            CollectionName = source.Knowledge.CollectionName,
+            EmbeddingDimension = source.Knowledge.EmbeddingDimension,
+            DocumentsPath = source.Knowledge.DocumentsPath,
+            DefaultDocumentTags = source.Knowledge.DefaultDocumentTags.ToArray(),
+            AgentScopes = new Dictionary<string, AgentScopeConfig>(source.Knowledge.AgentScopes),
+            TagRules = source.Knowledge.TagRules.ToList()
         }
     };
 

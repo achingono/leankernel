@@ -69,7 +69,11 @@ public sealed class QdrantConfig
 {
     public string Host { get; set; } = "qdrant";
     public int Port { get; set; } = 6334;
-    public string CollectionName { get; set; } = "LEANKERNEL_wiki";
+    /// <summary>
+    /// Legacy collection name. Use Knowledge.CollectionName for the unified knowledge collection.
+    /// Retained for backward compatibility with existing Qdrant data.
+    /// </summary>
+    public string CollectionName { get; set; } = "LEANKERNEL_knowledge";
     public int EmbeddingDimension { get; set; } = 1536;
 }
 

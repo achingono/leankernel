@@ -199,4 +199,73 @@ public class ContextGatekeeperFullTests
         Assert.NotEmpty(ctx.WikiLeanKernels);
         Assert.Contains("Alice", ctx.WikiLeanKernels[0].Content);
     }
+
+    [Fact]
+    public async Task GateContextAsync_WithAgentTags_PassesTagsToKnowledgeSearch()
+    {
+        var wiki = Substitute.For<IWikiStore>();
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([]));
+
+        var sessions = Substitute.For<ISessionStore>();
+        sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<ConversationTurn>()));
+
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
+        var config = Options.Create(new LeanKernelConfig());
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
+
+        var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "search docs" };
+        var budget = ContextBudget.FromModelWindow(128_000);
+        var tags = new List<string> { "technical", "wiki" };
+
+        await gatekeeper.GateContextAsync(msg, budget, "s1", tags, CancellationToken.None);
+
+        await knowledgeSearch.Received(1).SearchAsync(
+            Arg.Any<string>(),
+            Arg.Is<IReadOnlyList<string>>(t => t.Contains("technical") && t.Contains("wiki")),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GateContextAsync_VectorResults_NotExcludedByThreshold()
+    {
+        var wiki = Substitute.For<IWikiStore>();
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([]));
+
+        var sessions = Substitute.For<ISessionStore>();
+        sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<ConversationTurn>()));
+
+        // Return a vector result with high semantic similarity
+        var vectorResult = new RelevanceScore
+        {
+            EntryId = "doc-1",
+            Content = "Technical document content",
+            EstimatedTokens = 20,
+            SemanticSimilarity = 0.85,
+            Score = 0.85,
+            SourceType = RelevanceSourceType.Vector
+        };
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore> { vectorResult }));
+
+        // Default threshold is 0.65 — vector result with 0.85 semantic should pass
+        var config = Options.Create(new LeanKernelConfig());
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
+
+        var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "technical question" };
+        var budget = ContextBudget.FromModelWindow(128_000);
+
+        var ctx = await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
+
+        Assert.NotEmpty(ctx.RetrievedLeanKernels);
+        Assert.Equal("doc-1", ctx.RetrievedLeanKernels[0].EntryId);
+    }
 }
