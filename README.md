@@ -64,6 +64,58 @@ Knowledge is stored as structured facts across six dimensions:
 
 Each fact carries confidence scores, source citations, and is automatically extracted from conversations via heuristic pattern matching.
 
+Wiki entries are stored as **markdown files** with YAML frontmatter — human-readable, editable, and git-friendly:
+
+```markdown
+---
+id: who-alice-smith
+dimension: who
+subject: Alice Smith
+lastAccessed: 2024-06-15T10:00:00Z
+accessCount: 12
+---
+
+# Alice Smith
+
+- Alice is a software engineer at Acme Corp <!--{confidence: 0.9, source: session-123, confirmed: 2024-06-01}-->
+- Alice prefers TypeScript over JavaScript <!--{confidence: 0.85, source: session-456, confirmed: 2024-06-10}-->
+
+## Related
+
+- [Project Atlas](../what/project-atlas.md)
+```
+
+### Knowledge Indexing
+
+LeanKernel uses a **sidecar indexer** to unify wiki facts and document search into a single vector index:
+
+| Service | Role |
+|---------|------|
+| **LeanKernel-indexer** | Python sidecar: watches wiki + documents, generates embeddings, stores in Qdrant |
+| **unstructured** | Parses complex documents (PDF, DOCX, EPUB) into structured chunks |
+| **Qdrant** (`LEANKERNEL_knowledge`) | Unified vector collection for wiki + documents |
+
+**Agent-scoped search**: Each agent sees only knowledge matching its configured tags. Configure in `appsettings.json`:
+
+```json
+{
+  "LeanKernel": {
+    "Knowledge": {
+      "AgentScopes": {
+        "research": { "tags": ["*"] },
+        "code": { "tags": ["wiki", "technical"] }
+      },
+      "TagRules": [
+        { "pathPattern": "wiki/**", "tags": ["wiki"] },
+        { "pathPattern": "documents/technical/**", "tags": ["technical"] }
+      ]
+    }
+  }
+}
+```
+
+To add documents, drop files into `./data/documents/`. The indexer automatically detects, parses, embeds, and indexes them.
+
 ## Stack
 
 | Layer | Technology | Version |
@@ -74,6 +126,8 @@ Each fact carries confidence scores, source citations, and is automatically extr
 | OpenAI SDK | OpenAI | 2.10.0 |
 | LLM Proxy | LiteLLM | v1.83.7-stable |
 | Vector DB | Qdrant | v1.17.1 |
+| Document Parser | Unstructured.io | latest |
+| Knowledge Indexer | Python 3.12 (sidecar) | custom |
 | Messaging | signal-cli | latest |
 | Logging | Serilog | 9.0.0 |
 | Containers | Docker Compose | v2 |
@@ -121,19 +175,24 @@ dotnet test LeanKernel.sln -v minimal
 
 ```
 LeanKernel/
-├── docker-compose.yml          # 3 services: engine, litellm, qdrant
+├── docker-compose.yml          # 5 services: engine, litellm, qdrant, unstructured, indexer
 ├── Dockerfile                  # Multi-stage .NET 10 build
 ├── .env.example                # Environment variables template
 ├── config/
 │   └── litellm/config.yaml     # LLM model routing
 ├── data/
-│   ├── wiki/                   # 5W1H knowledge filesystem
+│   ├── wiki/                   # 5W1H knowledge filesystem (.md files)
 │   │   ├── who/ what/ where/ when/ why/ how/
-│   │   └── .LeanKernel/             # Embedding cache, digest
+│   │   └── .LeanKernel/             # Internal metadata
+│   ├── documents/              # Drop PDFs, ebooks, articles here
 │   ├── sessions/               # Conversation history
 │   ├── qdrant/                 # Vector DB storage
 │   └── logs/                   # Rolling application logs
 ├── scripts/
+│   ├── indexer/                # Knowledge indexer sidecar (Python)
+│   │   ├── Dockerfile
+│   │   ├── indexer.py
+│   │   └── requirements.txt
 │   ├── setup-signal.sh         # Signal registration helper
 │   └── wiki-backup.sh          # Wiki backup/restore
 └── src/

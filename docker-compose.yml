@@ -1,5 +1,6 @@
 # docker-compose.yml — LeanKernel AI Agent
-# Services: Engine (.NET 10), LiteLLM (model proxy), Qdrant (vector DB)
+# Services: Engine (.NET 10), LiteLLM (model proxy), Qdrant (vector DB),
+#           Unstructured (document parser), Indexer (knowledge pipeline)
 
 services:
   # ── LeanKernel Engine (Core Application) ───────────────────────────
@@ -17,9 +18,12 @@ services:
       - LEANKERNEL__Qdrant__Port=6334
       - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
       - LEANKERNEL__Wiki__BasePath=/app/data/wiki
+      - LEANKERNEL__Knowledge__Enabled=true
+      - LEANKERNEL__Knowledge__CollectionName=LEANKERNEL_knowledge
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data/wiki:/app/data/wiki
+      - ./data/documents:/app/data/documents
       - ./data/sessions:/app/data/sessions
       - ./data/logs:/app/data/logs
       - signal-config:/home/LeanKernel/.local/share/signal-cli
@@ -94,6 +98,69 @@ services:
       timeout: 5s
       retries: 3
 
+  # ── Unstructured (Document Parser) ───────────────────────────
+  unstructured:
+    image: quay.io/unstructured-io/unstructured-api:latest
+    container_name: LeanKernel-unstructured
+    ports:
+      - "${UNSTRUCTURED_PORT:-8000}:8000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── LeanKernel Indexer (Knowledge Pipeline Sidecar) ────────────────
+  LeanKernel-indexer:
+    build:
+      context: ./scripts/indexer
+      dockerfile: Dockerfile
+    container_name: LeanKernel-indexer
+    environment:
+      - UNSTRUCTURED_API_URL=http://unstructured:8000
+      - LITELLM_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6334
+      - COLLECTION_NAME=LEANKERNEL_knowledge
+      - WIKI_PATH=/app/data/wiki
+      - DOCUMENTS_PATH=/app/data/documents
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-1536}
+      - RESCAN_INTERVAL_SECONDS=${INDEXER_RESCAN_INTERVAL:-300}
+      - WIKI_DEBOUNCE_SECONDS=5
+      - STATE_DB_PATH=/app/data/indexer-state.db
+      - TAG_RULES_JSON=${TAG_RULES_JSON:-[{"pathPattern":"wiki/**","tags":["wiki"]},{"pathPattern":"documents/technical/**","tags":["technical"]},{"pathPattern":"documents/books/**","tags":["books","general"]}]}
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - ./data/wiki:/app/data/wiki
+      - ./data/documents:/app/data/documents
+      - indexer-state:/app/data
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+      unstructured:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
 volumes:
   signal-config:
+    driver: local
+  indexer-state:
     driver: local

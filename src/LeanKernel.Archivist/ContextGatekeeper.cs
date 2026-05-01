@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
@@ -17,20 +16,20 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 {
     private readonly IWikiStore _wiki;
     private readonly ISessionStore _sessions;
-    private readonly WikiIndexer _indexer;
+    private readonly IKnowledgeSearchService _knowledgeSearch;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ContextGatekeeper> _logger;
 
     public ContextGatekeeper(
         IWikiStore wiki,
         ISessionStore sessions,
-        WikiIndexer indexer,
+        IKnowledgeSearchService knowledgeSearch,
         IOptions<LeanKernelConfig> config,
         ILogger<ContextGatekeeper> logger)
     {
         _wiki = wiki;
         _sessions = sessions;
-        _indexer = indexer;
+        _knowledgeSearch = knowledgeSearch;
         _config = config.Value;
         _logger = logger;
     }
@@ -150,12 +149,13 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     {
         try
         {
-            var results = await _indexer.SearchAsync(query.Content, limit: 10, ct);
+            // Use wildcard tags for context gatekeeper (full access for internal retrieval)
+            var results = await _knowledgeSearch.SearchAsync(query.Content, ["*"], limit: 10, ct);
             return results;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Vector search failed — falling back to wiki-only context");
+            _logger.LogWarning(ex, "Knowledge search failed — falling back to wiki-only context");
             return [];
         }
     }

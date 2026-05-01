@@ -18,4 +18,10 @@ public sealed record AgentDefinition
 
     /// <summary>Categories of tasks this agent handles.</summary>
     public List<string> Categories { get; init; } = [];
+
+    /// <summary>
+    /// Knowledge tags this agent can access for document/wiki search.
+    /// Use ["*"] for unrestricted access. Empty means wiki-only (default).
+    /// </summary>
+    public List<string> KnowledgeTags { get; init; } = ["wiki"];
 }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Serilog;
 using LeanKernel.Archivist;
 using LeanKernel.Archivist.Embedding;
+using LeanKernel.Archivist.Knowledge;
 using LeanKernel.Archivist.Sessions;
 using LeanKernel.Archivist.Wiki;
 using LeanKernel.Commander;
@@ -85,7 +86,7 @@ try
     builder.Services.AddHttpClient("onboarding-probe");
 
     // Archivist
-    builder.Services.AddSingleton<WikiIndexer>();
+    builder.Services.AddSingleton<IKnowledgeSearchService, KnowledgeSearchService>();
     builder.Services.AddSingleton<WikiCompiler>();
     builder.Services.AddSingleton<ConversationCompactor>();
     builder.Services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();

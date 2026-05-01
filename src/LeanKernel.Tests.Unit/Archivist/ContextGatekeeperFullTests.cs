@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using LeanKernel.Archivist;
-using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
@@ -100,11 +99,12 @@ public class ContextGatekeeperFullTests
         sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new List<ConversationTurn>()));
 
-        var embeddings = Substitute.For<IEmbeddingService>();
-        var config = Options.Create(new LeanKernelConfig());
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
 
-        var indexer = new WikiIndexer(embeddings, config, NullLogger<WikiIndexer>.Instance);
-        var gatekeeper = new ContextGatekeeper(wiki, sessions, indexer, config, NullLogger<ContextGatekeeper>.Instance);
+        var config = Options.Create(new LeanKernelConfig());
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
 
         var msg = new LeanKernelMessage
         {
@@ -142,10 +142,12 @@ public class ContextGatekeeperFullTests
         sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(history));
 
-        var embeddings = Substitute.For<IEmbeddingService>();
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
         var config = Options.Create(new LeanKernelConfig());
-        var indexer = new WikiIndexer(embeddings, config, NullLogger<WikiIndexer>.Instance);
-        var gatekeeper = new ContextGatekeeper(wiki, sessions, indexer, config, NullLogger<ContextGatekeeper>.Instance);
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
 
         var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "hi" };
         var budget = ContextBudget.FromModelWindow(128_000);
@@ -182,10 +184,12 @@ public class ContextGatekeeperFullTests
         sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new List<ConversationTurn>()));
 
-        var embeddings = Substitute.For<IEmbeddingService>();
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
         var config = Options.Create(new LeanKernelConfig { Context = new ContextConfig { MinRelevanceThreshold = 0.0 } });
-        var indexer = new WikiIndexer(embeddings, config, NullLogger<WikiIndexer>.Instance);
-        var gatekeeper = new ContextGatekeeper(wiki, sessions, indexer, config, NullLogger<ContextGatekeeper>.Instance);
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
 
         var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "who is Alice?" };
         var budget = ContextBudget.FromModelWindow(128_000);

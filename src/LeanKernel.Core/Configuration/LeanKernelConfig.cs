@@ -11,6 +11,7 @@ public sealed class LeanKernelConfig
     public QdrantConfig Qdrant { get; set; } = new();
     public SignalConfig Signal { get; set; } = new();
     public WikiConfig Wiki { get; set; } = new();
+    public KnowledgeConfig Knowledge { get; set; } = new();
     public ContextConfig Context { get; set; } = new();
     public SchedulerConfig Scheduler { get; set; } = new();
     public AuthConfig Auth { get; set; } = new();
@@ -95,6 +96,29 @@ public sealed class ContextConfig
     public double InteractionFrequencyWeight { get; set; } = 0.15;
     public double MinRelevanceThreshold { get; set; } = 0.65;
     public int MaxConversationTurns { get; set; } = 15;
+}
+
+public sealed class KnowledgeConfig
+{
+    public bool Enabled { get; set; } = true;
+    public string CollectionName { get; set; } = "LEANKERNEL_knowledge";
+    public int EmbeddingDimension { get; set; } = 1536;
+    public string DocumentsPath { get; set; } = "/app/data/documents";
+    public string[] DefaultDocumentTags { get; set; } = ["general"];
+    public Dictionary<string, AgentScopeConfig> AgentScopes { get; set; } = new();
+    public List<TagRule> TagRules { get; set; } = [];
+}
+
+public sealed class AgentScopeConfig
+{
+    public string[] Tags { get; set; } = [];
+    public string Description { get; set; } = "";
+}
+
+public sealed class TagRule
+{
+    public string PathPattern { get; set; } = "";
+    public string[] Tags { get; set; } = [];
 }
 
 public sealed class SchedulerConfig
