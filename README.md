@@ -179,7 +179,10 @@ LeanKernel/
 ├── Dockerfile                  # Multi-stage .NET 10 build
 ├── .env.example                # Environment variables template
 ├── config/
-│   └── litellm/config.yaml     # LLM model routing
+│   ├── render_litellm_config.py # Dynamic LiteLLM config renderer
+│   └── litellm/
+│       ├── Dockerfile          # LiteLLM container image (dynamic config startup)
+│       └── config.yaml         # Multi-provider/multi-tier routing template
 ├── data/
 │   ├── wiki/                   # 5W1H knowledge filesystem (.md files)
 │   │   ├── who/ what/ where/ when/ why/ how/
@@ -263,22 +266,74 @@ LEANKERNEL__Auth__Oidc__AdminClaimType=email
 
 See `docs/prd-authentication.md` for the full authentication PRD.
 
-### LiteLLM Model Routing
+### LiteLLM Dynamic Routing
 
-Configure `config/litellm/config.yaml` to route to different providers:
+LiteLLM runs from a dedicated container image built from `config/litellm/Dockerfile`.
+At startup, it renders the routing template using `config/render_litellm_config.py`:
+
+```bash
+python3 /app/render_litellm_config.py /app/config.yaml /tmp/litellm_config.yaml
+```
+
+This keeps `config/litellm/config.yaml` as the source template while automatically
+removing model blocks for providers missing required environment variables.
+
+### LiteLLM Provider Environment Variables
+
+Configure these in `.env` (or your secret manager):
+
+```bash
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+GROQ_API_KEY=
+GROQ_API_KEY_2=
+GEMINI_API_KEY=
+GEMINI_API_KEY_2=
+GEMINI_API_KEY_3=
+AZURE_AI_API_KEY=
+AZURE_AI_API_BASE=
+AZURE_AI_API_KEY_2=
+AZURE_AI_API_BASE_2=
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+LITELLM_MASTER_KEY=sk-LeanKernel-local
+LITELLM_SALT_KEY=change-me-to-random-string
+```
+
+### LiteLLM Model Routing Template
+
+`config/litellm/config.yaml` defines:
+
+- Multiple providers (Groq, Gemini, Azure AI, local Ollama)
+- Multiple keys per provider for load distribution
+- Tiered model groups (`tier1`, `tier2`, `tier3`) plus OpenAI-compatible aliases
+- Order-based routing + fallback chains
+
+Example shape:
 
 ```yaml
+x-providers:
+  groq1:   &provider-groq1   { api_key: "os.environ/GROQ_API_KEY" }
+  groq2:   &provider-groq2   { api_key: "os.environ/GROQ_API_KEY_2" }
+  gemini1: &provider-gemini1 { api_key: "os.environ/GEMINI_API_KEY" }
+  azure1:  &provider-azure1  { api_key: "os.environ/AZURE_AI_API_KEY", api_base: "os.environ/AZURE_AI_API_BASE" }
+
 model_list:
-  - model_name: gpt-4o-mini
+  - model_name: "tier1"
     litellm_params:
-      model: openai/gpt-4o-mini
-  - model_name: claude-sonnet
+      <<: *provider-groq1
+      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
+      order: 1
+  - model_name: "tier1"
     litellm_params:
-      model: anthropic/claude-sonnet-4-20250514
-  - model_name: local-llama
-    litellm_params:
-      model: ollama/llama3
-      api_base: http://host.docker.internal:11434
+      <<: *provider-gemini1
+      model: "gemini/gemini-2.5-flash"
+      order: 2
+
+router_settings:
+  routing_strategy: "simple-shuffle"
+  enable_pre_call_checks: true
+  fallbacks:
+    - tier1: ["tier2", "tier3"]
 ```
 
 ## Multi-Agent System

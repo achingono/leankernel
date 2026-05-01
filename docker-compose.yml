@@ -50,16 +50,25 @@ services:
 
   # ── LiteLLM Proxy (Model Router) ─────────────────────────────
   litellm:
-    image: ghcr.io/berriai/litellm:v1.83.7-stable
+    build:
+      context: .
+      dockerfile: config/litellm/Dockerfile
     container_name: LeanKernel-litellm
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
       - LITELLM_SALT_KEY=${LITELLM_SALT_KEY:-LeanKernel-salt-change-me}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-    volumes:
-      - ./config/litellm/config.yaml:/app/config.yaml
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_API_KEY_2=${GROQ_API_KEY_2:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_API_KEY_2=${GEMINI_API_KEY_2:-}
+      - GEMINI_API_KEY_3=${GEMINI_API_KEY_3:-}
+      - AZURE_AI_API_KEY=${AZURE_AI_API_KEY:-}
+      - AZURE_AI_API_BASE=${AZURE_AI_API_BASE:-}
+      - AZURE_AI_API_KEY_2=${AZURE_AI_API_KEY_2:-}
+      - AZURE_AI_API_BASE_2=${AZURE_AI_API_BASE_2:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
     ports:
       - "${LITELLM_PORT:-4000}:4000"
     extra_hosts:
