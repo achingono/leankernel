@@ -1,7 +1,10 @@
 @page "/wiki"
 @using System.Diagnostics.CodeAnalysis
+@using LeanKernel.Core.Enums
+@using LeanKernel.Core.Interfaces
+@using LeanKernel.Core.Models
 @attribute [ExcludeFromCodeCoverage]
-@inject HttpClient Http
+@inject IWikiStore WikiStore
 @rendermode InteractiveServer
 
 <div class="page-header">
@@ -129,8 +132,8 @@
     private static readonly string[] AllDimensions = ["all", "who", "what", "where", "when", "why", "how"];
     private string ActiveDimension = "all";
     private string SearchQuery = "";
-    private List<WikiEntryDto> Entries = [];
-    private WikiEntryDto? SelectedEntry;
+    private List<WikiEntry> Entries = [];
+    private WikiEntry? SelectedEntry;
     private Dictionary<string, int> DimensionCounts = [];
 
     protected override async Task OnInitializedAsync()
@@ -141,37 +144,46 @@
 
     private async Task LoadDimensionCounts()
     {
-        try
+        DimensionCounts.Clear();
+        var total = 0;
+        foreach (var dim in Enum.GetValues<WikiDimension>())
         {
-            var dims = await Http.GetFromJsonAsync<List<DimSummary>>("api/wiki/dimensions");
-            if (dims is not null)
-            {
-                DimensionCounts["all"] = dims.Sum(d => d.Count);
-                foreach (var d in dims)
-                    DimensionCounts[d.Dimension ?? ""] = d.Count;
-            }
+            var entries = await WikiStore.ListByDimensionAsync(dim, CancellationToken.None);
+            var key = dim.ToString().ToLowerInvariant();
+            var count = entries.Count;
+            DimensionCounts[key] = count;
+            total += count;
         }
-        catch { }
+
+        DimensionCounts["all"] = total;
     }
 
     private async Task LoadEntries()
     {
-        try
+        if (ActiveDimension != "all" && Enum.TryParse<WikiDimension>(ActiveDimension, true, out var dim))
         {
-            var url = "api/wiki/entries";
-            var query = new List<string>();
-
-            if (ActiveDimension != "all")
-                query.Add($"dimension={ActiveDimension}");
-            if (!string.IsNullOrWhiteSpace(SearchQuery))
-                query.Add($"q={Uri.EscapeDataString(SearchQuery)}");
-
-            if (query.Count > 0)
-                url += "?" + string.Join("&", query);
-
-            Entries = await Http.GetFromJsonAsync<List<WikiEntryDto>>(url) ?? [];
+            var filtered = await WikiStore.ListByDimensionAsync(dim, CancellationToken.None);
+            Entries = ApplyQueryFilter(filtered).ToList();
         }
-        catch { Entries = []; }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(SearchQuery))
+            {
+                var results = await WikiStore.QueryAsync(new WikiQuery { TextQuery = SearchQuery }, CancellationToken.None);
+                Entries = [.. results];
+            }
+            else
+            {
+                var all = new List<WikiEntry>();
+                foreach (var d in Enum.GetValues<WikiDimension>())
+                {
+                    var entries = await WikiStore.ListByDimensionAsync(d, CancellationToken.None);
+                    all.AddRange(entries);
+                }
+
+                Entries = all;
+            }
+        }
     }
 
     private async Task SelectDimension(string dim)
@@ -181,7 +193,7 @@
         await LoadEntries();
     }
 
-    private void SelectEntry(WikiEntryDto entry) => SelectedEntry = entry;
+    private void SelectEntry(WikiEntry entry) => SelectedEntry = entry;
 
     private async Task OnSearch() => await LoadEntries();
 
@@ -189,24 +201,13 @@
         confidence >= 0.7 ? "confidence-high" :
         confidence >= 0.4 ? "confidence-medium" : "confidence-low";
 
-    private record DimSummary { public string? Dimension { get; init; } public int Count { get; init; } }
-
-    private record WikiEntryDto
+    private IEnumerable<WikiEntry> ApplyQueryFilter(IEnumerable<WikiEntry> entries)
     {
-        public string Id { get; init; } = "";
-        public string Dimension { get; init; } = "";
-        public string Subject { get; init; } = "";
-        public List<WikiFactDto> Facts { get; init; } = [];
-        public List<string> Relations { get; init; } = [];
-        public DateTimeOffset LastAccessed { get; init; }
-        public int AccessCount { get; init; }
-    }
+        if (string.IsNullOrWhiteSpace(SearchQuery))
+            return entries;
 
-    private record WikiFactDto
-    {
-        public string Claim { get; init; } = "";
-        public double Confidence { get; init; }
-        public string? Source { get; init; }
-        public DateTimeOffset LastConfirmed { get; init; }
+        return entries.Where(e =>
+            e.Subject.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) ||
+            e.Facts.Any(f => f.Claim.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase)));
     }
 }

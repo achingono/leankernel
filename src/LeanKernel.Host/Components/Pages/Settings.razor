@@ -1,7 +1,9 @@
 @page "/settings"
 @using System.Diagnostics.CodeAnalysis
+@using Microsoft.Extensions.Options
+@using LeanKernel.Core.Configuration
 @attribute [ExcludeFromCodeCoverage]
-@inject HttpClient Http
+@inject IOptions<LeanKernelConfig> LeanKernelConfig
 @rendermode InteractiveServer
 
 <div class="page-header">
@@ -167,11 +169,62 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        try
+        var cfg = LeanKernelConfig.Value;
+        Config = new ConfigResponse
         {
-            Config = await Http.GetFromJsonAsync<ConfigResponse>("api/config");
-        }
-        catch { }
+            LiteLlm = new LiteLlmDto
+            {
+                BaseUrl = cfg.LiteLlm.BaseUrl,
+                ApiKey = MaskSecret(cfg.LiteLlm.ApiKey),
+                DefaultModel = cfg.LiteLlm.DefaultModel,
+                EmbeddingModel = cfg.LiteLlm.EmbeddingModel,
+                ContextWindowTokens = cfg.LiteLlm.ContextWindowTokens
+            },
+            Qdrant = new QdrantDto
+            {
+                Host = cfg.Qdrant.Host,
+                Port = cfg.Qdrant.Port,
+                CollectionName = cfg.Qdrant.CollectionName,
+                EmbeddingDimension = cfg.Qdrant.EmbeddingDimension
+            },
+            Signal = new SignalDto
+            {
+                CliPath = cfg.Signal.CliPath,
+                Account = MaskSecret(cfg.Signal.Account),
+                Enabled = cfg.Signal.Enabled
+            },
+            Wiki = new WikiDto
+            {
+                BasePath = cfg.Wiki.BasePath,
+                MaxFactsPerEntry = cfg.Wiki.MaxFactsPerEntry,
+                StaleFactDays = cfg.Wiki.StaleFactDays,
+                MinConfidenceThreshold = cfg.Wiki.MinConfidenceThreshold
+            },
+            Context = new ContextDto
+            {
+                SemanticSimilarityWeight = cfg.Context.SemanticSimilarityWeight,
+                RecencyDecayWeight = cfg.Context.RecencyDecayWeight,
+                DimensionMatchWeight = cfg.Context.DimensionMatchWeight,
+                InteractionFrequencyWeight = cfg.Context.InteractionFrequencyWeight,
+                MinRelevanceThreshold = cfg.Context.MinRelevanceThreshold,
+                MaxConversationTurns = cfg.Context.MaxConversationTurns
+            },
+            Scheduler = new SchedulerDto
+            {
+                Enabled = cfg.Scheduler.Enabled,
+                WikiMaintenanceCron = cfg.Scheduler.WikiMaintenanceCron
+            }
+        };
+
+        await Task.CompletedTask;
+    }
+
+    private static string MaskSecret(string value)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length < 8)
+            return "***";
+
+        return value[..4] + new string('*', value.Length - 4);
     }
 
     private record ConfigResponse

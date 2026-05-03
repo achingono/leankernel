@@ -1,7 +1,8 @@
 @page "/files"
 @using System.Diagnostics.CodeAnalysis
+@using LeanKernel.Host.Services
 @attribute [ExcludeFromCodeCoverage]
-@inject HttpClient Http
+@inject FileBrowserService Browser
 @rendermode InteractiveServer
 
 <div class="page-header">
@@ -76,8 +77,8 @@
 
 @code {
     private string CurrentPath = "";
-    private FileBrowseResultDto? BrowseResult;
-    private FileReadResultDto? FileContent;
+    private FileBrowseResult? BrowseResult;
+    private FileReadResult? FileContent;
     private string? FileError;
 
     protected override async Task OnInitializedAsync()
@@ -87,21 +88,16 @@
 
     private async Task Browse(string path)
     {
-        try
-        {
-            CurrentPath = path;
-            FileContent = null;
-            FileError = null;
-            var url = string.IsNullOrEmpty(path) ? "api/files/browse" : $"api/files/browse?path={Uri.EscapeDataString(path)}";
-            BrowseResult = await Http.GetFromJsonAsync<FileBrowseResultDto>(url);
-        }
-        catch (Exception ex)
-        {
-            FileError = ex.Message;
-        }
+        CurrentPath = path;
+        FileContent = null;
+        FileError = null;
+        BrowseResult = Browser.Browse(path);
+        if (BrowseResult.Error is not null)
+            FileError = BrowseResult.Error;
+        await Task.CompletedTask;
     }
 
-    private async Task OnItemClick(FileItemDto item)
+    private async Task OnItemClick(FileSystemItem item)
     {
         if (item.IsDirectory)
         {
@@ -115,14 +111,11 @@
 
     private async Task ReadFile(string path)
     {
-        try
+        FileError = null;
+        FileContent = await Browser.ReadAsync(path, CancellationToken.None);
+        if (FileContent.Error is not null)
         {
-            FileError = null;
-            FileContent = await Http.GetFromJsonAsync<FileReadResultDto>($"api/files/read?path={Uri.EscapeDataString(path)}");
-        }
-        catch (Exception ex)
-        {
-            FileError = ex.Message;
+            FileError = FileContent.Error;
             FileContent = null;
         }
     }
@@ -154,25 +147,4 @@
             _ => "📄"
         };
 
-    private record FileBrowseResultDto
-    {
-        public string CurrentPath { get; init; } = "";
-        public List<FileItemDto> Entries { get; init; } = [];
-    }
-
-    private record FileItemDto
-    {
-        public string Name { get; init; } = "";
-        public string Path { get; init; } = "";
-        public bool IsDirectory { get; init; }
-        public long Size { get; init; }
-    }
-
-    private record FileReadResultDto
-    {
-        public string? Path { get; init; }
-        public string? Content { get; init; }
-        public long Size { get; init; }
-        public string? Extension { get; init; }
-    }
 }

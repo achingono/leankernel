@@ -1,9 +1,13 @@
 @page "/"
 @using System.Diagnostics.CodeAnalysis
+@using Microsoft.Extensions.Options
+@using LeanKernel.Core.Configuration
+@using LeanKernel.Core.Enums
+@using LeanKernel.Core.Interfaces
 @attribute [ExcludeFromCodeCoverage]
-@using System.Text.Json
-@inject HttpClient Http
-@inject NavigationManager Nav
+@inject ISessionStore SessionStore
+@inject IWikiStore WikiStore
+@inject IOptions<LeanKernelConfig> LeanKernelConfig
 
 <div class="page-header">
     <h1><span class="text-neon">◆</span> Dashboard</h1>
@@ -86,17 +90,60 @@
 </div>
 
 @code {
+    private static readonly DateTime StartTime = DateTime.UtcNow;
     private StatsResponse? Stats;
     private List<DimensionSummary>? Dimensions;
 
     protected override async Task OnInitializedAsync()
     {
-        try
+        var sessionList = await SessionStore.ListSessionsAsync(CancellationToken.None);
+
+        var wikiCounts = new Dictionary<string, int>();
+        var totalFacts = 0;
+        var dimensionSummary = new List<DimensionSummary>();
+
+        foreach (var dim in Enum.GetValues<WikiDimension>())
         {
-            Stats = await Http.GetFromJsonAsync<StatsResponse>("api/stats");
-            Dimensions = await Http.GetFromJsonAsync<List<DimensionSummary>>("api/wiki/dimensions");
+            var entries = await WikiStore.ListByDimensionAsync(dim, CancellationToken.None);
+            var key = dim.ToString().ToLowerInvariant();
+            var count = entries.Count;
+            var facts = entries.Sum(e => e.Facts.Count);
+
+            wikiCounts[key] = count;
+            totalFacts += facts;
+            dimensionSummary.Add(new DimensionSummary
+            {
+                Dimension = key,
+                Count = count,
+                TotalFacts = facts
+            });
         }
-        catch { /* API might not be ready */ }
+
+        var cfg = LeanKernelConfig.Value;
+        Stats = new StatsResponse
+        {
+            Uptime = (DateTime.UtcNow - StartTime).ToString(@"dd\.hh\:mm\:ss"),
+            Sessions = new SessionStats { Total = sessionList.Count },
+            Wiki = new WikiStats
+            {
+                TotalEntries = wikiCounts.Values.Sum(),
+                TotalFacts = totalFacts
+            },
+            Config = new ConfigStats
+            {
+                Model = cfg.LiteLlm.DefaultModel,
+                ContextWindow = cfg.LiteLlm.ContextWindowTokens,
+                SchedulerEnabled = cfg.Scheduler.Enabled,
+                SignalEnabled = cfg.Signal.Enabled
+            },
+            Environment = new EnvStats
+            {
+                DotnetVersion = Environment.Version.ToString(),
+                ProcessMemoryMb = Math.Round(Environment.WorkingSet / 1_048_576.0, 1)
+            }
+        };
+
+        Dimensions = dimensionSummary;
     }
 
     private record StatsResponse

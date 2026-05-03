@@ -1,7 +1,8 @@
 @page "/logs"
 @using System.Diagnostics.CodeAnalysis
+@using LeanKernel.Host.Services
 @attribute [ExcludeFromCodeCoverage]
-@inject HttpClient Http
+@inject LogReaderService LogReader
 @rendermode InteractiveServer
 
 <div class="page-header">
@@ -63,7 +64,7 @@
 @code {
     private string SearchQuery = "";
     private string SelectedLevel = "";
-    private LogSearchResultDto? LogResult;
+    private LogSearchResult? LogResult;
 
     protected override async Task OnInitializedAsync()
     {
@@ -72,21 +73,12 @@
 
     private async Task LoadLogs()
     {
-        try
-        {
-            var query = new List<string>();
-            if (!string.IsNullOrWhiteSpace(SearchQuery))
-                query.Add($"q={Uri.EscapeDataString(SearchQuery)}");
-            if (!string.IsNullOrEmpty(SelectedLevel))
-                query.Add($"level={SelectedLevel}");
-
-            var url = "api/logs";
-            if (query.Count > 0)
-                url += "?" + string.Join("&", query);
-
-            LogResult = await Http.GetFromJsonAsync<LogSearchResultDto>(url);
-        }
-        catch { LogResult = new LogSearchResultDto(); }
+        LogResult = await LogReader.SearchAsync(
+            string.IsNullOrWhiteSpace(SearchQuery) ? null : SearchQuery,
+            string.IsNullOrWhiteSpace(SelectedLevel) ? null : SelectedLevel,
+            since: null,
+            limit: 300,
+            ct: CancellationToken.None);
     }
 
     private static string GetLogClass(string line)
@@ -98,15 +90,4 @@
         return "";
     }
 
-    private record LogSearchResultDto
-    {
-        public List<LogLineDto>? Lines { get; init; }
-        public int TotalFiles { get; init; }
-    }
-
-    private record LogLineDto
-    {
-        public string Content { get; init; } = "";
-        public string File { get; init; } = "";
-    }
 }
