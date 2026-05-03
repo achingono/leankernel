@@ -1,258 +1,144 @@
+providers:
+  groq:
+    keys:
+      - source: env
+        name: GROQ_API_KEY
+      - source: env
+        name: GROQ_API_KEY_2
+    models:
+      - id: scout
+        name: meta-llama/llama-4-scout-17b-16e-instruct
+        max_tokens: 8192
+  gemini:
+    keys:
+      - source: env
+        name: GEMINI_API_KEY
+      - source: env
+        name: GEMINI_API_KEY_2
+      - source: env
+        name: GEMINI_API_KEY_3
+    models:
+      - id: flash
+        name: gemini-2.5-flash
+        max_tokens: 8192
+  azure:
+    keys:
+      - source: env
+        name: AZURE_AI_API_KEY
+        api_base_env: AZURE_AI_API_BASE
+      - source: env
+        name: AZURE_AI_API_KEY_2
+        api_base_env: AZURE_AI_API_BASE_2
+    models:
+      - id: kimi_k2_5
+        name: kimi-k2.5
+        max_tokens: 8192
+      - id: gpt_5_2_chat
+        name: gpt-5.2-chat
+        max_tokens: 32768
+  ollama:
+    base_url:
+      - source: env
+        name: OLLAMA_BASE_URL
+    models:
+      - id: gemma4_26b
+        name: gemma4:26b
+        max_tokens: 32768
+  openai:
+    keys:
+      - source: env
+        name: OPENAI_API_KEY
+    models:
+      - id: text_embedding_3_small
+        name: text-embedding-3-small
+        mode: embedding
+        dimensions: 1536
 
-# YAML anchors for shared model_info and provider credential blocks.
-x-model-info:
-  small:  &model-info-small  { max_tokens: 8192,  mode: chat, supports_function_calling: true }
-  medium: &model-info-medium { max_tokens: 32768, mode: chat, supports_function_calling: true }
-  large:  &model-info-large  { max_tokens: 65536, mode: chat, supports_function_calling: true }
-
-x-providers:
-  groq1:    &provider-groq1    { api_key: "os.environ/GROQ_API_KEY" }
-  groq2:    &provider-groq2    { api_key: "os.environ/GROQ_API_KEY_2" }
-  gemini1:  &provider-gemini1  { api_key: "os.environ/GEMINI_API_KEY" }
-  gemini2:  &provider-gemini2  { api_key: "os.environ/GEMINI_API_KEY_2" }
-  gemini3:  &provider-gemini3  { api_key: "os.environ/GEMINI_API_KEY_3" }
-  azure1:   &provider-azure1   { api_key: "os.environ/AZURE_AI_API_KEY", api_base: "os.environ/AZURE_AI_API_BASE" }
-  azure2:   &provider-azure2   { api_key: "os.environ/AZURE_AI_API_KEY_2", api_base: "os.environ/AZURE_AI_API_BASE_2" }
-  local:    &provider-local    { api_base: "os.environ/OLLAMA_BASE_URL", api_key: "local" }
-
-model_list:
-  # Tier 1: Simple tasks
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-groq1
-      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
+routes:
+  small:
+    - provider: groq
+      model: scout
+      keys: [groq1, groq2]
       order: 1
-    model_info: *model-info-small
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-groq2
-      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
-      order: 1
-    model_info: *model-info-small
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-gemini1
-      model: "gemini/gemini-2.5-flash"
+    - provider: gemini
+      model: flash
+      keys: [gemini1, gemini2, gemini3]
       order: 2
-    model_info: *model-info-small
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-gemini2
-      model: "gemini/gemini-2.5-flash"
-      order: 2
-    model_info: *model-info-small
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-gemini3
-      model: "gemini/gemini-2.5-flash"
-      order: 2
-    model_info: *model-info-small
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-azure1
-      model: "azure_ai/kimi-k2.5"
+    - provider: azure
+      model: kimi_k2_5
+      keys: [azure1, azure2]
       order: 3
-    model_info: *model-info-small
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-azure2
-      model: "azure_ai/kimi-k2.5"
-      order: 3
-    model_info: *model-info-small
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-local
-      model: "ollama/gemma4:26b"
+    - provider: ollama
+      model: gemma4_26b
+      keys: [ollama1]
       order: 0
-    model_info: *model-info-small
-
-  # Tier 2: Standard tasks
-  - model_name: "tier2"
-    litellm_params:
-      <<: *provider-groq1
-      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
+  medium:
+    - provider: groq
+      model: scout
+      keys: [groq1, groq2]
       order: 1
-    model_info: *model-info-medium
-  - model_name: "tier2"
-    litellm_params:
-      <<: *provider-groq2
-      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
-      order: 1
-    model_info: *model-info-medium
-  - model_name: "tier2"
-    litellm_params:
-      <<: *provider-gemini1
-      model: "gemini/gemini-2.5-flash"
+    - provider: gemini
+      model: flash
+      keys: [gemini1, gemini2, gemini3]
       order: 2
-    model_info: *model-info-medium
-  - model_name: "tier2"
-    litellm_params:
-      <<: *provider-gemini2
-      model: "gemini/gemini-2.5-flash"
-      order: 2
-    model_info: *model-info-medium
-  - model_name: "tier2"
-    litellm_params:
-      <<: *provider-gemini3
-      model: "gemini/gemini-2.5-flash"
-      order: 2
-    model_info: *model-info-medium
-  - model_name: "tier2"
-    litellm_params:
-      <<: *provider-azure1
-      model: "azure_ai/gpt-5.2-chat"
+    - provider: azure
+      model: gpt_5_2_chat
+      keys: [azure1, azure2]
       order: 3
-    model_info: *model-info-medium
-  - model_name: "tier2"
-    litellm_params:
-      <<: *provider-azure2
-      model: "azure_ai/gpt-5.2-chat"
-      order: 3
-    model_info: *model-info-medium
-  - model_name: "tier2"
-    litellm_params:
-      <<: *provider-local
-      model: "ollama/gemma4:26b"
+    - provider: ollama
+      model: gemma4_26b
+      keys: [ollama1]
       order: 0
-    model_info: *model-info-medium
-
-  # Tier 3: Complex tasks
-  - model_name: "tier3"
-    litellm_params:
-      <<: *provider-groq1
-      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
+  large:
+    - provider: groq
+      model: scout
+      keys: [groq1, groq2]
       order: 1
-    model_info: *model-info-medium
-  - model_name: "tier3"
-    litellm_params:
-      <<: *provider-groq2
-      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
-      order: 1
-    model_info: *model-info-medium
-  - model_name: "tier3"
-    litellm_params:
-      <<: *provider-gemini1
-      model: "gemini/gemini-2.5-flash"
+    - provider: gemini
+      model: flash
+      keys: [gemini1, gemini2, gemini3]
       order: 2
-    model_info: *model-info-medium
-  - model_name: "tier3"
-    litellm_params:
-      <<: *provider-gemini2
-      model: "gemini/gemini-2.5-flash"
-      order: 2
-    model_info: *model-info-medium
-  - model_name: "tier3"
-    litellm_params:
-      <<: *provider-gemini3
-      model: "gemini/gemini-2.5-flash"
-      order: 2
-    model_info: *model-info-medium
-  - model_name: "tier3"
-    litellm_params:
-      <<: *provider-azure1
-      model: "azure_ai/gpt-5.2-chat"
+    - provider: azure
+      model: gpt_5_2_chat
+      keys: [azure1, azure2]
       order: 3
-    model_info: *model-info-medium
-  - model_name: "tier3"
-    litellm_params:
-      <<: *provider-azure2
-      model: "azure_ai/gpt-5.2-chat"
-      order: 3
-    model_info: *model-info-medium
-  - model_name: "tier3"
-    litellm_params:
-      <<: *provider-local
-      model: "ollama/gemma4:26b"
+    - provider: ollama
+      model: gemma4_26b
+      keys: [ollama1]
       order: 0
-    model_info: *model-info-medium
-
-  # Model aliases for OpenAI compatibility
-  - model_name: "gpt-4o-mini"
-    litellm_params:
-      <<: *provider-groq1
-      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
+  embedding-small:
+    - provider: openai
+      model: text_embedding_3_small
+      keys: [openai1]
       order: 1
-    model_info: *model-info-small
-  - model_name: "gpt-4o-mini"
-    litellm_params:
-      <<: *provider-groq2
-      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
-      order: 1
-    model_info: *model-info-small
-  - model_name: "gpt-4o-mini"
-    litellm_params:
-      <<: *provider-gemini1
-      model: "gemini/gemini-2.5-flash"
-      order: 2
-    model_info: *model-info-small
-  - model_name: "gpt-4o-mini"
-    litellm_params:
-      <<: *provider-gemini2
-      model: "gemini/gemini-2.5-flash"
-      order: 2
-    model_info: *model-info-small
-  - model_name: "gpt-4o-mini"
-    litellm_params:
-      <<: *provider-gemini3
-      model: "gemini/gemini-2.5-flash"
-      order: 2
-    model_info: *model-info-small
-  - model_name: "gpt-4o-mini"
-    litellm_params:
-      <<: *provider-azure1
-      model: "azure_ai/kimi-k2.5"
-      order: 3
-    model_info: *model-info-small
-  - model_name: "gpt-4o-mini"
-    litellm_params:
-      <<: *provider-azure2
-      model: "azure_ai/kimi-k2.5"
-      order: 3
-    model_info: *model-info-small
-  - model_name: "gpt-4o-mini"
-    litellm_params:
-      <<: *provider-local
-      model: "ollama/gemma4:26b"
-      order: 0
-    model_info: *model-info-small
 
-router_settings:
-  routing_strategy: "simple-shuffle"
+aliases:
+  gpt-4o-mini: small
+  gpt-4o: medium
+  gpt-4.1: large
+  gpt-4.1-mini: small
+  gpt-4.1-nano: small
+  gpt-5-nano: small
+  gpt-5-mini: small
+
+router:
+  routing_strategy: simple-shuffle
   enable_pre_call_checks: true
   num_retries: 7
   retry_after: 5
   timeout: 120
   cooldown_time: 60
-  fallbacks:
-    - tier1: ["tier2", "tier3"]
-    - tier2: ["tier1", "tier3"]
-    - tier3: ["tier2", "tier1"]
-    - gpt-4o-mini: ["tier2", "tier3"]
-    - gpt-4o: ["tier1", "tier3"]
-    - gpt-4.1: ["tier2", "tier1"]
-    - gpt-4.1-mini: ["tier2", "tier3"]
-    - gpt-4.1-nano: ["tier2", "tier3"]
-    - gpt-5-nano: ["tier2", "tier3"]
-    - gpt-5-mini: ["tier2", "tier3"]
-  model_group_alias:
-    "gpt-4o-mini": "tier1"
-    "gpt-4o": "tier2"
-    "gpt-4.1": "tier3"
-    "gpt-4.1-mini": "tier1"
-    "gpt-4.1-nano": "tier1"
-    "gpt-5-nano": "tier1"
-    "gpt-5-mini": "tier1"
-
-general_settings:
-  master_key: "os.environ/LITELLM_MASTER_KEY"
-  drop_params: true
-  set_verbose: false
-  json_logs: true
-  max_parallel_requests: 100
-  global_max_parallel_requests: 1000
   fallback_on_status_codes: [429, 500, 502, 503, 504]
-
-litellm_settings:
-  drop_params: true
-  set_verbose: false
-  cache: false
+  route_fallbacks:
+    small: [medium, large]
+    medium: [small, large]
+    large: [medium, small]
+    embedding-small: []
+  alias_fallbacks:
+    gpt-4o-mini: [medium, large]
+    gpt-4o: [small, large]
+    gpt-4.1: [medium, small]
+    gpt-4.1-mini: [medium, large]
+    gpt-4.1-nano: [medium, large]
+    gpt-5-nano: [medium, large]
+    gpt-5-mini: [medium, large]

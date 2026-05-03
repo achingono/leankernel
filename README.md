@@ -221,7 +221,7 @@ All configuration is via `appsettings.json` or environment variables (using `__`
 ```bash
 # Override via environment
 LEANKERNEL__LiteLlm__BaseUrl=http://litellm:4000
-LEANKERNEL__LiteLlm__DefaultModel=claude-sonnet-4-20250514
+LEANKERNEL__LiteLlm__DefaultModel=small
 LEANKERNEL__Qdrant__Host=localhost
 LEANKERNEL__Signal__Enabled=false
 ```
@@ -269,14 +269,20 @@ See `docs/prd-authentication.md` for the full authentication PRD.
 ### LiteLLM Dynamic Routing
 
 LiteLLM runs from a dedicated container image built from `config/litellm/Dockerfile`.
-At startup, it renders the routing template using `config/render_litellm_config.py`:
+At startup, it compiles the single-file source spec using `config/render_litellm_config.py`:
 
 ```bash
-python3 /app/render_litellm_config.py /app/config.yaml /tmp/litellm_config.yaml
+python3 /app/render_litellm_config.py /app/litellm_spec.yaml /tmp/litellm_config.yaml
 ```
 
-This keeps `config/litellm/config.yaml` as the source template while automatically
-removing model blocks for providers missing required environment variables.
+This keeps `config/litellm/config.yaml` as a declarative source spec while
+automatically excluding provider-key deployments that are missing required env vars.
+
+Local preview command:
+
+```bash
+python3 config/render_litellm_config.py config/litellm/config.yaml /tmp/litellm_config.yaml
+```
 
 ### LiteLLM Provider Environment Variables
 
@@ -301,41 +307,43 @@ LITELLM_SALT_KEY=change-me-to-random-string
 
 ### LiteLLM Model Routing Template
 
-`config/litellm/config.yaml` defines:
+`config/litellm/config.yaml` is the only authoring file. It defines:
 
-- Multiple providers (Groq, Gemini, Azure AI, local Ollama)
-- Multiple keys per provider for load distribution
-- Tiered model groups (`tier1`, `tier2`, `tier3`) plus OpenAI-compatible aliases
-- Order-based routing + fallback chains
+- `providers`: provider credentials + model catalog
+- `routes`: route names mapped to provider/model selections
+- `aliases`: optional OpenAI-compatible aliases mapped to route names
+- `router`: retries, cooldown, and fallback policies
 
 Example shape:
 
 ```yaml
-x-providers:
-  groq1:   &provider-groq1   { api_key: "os.environ/GROQ_API_KEY" }
-  groq2:   &provider-groq2   { api_key: "os.environ/GROQ_API_KEY_2" }
-  gemini1: &provider-gemini1 { api_key: "os.environ/GEMINI_API_KEY" }
-  azure1:  &provider-azure1  { api_key: "os.environ/AZURE_AI_API_KEY", api_base: "os.environ/AZURE_AI_API_BASE" }
+providers:
+  groq:
+    keys:
+      - source: env
+        name: GROQ_API_KEY
+    models:
+      - id: scout
+        name: meta-llama/llama-4-scout-17b-16e-instruct
+        max_tokens: 8192
 
-model_list:
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-groq1
-      model: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
+routes:
+  small:
+    - provider: groq
+      model: scout
       order: 1
-  - model_name: "tier1"
-    litellm_params:
-      <<: *provider-gemini1
-      model: "gemini/gemini-2.5-flash"
-      order: 2
+  embedding-small:
+    - provider: openai
+      model: text_embedding_3_small
+      order: 1
 
-router_settings:
-  routing_strategy: "simple-shuffle"
-  enable_pre_call_checks: true
-  fallbacks:
-    - tier1: ["tier2", "tier3"]
+aliases:
+  gpt-4o-mini: small
+
+# App model selection uses route names
+# LEANKERNEL__LiteLlm__DefaultModel=small
+# LEANKERNEL__LiteLlm__EmbeddingModel=embedding-small
 ```
-
 ## Multi-Agent System
 
 LeanKernel uses the **MAF Agent-as-Tool** pattern — specialized worker agents are exposed as `AIFunction` tools on a coordinator agent. The LLM natively decides which specialists to invoke:

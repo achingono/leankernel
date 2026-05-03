@@ -60,8 +60,8 @@ public sealed class LiteLlmConfig
 {
     public string BaseUrl { get; set; } = "http://litellm:4000";
     public string ApiKey { get; set; } = "sk-LeanKernel-local";
-    public string DefaultModel { get; set; } = "gpt-4o-mini";
-    public string EmbeddingModel { get; set; } = "text-embedding-3-small";
+    public string DefaultModel { get; set; } = "small";
+    public string EmbeddingModel { get; set; } = "embedding-small";
     public int ContextWindowTokens { get; set; } = 128_000;
 }
 

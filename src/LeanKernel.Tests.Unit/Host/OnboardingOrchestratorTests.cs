@@ -127,7 +127,7 @@ public class OnboardingOrchestratorTests : IDisposable
                 BaseUrl = "http://new-litellm:4000/",
                 ApiKey = "",
                 DefaultModel = "custom-model",
-                EmbeddingModel = "text-embedding-3-small",
+                EmbeddingModel = "embedding-small",
                 ContextWindowTokens = 0
             },
             Qdrant = new QdrantConfig
@@ -304,8 +304,8 @@ public class OnboardingOrchestratorTests : IDisposable
         {
             BaseUrl = "http://litellm:4000",
             ApiKey = "sk-test",
-            DefaultModel = "gpt-4o-mini",
-            EmbeddingModel = "text-embedding-3-small",
+            DefaultModel = "small",
+            EmbeddingModel = "embedding-small",
             ContextWindowTokens = 128000
         },
         Qdrant = new QdrantConfig

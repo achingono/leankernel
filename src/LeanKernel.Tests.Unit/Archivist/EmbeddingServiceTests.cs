@@ -16,7 +16,7 @@ public class EmbeddingServiceTests
         {
             BaseUrl = "http://localhost:4000",
             ApiKey = "test",
-            EmbeddingModel = "text-embedding-3-small"
+            EmbeddingModel = "embedding-small"
         },
         Qdrant = new QdrantConfig { EmbeddingDimension = 384 }
     });
