@@ -38,11 +38,13 @@ public sealed class AgentsConfigurationStep
         if (File.Exists(agentsPath))
         {
             _logger.LogInformation("AGENTS.md already exists at {Path}", agentsPath);
+            var existingRules = await _rulesProvider.LoadAsync(ct);
             return new AgentsStepResult
             {
                 Success = true,
                 Message = "AGENTS.md already configured",
-                AlreadyExists = true
+                AlreadyExists = true,
+                Rules = existingRules
             };
         }
 
@@ -56,14 +58,15 @@ public sealed class AgentsConfigurationStep
         _logger.LogInformation("AGENTS.md initialized at {Path} with preset '{Preset}'", agentsPath, preset);
 
         // Load the rules so they're available immediately
-        await _rulesProvider.LoadAsync(ct);
+        var rules = await _rulesProvider.LoadAsync(ct);
 
         return new AgentsStepResult
         {
             Success = true,
             Message = $"AGENTS.md initialized with '{preset}' preset",
             AgentsPath = agentsPath,
-            PresetUsed = preset
+            PresetUsed = preset,
+            Rules = rules
         };
     }
 
@@ -140,6 +143,89 @@ public sealed class AgentsConfigurationStep
                 IsValid = false
             };
         }
+    }
+
+    /// <summary>
+    /// Update a specific section of AGENTS.md.
+    /// </summary>
+    public async Task<AgentsStepResult> UpdateSectionAsync(string sectionName, string content, CancellationToken ct = default)
+    {
+        var agentsPath = Path.Combine(_paths.DataDirectory, "wiki", ".LeanKernel", "AGENTS.md");
+
+        if (!File.Exists(agentsPath))
+        {
+            return new AgentsStepResult
+            {
+                Success = false,
+                Message = "AGENTS.md not found",
+                Errors = ["AGENTS.md has not been initialized"]
+            };
+        }
+
+        try
+        {
+            var fileContent = await File.ReadAllTextAsync(agentsPath, ct);
+            var sectionMarker = $"## {sectionName}";
+
+            if (!fileContent.Contains(sectionMarker, StringComparison.OrdinalIgnoreCase))
+            {
+                return new AgentsStepResult
+                {
+                    Success = false,
+                    Message = $"Section '{sectionName}' not found",
+                    Errors = [$"Section '{sectionName}' does not exist in AGENTS.md"]
+                };
+            }
+
+            // Find section bounds
+            var startIdx = fileContent.IndexOf(sectionMarker, StringComparison.OrdinalIgnoreCase);
+            var endIdx = fileContent.IndexOf("## ", startIdx + 1);
+            if (endIdx == -1) endIdx = fileContent.Length;
+
+            // Replace section
+            var before = fileContent.Substring(0, startIdx);
+            var after = fileContent.Substring(endIdx);
+            var updated = $"{before}{sectionMarker}\n\n{content}\n\n{after}";
+
+            await File.WriteAllTextAsync(agentsPath, updated, ct);
+            
+            _logger.LogInformation("Updated section '{Section}' in AGENTS.md", sectionName);
+
+            // Reload rules
+            var rules = await _rulesProvider.LoadAsync(ct);
+
+            return new AgentsStepResult
+            {
+                Success = true,
+                Message = $"Section '{sectionName}' updated successfully",
+                Rules = rules
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating AGENTS.md section '{Section}'", sectionName);
+            return new AgentsStepResult
+            {
+                Success = false,
+                Message = $"Failed to update section: {ex.Message}",
+                Errors = [ex.Message]
+            };
+        }
+    }
+
+    /// <summary>
+    /// Get the full AGENTS.md content.
+    /// </summary>
+    public async Task<string> GetAgentsMdAsync(CancellationToken ct = default)
+    {
+        var agentsPath = Path.Combine(_paths.DataDirectory, "wiki", ".LeanKernel", "AGENTS.md");
+
+        if (!File.Exists(agentsPath))
+        {
+            return "";
+        }
+
+        return await File.ReadAllTextAsync(agentsPath, ct);
     }
 
     /// <summary>
@@ -292,6 +378,9 @@ public sealed class AgentsStepResult
     public bool? IsValid { get; init; }
     public string? AgentsPath { get; init; }
     public string? PresetUsed { get; init; }
+    public EngagementRules? Rules { get; init; }
+    public List<string> Errors { get; init; } = [];
+    public List<string> Warnings { get; init; } = [];
 }
 
 /// <summary>

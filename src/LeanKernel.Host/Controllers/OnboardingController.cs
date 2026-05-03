@@ -11,11 +11,16 @@ public sealed class OnboardingController : ControllerBase
 {
     private readonly IOnboardingOrchestrator _orchestrator;
     private readonly IOnboardingStateStore _stateStore;
+    private readonly AgentsConfigurationStep _agentsStep;
 
-    public OnboardingController(IOnboardingOrchestrator orchestrator, IOnboardingStateStore stateStore)
+    public OnboardingController(
+        IOnboardingOrchestrator orchestrator,
+        IOnboardingStateStore stateStore,
+        AgentsConfigurationStep agentsStep)
     {
         _orchestrator = orchestrator;
         _stateStore = stateStore;
+        _agentsStep = agentsStep;
     }
 
     [HttpGet("status")]
@@ -63,6 +68,88 @@ public sealed class OnboardingController : ControllerBase
             return BadRequest(result);
 
         return Ok(result);
+    }
+
+    [HttpGet("agents/presets")]
+    [AllowAnonymous]
+    public IActionResult GetAgentPresets()
+    {
+        var presets = _agentsStep.GetAvailablePresets();
+        return Ok(presets);
+    }
+
+    [HttpPost("agents/initialize")]
+    public async Task<IActionResult> InitializeAgents(
+        [FromBody] AgentsInitializeRequest request,
+        CancellationToken ct)
+    {
+        if (!await AllowAccessAsync(ct))
+            return Forbid();
+
+        try
+        {
+            var result = await _agentsStep.InitializeAsync(request.PresetName);
+            if (!result.Success)
+                return BadRequest(new AgentsInitializeResponse
+                {
+                    Success = false,
+                    Message = result.Message
+                });
+
+            return Ok(new AgentsInitializeResponse
+            {
+                Success = true,
+                Message = result.Message,
+                Rules = result.Rules
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new AgentsInitializeResponse
+            {
+                Success = false,
+                Message = $"Invalid preset: {ex.Message}"
+            });
+        }
+    }
+
+    [HttpGet("agents/validate")]
+    public async Task<IActionResult> ValidateAgents(CancellationToken ct)
+    {
+        if (!await AllowAccessAsync(ct))
+            return Forbid();
+
+        var result = await _agentsStep.ValidateAsync();
+        return Ok(new AgentsValidateResponse
+        {
+            Success = result.Success,
+            IsValid = result.IsValid ?? false,
+            Errors = result.Errors,
+            Warnings = result.Warnings
+        });
+    }
+
+    [HttpPost("agents/sections/{sectionName}")]
+    public async Task<IActionResult> UpdateAgentSection(
+        string sectionName,
+        [FromBody] AgentsSectionUpdateRequest request,
+        CancellationToken ct)
+    {
+        if (!await AllowAccessAsync(ct))
+            return Forbid();
+
+        try
+        {
+            var result = await _agentsStep.UpdateSectionAsync(sectionName, request.Content);
+            if (!result.Success)
+                return BadRequest(new { success = false, message = result.Message });
+
+            return Ok(new { success = true, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { success = false, message = $"Failed to update section: {ex.Message}" });
+        }
     }
 
     /// <summary>
