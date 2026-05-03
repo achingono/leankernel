@@ -10,26 +10,31 @@
     <p class="subtitle">Data directory browser</p>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; height: calc(100vh - 12rem);">
+<div class="files-layout">
     <!-- File tree -->
-    <div class="glass-card" style="overflow-y: auto;">
+    <div class="glass-card files-tree-panel">
         <!-- Breadcrumb -->
-        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; align-items: center;">
+        <div class="files-breadcrumb">
             <button class="btn-ghost" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"
                     @onclick="NavigateUp" disabled="@(CurrentPath == "")">
                 ↑ Up
             </button>
-            <span class="text-mono text-muted" style="font-size: 0.8rem;">
+            <span class="text-mono text-muted files-path">
                 /@CurrentPath
             </span>
         </div>
 
-        <ul class="file-tree">
+        <ul class="file-tree" aria-label="File browser entries">
             @if (BrowseResult?.Entries is not null)
             {
                 @foreach (var item in BrowseResult.Entries)
                 {
-                    <li class="file-item" @onclick="() => OnItemClick(item)">
+                    <li class="file-item"
+                        role="button"
+                        tabindex="0"
+                        aria-label="@(item.IsDirectory ? $"Open folder {item.Name}" : $"Preview file {item.Name}")"
+                        @onclick="() => OnItemClick(item)"
+                        @onkeydown="(e) => OnFileKeyDown(e, item)">
                         <span class="file-icon">@(item.IsDirectory ? "📁" : GetFileIcon(item.Name))</span>
                         <span>@item.Name</span>
                         @if (!item.IsDirectory)
@@ -41,14 +46,14 @@
 
                 @if (BrowseResult.Entries.Count == 0)
                 {
-                    <li style="padding: 1rem; color: var(--text-muted); text-align: center;">Empty directory</li>
+                    <li class="empty-state">Empty directory</li>
                 }
             }
         </ul>
     </div>
 
     <!-- File preview -->
-    <div class="glass-card" style="overflow: auto;">
+    <div class="glass-card files-preview-panel">
         @if (FileContent is not null)
         {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -59,16 +64,16 @@
                 <button class="btn-ghost" @onclick="() => FileContent = null">✕</button>
             </div>
             <div class="log-viewer" style="max-height: none;">
-                <pre style="margin: 0; white-space: pre-wrap;">@FileContent.Content</pre>
+                <pre class="file-preview-content">@FileContent.Content</pre>
             </div>
         }
         else if (FileError is not null)
         {
-            <div style="text-align: center; padding: 2rem; color: var(--neon-danger);">@FileError</div>
+            <div class="error-state" role="alert">@FileError</div>
         }
         else
         {
-            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">
+            <div class="empty-state" style="height: 100%; display: grid; place-items: center;">
                 Select a file to preview
             </div>
         }
@@ -107,6 +112,12 @@
         {
             await ReadFile(item.Path);
         }
+    }
+
+    private async Task OnFileKeyDown(KeyboardEventArgs e, FileSystemItem item)
+    {
+        if (e.Key is "Enter" or " ")
+            await OnItemClick(item);
     }
 
     private async Task ReadFile(string path)

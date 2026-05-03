@@ -135,6 +135,7 @@
     private List<WikiEntry> Entries = [];
     private WikiEntry? SelectedEntry;
     private Dictionary<string, int> DimensionCounts = [];
+    private CancellationTokenSource? _searchDebounceCts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -195,7 +196,22 @@
 
     private void SelectEntry(WikiEntry entry) => SelectedEntry = entry;
 
-    private async Task OnSearch() => await LoadEntries();
+    private async Task OnSearch()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+
+        try
+        {
+            await Task.Delay(180, _searchDebounceCts.Token);
+            await LoadEntries();
+        }
+        catch (TaskCanceledException)
+        {
+            // Ignore: another keystroke superseded this search.
+        }
+    }
 
     private static string GetConfidenceClass(double confidence) =>
         confidence >= 0.7 ? "confidence-high" :
@@ -209,5 +225,11 @@
         return entries.Where(e =>
             e.Subject.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) ||
             e.Facts.Any(f => f.Claim.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
     }
 }

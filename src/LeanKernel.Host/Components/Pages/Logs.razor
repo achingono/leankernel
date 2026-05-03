@@ -11,7 +11,7 @@
 </div>
 
 <!-- Filters -->
-<div style="display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;">
+<div class="toolbar-row">
     <div class="search-box" style="flex: 1; min-width: 200px; margin-bottom: 0;">
         <span class="search-icon">⌕</span>
         <input class="search-input"
@@ -39,7 +39,15 @@
 
 <!-- Log viewer -->
 <div class="glass-card log-viewer">
-    @if (LogResult?.Lines is not null)
+    @if (IsLoading)
+    {
+        <div class="loading-state" aria-live="polite">Loading logs...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(LoadError))
+    {
+        <div class="error-state" role="alert">@LoadError</div>
+    }
+    else if (LogResult?.Lines is not null)
     {
         @foreach (var line in LogResult.Lines)
         {
@@ -48,16 +56,14 @@
 
         @if (LogResult.Lines.Count == 0)
         {
-            <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+            <div class="empty-state">
                 No log entries found
             </div>
         }
     }
     else
     {
-        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
-            Loading logs...
-        </div>
+        <div class="empty-state">No logs available yet</div>
     }
 </div>
 
@@ -65,6 +71,8 @@
     private string SearchQuery = "";
     private string SelectedLevel = "";
     private LogSearchResult? LogResult;
+    private bool IsLoading;
+    private string? LoadError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -73,12 +81,27 @@
 
     private async Task LoadLogs()
     {
-        LogResult = await LogReader.SearchAsync(
-            string.IsNullOrWhiteSpace(SearchQuery) ? null : SearchQuery,
-            string.IsNullOrWhiteSpace(SelectedLevel) ? null : SelectedLevel,
-            since: null,
-            limit: 300,
-            ct: CancellationToken.None);
+        IsLoading = true;
+        LoadError = null;
+
+        try
+        {
+            LogResult = await LogReader.SearchAsync(
+                string.IsNullOrWhiteSpace(SearchQuery) ? null : SearchQuery,
+                string.IsNullOrWhiteSpace(SelectedLevel) ? null : SelectedLevel,
+                since: null,
+                limit: 300,
+                ct: CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            LoadError = ex.Message;
+            LogResult = new LogSearchResult();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private static string GetLogClass(string line)
