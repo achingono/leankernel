@@ -64,3 +64,6 @@ signal-config/
 # Code coverage
 coverage-results/
 coverage-report/
+
+# Local configuration files
+data/

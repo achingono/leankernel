@@ -23,8 +23,16 @@ RUN dotnet publish LeanKernel.Host/LeanKernel.Host.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Install curl for healthchecks
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+# Install runtime dependencies + signal-cli (native package)
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates gpg adduser && \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://packaging.gitlab.io/signal-cli/gpg.key \
+      | gpg --dearmor -o /etc/apt/keyrings/signal-cli.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/signal-cli.gpg] https://packaging.gitlab.io/signal-cli signalcli main" \
+      > /etc/apt/sources.list.d/signal-cli.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends signal-cli-native && \
+    signal-cli --version && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user

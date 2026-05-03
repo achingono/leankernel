@@ -17,6 +17,7 @@ services:
       - LEANKERNEL__Qdrant__Host=qdrant
       - LEANKERNEL__Qdrant__Port=6334
       - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
+      - LEANKERNEL__Signal__AllowedSenders__0=${SIGNAL_ALLOWED_SENDER_0:-}
       - LEANKERNEL__Wiki__BasePath=/app/data/wiki
       - LEANKERNEL__Knowledge__Enabled=true
       - LEANKERNEL__Knowledge__CollectionName=LEANKERNEL_knowledge
@@ -26,6 +27,7 @@ services:
       - ./data/documents:/app/data/documents
       - ./data/sessions:/app/data/sessions
       - ./data/logs:/app/data/logs
+      - ./data/keys:/app/data/.keys
       - signal-config:/home/LeanKernel/.local/share/signal-cli
     depends_on:
       qdrant:
@@ -79,9 +81,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 1G
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ["CMD", "python3", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/health/liveliness').getcode() == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -104,7 +106,7 @@ services:
         reservations:
           memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      test: ["CMD", "perl", "-e", "use IO::Socket::INET; exit(IO::Socket::INET->new(PeerAddr=>\"127.0.0.1:6333\") ? 0 : 1)"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -123,7 +125,7 @@ services:
         reservations:
           memory: 512M
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3

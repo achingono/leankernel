@@ -105,10 +105,6 @@ routes:
       model: kimi_k2_5
       keys: [azure1, azure2]
       order: 3
-    - provider: github_copilot
-      model: gpt-4.1
-      keys: [github_copilot1]
-      order: 4
     - provider: local
       model: gemma4_26b
       keys: [local]
@@ -126,10 +122,6 @@ routes:
       model: gpt-5.4-1
       keys: [azure1, azure2]
       order: 3
-    - provider: github_copilot
-      model: gpt-4.1
-      keys: [github_copilot1]
-      order: 4
     - provider: local
       model: gemma4_26b
       keys: [local]
@@ -147,10 +139,6 @@ routes:
       model: gpt-5.4-1
       keys: [azure1, azure2]
       order: 3
-    - provider: github_copilot
-      model: gpt-4.1
-      keys: [github_copilot1]
-      order: 4
     - provider: local
       model: gemma4_26b
       keys: [local]
