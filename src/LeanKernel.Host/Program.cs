@@ -97,6 +97,20 @@ try
     builder.Services.AddSingleton<AgentFactory>();
     builder.Services.AddSingleton<ToolFunctionAdapter>();
     builder.Services.AddSingleton<PromptAssembler>();
+
+    // Intelligent routing (FR-1 through FR-8) — disabled by default until LeanKernel:Routing:Enabled = true
+    builder.Services.AddSingleton<LeanKernel.Thinker.Routing.TaskComplexityScorer>();
+    builder.Services.AddSingleton<LeanKernel.Thinker.Routing.ProviderHealthTracker>(sp =>
+    {
+        var cfg = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<LeanKernelConfig>>().Value;
+        return new LeanKernel.Thinker.Routing.ProviderHealthTracker(
+            TimeSpan.FromSeconds(cfg.Routing.CooldownSeconds));
+    });
+    builder.Services.AddSingleton<LeanKernel.Thinker.Routing.SpendGuard>();
+    builder.Services.AddSingleton<LeanKernel.Thinker.Routing.PolicyModelSelector>();
+    builder.Services.AddSingleton<LeanKernel.Thinker.Routing.ResponseQualityGate>();
+    builder.Services.AddSingleton<LeanKernel.Thinker.Routing.ModelRoutingService>();
+
     builder.Services.AddSingleton<IThinkerService, ThinkerService>();
 
     // Multi-Agent Orchestration

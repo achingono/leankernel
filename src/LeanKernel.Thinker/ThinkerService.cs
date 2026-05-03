@@ -6,6 +6,7 @@ using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
+using LeanKernel.Thinker.Routing;
 
 namespace LeanKernel.Thinker;
 
@@ -22,6 +23,7 @@ public sealed class ThinkerService : IThinkerService
     private readonly AgentFactory _agentFactory;
     private readonly ToolFunctionAdapter _toolAdapter;
     private readonly PromptAssembler _promptAssembler;
+    private readonly ModelRoutingService? _routing;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -33,7 +35,8 @@ public sealed class ThinkerService : IThinkerService
         ToolFunctionAdapter toolAdapter,
         PromptAssembler promptAssembler,
         IOptions<LeanKernelConfig> config,
-        ILogger<ThinkerService> logger)
+        ILogger<ThinkerService> logger,
+        ModelRoutingService? routing = null)
     {
         _gatekeeper = gatekeeper;
         _sessions = sessions;
@@ -41,6 +44,7 @@ public sealed class ThinkerService : IThinkerService
         _agentFactory = agentFactory;
         _toolAdapter = toolAdapter;
         _promptAssembler = promptAssembler;
+        _routing = routing;
         _config = config.Value;
         _logger = logger;
     }
@@ -68,32 +72,22 @@ public sealed class ThinkerService : IThinkerService
             context.EstimatedTotalTokens, context.WikiLeanKernels.Count,
             context.History.Count, context.ExclusionLog.Count);
 
-        // 4. Call LLM via MAF ChatClientAgent
+        // 4. Call LLM — via intelligent routing when enabled, otherwise static default.
         string response;
         try
         {
             var instructions = _promptAssembler.AssembleSystemMessage(context);
             var tools = _toolAdapter.BuildTools();
-            var agent = _agentFactory.CreateAgent(instructions, tools);
 
-            // Build history messages from gated context using SessionExtensions
-            var messages = BuildMessages(context.History, message.Content);
-            var agentSession = await agent.CreateSessionAsync(ct);
-            var agentResponse = await agent.RunAsync(messages, agentSession, cancellationToken: ct);
-
-            response = agentResponse.Text ?? string.Empty;
-
-            // Persist diagnostics metadata from middleware StateBag
-            if (agentSession?.StateBag is { } bag)
+            if (_config.Routing.Enabled && _routing is not null)
             {
-                // Known middleware keys set by DiagnosticsMiddleware
-                string[] diagKeys = ["last_duration_ms", "last_message_count", "last_tool_calls"];
-                foreach (var key in diagKeys)
-                {
-                    var val = bag.GetValue<string>(key);
-                    if (val is not null)
-                        await _sessions.SetMetadataAsync(sessionId, key, val, ct);
-                }
+                response = await InvokeWithRoutingAsync(
+                    message, context, instructions, tools, sessionId, ct);
+            }
+            else
+            {
+                response = await InvokeStaticAsync(
+                    message, context, instructions, tools, sessionId, ct);
             }
         }
         catch (Exception ex)
@@ -124,6 +118,72 @@ public sealed class ThinkerService : IThinkerService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Fact extraction failed — continuing without persistence");
+        }
+
+        return response;
+    }
+
+    /// <summary>
+    /// Invokes the LLM through the intelligent routing pipeline (FR-1 through FR-8).
+    /// </summary>
+    private async Task<string> InvokeWithRoutingAsync(
+        LeanKernelMessage message,
+        ConversationContext context,
+        string instructions,
+        IReadOnlyList<AITool> tools,
+        string sessionId,
+        CancellationToken ct)
+    {
+        var (response, metadata) = await _routing!.RouteAsync(
+            requestId: message.Id,
+            prompt: message.Content,
+            existingContextTokens: context.EstimatedTotalTokens,
+            systemInstructions: instructions,
+            tools: tools,
+            ct: ct);
+
+        // Persist routing metadata to session store for observability.
+        await _sessions.SetMetadataAsync(sessionId, "routing:alias", metadata.SelectedAlias, ct);
+        await _sessions.SetMetadataAsync(sessionId, "routing:tier", metadata.SelectedTier, ct);
+        await _sessions.SetMetadataAsync(sessionId, "routing:complexity", metadata.Complexity.ToString(), ct);
+        await _sessions.SetMetadataAsync(sessionId, "routing:cost_bucket", metadata.CostBucket, ct);
+        await _sessions.SetMetadataAsync(sessionId, "routing:latency_ms", metadata.LatencyMs.ToString(), ct);
+        await _sessions.SetMetadataAsync(sessionId, "routing:attempts", metadata.AttemptCount.ToString(), ct);
+
+        return response;
+    }
+
+    /// <summary>
+    /// Invokes the LLM via the static default model (phase 0 / routing disabled).
+    /// </summary>
+    private async Task<string> InvokeStaticAsync(
+        LeanKernelMessage message,
+        ConversationContext context,
+        string instructions,
+        IReadOnlyList<AITool> tools,
+        string sessionId,
+        CancellationToken ct)
+    {
+        var agent = _agentFactory.CreateAgent(instructions, tools);
+
+        // Build history messages from gated context using SessionExtensions
+        var messages = BuildMessages(context.History, message.Content);
+        var agentSession = await agent.CreateSessionAsync(ct);
+        var agentResponse = await agent.RunAsync(messages, agentSession, cancellationToken: ct);
+
+        var response = agentResponse.Text ?? string.Empty;
+
+        // Persist diagnostics metadata from middleware StateBag
+        if (agentSession?.StateBag is { } bag)
+        {
+            // Known middleware keys set by DiagnosticsMiddleware
+            string[] diagKeys = ["last_duration_ms", "last_message_count", "last_tool_calls"];
+            foreach (var key in diagKeys)
+            {
+                var val = bag.GetValue<string>(key);
+                if (val is not null)
+                    await _sessions.SetMetadataAsync(sessionId, key, val, ct);
+            }
         }
 
         return response;

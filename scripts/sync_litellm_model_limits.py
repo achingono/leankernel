@@ -102,12 +102,15 @@ def update_gemini_limits(config: dict[str, Any]) -> int:
 		meta = by_name.get(name)
 		if not meta:
 			continue
+		model_id = model.get("id", name)
 		output_limit = meta.get("outputTokenLimit")
 		input_limit = meta.get("inputTokenLimit")
 		if isinstance(output_limit, int) and model.get("max_tokens") != output_limit:
+			record_drift("gemini", model_id, name, "max_tokens", model.get("max_tokens"), output_limit)
 			model["max_tokens"] = output_limit
 			changed += 1
 		if isinstance(input_limit, int) and model.get("context_window") != input_limit:
+			record_drift("gemini", model_id, name, "context_window", model.get("context_window"), input_limit)
 			model["context_window"] = input_limit
 			changed += 1
 	return changed
@@ -170,13 +173,16 @@ def update_azure_limits(config: dict[str, Any]) -> int:
 		if not meta:
 			continue
 
+		model_id = model.get("id", name)
 		out_limit = meta.get("output_token_limit") or meta.get("max_output_tokens")
 		in_limit = meta.get("input_token_limit") or meta.get("context_length")
 
 		if isinstance(out_limit, int) and model.get("max_tokens") != out_limit:
+			record_drift("azure", model_id, name, "max_tokens", model.get("max_tokens"), out_limit)
 			model["max_tokens"] = out_limit
 			changed += 1
 		if isinstance(in_limit, int) and model.get("context_window") != in_limit:
+			record_drift("azure", model_id, name, "context_window", model.get("context_window"), in_limit)
 			model["context_window"] = in_limit
 			changed += 1
 	return changed
@@ -217,12 +223,15 @@ def update_groq_limits(config: dict[str, Any]) -> int:
 		meta = by_id.get(name)
 		if not meta:
 			continue
+		model_id = model.get("id", name)
 		out_limit = meta.get("max_completion_tokens")
 		in_limit = meta.get("context_window")
 		if isinstance(out_limit, int) and model.get("max_tokens") != out_limit:
+			record_drift("groq", model_id, name, "max_tokens", model.get("max_tokens"), out_limit)
 			model["max_tokens"] = out_limit
 			changed += 1
 		if isinstance(in_limit, int) and model.get("context_window") != in_limit:
+			record_drift("groq", model_id, name, "context_window", model.get("context_window"), in_limit)
 			model["context_window"] = in_limit
 			changed += 1
 	return changed
@@ -245,7 +254,42 @@ def parse_args() -> argparse.Namespace:
 		action="store_true",
 		help="Write updates back to config file (default is dry-run)",
 	)
+	parser.add_argument(
+		"--drift-report",
+		metavar="FILE",
+		help="Write a JSON drift report to FILE (field-level diff per model)",
+	)
 	return parser.parse_args()
+
+
+# ---------------------------------------------------------------------------
+# Drift tracking
+# ---------------------------------------------------------------------------
+
+_drift_entries: list[dict[str, Any]] = []
+
+
+def record_drift(provider: str, model_id: str, model_name: str, field: str, old_value: Any, new_value: Any) -> None:
+	"""Record a single field-level change for the drift report."""
+	_drift_entries.append({
+		"provider": provider,
+		"model_id": model_id,
+		"model_name": model_name,
+		"field": field,
+		"old_value": old_value,
+		"new_value": new_value,
+	})
+	print(f"  DRIFT [{provider}/{model_id}] {field}: {old_value!r} -> {new_value!r}")
+
+
+def write_drift_report(path: str) -> None:
+	report = {
+		"generated_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+		"total_changes": len(_drift_entries),
+		"changes": _drift_entries,
+	}
+	Path(path).write_text(json.dumps(report, indent=2), encoding="utf-8")
+	print(f"Drift report written to {path} ({len(_drift_entries)} change(s))")
 
 
 def main() -> int:
@@ -270,6 +314,8 @@ def main() -> int:
 
 	if changes == 0:
 		print("No model limit updates found.")
+		if args.drift_report:
+			write_drift_report(args.drift_report)
 		return 0
 
 	print(f"Detected {changes} model-limit field updates.")
@@ -278,6 +324,9 @@ def main() -> int:
 		print(f"Updated {config_path}")
 	else:
 		print("Dry-run complete. Re-run with --write to persist updates.")
+
+	if args.drift_report:
+		write_drift_report(args.drift_report)
 
 	return 0
 

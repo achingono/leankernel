@@ -17,6 +17,8 @@ namespace LeanKernel.Thinker;
 public sealed class AgentFactory
 {
     private readonly IChatClient _chatClient;
+    private readonly OpenAIClient? _openAiClient;
+    private readonly FunctionLoggingMiddleware? _functionLogging;
     private readonly DiagnosticsMiddleware? _diagnostics;
     private readonly ILogger<AgentFactory> _logger;
 
@@ -27,15 +29,16 @@ public sealed class AgentFactory
         DiagnosticsMiddleware? diagnostics = null)
     {
         _logger = logger;
+        _functionLogging = functionLogging;
         _diagnostics = diagnostics;
         var cfg = config.Value.LiteLlm;
 
         // LiteLLM is OpenAI-compatible — use the OpenAI SDK with a custom endpoint
-        var openAiClient = new OpenAIClient(
+        _openAiClient = new OpenAIClient(
             new ApiKeyCredential(cfg.ApiKey),
             new OpenAIClientOptions { Endpoint = new Uri(cfg.BaseUrl) });
 
-        IChatClient client = openAiClient
+        IChatClient client = _openAiClient
             .GetChatClient(cfg.DefaultModel)
             .AsIChatClient();
 
@@ -80,6 +83,38 @@ public sealed class AgentFactory
             tools: tools?.ToList());
 
         return agent;
+    }
+
+    /// <summary>
+    /// Create an agent targeting a specific LiteLLM model alias (e.g. "small", "medium", "large").
+    /// Used by the intelligent routing pipeline to invoke a particular tier (FR-3).
+    /// Falls back to the default client when the <see cref="OpenAIClient"/> is unavailable (test mode).
+    /// </summary>
+    public ChatClientAgent CreateAgentForModel(
+        string modelAlias,
+        string instructions,
+        IReadOnlyList<AITool>? tools = null)
+    {
+        _logger.LogDebug("Creating agent for model alias '{Alias}': instructions={Length} chars, tools={ToolCount}",
+            modelAlias, instructions.Length, tools?.Count ?? 0);
+
+        // Build a new IChatClient scoped to this model alias.
+        IChatClient client;
+        if (_openAiClient is not null)
+        {
+            client = _openAiClient.GetChatClient(modelAlias).AsIChatClient();
+            if (_functionLogging is not null)
+                client = _functionLogging.Wrap(client);
+        }
+        else
+        {
+            // Fallback: test mode — use the pre-built client regardless of alias.
+            client = _chatClient;
+        }
+
+        return new ChatClientAgent(client,
+            instructions: instructions,
+            tools: tools?.ToList());
     }
 
     /// <summary>

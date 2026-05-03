@@ -15,6 +15,7 @@ public sealed class LeanKernelConfig
     public ContextConfig Context { get; set; } = new();
     public SchedulerConfig Scheduler { get; set; } = new();
     public AuthConfig Auth { get; set; } = new();
+    public RoutingConfig Routing { get; set; } = new();
 }
 
 public enum AuthMode { LocalPasscode, Oidc, Disabled }
@@ -130,4 +131,45 @@ public sealed class SchedulerConfig
 {
     public bool Enabled { get; set; } = true;
     public string WikiMaintenanceCron { get; set; } = "0 3 * * *"; // 3 AM daily
+}
+
+public sealed class RoutingConfig
+{
+    /// <summary>
+    /// When true, the intelligent routing pipeline is active.
+    /// When false (default/phase-0), the static DefaultModel is used for all requests.
+    /// </summary>
+    public bool Enabled { get; set; } = false;
+
+    // Complexity classification thresholds (FR-1)
+    public int SmallMaxTokens { get; set; } = 4_000;
+    public int SmallMaxConstraints { get; set; } = 3;
+    public int MediumMaxTokens { get; set; } = 16_000;
+    public int MediumMaxConstraints { get; set; } = 8;
+
+    // LiteLLM tier aliases (AC-5)
+    public string SmallAlias { get; set; } = "small";
+    public string MediumAlias { get; set; } = "medium";
+    public string LargeAlias { get; set; } = "large";
+
+    // Provider health / failure handling (FR-5)
+    public int CooldownSeconds { get; set; } = 60;
+    public int MaxProviderAttempts { get; set; } = 3;
+    public int MaxSelectionBudgetMs { get; set; } = 30_000;
+
+    // Quality gate thresholds (FR-4)
+    public int QualityMinOutputLength { get; set; } = 80;
+    public double QualityMinConstraintCoverage { get; set; } = 0.80;
+
+    // Spend guard (FR-8)
+    public SpendGuardConfig SpendGuard { get; set; } = new();
+}
+
+public sealed class SpendGuardConfig
+{
+    /// <summary>Daily paid-request soft threshold (warning alert). 0 = disabled.</summary>
+    public int DailyPaidRequestSoftLimit { get; set; } = 0;
+
+    /// <summary>Daily paid-request hard threshold (disables paid fallback). 0 = disabled.</summary>
+    public int DailyPaidRequestHardLimit { get; set; } = 0;
 }
