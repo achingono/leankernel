@@ -44,7 +44,8 @@ public sealed class EmbeddingService : IEmbeddingService
             var request = new EmbeddingRequest
             {
                 Model = _config.LiteLlm.EmbeddingModel,
-                Input = textList
+                Input = textList,
+                Dimensions = _config.Qdrant.EmbeddingDimension
             };
 
             var response = await _httpClient.PostAsJsonAsync(
@@ -83,6 +84,7 @@ internal sealed record EmbeddingRequest
 {
     [JsonPropertyName("model")] public required string Model { get; init; }
     [JsonPropertyName("input")] public required List<string> Input { get; init; }
+    [JsonPropertyName("dimensions")] public int Dimensions { get; init; }
 }
 
 internal sealed record EmbeddingResponse

@@ -21,6 +21,10 @@ providers:
       - id: flash
         name: gemini-2.5-flash
         max_tokens: 8192
+      - id: embedding_2
+        name: gemini-embedding-2
+        mode: embedding
+        dimensions: 1536
   azure:
     keys:
       - source: env
@@ -30,20 +34,39 @@ providers:
         name: AZURE_AI_API_KEY_2
         api_base_env: AZURE_AI_API_BASE_2
     models:
-      - id: kimi_k2_5
-        name: kimi-k2.5
+      - id: kimi_k2_6
+        name: kimi-k2.6
         max_tokens: 8192
-      - id: gpt_5_2_chat
-        name: gpt-5.2-chat
+      - id: deepseek_v3_2
+        name: DeepSeek-V3.2
+        max_tokens: 8192
+      - id: gpt_5_4_1
+        name: gpt-5.4-1
         max_tokens: 32768
+        litellm_params:
+          use_responses_api: true
+      - id: gpt_5_4_mini_1
+        name: gpt-5.4-mini-1
+        max_tokens: 32768
+        litellm_params:
+          use_responses_api: true
+      - id: gpt_5_4_nano_1
+        name: gpt-5.4-nano-1
+        max_tokens: 32768
+        litellm_params:
+          use_responses_api: true
+      - id: embedding_3_large
+        name: text-embedding-3-large-1
+        mode: embedding
+        dimensions: 1536
   github_copilot:
     keys:
       - source: env
         name: GITHUB_COPILOT_OAUTH_TOKEN
         api_base_env: GITHUB_COPILOT_API_BASE
     models:
-      - id: gpt_5_4
-        name: gpt-5.4
+      - id: gpt_4o
+        name: gpt-4o
         max_tokens: 32768
   ollama:
     base_url:
@@ -74,11 +97,11 @@ routes:
       keys: [gemini1, gemini2, gemini3]
       order: 2
     - provider: azure
-      model: kimi_k2_5
+      model: gpt_5_4_nano_1
       keys: [azure1, azure2]
       order: 3
     - provider: github_copilot
-      model: gpt_5_4
+      model: gpt_4o
       keys: [github_copilot1]
       order: 4
     - provider: ollama
@@ -95,11 +118,11 @@ routes:
       keys: [gemini1, gemini2, gemini3]
       order: 2
     - provider: azure
-      model: gpt_5_2_chat
+      model: gpt_5_4_mini_1
       keys: [azure1, azure2]
       order: 3
     - provider: github_copilot
-      model: gpt_5_4
+      model: gpt_4o
       keys: [github_copilot1]
       order: 4
     - provider: ollama
@@ -116,11 +139,11 @@ routes:
       keys: [gemini1, gemini2, gemini3]
       order: 2
     - provider: azure
-      model: gpt_5_2_chat
+      model: gpt_5_4_1
       keys: [azure1, azure2]
       order: 3
     - provider: github_copilot
-      model: gpt_5_4
+      model: gpt_4o
       keys: [github_copilot1]
       order: 4
     - provider: ollama
@@ -132,15 +155,24 @@ routes:
       model: text_embedding_3_small
       keys: [openai1]
       order: 1
+    - provider: gemini
+      model: embedding_2
+      keys: [gemini1, gemini2, gemini3]
+      order: 2
+  embedding-large:
+    - provider: azure
+      model: embedding_3_large
+      keys: [azure2]
+      order: 1
 
 aliases:
   gpt-4o-mini: small
   gpt-4o: medium
   gpt-5.4: large
-  gpt-5.4-mini: small
+  gpt-5.4-mini: medium
   gpt-5.4-nano: small
   gpt-5-nano: small
-  gpt-5-mini: small
+  gpt-5-mini: medium
 
 router:
   routing_strategy: simple-shuffle
@@ -159,7 +191,7 @@ router:
     gpt-4o-mini: [medium, large]
     gpt-4o: [small, large]
     gpt-5.4: [medium, small]
-    gpt-5.4-mini: [medium, large]
+    gpt-5.4-mini: [small, large]
     gpt-5.4-nano: [medium, large]
     gpt-5-nano: [medium, large]
-    gpt-5-mini: [medium, large]
+    gpt-5-mini: [small, large]

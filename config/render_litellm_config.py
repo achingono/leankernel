@@ -12,6 +12,7 @@ import yaml
 PROVIDER_PREFIX_OVERRIDES = {
     "azure": "azure_ai",
     "local": "ollama",
+    "github_copilot": "openai",
 }
 
 GENERAL_SETTINGS_DEFAULT = {
@@ -105,6 +106,8 @@ def parse_provider_models(provider_name: str, provider_spec: dict[str, Any]) -> 
         name = ensure_string(model_spec.get("name"), f"{model_path}.name")
         mode = model_spec.get("mode", "chat")
         mode = ensure_string(mode, f"{model_path}.mode")
+        raw_litellm_params = model_spec.get("litellm_params", {})
+        litellm_params = ensure_mapping(raw_litellm_params, f"{model_path}.litellm_params")
         model_info: dict[str, Any]
         if mode == "embedding":
             dimensions = model_spec.get("dimensions")
@@ -118,7 +121,11 @@ def parse_provider_models(provider_name: str, provider_spec: dict[str, Any]) -> 
                 "max_tokens": ensure_number(max_tokens, f"{model_path}.max_tokens"),
                 "supports_function_calling": bool(model_spec.get("supports_function_calling", True)),
             }
-        parsed[model_id] = {"name": name, "model_info": model_info}
+        parsed[model_id] = {
+            "name": name,
+            "model_info": model_info,
+            "litellm_params": copy.deepcopy(litellm_params),
+        }
     return parsed
 
 
@@ -256,6 +263,7 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
                     continue
                 litellm_params = copy.deepcopy(key_spec["litellm_params"])
                 litellm_params["model"] = full_model_name
+                litellm_params.update(copy.deepcopy(model_spec.get("litellm_params", {})))
                 litellm_params["order"] = order
                 deployment = {
                     "model_name": route,

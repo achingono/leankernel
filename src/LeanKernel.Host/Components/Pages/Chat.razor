@@ -1,7 +1,10 @@
 @page "/chat"
 @using System.Diagnostics.CodeAnalysis
+@using LeanKernel.Core.Interfaces
+@using LeanKernel.Core.Models
 @attribute [ExcludeFromCodeCoverage]
-@inject HttpClient Http
+@inject IThinkerService Thinker
+@inject ISessionStore SessionStore
 @rendermode InteractiveServer
 
 <div class="page-header">
@@ -95,7 +98,8 @@
     {
         try
         {
-            Sessions = await Http.GetFromJsonAsync<List<string>>("api/chat/sessions") ?? [];
+            var list = await SessionStore.ListSessionsAsync(CancellationToken.None);
+            Sessions = [.. list];
         }
         catch { }
     }
@@ -109,17 +113,14 @@
         {
             try
             {
-                var result = await Http.GetFromJsonAsync<SessionResponse>($"api/chat/sessions/{CurrentSession}");
-                if (result?.Turns is not null)
+                var turns = await SessionStore.GetHistoryAsync(CurrentSession, CancellationToken.None);
+                Messages = turns.Select(t => new ChatMessage
                 {
-                    Messages = result.Turns.Select(t => new ChatMessage
-                    {
-                        Role = t.Role ?? "user",
-                        Content = t.Content ?? "",
-                        Timestamp = t.Timestamp,
-                        IsCompacted = t.IsCompacted
-                    }).ToList();
-                }
+                    Role = t.Role ?? "user",
+                    Content = t.Content ?? "",
+                    Timestamp = t.Timestamp,
+                    IsCompacted = t.IsCompacted
+                }).ToList();
             }
             catch { }
         }
@@ -150,26 +151,23 @@
 
         try
         {
-            var response = await Http.PostAsJsonAsync("api/chat/message", new
+            var message = new LeanKernelMessage
             {
-                content = userMsg,
-                senderId = "web-user",
-                sessionId = CurrentSession
-            });
+                Id = Guid.NewGuid().ToString("N"),
+                ChannelId = "web",
+                SenderId = "web-user",
+                Content = userMsg,
+                Timestamp = DateTimeOffset.UtcNow
+            };
 
-            if (response.IsSuccessStatusCode)
+            var response = await Thinker.ProcessAsync(message, CancellationToken.None);
+
+            Messages.Add(new ChatMessage
             {
-                var result = await response.Content.ReadFromJsonAsync<ChatResponse>();
-                if (result is not null)
-                {
-                    Messages.Add(new ChatMessage
-                    {
-                        Role = "assistant",
-                        Content = result.Response ?? "",
-                        Timestamp = result.Timestamp
-                    });
-                }
-            }
+                Role = "assistant",
+                Content = response,
+                Timestamp = DateTimeOffset.UtcNow
+            });
         }
         catch (Exception ex)
         {
@@ -194,8 +192,4 @@
         public bool IsCompacted { get; set; }
         public bool ShowDiagnostics { get; set; }
     }
-
-    private record SessionResponse { public List<TurnData>? Turns { get; init; } }
-    private record TurnData { public string? Role { get; init; } public string? Content { get; init; } public DateTimeOffset Timestamp { get; init; } public bool IsCompacted { get; init; } }
-    private record ChatResponse { public string? Response { get; init; } public DateTimeOffset Timestamp { get; init; } }
 }
