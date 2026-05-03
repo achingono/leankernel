@@ -159,6 +159,10 @@ try
     });
     builder.Services.AddScoped<EngagementAuthorizationFilter>();
 
+    // Phase 2: Message Queue and Agents Configuration
+    builder.Services.AddSingleton<IMessageQueue, MessageQueueService>();
+    builder.Services.AddScoped<AgentsConfigurationStep>();
+
     // Forwarded headers (for reverse proxy HTTPS detection)
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
