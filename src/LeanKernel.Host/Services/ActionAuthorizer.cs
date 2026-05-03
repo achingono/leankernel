@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using LeanKernel.Core.Configuration;
 
 namespace LeanKernel.Host.Services;
 

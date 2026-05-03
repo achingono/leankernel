@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using LeanKernel.Core.Configuration;
 
 namespace LeanKernel.Host.Services;
 
@@ -97,9 +98,9 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
             rules.Personality.Tone = ExtractValue(toneLine);
         }
 
-        rules.Personality.AllowOpinions = !section.Contains("AllowOpinions.*false", RegexOptions.IgnoreCase);
-        rules.Personality.BeResourceful = !section.Contains("BeResourceful.*false", RegexOptions.IgnoreCase);
-        rules.Personality.AdmitUncertainty = !section.Contains("AdmitUncertainty.*false", RegexOptions.IgnoreCase);
+        rules.Personality.AllowOpinions = !Regex.IsMatch(section, "AllowOpinions.*false", RegexOptions.IgnoreCase);
+        rules.Personality.BeResourceful = !Regex.IsMatch(section, "BeResourceful.*false", RegexOptions.IgnoreCase);
+        rules.Personality.AdmitUncertainty = !Regex.IsMatch(section, "AdmitUncertainty.*false", RegexOptions.IgnoreCase);
     }
 
     private static void ParseAutonomySection(string content, EngagementRules rules)
@@ -144,7 +145,7 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
             ? DayOfWeek.Saturday 
             : null;
 
-        rules.TimeBoundaries.AllowSabbathMessages = section.Contains("AllowSabbathMessages.*true", RegexOptions.IgnoreCase);
+        rules.TimeBoundaries.AllowSabbathMessages = Regex.IsMatch(section, "AllowSabbathMessages.*true", RegexOptions.IgnoreCase);
     }
 
     private static void ParseChannelRulesSection(string content, EngagementRules rules)
@@ -175,7 +176,7 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
         var section = ExtractSection(content, "Action Follow", "Knowledge");
         if (string.IsNullOrEmpty(section)) return;
 
-        rules.ActionFollowUp.AutoTrackFollowUps = !section.Contains("AutoTrack.*false", RegexOptions.IgnoreCase);
+        rules.ActionFollowUp.AutoTrackFollowUps = !Regex.IsMatch(section, "AutoTrack.*false", RegexOptions.IgnoreCase);
 
         // Extract follow-up days
         var sendMessageMatch = Regex.Match(section, @"SendMessage.*?(\d+)\s*days?", RegexOptions.IgnoreCase);
@@ -192,8 +193,8 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
         if (whatToCapture.Any())
             rules.MemoryPolicy.WhatToCapture = whatToCapture.ToArray();
 
-        rules.MemoryPolicy.UpdateSoulMd = !section.Contains("UpdateSoulMd.*false", RegexOptions.IgnoreCase);
-        rules.MemoryPolicy.UpdateUserMd = !section.Contains("UpdateUserMd.*false", RegexOptions.IgnoreCase);
+        rules.MemoryPolicy.UpdateSoulMd = !Regex.IsMatch(section, "UpdateSoulMd.*false", RegexOptions.IgnoreCase);
+        rules.MemoryPolicy.UpdateUserMd = !Regex.IsMatch(section, "UpdateUserMd.*false", RegexOptions.IgnoreCase);
     }
 
     private static void ParseSafetyBoundariesSection(string content, EngagementRules rules)
@@ -201,9 +202,9 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
         var section = ExtractSection(content, "Privacy", "---");
         if (string.IsNullOrEmpty(section)) return;
 
-        rules.SafetyBoundaries.AllowExternalDataExport = section.Contains("AllowExternalDataExport.*true", RegexOptions.IgnoreCase);
-        rules.SafetyBoundaries.RequireEmailDraft = !section.Contains("RequireEmailDraft.*false", RegexOptions.IgnoreCase);
-        rules.SafetyBoundaries.RequireCodeReview = !section.Contains("RequireCodeReview.*false", RegexOptions.IgnoreCase);
+        rules.SafetyBoundaries.AllowExternalDataExport = Regex.IsMatch(section, "AllowExternalDataExport.*true", RegexOptions.IgnoreCase);
+        rules.SafetyBoundaries.RequireEmailDraft = !Regex.IsMatch(section, "RequireEmailDraft.*false", RegexOptions.IgnoreCase);
+        rules.SafetyBoundaries.RequireCodeReview = !Regex.IsMatch(section, "RequireCodeReview.*false", RegexOptions.IgnoreCase);
     }
 
     private static string ExtractSection(string content, string sectionStart, string sectionEnd)

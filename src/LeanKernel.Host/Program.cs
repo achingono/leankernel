@@ -147,6 +147,18 @@ try
     builder.Services.AddLeanKernelAuth(builder.Configuration, configuredDataDir);
     builder.Services.AddLeanKernelOidc(builder.Configuration);
 
+    // Engagement Rules (AGENTS.md) — rules of engagement between user and agent
+    builder.Services.AddSingleton<IEngagementRulesProvider, EngagementRulesProvider>();
+    builder.Services.AddSingleton<IActionAuthorizer, ActionAuthorizer>();
+    builder.Services.AddSingleton(sp =>
+    {
+        var rulesProvider = sp.GetRequiredService<IEngagementRulesProvider>();
+        var logger = sp.GetRequiredService<ILogger<TimeBoundaryService>>();
+        var rules = rulesProvider.GetCurrent();
+        return new TimeBoundaryService(rules, logger);
+    });
+    builder.Services.AddScoped<EngagementAuthorizationFilter>();
+
     // Forwarded headers (for reverse proxy HTTPS detection)
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
@@ -156,7 +168,10 @@ try
     });
 
     // ASP.NET Core
-    builder.Services.AddControllers();
+    builder.Services.AddControllers(options =>
+    {
+        options.Filters.Add<EngagementAuthorizationFilter>();
+    });
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
 
@@ -197,6 +212,10 @@ try
     });
 
     var app = builder.Build();
+
+    // Load engagement rules (AGENTS.md) on startup
+    var rulesProvider = app.Services.GetRequiredService<IEngagementRulesProvider>();
+    await rulesProvider.LoadAsync(CancellationToken.None);
 
     app.UseForwardedHeaders();
     app.UseCors();
