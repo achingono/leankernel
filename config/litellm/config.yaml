@@ -77,6 +77,10 @@ routes:
       model: kimi_k2_5
       keys: [azure1, azure2]
       order: 3
+    - provider: github_copilot
+      model: gpt_5_4
+      keys: [github_copilot1]
+      order: 4
     - provider: ollama
       model: gemma4_26b
       keys: [ollama1]
@@ -94,6 +98,10 @@ routes:
       model: gpt_5_2_chat
       keys: [azure1, azure2]
       order: 3
+    - provider: github_copilot
+      model: gpt_5_4
+      keys: [github_copilot1]
+      order: 4
     - provider: ollama
       model: gemma4_26b
       keys: [ollama1]
@@ -111,6 +119,10 @@ routes:
       model: gpt_5_2_chat
       keys: [azure1, azure2]
       order: 3
+    - provider: github_copilot
+      model: gpt_5_4
+      keys: [github_copilot1]
+      order: 4
     - provider: ollama
       model: gemma4_26b
       keys: [ollama1]
