@@ -55,6 +55,30 @@ public sealed class AuthController : ControllerBase
         return Ok(new { message = "Authenticated" });
     }
 
+    [HttpPost("login-form")]
+    [AllowAnonymous]
+    public async Task<IActionResult> LoginForm([FromForm] LoginFormRequest request, CancellationToken ct)
+    {
+        if (_config.Value.Auth.Mode == AuthMode.Disabled)
+            return Redirect("/login?error=auth_disabled");
+
+        if (!_passcode.IsConfigured)
+            return Redirect("/login?error=not_configured");
+
+        if (!await _passcode.VerifyAsync(request.Passcode, ct))
+        {
+            _logger.LogWarning("Login failed from {IP}", HttpContext.Connection.RemoteIpAddress);
+            return Redirect($"/login?error=invalid_passcode&returnUrl={Uri.EscapeDataString(NormalizeReturnUrl(request.ReturnUrl))}");
+        }
+
+        var stamp = await _stamp.GetStampAsync(ct);
+        var principal = AuthRegistration.CreateAdminPrincipal(stamp);
+        await HttpContext.SignInAsync(AuthConstants.CookieScheme, principal);
+
+        _logger.LogInformation("Login successful from {IP}", HttpContext.Connection.RemoteIpAddress);
+        return LocalRedirect(NormalizeReturnUrl(request.ReturnUrl));
+    }
+
     [HttpPost("logout")]
     [Authorize(Policy = AuthConstants.PolicyUiAuthenticated)]
     public async Task<IActionResult> Logout()
@@ -189,9 +213,17 @@ public sealed class AuthController : ControllerBase
         _logger.LogInformation("Initial passcode set via bootstrap");
         return Ok(new { message = "Passcode configured successfully" });
     }
+
+    private string NormalizeReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl) || !Url.IsLocalUrl(returnUrl))
+            return "/";
+        return returnUrl;
+    }
 }
 
 public sealed record LoginRequest(string Passcode);
+public sealed record LoginFormRequest(string Passcode, string? ReturnUrl);
 public sealed record ChangePasscodeRequest(string CurrentPasscode, string NewPasscode);
 public sealed record CreateTokenRequest(string Name, int? ExpirationDays = null);
 public sealed record BootstrapRequest(string Passcode);

@@ -1,9 +1,11 @@
 @inherits LayoutComponentBase
 @using System.Diagnostics.CodeAnalysis
 @using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Authorization
 @attribute [ExcludeFromCodeCoverage]
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 @implements IDisposable
 
 <div class="LeanKernel-layout">
@@ -115,8 +117,8 @@
         {
             try
             {
-                var authStatus = await Http.GetFromJsonAsync<AuthStatusDto>("api/auth/status");
-                IsAuthenticated = authStatus?.Authenticated ?? false;
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                IsAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
             }
             catch
             {
@@ -161,10 +163,4 @@
         public bool Completed { get; init; }
     }
 
-    private sealed record AuthStatusDto
-    {
-        public string Mode { get; init; } = "";
-        public bool Configured { get; init; }
-        public bool Authenticated { get; init; }
-    }
 }

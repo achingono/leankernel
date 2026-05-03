@@ -1,15 +1,15 @@
 @page "/login"
 @using System.Diagnostics.CodeAnalysis
+@using Microsoft.AspNetCore.WebUtilities
 @attribute [ExcludeFromCodeCoverage]
-@inject HttpClient Http
 @inject NavigationManager Nav
 
 <div class="login-container">
     <div class="login-card">
         <div class="login-header">
             <span class="LeanKernel-logo">◆</span>
-            <h1>LeanKernel</h1>
-            <p class="login-subtitle">Enter your passcode to continue</p>
+            <h1>LeanKernel ACCESS</h1>
+            <p class="login-subtitle">Authenticate with your admin passcode</p>
         </div>
 
         @if (!string.IsNullOrEmpty(ErrorMessage))
@@ -17,65 +17,46 @@
             <div class="login-error" role="alert">@ErrorMessage</div>
         }
 
-        <form @onsubmit="HandleLogin">
+        <form method="post" action="/api/auth/login-form" class="login-form">
+            <input type="hidden" name="returnUrl" value="@ReturnUrl" />
             <div class="login-field">
-                <input type="password"
-                       @bind="Passcode"
-                       placeholder="Passcode"
-                       autofocus
-                       disabled="@IsLoading"
-                       aria-label="Passcode" />
+            <label for="passcode-input" class="login-label">Passcode</label>
+                <input id="passcode-input"
+                        name="passcode"
+                        type="password"
+                        placeholder="Passcode"
+                        autocomplete="current-password"
+                        autofocus
+                        aria-label="Passcode" />
+            <p class="login-help">Use your admin passcode to unlock dashboard access.</p>
             </div>
-            <button type="submit" class="login-button" disabled="@IsLoading">
-                @if (IsLoading) { <span>Authenticating...</span> }
-                else { <span>Login</span> }
-            </button>
+            <button type="submit" class="login-button">Login</button>
         </form>
     </div>
 </div>
 
 @code {
-    private string Passcode { get; set; } = "";
     private string? ErrorMessage { get; set; }
-    private bool IsLoading { get; set; }
+    private string ReturnUrl { get; set; } = "/";
 
-    private async Task HandleLogin()
+    protected override void OnInitialized()
     {
-        if (string.IsNullOrWhiteSpace(Passcode))
+        var uri = new Uri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        var returnUrl = query.TryGetValue("returnUrl", out var returnUrlValue)
+            ? returnUrlValue.ToString()
+            : "/";
+        ReturnUrl = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
+        var error = query.TryGetValue("error", out var errorValue) ? errorValue.ToString() : null;
+        if (!string.IsNullOrWhiteSpace(error))
         {
-            ErrorMessage = "Please enter your passcode";
-            return;
-        }
-
-        IsLoading = true;
-        ErrorMessage = null;
-
-        try
-        {
-            var response = await Http.PostAsJsonAsync("api/auth/login", new { passcode = Passcode });
-            if (response.IsSuccessStatusCode)
+            ErrorMessage = error switch
             {
-                Nav.NavigateTo("/", forceLoad: true);
-            }
-            else
-            {
-                var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
-                ErrorMessage = body?.Error ?? "Authentication failed";
-            }
+                "invalid_passcode" => "Invalid passcode. Try again.",
+                "not_configured" => "Passcode not configured. Complete onboarding first.",
+                "auth_disabled" => "Authentication is disabled.",
+                _ => "Authentication failed."
+            };
         }
-        catch
-        {
-            ErrorMessage = "Unable to connect. Please try again.";
-        }
-        finally
-        {
-            IsLoading = false;
-            Passcode = "";
-        }
-    }
-
-    private sealed record ErrorResponse
-    {
-        public string Error { get; init; } = "";
     }
 }
