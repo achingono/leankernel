@@ -16,6 +16,7 @@ public sealed class LeanKernelConfig
     public SchedulerConfig Scheduler { get; set; } = new();
     public AuthConfig Auth { get; set; } = new();
     public RoutingConfig Routing { get; set; } = new();
+    public EngagementRules Engagement { get; set; } = new();
 }
 
 public enum AuthMode { LocalPasscode, Oidc, Disabled }
