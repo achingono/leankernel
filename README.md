@@ -224,6 +224,7 @@ LEANKERNEL__LiteLlm__BaseUrl=http://litellm:4000
 LEANKERNEL__LiteLlm__DefaultModel=small
 LEANKERNEL__Qdrant__Host=localhost
 LEANKERNEL__Signal__Enabled=false
+LEANKERNEL__Signal__AllowedSenders__0=+15551234567
 ```
 
 ### Authentication

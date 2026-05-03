@@ -40,4 +40,37 @@ public class SignalChannelTests
         // Without starting, adapter is null — SendAsync should handle gracefully
         await channel.SendAsync("recipient", "message", CancellationToken.None);
     }
+
+    [Fact]
+    public void SignalChannel_IsAuthorizedSender_NoAllowlist_AllowsAnySender()
+    {
+        var config = Microsoft.Extensions.Options.Options.Create(new Core.Configuration.LeanKernelConfig
+        {
+            Signal = new Core.Configuration.SignalConfig
+            {
+                Enabled = false,
+                AllowedSenders = []
+            }
+        });
+        var channel = new SignalChannel(config, new Microsoft.Extensions.Logging.Abstractions.NullLogger<SignalChannel>());
+
+        Assert.True(channel.IsAuthorizedSender("+15550000000"));
+    }
+
+    [Fact]
+    public void SignalChannel_IsAuthorizedSender_WithAllowlist_RejectsUnknownSender()
+    {
+        var config = Microsoft.Extensions.Options.Options.Create(new Core.Configuration.LeanKernelConfig
+        {
+            Signal = new Core.Configuration.SignalConfig
+            {
+                Enabled = false,
+                AllowedSenders = ["+15550001111"]
+            }
+        });
+        var channel = new SignalChannel(config, new Microsoft.Extensions.Logging.Abstractions.NullLogger<SignalChannel>());
+
+        Assert.True(channel.IsAuthorizedSender("+15550001111"));
+        Assert.False(channel.IsAuthorizedSender("+15559990000"));
+    }
 }

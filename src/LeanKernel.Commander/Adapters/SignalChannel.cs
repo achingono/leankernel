@@ -15,7 +15,9 @@ public sealed class SignalChannel : IChannel
     public string ChannelId => "signal";
 
     private readonly LeanKernelConfig _config;
+    private readonly string _cliPath;
     private readonly ILogger<SignalChannel> _logger;
+    private readonly HashSet<string> _allowedSenders;
     private SignalCliAdapter? _adapter;
 
     public event Func<LeanKernelMessage, CancellationToken, Task>? OnMessageReceived;
@@ -24,6 +26,19 @@ public sealed class SignalChannel : IChannel
     {
         _config = config.Value;
         _logger = logger;
+        _cliPath = ResolveSignalCliPath(_config.Signal.CliPath) ?? _config.Signal.CliPath;
+        _allowedSenders = (_config.Signal.AllowedSenders ?? [])
+            .Where(sender => !string.IsNullOrWhiteSpace(sender))
+            .Select(sender => sender.Trim())
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    public bool IsAuthorizedSender(string senderId)
+    {
+        if (_allowedSenders.Count == 0)
+            return true;
+
+        return _allowedSenders.Contains(senderId);
     }
 
     public async Task StartAsync(CancellationToken ct)
@@ -35,7 +50,7 @@ public sealed class SignalChannel : IChannel
         }
 
         _adapter = new SignalCliAdapter(
-            _config.Signal.CliPath,
+            _cliPath,
             _config.Signal.Account,
             _logger);
 
@@ -97,5 +112,19 @@ public sealed class SignalChannel : IChannel
         if (_adapter is not null)
             await _adapter.DisposeAsync();
         _logger.LogDebug("Signal channel disposed");
+    }
+
+    private static string? ResolveSignalCliPath(string configuredPath)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredPath) && File.Exists(configuredPath))
+            return configuredPath;
+
+        foreach (var candidate in new[] { "/usr/bin/signal-cli", "/usr/local/bin/signal-cli" })
+        {
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        return null;
     }
 }

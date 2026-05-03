@@ -99,6 +99,28 @@ public class OnboardingOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidateAsync_ConfiguredEmbeddingMissing_SkipsEmbeddingProbe()
+    {
+        var cfg = MakeConfig(new SignalConfig { Enabled = false });
+        var orchestrator = CreateOrchestrator(
+            new StubRuntimeConfigStore(cfg),
+            new StubOnboardingStateStore(),
+            CreateFactory(HttpStatusCode.OK, HttpStatusCode.BadRequest),
+            (_, _) => Task.FromResult(new OnboardingStepResult
+            {
+                Step = "qdrant",
+                Success = true,
+                Message = "ok"
+            }));
+
+        var result = await orchestrator.ValidateAsync(CancellationToken.None);
+        var embeddings = Assert.Single(result.Steps.Where(s => s.Step == "embeddings"));
+
+        Assert.True(embeddings.Success);
+        Assert.Contains("skipping embedding probe", embeddings.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SaveDraftAsync_MergesValuesAndMarksInProgress()
     {
         var current = MakeConfig(new SignalConfig

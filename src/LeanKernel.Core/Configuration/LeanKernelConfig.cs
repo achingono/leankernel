@@ -79,9 +79,10 @@ public sealed class QdrantConfig
 
 public sealed class SignalConfig
 {
-    public string CliPath { get; set; } = "/usr/local/bin/signal-cli";
+    public string CliPath { get; set; } = "/usr/bin/signal-cli";
     public string Account { get; set; } = "";
     public bool Enabled { get; set; } = true;
+    public string[] AllowedSenders { get; set; } = [];
 }
 
 public sealed class WikiConfig

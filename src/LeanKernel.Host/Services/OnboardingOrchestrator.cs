@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Net;
 using Microsoft.Extensions.Logging;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
@@ -261,47 +262,96 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
     {
         try
         {
-            var payload = JsonSerializer.Serialize(new
+            var availableModels = await GetAvailableLiteLlmModelIdsAsync(cfg, ct);
+            var probeCandidates = new HashSet<string>(StringComparer.Ordinal);
+            var configuredEmbeddingModel = cfg.LiteLlm.EmbeddingModel?.Trim();
+
+            if (!string.IsNullOrWhiteSpace(configuredEmbeddingModel))
             {
-                model = cfg.LiteLlm.EmbeddingModel,
-                input = new[] { "onboarding readiness probe" }
-            });
+                if (availableModels.Count == 0 || availableModels.Contains(configuredEmbeddingModel))
+                    probeCandidates.Add(configuredEmbeddingModel);
+            }
 
-            var client = _httpClientFactory.CreateClient("onboarding-probe");
-            using var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                BuildEndpoint(cfg.LiteLlm.BaseUrl, "v1/embeddings"));
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", cfg.LiteLlm.ApiKey);
-            request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+            foreach (var availableModel in availableModels.Where(IsLikelyEmbeddingModelId))
+                probeCandidates.Add(availableModel);
 
-            using var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode)
+            if (probeCandidates.Count == 0)
             {
                 return new OnboardingStepResult
                 {
                     Step = "embeddings",
-                    Success = false,
-                    Message = $"Embedding probe returned {(int)response.StatusCode}."
+                    Success = true,
+                    Message = "No embedding model is currently configured in LiteLLM; skipping embedding probe."
                 };
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
-            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-            if (!doc.RootElement.TryGetProperty("data", out var data) || data.GetArrayLength() == 0)
+            var client = _httpClientFactory.CreateClient("onboarding-probe");
+            var endpoint = BuildEndpoint(cfg.LiteLlm.BaseUrl, "v1/embeddings");
+            var orderedCandidates = probeCandidates.ToList();
+            string? lastFailure = null;
+
+            foreach (var model in orderedCandidates)
             {
+                var payload = JsonSerializer.Serialize(new
+                {
+                    model,
+                    input = new[] { "onboarding readiness probe" }
+                });
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", cfg.LiteLlm.ApiKey);
+                request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+                using var response = await client.SendAsync(request, ct);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync(ct);
+                    lastFailure = $"Embedding probe for '{model}' returned {(int)response.StatusCode}.";
+
+                    // Keep trying if this specific model is unavailable/mismatched.
+                    if ((response.StatusCode == HttpStatusCode.BadRequest || response.StatusCode == HttpStatusCode.NotFound)
+                        && orderedCandidates.Count > 1)
+                    {
+                        continue;
+                    }
+
+                    // If LiteLLM reports invalid model and we have no alternate embedding model, treat as optional.
+                    if (response.StatusCode == HttpStatusCode.BadRequest &&
+                        responseBody.Contains("Invalid model name", StringComparison.OrdinalIgnoreCase) &&
+                        orderedCandidates.Count == 1)
+                    {
+                        return new OnboardingStepResult
+                        {
+                            Step = "embeddings",
+                            Success = true,
+                            Message = "Configured embedding model is unavailable in LiteLLM; skipping embedding probe."
+                        };
+                    }
+
+                    continue;
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync(ct);
+                using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+                if (!doc.RootElement.TryGetProperty("data", out var data) || data.GetArrayLength() == 0)
+                {
+                    lastFailure = $"Embedding probe for '{model}' returned no vectors.";
+                    continue;
+                }
+
                 return new OnboardingStepResult
                 {
                     Step = "embeddings",
-                    Success = false,
-                    Message = "Embedding probe returned no vectors."
+                    Success = true,
+                    Message = $"Embedding endpoint is operational (model: {model})."
                 };
             }
 
             return new OnboardingStepResult
             {
                 Step = "embeddings",
-                Success = true,
-                Message = "Embedding endpoint is operational."
+                Success = false,
+                Message = lastFailure ?? "Embedding probe failed for all candidate models."
             };
         }
         catch (Exception ex)
@@ -314,6 +364,38 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
             };
         }
     }
+
+    private async Task<HashSet<string>> GetAvailableLiteLlmModelIdsAsync(LeanKernelConfig cfg, CancellationToken ct)
+    {
+        var client = _httpClientFactory.CreateClient("onboarding-probe");
+        using var request = new HttpRequestMessage(HttpMethod.Get, BuildEndpoint(cfg.LiteLlm.BaseUrl, "v1/models"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", cfg.LiteLlm.ApiKey);
+        using var response = await client.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+            return [];
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+        if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var modelIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var model in data.EnumerateArray())
+        {
+            if (model.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
+            {
+                var id = idProp.GetString();
+                if (!string.IsNullOrWhiteSpace(id))
+                    modelIds.Add(id.Trim());
+            }
+        }
+
+        return modelIds;
+    }
+
+    private static bool IsLikelyEmbeddingModelId(string modelId) =>
+        modelId.Contains("embedding", StringComparison.OrdinalIgnoreCase)
+        || modelId.Contains("embed", StringComparison.OrdinalIgnoreCase);
 
     private static async Task<OnboardingStepResult> ValidateQdrantAsync(LeanKernelConfig cfg, CancellationToken ct)
     {
@@ -373,7 +455,8 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
             };
         }
 
-        if (!File.Exists(cfg.Signal.CliPath))
+        var resolvedCliPath = ResolveSignalCliPath(cfg.Signal.CliPath);
+        if (resolvedCliPath is null)
         {
             return new OnboardingStepResult
             {
@@ -387,8 +470,22 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
         {
             Step = "signal",
             Success = true,
-            Message = "Signal configuration looks valid."
+            Message = $"Signal configuration looks valid (CLI: {resolvedCliPath})."
         };
+    }
+
+    private static string? ResolveSignalCliPath(string configuredPath)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredPath) && File.Exists(configuredPath))
+            return configuredPath;
+
+        foreach (var candidate in new[] { "/usr/bin/signal-cli", "/usr/local/bin/signal-cli" })
+        {
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        return null;
     }
 
     private static Uri BuildEndpoint(string baseUrl, string relativePath)

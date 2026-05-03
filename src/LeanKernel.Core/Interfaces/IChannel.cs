@@ -9,6 +9,7 @@ namespace LeanKernel.Core.Interfaces;
 public interface IChannel : IAsyncDisposable
 {
     string ChannelId { get; }
+    bool IsAuthorizedSender(string senderId);
     Task StartAsync(CancellationToken ct);
     Task StopAsync(CancellationToken ct);
     Task SendAsync(string recipientId, string content, CancellationToken ct);

@@ -29,7 +29,13 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
         {
             LiteLlm = new LiteLlmConfig { BaseUrl = "http://litellm:4000", ApiKey = "key" },
             Qdrant = new QdrantConfig { Host = "qdrant", Port = 6334 },
-            Signal = new SignalConfig { Enabled = false, CliPath = "/usr/local/bin/signal-cli", Account = "" },
+            Signal = new SignalConfig
+            {
+                Enabled = false,
+                CliPath = "/usr/local/bin/signal-cli",
+                Account = "",
+                AllowedSenders = ["+15551234567"]
+            },
             Wiki = new WikiConfig { BasePath = "/app/data/wiki" },
             Context = new ContextConfig(),
             Scheduler = new SchedulerConfig()
@@ -45,7 +51,11 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
         Assert.True(File.Exists(_paths.RuntimeConfigPath));
         var json = await File.ReadAllTextAsync(_paths.RuntimeConfigPath);
         using var doc = JsonDocument.Parse(json);
-        Assert.True(doc.RootElement.TryGetProperty("LeanKernel", out _));
+        Assert.True(doc.RootElement.TryGetProperty("LeanKernel", out var LeanKernel));
+        var sender = LeanKernel.GetProperty("signal")
+            .GetProperty("allowedSenders")[0]
+            .GetString();
+        Assert.Equal("+15551234567", sender);
     }
 
     public void Dispose()

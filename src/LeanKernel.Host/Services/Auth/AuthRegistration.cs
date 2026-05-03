@@ -12,11 +12,16 @@ namespace LeanKernel.Host.Services.Auth;
 /// </summary>
 public static class AuthRegistration
 {
-    public static IServiceCollection AddLeanKernelAuth(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddLeanKernelAuth(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string? dataDirectory = null)
     {
-        var dataDir = configuration["LeanKernel:Wiki:BasePath"] is string wikiPath
-            ? Path.GetDirectoryName(wikiPath) ?? "/app/data"
-            : "/app/data";
+        var dataDir = string.IsNullOrWhiteSpace(dataDirectory)
+            ? configuration["LeanKernel:Wiki:BasePath"] is string wikiPath
+                ? Path.GetDirectoryName(wikiPath) ?? "/app/data"
+                : "/app/data"
+            : dataDirectory;
 
         var authStatePath = Path.Combine(dataDir, "auth-state.json");
 

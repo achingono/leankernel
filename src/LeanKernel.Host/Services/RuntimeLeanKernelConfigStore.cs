@@ -69,7 +69,8 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
         {
             CliPath = source.Signal.CliPath,
             Account = source.Signal.Account,
-            Enabled = source.Signal.Enabled
+            Enabled = source.Signal.Enabled,
+            AllowedSenders = source.Signal.AllowedSenders?.ToArray() ?? []
         },
         Wiki = new WikiConfig
         {

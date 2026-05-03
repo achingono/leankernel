@@ -37,7 +37,8 @@ public sealed class ConfigController : ControllerBase
             {
                 cliPath = cfg.Signal.CliPath,
                 account = MaskSecret(cfg.Signal.Account),
-                enabled = cfg.Signal.Enabled
+                enabled = cfg.Signal.Enabled,
+                allowedSenders = cfg.Signal.AllowedSenders ?? []
             },
             wiki = cfg.Wiki,
             context = cfg.Context,

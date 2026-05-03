@@ -32,8 +32,7 @@ try
 
     // Runtime config overlay persisted by onboarding
     var configuredWikiPath = builder.Configuration["LeanKernel:Wiki:BasePath"] ?? "/app/data/wiki";
-    var configuredDataDir = Path.GetFullPath(Path.GetDirectoryName(configuredWikiPath) ?? "/app/data");
-    Directory.CreateDirectory(configuredDataDir);
+    var configuredDataDir = ResolveWritableDataDirectory(configuredWikiPath);
 
     var runtimeConfigPath = Path.Combine(configuredDataDir, "runtime-settings.json");
     var onboardingStatePath = Path.Combine(configuredDataDir, "onboarding-state.json");
@@ -129,7 +128,7 @@ try
     builder.Services.AddSingleton<IOnboardingOrchestrator, OnboardingOrchestrator>();
 
     // Authentication & Authorization
-    builder.Services.AddLeanKernelAuth(builder.Configuration);
+    builder.Services.AddLeanKernelAuth(builder.Configuration, configuredDataDir);
     builder.Services.AddLeanKernelOidc(builder.Configuration);
 
     // Forwarded headers (for reverse proxy HTTPS detection)
@@ -206,6 +205,40 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+static string ResolveWritableDataDirectory(string configuredWikiPath)
+{
+    var parentDirectory = Path.GetFullPath(Path.GetDirectoryName(configuredWikiPath) ?? "/app/data");
+    if (CanWriteToDirectory(parentDirectory))
+        return parentDirectory;
+
+    var wikiDirectory = Path.GetFullPath(configuredWikiPath);
+    if (CanWriteToDirectory(wikiDirectory))
+        return wikiDirectory;
+
+    throw new UnauthorizedAccessException(
+        $"Neither '{parentDirectory}' nor '{wikiDirectory}' is writable for runtime configuration persistence.");
+}
+
+static bool CanWriteToDirectory(string directoryPath)
+{
+    try
+    {
+        Directory.CreateDirectory(directoryPath);
+        var probePath = Path.Combine(directoryPath, $".LeanKernel-write-probe-{Guid.NewGuid():N}");
+        using (File.Create(probePath)) { }
+        File.Delete(probePath);
+        return true;
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return false;
+    }
+    catch (IOException)
+    {
+        return false;
+    }
 }
 
 /// <summary>

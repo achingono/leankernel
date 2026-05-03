@@ -45,22 +45,27 @@ public sealed class ChannelRouter
 
     private async Task HandleMessageAsync(LeanKernelMessage message, CancellationToken ct)
     {
+        var channel = _channels.FirstOrDefault(c => c.ChannelId == message.ChannelId);
+        if (channel is null)
+        {
+            _logger.LogWarning("No channel found for {ChannelId}", message.ChannelId);
+            return;
+        }
+
+        if (!channel.IsAuthorizedSender(message.SenderId))
+        {
+            _logger.LogWarning("Rejected message from unauthorized sender {Sender} on {Channel}",
+                message.SenderId, message.ChannelId);
+            return;
+        }
+
         _logger.LogInformation("Message from {Sender} on {Channel}: {Content}",
             message.SenderId, message.ChannelId, Truncate(message.Content, 80));
 
         try
         {
             var response = await _thinker.ProcessAsync(message, ct);
-            var channel = _channels.FirstOrDefault(c => c.ChannelId == message.ChannelId);
-
-            if (channel is not null)
-            {
-                await channel.SendAsync(message.SenderId, response, ct);
-            }
-            else
-            {
-                _logger.LogWarning("No channel found for {ChannelId}", message.ChannelId);
-            }
+            await channel.SendAsync(message.SenderId, response, ct);
         }
         catch (Exception ex)
         {
