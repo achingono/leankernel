@@ -6,9 +6,9 @@ providers:
       - source: env
         name: GROQ_API_KEY_2
     models:
-      - id: scout
-        name: meta-llama/llama-4-scout-17b-16e-instruct
-        max_tokens: 8192
+      - name: meta-llama/llama-4-scout-17b-16e-instruct
+        context_window: 8192
+        max_tokens: 2048
   gemini:
     keys:
       - source: env
@@ -18,50 +18,78 @@ providers:
       - source: env
         name: GEMINI_API_KEY_3
     models:
-      - id: flash
-        name: gemini-2.5-flash
+      - name: gemini-3-flash-preview
+        context_window: 32768
         max_tokens: 8192
+      - name: gemini-3.1-pro-preview
+        context_window: 32768
+        max_tokens: 8192
+      - name: gemini-2.5-flash
+        context_window: 8192
+        max_tokens: 2048
+      - name: gemini-2.5-pro
+        context_window: 8192
+        max_tokens: 2048
+      - name: gemini-pro-latest
+        context_window: 32768
+        max_tokens: 8192
+      - name: gemini-flash-latest
+        context_window: 8192
+        max_tokens: 2048
   azure:
     keys:
       - source: env
         name: AZURE_AI_API_KEY
-        api_base_env: AZURE_AI_API_BASE
+        resourceName: fs-LeanKernel
       - source: env
         name: AZURE_AI_API_KEY_2
-        api_base_env: AZURE_AI_API_BASE_2
+        resourceName: alfer-mkokmbre
     models:
-      - id: kimi_k2_5
-        name: kimi-k2.5
+      - name: gpt-5.4-1
+        context_window: 8192
+        max_tokens: 2048
+      - name: gpt-5.4-mini-1
+        context_window: 32768
         max_tokens: 8192
-      - id: gpt_5_2_chat
-        name: gpt-5.2-chat
-        max_tokens: 32768
+      - name: gpt-5.4-nano-1
+        context_window: 32768
+        max_tokens: 8192
   github_copilot:
     keys:
       - source: env
         name: GITHUB_COPILOT_OAUTH_TOKEN
         api_base_env: GITHUB_COPILOT_API_BASE
     models:
-      - id: gpt_5_4
-        name: gpt-5.4
-        max_tokens: 32768
+      - name: gpt-4.1
+        context_window: 32768
+        max_tokens: 8192
+  openai:
+    keys:
+      - source: env
+        name: OPENAI_API_KEY
+  anthropic:
+    keys:
+      - source: env
+        name: ANTHROPIC_API_KEY
   ollama:
     base_url:
       - source: env
         name: OLLAMA_BASE_URL
     models:
-      - id: gemma4_26b
-        name: gemma4:26b
-        max_tokens: 32768
-  openai:
+      - name: gemma4:26b
+        context_window: 32768
+        max_tokens: 8192
+  custom:
+    base_url:
+      - source: env
+        name: CUSTOM_API_BASE
     keys:
       - source: env
-        name: OPENAI_API_KEY
+        name: CUSTOM_API_KEY
     models:
-      - id: text_embedding_3_small
-        name: text-embedding-3-small
-        mode: embedding
-        dimensions: 1536
+      - name: custom-model
+        context_window: 32768
+        max_tokens: 8192
 
 routes:
   small:
@@ -78,12 +106,12 @@ routes:
       keys: [azure1, azure2]
       order: 3
     - provider: github_copilot
-      model: gpt_5_4
+      model: gpt-4.1
       keys: [github_copilot1]
       order: 4
-    - provider: ollama
+    - provider: local
       model: gemma4_26b
-      keys: [ollama1]
+      keys: [local]
       order: 0
   medium:
     - provider: groq
@@ -95,16 +123,16 @@ routes:
       keys: [gemini1, gemini2, gemini3]
       order: 2
     - provider: azure
-      model: gpt_5_2_chat
+      model: gpt-5.4-1
       keys: [azure1, azure2]
       order: 3
     - provider: github_copilot
-      model: gpt_5_4
+      model: gpt-4.1
       keys: [github_copilot1]
       order: 4
-    - provider: ollama
+    - provider: local
       model: gemma4_26b
-      keys: [ollama1]
+      keys: [local]
       order: 0
   large:
     - provider: groq
@@ -116,50 +144,14 @@ routes:
       keys: [gemini1, gemini2, gemini3]
       order: 2
     - provider: azure
-      model: gpt_5_2_chat
+      model: gpt-5.4-1
       keys: [azure1, azure2]
       order: 3
     - provider: github_copilot
-      model: gpt_5_4
+      model: gpt-4.1
       keys: [github_copilot1]
       order: 4
-    - provider: ollama
+    - provider: local
       model: gemma4_26b
-      keys: [ollama1]
+      keys: [local]
       order: 0
-  embedding-small:
-    - provider: openai
-      model: text_embedding_3_small
-      keys: [openai1]
-      order: 1
-
-aliases:
-  gpt-4o-mini: small
-  gpt-4o: medium
-  gpt-5.4: large
-  gpt-5.4-mini: small
-  gpt-5.4-nano: small
-  gpt-5-nano: small
-  gpt-5-mini: small
-
-router:
-  routing_strategy: simple-shuffle
-  enable_pre_call_checks: true
-  num_retries: 7
-  retry_after: 5
-  timeout: 120
-  cooldown_time: 60
-  fallback_on_status_codes: [429, 500, 502, 503, 504]
-  route_fallbacks:
-    small: [medium, large]
-    medium: [small, large]
-    large: [medium, small]
-    embedding-small: []
-  alias_fallbacks:
-    gpt-4o-mini: [medium, large]
-    gpt-4o: [small, large]
-    gpt-5.4: [medium, small]
-    gpt-5.4-mini: [medium, large]
-    gpt-5.4-nano: [medium, large]
-    gpt-5-nano: [medium, large]
-    gpt-5-mini: [medium, large]

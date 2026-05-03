@@ -69,6 +69,8 @@ services:
       - AZURE_AI_API_KEY_2=${AZURE_AI_API_KEY_2:-}
       - AZURE_AI_API_BASE_2=${AZURE_AI_API_BASE_2:-}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - GITHUB_COPILOT_OAUTH_TOKEN=${GITHUB_COPILOT_OAUTH_TOKEN:-}
+      - GITHUB_COPILOT_API_BASE=${GITHUB_COPILOT_API_BASE:-}
     ports:
       - "${LITELLM_PORT:-4000}:4000"
     extra_hosts:
