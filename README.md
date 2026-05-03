@@ -285,6 +285,16 @@ Local preview command:
 python3 config/render_litellm_config.py config/litellm/config.yaml /tmp/litellm_config.yaml
 ```
 
+Sync model limits from live provider/deployment metadata:
+
+```bash
+# dry-run
+python3 scripts/sync_litellm_model_limits.py
+
+# write updates to config/litellm/config.yaml
+python3 scripts/sync_litellm_model_limits.py --write
+```
+
 ### LiteLLM Provider Environment Variables
 
 Configure these in `.env` (or your secret manager):
