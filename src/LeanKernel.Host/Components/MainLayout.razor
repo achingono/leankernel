@@ -12,7 +12,7 @@
     <!-- Sidebar Navigation -->
     <nav class="LeanKernel-sidebar @(SidebarCollapsed ? "collapsed" : "")" aria-label="Main navigation">
         <div class="sidebar-header">
-            <span class="LeanKernel-logo" aria-hidden="true">◆</span>
+            <LeanKernelIcon Name="logo" Class="LeanKernel-logo" />
             @if (!SidebarCollapsed)
             {
                 <span class="LeanKernel-title">LeanKernel</span>
@@ -21,7 +21,7 @@
                     @onclick="ToggleSidebar"
                     aria-label="@(SidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")"
                     aria-expanded="@(!SidebarCollapsed)">
-                @(SidebarCollapsed ? "▶" : "◀")
+                <LeanKernelIcon Name="@(SidebarCollapsed ? "chevron-right" : "chevron-left")" Class="sidebar-toggle-icon" />
             </button>
         </div>
 
@@ -29,47 +29,47 @@
             @if (OnboardingIncomplete)
             {
                 <NavLink href="/onboarding" class="nav-item" role="listitem" aria-label="Onboarding">
-                    <span class="nav-icon" aria-hidden="true">◎</span>
+                    <LeanKernelIcon Name="onboarding" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Onboarding</span> }
                 </NavLink>
             }
             else if (!IsAuthenticated)
             {
                 <NavLink href="/login" class="nav-item" role="listitem" aria-label="Login">
-                    <span class="nav-icon" aria-hidden="true">🔒</span>
+                    <LeanKernelIcon Name="lock" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Login</span> }
                 </NavLink>
             }
             else
             {
                 <NavLink href="/" class="nav-item" Match="NavLinkMatch.All" role="listitem" aria-label="Dashboard">
-                    <span class="nav-icon" aria-hidden="true">⬡</span>
+                    <LeanKernelIcon Name="dashboard" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Dashboard</span> }
                 </NavLink>
                 <NavLink href="/chat" class="nav-item" role="listitem" aria-label="Chat">
-                    <span class="nav-icon" aria-hidden="true">◈</span>
+                    <LeanKernelIcon Name="chat" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Chat</span> }
                 </NavLink>
                 <NavLink href="/wiki" class="nav-item" role="listitem" aria-label="Wiki">
-                    <span class="nav-icon" aria-hidden="true">◇</span>
+                    <LeanKernelIcon Name="wiki" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Wiki</span> }
                 </NavLink>
                 <NavLink href="/logs" class="nav-item" role="listitem" aria-label="Logs">
-                    <span class="nav-icon" aria-hidden="true">▣</span>
+                    <LeanKernelIcon Name="logs" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Logs</span> }
                 </NavLink>
                 <NavLink href="/files" class="nav-item" role="listitem" aria-label="Files">
-                    <span class="nav-icon" aria-hidden="true">▤</span>
+                    <LeanKernelIcon Name="files" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Files</span> }
                 </NavLink>
                 <NavLink href="/settings" class="nav-item" role="listitem" aria-label="Settings">
-                    <span class="nav-icon" aria-hidden="true">⚙</span>
+                    <LeanKernelIcon Name="settings" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Settings</span> }
                 </NavLink>
 
                 <div class="nav-spacer"></div>
                 <button class="nav-item nav-logout" @onclick="LogoutAsync" aria-label="Logout">
-                    <span class="nav-icon" aria-hidden="true">⏻</span>
+                    <LeanKernelIcon Name="logout" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Logout</span> }
                 </button>
             }

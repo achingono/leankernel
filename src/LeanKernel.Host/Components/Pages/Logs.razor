@@ -6,14 +6,14 @@
 @rendermode InteractiveServer
 
 <div class="page-header">
-    <h1><span class="text-neon">▣</span> Logs</h1>
+    <h1><span class="text-neon"><LeanKernelIcon Name="logs" /></span> Logs</h1>
     <p class="subtitle">Application log viewer with search and filtering</p>
 </div>
 
 <!-- Filters -->
 <div class="toolbar-row">
     <div class="search-box" style="flex: 1; min-width: 200px; margin-bottom: 0;">
-        <span class="search-icon">⌕</span>
+        <LeanKernelIcon Name="search" Class="search-icon" />
         <input class="search-input"
                @bind="SearchQuery"
                @bind:event="oninput"

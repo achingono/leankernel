@@ -132,11 +132,17 @@ html {
 }
 
 .LeanKernel-logo {
-    font-size: 1.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
     color: var(--neon-primary);
     filter: drop-shadow(0 0 8px rgba(0, 255, 136, 0.4));
     flex-shrink: 0;
     animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.LeanKernel-icon {
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .LeanKernel-title {
@@ -159,6 +165,11 @@ html {
     font-size: 0.7rem;
     transition: all var(--transition-fast);
     flex-shrink: 0;
+}
+
+.sidebar-toggle-icon {
+    width: 0.9rem;
+    height: 0.9rem;
 }
 
 .sidebar-toggle:hover {
@@ -221,10 +232,10 @@ html {
 }
 
 .nav-icon {
-    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
     flex-shrink: 0;
-    width: 1.5rem;
-    text-align: center;
+    margin-right: 0.35rem;
 }
 
 /* ── Glass Card ─────────────────────────────────────────────── */
@@ -438,6 +449,8 @@ h3 {
     border: none;
     color: var(--text-muted);
     font-size: 0.7rem;
+    display: inline-flex;
+    align-items: center;
     cursor: pointer;
     padding: 0.25rem 0.5rem;
     font-family: var(--font-mono);
@@ -662,7 +675,11 @@ h3 {
     color: var(--text-primary);
 }
 
-.file-icon { flex-shrink: 0; }
+.file-icon {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+}
 .file-size {
     margin-left: auto;
     font-family: var(--font-mono);
@@ -784,7 +801,19 @@ h3 {
     top: 50%;
     transform: translateY(-50%);
     color: var(--text-muted);
-    font-size: 0.9rem;
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.button-icon {
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-right: 0.35rem;
+}
+
+.btn-ghost > .button-icon:only-child,
+.btn-primary > .button-icon:only-child {
+    margin-right: 0;
 }
 
 /* ── Table ──────────────────────────────────────────────────── */

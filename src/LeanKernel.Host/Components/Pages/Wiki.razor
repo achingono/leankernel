@@ -8,7 +8,7 @@
 @rendermode InteractiveServer
 
 <div class="page-header">
-    <h1><span class="text-neon">◇</span> Wiki</h1>
+    <h1><span class="text-neon"><LeanKernelIcon Name="wiki" /></span> Wiki</h1>
     <p class="subtitle">5W1H knowledge base browser</p>
 </div>
 
@@ -25,7 +25,7 @@
 
 <!-- Search -->
 <div class="search-box">
-    <span class="search-icon">⌕</span>
+    <LeanKernelIcon Name="search" Class="search-icon" />
     <input class="search-input"
            @bind="SearchQuery"
            @bind:event="oninput"
@@ -44,7 +44,9 @@
                     <h2>@SelectedEntry.Subject</h2>
                     <span class="dimension-tab active" style="font-size: 0.7rem;">@SelectedEntry.Dimension</span>
                 </div>
-                <button class="btn-ghost" @onclick="() => SelectedEntry = null">✕ Close</button>
+                <button class="btn-ghost" @onclick="() => SelectedEntry = null" aria-label="Close entry details">
+                    <LeanKernelIcon Name="close" Class="button-icon" /> Close
+                </button>
             </div>
 
             <div style="margin-bottom: 1rem;">

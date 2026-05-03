@@ -6,7 +6,7 @@
 @rendermode InteractiveServer
 
 <div class="page-header">
-    <h1><span class="text-neon">▤</span> Files</h1>
+    <h1><span class="text-neon"><LeanKernelIcon Name="files" /></span> Files</h1>
     <p class="subtitle">Data directory browser</p>
 </div>
 
@@ -17,7 +17,7 @@
         <div class="files-breadcrumb">
             <button class="btn-ghost" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"
                     @onclick="NavigateUp" disabled="@(CurrentPath == "")">
-                ↑ Up
+                <LeanKernelIcon Name="up" Class="button-icon" /> Up
             </button>
             <span class="text-mono text-muted files-path">
                 /@CurrentPath
@@ -35,7 +35,7 @@
                         aria-label="@(item.IsDirectory ? $"Open folder {item.Name}" : $"Preview file {item.Name}")"
                         @onclick="() => OnItemClick(item)"
                         @onkeydown="(e) => OnFileKeyDown(e, item)">
-                        <span class="file-icon">@(item.IsDirectory ? "📁" : GetFileIcon(item.Name))</span>
+                        <LeanKernelIcon Name="@(item.IsDirectory ? "folder" : GetFileIcon(item.Name))" Class="file-icon" />
                         <span>@item.Name</span>
                         @if (!item.IsDirectory)
                         {
@@ -61,7 +61,9 @@
                     <h3>@FileContent.Path</h3>
                     <span class="text-muted" style="font-size: 0.8rem;">@FormatSize(FileContent.Size)</span>
                 </div>
-                <button class="btn-ghost" @onclick="() => FileContent = null">✕</button>
+                <button class="btn-ghost" @onclick="() => FileContent = null" aria-label="Close file preview">
+                    <LeanKernelIcon Name="close" Class="button-icon" />
+                </button>
             </div>
             <div class="log-viewer" style="max-height: none;">
                 <pre class="file-preview-content">@FileContent.Content</pre>
@@ -149,13 +151,13 @@
     private static string GetFileIcon(string name) =>
         Path.GetExtension(name).ToLower() switch
         {
-            ".json" => "📄",
-            ".yaml" or ".yml" => "⚙️",
-            ".log" => "📋",
-            ".md" => "📝",
-            ".cs" => "💎",
-            ".sh" => "🔧",
-            _ => "📄"
+            ".json" => "file-json",
+            ".yaml" or ".yml" => "file-config",
+            ".log" => "file-log",
+            ".md" => "file-md",
+            ".cs" => "file-code",
+            ".sh" => "file-script",
+            _ => "file-json"
         };
 
 }

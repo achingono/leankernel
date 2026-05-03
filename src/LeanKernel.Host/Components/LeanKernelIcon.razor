@@ -1,0 +1,124 @@
+<svg class="LeanKernel-icon @Class"
+     width="@Size"
+     height="@Size"
+     viewBox="0 0 24 24"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     role="img"
+     aria-hidden="@(string.IsNullOrWhiteSpace(Title))"
+     aria-label="@Title">
+    @switch (Name.ToLowerInvariant())
+    {
+        case "logo":
+            <polygon points="12 3 21 12 12 21 3 12"></polygon>
+            break;
+        case "onboarding":
+            <circle cx="12" cy="12" r="7"></circle>
+            <path d="M12 3v3"></path>
+            <path d="M12 18v3"></path>
+            <path d="M3 12h3"></path>
+            <path d="M18 12h3"></path>
+            break;
+        case "lock":
+            <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+            <path d="M8 11V8a4 4 0 1 1 8 0v3"></path>
+            break;
+        case "dashboard":
+            <rect x="3" y="3" width="8" height="8" rx="1"></rect>
+            <rect x="13" y="3" width="8" height="5" rx="1"></rect>
+            <rect x="13" y="10" width="8" height="11" rx="1"></rect>
+            <rect x="3" y="13" width="8" height="8" rx="1"></rect>
+            break;
+        case "chat":
+            <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path>
+            break;
+        case "wiki":
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5V4.5A2.5 2.5 0 0 1 6.5 2z"></path>
+            break;
+        case "logs":
+            <rect x="4" y="3" width="16" height="18" rx="2"></rect>
+            <path d="M8 8h8"></path>
+            <path d="M8 12h8"></path>
+            <path d="M8 16h5"></path>
+            break;
+        case "files":
+        case "folder":
+            <path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2"></path>
+            break;
+        case "settings":
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.4 1V21a2 2 0 1 1-4 0v-.1a1.65 1.65 0 0 0-.4-1 1.65 1.65 0 0 0-1-.6 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1-.4H3a2 2 0 1 1 0-4h.1a1.65 1.65 0 0 0 1-.4 1.65 1.65 0 0 0 .6-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .4-1V3a2 2 0 1 1 4 0v.1a1.65 1.65 0 0 0 .4 1 1.65 1.65 0 0 0 1 .6 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 .6 1 1.65 1.65 0 0 0 1 .4h.1a2 2 0 1 1 0 4H21a1.65 1.65 0 0 0-1 .4 1.65 1.65 0 0 0-.6 1z"></path>
+            break;
+        case "logout":
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <path d="M16 17l5-5-5-5"></path>
+            <path d="M21 12H9"></path>
+            break;
+        case "search":
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="M21 21l-4.35-4.35"></path>
+            break;
+        case "close":
+            <path d="M18 6L6 18"></path>
+            <path d="M6 6l12 12"></path>
+            break;
+        case "up":
+            <path d="m18 15-6-6-6 6"></path>
+            break;
+        case "chevron-left":
+            <path d="m15 18-6-6 6-6"></path>
+            break;
+        case "chevron-right":
+            <path d="m9 18 6-6-6-6"></path>
+            break;
+        case "chevron-down":
+            <path d="m6 9 6 6 6-6"></path>
+            break;
+        case "refresh":
+            <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"></path>
+            <path d="M21 3v5h-5"></path>
+            <path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"></path>
+            <path d="M3 21v-5h5"></path>
+            break;
+        case "file-json":
+        case "file-md":
+        case "file-log":
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <path d="M14 2v6h6"></path>
+            break;
+        case "file-config":
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <path d="M14 2v6h6"></path>
+            <circle cx="12" cy="14" r="2"></circle>
+            <path d="M12 10v2"></path>
+            <path d="M12 16v2"></path>
+            break;
+        case "file-code":
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <path d="M14 2v6h6"></path>
+            <path d="m10 13-2 2 2 2"></path>
+            <path d="m14 13 2 2-2 2"></path>
+            break;
+        case "file-script":
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <path d="M14 2v6h6"></path>
+            <path d="m9 15 2-2 2 2"></path>
+            <path d="M11 13v5"></path>
+            break;
+        default:
+            <circle cx="12" cy="12" r="8"></circle>
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter] public string Class { get; set; } = string.Empty;
+    [Parameter] public int Size { get; set; } = 16;
+    [Parameter] public string? Title { get; set; }
+}

@@ -8,7 +8,7 @@
 @rendermode InteractiveServer
 
 <div class="page-header">
-    <h1><span class="text-neon">◈</span> Chat</h1>
+    <h1><span class="text-neon"><LeanKernelIcon Name="chat" /></span> Chat</h1>
     <p class="subtitle">Conversation interface with tool diagnostics</p>
 </div>
 
@@ -22,7 +22,9 @@
                 <option value="@session" selected="@(session == CurrentSession)">@session</option>
             }
         </select>
-        <button class="btn-ghost" @onclick="LoadSessions">↻ Refresh</button>
+        <button class="btn-ghost" @onclick="LoadSessions">
+            <LeanKernelIcon Name="refresh" Class="button-icon" /> Refresh
+        </button>
     </div>
 
     <!-- Messages -->
@@ -36,7 +38,14 @@
                 @if (msg.Role == "assistant")
                 {
                     <button class="diagnostic-toggle" @onclick="() => msg.ShowDiagnostics = !msg.ShowDiagnostics">
-                        @(msg.ShowDiagnostics ? "▼ Hide diagnostics" : "▶ Show diagnostics")
+                        @if (msg.ShowDiagnostics)
+                        {
+                            <LeanKernelIcon Name="chevron-down" Class="button-icon" /> <span>Hide diagnostics</span>
+                        }
+                        else
+                        {
+                            <LeanKernelIcon Name="chevron-right" Class="button-icon" /> <span>Show diagnostics</span>
+                        }
                     </button>
                     @if (msg.ShowDiagnostics)
                     {
