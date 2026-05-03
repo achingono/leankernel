@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Serilog;
 using LeanKernel.Archivist;
@@ -12,6 +13,7 @@ using LeanKernel.Commander.Adapters;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Host;
+using LeanKernel.Host.Data;
 using LeanKernel.Host.Services;
 using LeanKernel.Host.Services.Auth;
 using LeanKernel.Plugins;
@@ -159,8 +161,31 @@ try
     });
     builder.Services.AddScoped<EngagementAuthorizationFilter>();
 
+    // Phase 3: Persistent Message Queue with Database Storage
+    builder.Services.AddDbContext<MessageQueueDbContext>(options =>
+    {
+        var dbPath = Path.Combine(configuredDataDir, ".LeanKernel", "messagequeue.db");
+        var dbDir = Path.GetDirectoryName(dbPath);
+        if (dbDir != null && !Directory.Exists(dbDir))
+        {
+            Directory.CreateDirectory(dbDir);
+        }
+        options.UseSqlite($"Data Source={dbPath}");
+    });
+
     // Phase 2: Message Queue and Agents Configuration
-    builder.Services.AddSingleton<IMessageQueue, MessageQueueService>();
+    // Register in-memory queue first (wrapped by persistent queue)
+    builder.Services.AddSingleton<MessageQueueService>();
+    
+    // Register persistent queue as the primary IMessageQueue interface
+    builder.Services.AddSingleton<IMessageQueue>(sp =>
+    {
+        var inMemoryQueue = sp.GetRequiredService<MessageQueueService>();
+        var dbContext = sp.GetRequiredService<MessageQueueDbContext>();
+        var logger = sp.GetRequiredService<ILogger<PersistentMessageQueueService>>();
+        return new PersistentMessageQueueService(inMemoryQueue, dbContext, logger);
+    });
+    
     builder.Services.AddScoped<AgentsConfigurationStep>();
     builder.Services.AddHostedService<MessageProcessingBackgroundService>();
 
@@ -217,6 +242,19 @@ try
     });
 
     var app = builder.Build();
+
+    // Phase 3: Apply database migrations and recover undelivered messages
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<MessageQueueDbContext>();
+        await dbContext.Database.MigrateAsync();
+
+        var messageQueue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+        if (messageQueue is PersistentMessageQueueService persistentQueue)
+        {
+            await persistentQueue.RecoverUndeliveredMessagesAsync(CancellationToken.None);
+        }
+    }
 
     // Load engagement rules (AGENTS.md) on startup
     var rulesProvider = app.Services.GetRequiredService<IEngagementRulesProvider>();

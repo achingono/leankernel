@@ -14,13 +14,13 @@ public sealed class ChatController : ControllerBase
 {
     private readonly ISessionStore _sessions;
     private readonly IThinkerService _thinker;
-    private readonly MessageQueueService _messageQueue;
+    private readonly IMessageQueue _messageQueue;
     private readonly TimeBoundaryService _timeBoundary;
 
     public ChatController(
         ISessionStore sessions,
         IThinkerService thinker,
-        MessageQueueService messageQueue,
+        IMessageQueue messageQueue,
         TimeBoundaryService timeBoundary)
     {
         _sessions = sessions;
