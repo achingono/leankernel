@@ -37,4 +37,7 @@ public sealed class SelectionResult
     public int EstimatedInputTokens { get; init; }
     public int ConstraintCount { get; init; }
     public bool QualityGateTriggered { get; init; }
+
+    /// <summary>UTC timestamp when the routing decision was made.</summary>
+    public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
 }

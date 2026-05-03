@@ -141,6 +141,20 @@ public sealed class RoutingConfig
     /// </summary>
     public bool Enabled { get; set; } = false;
 
+    /// <summary>
+    /// Phase 1 — Shadow mode: routing runs in parallel but its response is discarded.
+    /// Only the SelectionLog is emitted; the static response is returned to the user.
+    /// Requires Enabled=true.
+    /// </summary>
+    public bool ShadowMode { get; set; } = true;
+
+    /// <summary>
+    /// Phase 2/3 — Whether the quality gate is applied and can trigger escalation.
+    /// Set false (Phase 2) to use routing without quality-based retries.
+    /// Set true (Phase 3) to enable full escalation on quality failures.
+    /// </summary>
+    public bool EnableQualityEscalation { get; set; } = false;
+
     // Complexity classification thresholds (FR-1)
     public int SmallMaxTokens { get; set; } = 4_000;
     public int SmallMaxConstraints { get; set; } = 3;
@@ -163,6 +177,9 @@ public sealed class RoutingConfig
 
     // Spend guard (FR-8)
     public SpendGuardConfig SpendGuard { get; set; } = new();
+
+    // Phase 4 — model limit sync job
+    public string ModelLimitSyncCron { get; set; } = "0 4 * * *"; // 4 AM daily
 }
 
 public sealed class SpendGuardConfig

@@ -22,7 +22,8 @@ public class ProactiveTaskRunnerTests
             NullLogger<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>.Instance);
 
         var config = Options.Create(new LeanKernelConfig { Scheduler = new SchedulerConfig { Enabled = false } });
-        var runner = new ProactiveTaskRunner(scheduler, job, config, NullLogger<ProactiveTaskRunner>.Instance);
+        var syncJob = new LeanKernel.Scheduler.Jobs.ModelLimitSyncJob(config, NullLogger<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>.Instance);
+        var runner = new ProactiveTaskRunner(scheduler, job, syncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
 
         await runner.StartAsync(CancellationToken.None);
 
@@ -45,7 +46,8 @@ public class ProactiveTaskRunnerTests
             NullLogger<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>.Instance);
 
         var config = Options.Create(new LeanKernelConfig { Scheduler = new SchedulerConfig { Enabled = true, WikiMaintenanceCron = "0 3 * * *" } });
-        var runner = new ProactiveTaskRunner(scheduler, job, config, NullLogger<ProactiveTaskRunner>.Instance);
+        var syncJob = new LeanKernel.Scheduler.Jobs.ModelLimitSyncJob(config, NullLogger<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>.Instance);
+        var runner = new ProactiveTaskRunner(scheduler, job, syncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
 
         await runner.StartAsync(CancellationToken.None);
 

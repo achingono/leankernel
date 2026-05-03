@@ -1,0 +1,373 @@
+@page "/admin/routing"
+@using System.Diagnostics.CodeAnalysis
+@using Microsoft.Extensions.Options
+@using LeanKernel.Core.Configuration
+@using LeanKernel.Core.Enums
+@using LeanKernel.Thinker.Routing
+@attribute [ExcludeFromCodeCoverage]
+@inject SelectionLogStore LogStore
+@inject ProviderHealthTracker HealthTracker
+@inject SpendGuard SpendGuard
+@inject IOptions<LeanKernelConfig> LeanKernelConfig
+@rendermode InteractiveServer
+
+<div class="page-header">
+    <h1><span class="text-neon"><LeanKernelIcon Name="routing" /></span> Routing</h1>
+    <p class="subtitle">Intelligent model routing observability</p>
+</div>
+
+@if (!Config!.Routing.Enabled)
+{
+    <div class="glass-card" style="margin-bottom: 1.5rem;">
+        <p style="color: var(--text-muted); text-align: center;">
+            Routing is currently <strong style="color: var(--neon-green);">disabled</strong>.
+            Set <code>LEANKERNEL__Routing__Enabled=true</code> to activate.
+        </p>
+    </div>
+}
+else if (Config.Routing.ShadowMode)
+{
+    <div class="glass-card" style="margin-bottom: 1.5rem;">
+        <p style="color: var(--text-muted); text-align: center;">
+            <span class="status-badge" style="background: rgba(255, 200, 0, 0.15); color: #ffc800; border-color: rgba(255, 200, 0, 0.3);">● Shadow Mode</span>
+            &nbsp; Routing is running in shadow mode — decisions are logged but the static model responds.
+        </p>
+    </div>
+}
+
+<!-- Stat summary cards -->
+<div class="stats-grid stagger-in">
+    <div class="glass-card stat-card">
+        <div class="stat-value text-neon">@TotalRequests</div>
+        <div class="stat-label">Requests (1h)</div>
+    </div>
+    <div class="glass-card stat-card">
+        <div class="stat-value">@FreePct<span style="font-size:1rem; color:var(--text-muted);">%</span></div>
+        <div class="stat-label">Free (1h)</div>
+    </div>
+    <div class="glass-card stat-card">
+        <div class="stat-value">@P50<span style="font-size:1rem; color:var(--text-muted);">ms</span></div>
+        <div class="stat-label">Latency p50</div>
+    </div>
+    <div class="glass-card stat-card">
+        <div class="stat-value">@P95<span style="font-size:1rem; color:var(--text-muted);">ms</span></div>
+        <div class="stat-label">Latency p95</div>
+    </div>
+    <div class="glass-card stat-card">
+        <div class="stat-value">@SpendGuardCount</div>
+        <div class="stat-label">Paid Today</div>
+    </div>
+    <div class="glass-card stat-card">
+        <div class="stat-value">
+            @if (HardLimitActive)
+            {
+                <span class="status-badge" style="background: rgba(255,60,60,0.15); color: #ff3c3c; border-color: rgba(255,60,60,0.3);">● Hard Limit</span>
+            }
+            else if (SoftLimitActive)
+            {
+                <span class="status-badge" style="background: rgba(255,200,0,0.15); color: #ffc800; border-color: rgba(255,200,0,0.3);">● Soft Limit</span>
+            }
+            else
+            {
+                <span class="status-badge status-healthy">● OK</span>
+            }
+        </div>
+        <div class="stat-label">Spend Guard</div>
+    </div>
+</div>
+
+<div class="content-grid stagger-in">
+
+    <!-- Provider Health -->
+    <div class="glass-card">
+        <h3 class="text-cyan" style="margin-bottom: 1rem;">Provider Health</h3>
+        <div class="diagnostic-panel">
+            @foreach (var entry in HealthSnapshot)
+            {
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label">@entry.Key</span>
+                    <span class="diagnostic-value">
+                        @if (entry.Value)
+                        {
+                            <span class="status-badge" style="background: rgba(255,60,60,0.15); color: #ff3c3c; border-color: rgba(255,60,60,0.3);">● Cooldown</span>
+                        }
+                        else
+                        {
+                            <span class="status-badge status-healthy">● Healthy</span>
+                        }
+                    </span>
+                </div>
+            }
+            @if (HealthSnapshot.Count == 0)
+            {
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label" style="color: var(--text-muted);">No health data yet</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Spend Guard -->
+    <div class="glass-card">
+        <h3 class="text-cyan" style="margin-bottom: 1rem;">Spend Guard</h3>
+        <div class="diagnostic-panel">
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Paid requests today</span>
+                <span class="diagnostic-value text-neon">@SpendGuardCount</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Soft limit</span>
+                <span class="diagnostic-value">@(SoftLimit == 0 ? "—" : SoftLimit.ToString())</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Hard limit</span>
+                <span class="diagnostic-value">@(HardLimit == 0 ? "—" : HardLimit.ToString())</span>
+            </div>
+            @if (HardLimit > 0)
+            {
+                var pct = Math.Min(100, SpendGuardCount * 100 / HardLimit);
+                <div class="diagnostic-row" style="flex-direction: column; gap: 0.4rem; padding-top: 0.5rem;">
+                    <div style="display:flex; justify-content: space-between;">
+                        <span class="diagnostic-label">Usage</span>
+                        <span class="diagnostic-label">@pct%</span>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 8px; width: 100%;">
+                        <div style="width: @pct%; height: 100%; background: @(pct >= 100 ? "#ff3c3c" : pct >= 80 ? "#ffc800" : "#00ff88"); border-radius: 4px; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Complexity Distribution -->
+    <div class="glass-card">
+        <h3 class="text-cyan" style="margin-bottom: 1rem;">Complexity Distribution (1h)</h3>
+        <div class="diagnostic-panel">
+            @foreach (var (tier, pct) in ComplexityDist)
+            {
+                <div class="diagnostic-row" style="flex-direction: column; gap: 0.4rem;">
+                    <div style="display:flex; justify-content: space-between;">
+                        <span class="diagnostic-label">@tier</span>
+                        <span class="diagnostic-label">@pct.ToString("F1")%</span>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 6px; width: 100%;">
+                        <div style="width: @Math.Min(100d, pct).ToString("F1")%; height: 100%; background: #00d4ff; border-radius: 4px;"></div>
+                    </div>
+                </div>
+            }
+            @if (!ComplexityDist.Any())
+            {
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label" style="color: var(--text-muted);">No data yet</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Selection Reason Breakdown -->
+    <div class="glass-card">
+        <h3 class="text-cyan" style="margin-bottom: 1rem;">Selection Reasons (1h)</h3>
+        <div class="diagnostic-panel">
+            @foreach (var kv in ReasonCounts.OrderByDescending(x => x.Value))
+            {
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label">@kv.Key</span>
+                    <span class="diagnostic-value text-neon">@kv.Value</span>
+                </div>
+            }
+            @if (!ReasonCounts.Any())
+            {
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label" style="color: var(--text-muted);">No data yet</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Escalation Rate by Tier -->
+    <div class="glass-card">
+        <h3 class="text-cyan" style="margin-bottom: 1rem;">Escalation Rate by Tier (1h)</h3>
+        <div class="diagnostic-panel">
+            @foreach (var kv in EscalationRates.OrderBy(x => x.Key))
+            {
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label">@kv.Key</span>
+                    <span class="diagnostic-value">@kv.Value.ToString("F1")%</span>
+                </div>
+            }
+            @if (!EscalationRates.Any())
+            {
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label" style="color: var(--text-muted);">No data yet</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Latency Percentiles -->
+    <div class="glass-card">
+        <h3 class="text-cyan" style="margin-bottom: 1rem;">Latency Percentiles (1h)</h3>
+        <div class="diagnostic-panel">
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">p50</span>
+                <span class="diagnostic-value">@P50 ms</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">p95</span>
+                <span class="diagnostic-value">@P95 ms</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">p99</span>
+                <span class="diagnostic-value">@P99 ms</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Config -->
+    <div class="glass-card">
+        <h3 class="text-cyan" style="margin-bottom: 1rem;">Active Routing Config</h3>
+        <div class="diagnostic-panel">
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Enabled</span>
+                <span class="diagnostic-value">@Config.Routing.Enabled</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Shadow Mode</span>
+                <span class="diagnostic-value">@Config.Routing.ShadowMode</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Quality Escalation</span>
+                <span class="diagnostic-value">@Config.Routing.EnableQualityEscalation</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Small alias</span>
+                <span class="diagnostic-value">@Config.Routing.SmallAlias</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Medium alias</span>
+                <span class="diagnostic-value">@Config.Routing.MediumAlias</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Large alias</span>
+                <span class="diagnostic-value">@Config.Routing.LargeAlias</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Cooldown</span>
+                <span class="diagnostic-value">@Config.Routing.CooldownSeconds s</span>
+            </div>
+            <div class="diagnostic-row">
+                <span class="diagnostic-label">Max attempts</span>
+                <span class="diagnostic-value">@Config.Routing.MaxProviderAttempts</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Decisions -->
+    <div class="glass-card" style="grid-column: 1 / -1;">
+        <h3 class="text-cyan" style="margin-bottom: 1rem;">Recent Routing Decisions</h3>
+        @{
+            var recent = RecentDecisions;
+        }
+        @if (recent.Count == 0)
+        {
+            <p style="color: var(--text-muted);">No decisions recorded yet.</p>
+        }
+        else
+        {
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Time</th>
+                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Complexity</th>
+                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Alias</th>
+                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Cost</th>
+                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Reason</th>
+                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Attempts</th>
+                            <th style="text-align: right; padding: 0.5rem; color: var(--text-muted);">Latency</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in recent)
+                        {
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <td style="padding: 0.4rem 0.5rem; color: var(--text-muted);">@r.Timestamp.ToString("HH:mm:ss")</td>
+                                <td style="padding: 0.4rem 0.5rem;">@r.Complexity</td>
+                                <td style="padding: 0.4rem 0.5rem; color: #00d4ff;">@r.SelectedAlias</td>
+                                <td style="padding: 0.4rem 0.5rem;">
+                                    @if (r.CostBucket == "paid")
+                                    {
+                                        <span style="color: #ffc800;">paid</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-neon">free</span>
+                                    }
+                                </td>
+                                <td style="padding: 0.4rem 0.5rem; font-size: 0.8rem; color: var(--text-muted);">@r.SelectionReason</td>
+                                <td style="padding: 0.4rem 0.5rem;">@r.AttemptCount</td>
+                                <td style="padding: 0.4rem 0.5rem; text-align: right;">@r.LatencyMs ms</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+</div>
+
+@code {
+    private static readonly TimeSpan Window1h = TimeSpan.FromHours(1);
+
+    private LeanKernelConfig? Config;
+
+    private int TotalRequests;
+    private int FreePct;
+    private long P50, P95, P99;
+    private int SpendGuardCount;
+    private int SoftLimit;
+    private int HardLimit;
+    private bool SoftLimitActive;
+    private bool HardLimitActive;
+    private IReadOnlyDictionary<string, bool> HealthSnapshot = new Dictionary<string, bool>();
+    private IReadOnlyDictionary<string, double> EscalationRates = new Dictionary<string, double>();
+    private IReadOnlyDictionary<string, double> ComplexityDist = new Dictionary<string, double>();
+    private IReadOnlyDictionary<string, int> ReasonCounts = new Dictionary<string, int>();
+    private IReadOnlyList<SelectionResult> RecentDecisions = [];
+
+    protected override Task OnInitializedAsync()
+    {
+        Config = LeanKernelConfig.Value;
+
+        var records = LogStore.GetSince(Window1h);
+        TotalRequests = records.Count;
+
+        var (free, paid) = LogStore.GetFreeVsPaidCounts(Window1h);
+        FreePct = TotalRequests == 0 ? 100 : (int)Math.Round(free * 100.0 / TotalRequests);
+
+        var (p50, p95, p99) = LogStore.GetLatencyPercentiles(Window1h);
+        P50 = p50; P95 = p95; P99 = p99;
+
+        SpendGuardCount = SpendGuard.CurrentCount();
+        SoftLimit = Config.Routing.SpendGuard.DailyPaidRequestSoftLimit;
+        HardLimit = Config.Routing.SpendGuard.DailyPaidRequestHardLimit;
+        HardLimitActive = SpendGuard.ILeanKernelLimitActive();
+        SoftLimitActive = SoftLimit > 0 && SpendGuardCount >= SoftLimit;
+
+        HealthSnapshot = HealthTracker.GetSnapshot()
+            .ToDictionary(kv => kv.Key, kv => kv.Value > DateTimeOffset.UtcNow);
+        EscalationRates = LogStore.GetEscalationRateByTier(Window1h);
+        ComplexityDist = LogStore.GetComplexityDistribution(Window1h)
+            .ToDictionary(kv => kv.Key.ToString(), kv => kv.Value);
+        ReasonCounts = LogStore.GetSelectionReasonCounts(Window1h);
+
+        // Show 50 most recent decisions, newest first
+        RecentDecisions = LogStore.GetAll()
+            .OrderByDescending(r => r.Timestamp)
+            .Take(50)
+            .ToList();
+
+        return Task.CompletedTask;
+    }
+}

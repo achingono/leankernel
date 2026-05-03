@@ -13,17 +13,20 @@ public sealed class ProactiveTaskRunner
 {
     private readonly IScheduler _scheduler;
     private readonly Jobs.WikiMaintenanceJob _wikiJob;
+    private readonly Jobs.ModelLimitSyncJob _syncJob;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ProactiveTaskRunner> _logger;
 
     public ProactiveTaskRunner(
         IScheduler scheduler,
         Jobs.WikiMaintenanceJob wikiJob,
+        Jobs.ModelLimitSyncJob syncJob,
         IOptions<LeanKernelConfig> config,
         ILogger<ProactiveTaskRunner> logger)
     {
         _scheduler = scheduler;
         _wikiJob = wikiJob;
+        _syncJob = syncJob;
         _config = config.Value;
         _logger = logger;
     }
@@ -42,6 +45,16 @@ public sealed class ProactiveTaskRunner
             _config.Scheduler.WikiMaintenanceCron,
             _wikiJob.ExecuteAsync,
             ct);
+
+        // Phase 4 — model limit sync (only when routing is enabled)
+        if (_config.Routing.Enabled)
+        {
+            await _scheduler.ScheduleAsync(
+                "model-limit-sync",
+                _config.Routing.ModelLimitSyncCron,
+                _syncJob.ExecuteAsync,
+                ct);
+        }
 
         _logger.LogInformation("Proactive tasks registered: {Jobs}",
             string.Join(", ", _scheduler.ListScheduledJobs()));

@@ -129,8 +129,9 @@ public sealed class ModelRoutingService
 
             lastResponse = response ?? string.Empty;
 
-            // FR-4: Quality gate.
-            if (!_qualityGate.Passes(lastResponse, prompt, constraintCount, out var failReason))
+            // FR-4: Quality gate — only when EnableQualityEscalation=true (Phase 3+).
+            if (_config.EnableQualityEscalation &&
+                !_qualityGate.Passes(lastResponse, prompt, constraintCount, out var failReason))
             {
                 qualityGateTriggered = true;
                 _logger.LogInformation(

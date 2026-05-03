@@ -24,6 +24,7 @@ public sealed class ThinkerService : IThinkerService
     private readonly ToolFunctionAdapter _toolAdapter;
     private readonly PromptAssembler _promptAssembler;
     private readonly ModelRoutingService? _routing;
+    private readonly SelectionLogStore? _selectionLog;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -36,7 +37,8 @@ public sealed class ThinkerService : IThinkerService
         PromptAssembler promptAssembler,
         IOptions<LeanKernelConfig> config,
         ILogger<ThinkerService> logger,
-        ModelRoutingService? routing = null)
+        ModelRoutingService? routing = null,
+        SelectionLogStore? selectionLog = null)
     {
         _gatekeeper = gatekeeper;
         _sessions = sessions;
@@ -45,6 +47,7 @@ public sealed class ThinkerService : IThinkerService
         _toolAdapter = toolAdapter;
         _promptAssembler = promptAssembler;
         _routing = routing;
+        _selectionLog = selectionLog;
         _config = config.Value;
         _logger = logger;
     }
@@ -81,8 +84,19 @@ public sealed class ThinkerService : IThinkerService
 
             if (_config.Routing.Enabled && _routing is not null)
             {
-                response = await InvokeWithRoutingAsync(
-                    message, context, instructions, tools, sessionId, ct);
+                if (_config.Routing.ShadowMode)
+                {
+                    // Phase 1 — Shadow: run routing for logging only, return static response.
+                    response = await InvokeStaticAsync(
+                        message, context, instructions, tools, sessionId, ct);
+
+                    _ = RunShadowRoutingAsync(message, context, instructions, tools, ct);
+                }
+                else
+                {
+                    response = await InvokeWithRoutingAsync(
+                        message, context, instructions, tools, sessionId, ct);
+                }
             }
             else
             {
@@ -150,6 +164,8 @@ public sealed class ThinkerService : IThinkerService
         await _sessions.SetMetadataAsync(sessionId, "routing:latency_ms", metadata.LatencyMs.ToString(), ct);
         await _sessions.SetMetadataAsync(sessionId, "routing:attempts", metadata.AttemptCount.ToString(), ct);
 
+        _selectionLog?.Record(metadata);
+
         return response;
     }
 
@@ -187,6 +203,42 @@ public sealed class ThinkerService : IThinkerService
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Phase 1 shadow: fires routing in the background, records the SelectionResult for
+    /// observability, but the caller has already returned the static response to the user.
+    /// </summary>
+    private async Task RunShadowRoutingAsync(
+        LeanKernelMessage message,
+        ConversationContext context,
+        string instructions,
+        IReadOnlyList<AITool> tools,
+        CancellationToken ct)
+    {
+        try
+        {
+            var (_, metadata) = await _routing!.RouteAsync(
+                requestId: message.Id,
+                prompt: message.Content,
+                existingContextTokens: context.EstimatedTotalTokens,
+                systemInstructions: instructions,
+                tools: tools,
+                ct: ct);
+
+            _selectionLog?.Record(metadata);
+
+            _logger.LogInformation(
+                "Shadow routing [{RequestId}]: would have selected alias='{Alias}' tier='{Tier}' " +
+                "complexity={Complexity} cost={CostBucket} reason='{Reason}' attempts={Attempts} latency={LatencyMs}ms",
+                metadata.RequestId, metadata.SelectedAlias, metadata.SelectedTier,
+                metadata.Complexity, metadata.CostBucket, metadata.SelectionReason,
+                metadata.AttemptCount, metadata.LatencyMs);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Shadow routing [{RequestId}]: suppressed exception", message.Id);
+        }
     }
 
     /// <summary>

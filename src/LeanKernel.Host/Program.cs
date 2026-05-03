@@ -109,6 +109,7 @@ try
     builder.Services.AddSingleton<LeanKernel.Thinker.Routing.SpendGuard>();
     builder.Services.AddSingleton<LeanKernel.Thinker.Routing.PolicyModelSelector>();
     builder.Services.AddSingleton<LeanKernel.Thinker.Routing.ResponseQualityGate>();
+    builder.Services.AddSingleton<LeanKernel.Thinker.Routing.SelectionLogStore>();
     builder.Services.AddSingleton<LeanKernel.Thinker.Routing.ModelRoutingService>();
 
     builder.Services.AddSingleton<IThinkerService, ThinkerService>();
@@ -132,6 +133,7 @@ try
     // Scheduler
     builder.Services.AddSingleton<IScheduler, CronScheduler>();
     builder.Services.AddSingleton<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>();
+    builder.Services.AddSingleton<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>();
     builder.Services.AddSingleton<LeanKernel.Scheduler.ProactiveTaskRunner>();
 
     // Web API services
