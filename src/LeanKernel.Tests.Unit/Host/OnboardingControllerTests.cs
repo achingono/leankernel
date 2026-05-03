@@ -135,4 +135,74 @@ public class OnboardingControllerTests
 
         Assert.IsType<OkObjectResult>(result);
     }
+
+    [Fact]
+    public void GetAgentPresets_ReturnsOk()
+    {
+        var orchestrator = Substitute.For<IOnboardingOrchestrator>();
+        var agentsStep = CreateStubAgentsStep();
+
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore(), agentsStep);
+        var result = controller.GetAgentPresets();
+
+        Assert.IsType<OkObjectResult>(result);
+        var okResult = (OkObjectResult)result;
+        Assert.NotNull(okResult.Value);
+    }
+
+    [Fact]
+    public async Task InitializeAgents_WithValidPreset_ReturnsOk()
+    {
+        var orchestrator = Substitute.For<IOnboardingOrchestrator>();
+        var agentsStep = CreateStubAgentsStep();
+
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore(), agentsStep);
+        var request = new AgentsInitializeRequest { PresetName = "basic" };
+        var result = await controller.InitializeAgents(request, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task InitializeAgents_WithInvalidPreset_DefaultsToBasic()
+    {
+        var orchestrator = Substitute.For<IOnboardingOrchestrator>();
+        var agentsStep = CreateStubAgentsStep();
+
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore(), agentsStep);
+        var request = new AgentsInitializeRequest { PresetName = "invalid-preset-xyz" };
+        var result = await controller.InitializeAgents(request, CancellationToken.None);
+
+        // Invalid presets default to basic, so should return Ok
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task ValidateAgents_ReturnsOk()
+    {
+        var orchestrator = Substitute.For<IOnboardingOrchestrator>();
+        var agentsStep = CreateStubAgentsStep();
+
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore(), agentsStep);
+        var result = await controller.ValidateAgents(CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task UpdateAgentSection_WithValidSection_ReturnsOk()
+    {
+        var orchestrator = Substitute.For<IOnboardingOrchestrator>();
+        var agentsStep = CreateStubAgentsStep();
+
+        var controller = new OnboardingController(orchestrator, CreateIncompleteStore(), agentsStep);
+        var request = new AgentsSectionUpdateRequest 
+        { 
+            SectionName = "Agent Personality", 
+            Content = "Test content" 
+        };
+        var result = await controller.UpdateAgentSection("Agent Personality", request, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
 }
