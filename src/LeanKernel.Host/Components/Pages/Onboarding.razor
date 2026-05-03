@@ -113,7 +113,19 @@ else
 
         <div class="glass-card">
             <div class="setting-group">
-                <h3 class="text-cyan">5) Authentication</h3>
+                <h3 class="text-cyan">5) Agent Rules (optional)</h3>
+                <p class="text-muted" style="margin-bottom: 0.75rem; font-size: 0.85rem;">
+                    Define engagement rules, autonomy scope, and time boundaries for your agent.
+                </p>
+                <button class="btn-primary" @onclick='() => Nav.NavigateTo("/onboarding/agents")' style="width: 100%;">
+                    Configure Agent Rules →
+                </button>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <div class="setting-group">
+                <h3 class="text-cyan">6) Authentication</h3>
                 <p class="text-muted" style="margin-bottom: 0.75rem; font-size: 0.85rem;">
                     Set your admin passcode. This will be required to access LeanKernel after onboarding.
                 </p>
