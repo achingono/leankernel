@@ -153,7 +153,13 @@ try
 
     // Engagement Rules (AGENTS.md) — rules of engagement between user and agent
     builder.Services.AddSingleton<IEngagementRulesProvider, EngagementRulesProvider>();
-    builder.Services.AddSingleton<IActionAuthorizer, ActionAuthorizer>();
+    builder.Services.AddSingleton<IActionAuthorizer>(sp =>
+    {
+        var rulesProvider = sp.GetRequiredService<IEngagementRulesProvider>();
+        var logger = sp.GetRequiredService<ILogger<ActionAuthorizer>>();
+        var rules = rulesProvider.GetCurrent();
+        return new ActionAuthorizer(rules, logger);
+    });
     builder.Services.AddSingleton(sp =>
     {
         var rulesProvider = sp.GetRequiredService<IEngagementRulesProvider>();
@@ -161,6 +167,7 @@ try
         var rules = rulesProvider.GetCurrent();
         return new TimeBoundaryService(rules, logger);
     });
+    builder.Services.AddSingleton<ITimeBoundaryService>(sp => sp.GetRequiredService<TimeBoundaryService>());
     builder.Services.AddScoped<EngagementAuthorizationFilter>();
 
     // Phase 3: Persistent Message Queue with Database Storage
@@ -197,7 +204,7 @@ try
         var logger = sp.GetRequiredService<ILogger<SignalChannelAdapter>>();
         var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
         var httpClient = httpClientFactory.CreateClient();
-        var LeanKernelConfig = sp.GetRequiredService<LeanKernelConfig>();
+        var LeanKernelConfig = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
         
         var phoneNumber = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_PHONE") ?? LeanKernelConfig.SignalPhoneNumber;
         var serverUrl = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_SERVER") ?? LeanKernelConfig.SignalServerUrl;
@@ -211,7 +218,7 @@ try
         var logger = sp.GetRequiredService<ILogger<DiscordChannelAdapter>>();
         var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
         var httpClient = httpClientFactory.CreateClient();
-        var LeanKernelConfig = sp.GetRequiredService<LeanKernelConfig>();
+        var LeanKernelConfig = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
         
         var botToken = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_BOT_TOKEN") ?? LeanKernelConfig.DiscordBotToken;
         var channelId = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_CHANNEL_ID") ?? LeanKernelConfig.DiscordChannelId;
