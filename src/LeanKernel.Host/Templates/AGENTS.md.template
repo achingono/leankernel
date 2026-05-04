@@ -85,13 +85,21 @@ Configure how the agent communicates with you across different channels.
 
 ### Signal
 
+**Enabled:** false
 **Format:** Brief
 - Keep messages concise
 - Use bullet points for lists
 - Max 1 paragraph per topic
 
+**Configuration:**
+Set via environment variables or appsettings.json:
+- `LEANKERNEL_SIGNAL_PHONE`: Your Signal phone number (e.g., "+1234567890")
+- `LEANKERNEL_SIGNAL_SERVER`: Signal API server URL
+- `LEANKERNEL_SIGNAL_API_TOKEN`: API authentication token
+
 ### Email
 
+**Enabled:** false
 **Format:** Verbose
 - Provide full context and reasoning
 - Organize with headers
@@ -99,10 +107,35 @@ Configure how the agent communicates with you across different channels.
 
 ### Discord
 
+**Enabled:** false
 **Format:** Brief
 - Short, conversational messages
 - Use threads for detailed discussions
 - Emoji for quick reactions
+
+**Configuration:**
+Set via environment variables or appsettings.json:
+- `LEANKERNEL_DISCORD_BOT_TOKEN`: Your Discord bot token
+- `LEANKERNEL_DISCORD_CHANNEL_ID`: Channel ID where messages will be sent
+
+## Message Delivery
+
+Configure when and how messages are delivered to external channels.
+
+**Quiet Hours Batching:**
+- During quiet hours, non-urgent messages are batched
+- Urgent messages always delivered immediately
+- Batched messages sent at next active window
+
+**Retry Policy:**
+- Failed deliveries automatically retried with exponential backoff
+- Signal: Up to 3 attempts with 2s base delay
+- Discord: Up to 3 attempts with rate limit awareness
+
+**Delivery Channels:**
+Configure which channels are available for message delivery:
+- Each channel requires specific configuration (credentials, channel IDs, etc.)
+- Disabled channels are skipped (no delivery attempt, no error)
 
 ## Action Follow-Up
 
