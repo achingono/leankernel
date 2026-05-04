@@ -125,6 +125,7 @@ def parse_provider_models(provider_name: str, provider_spec: dict[str, Any]) -> 
             "name": name,
             "model_info": model_info,
             "litellm_params": copy.deepcopy(litellm_params),
+            "use_responses_api": bool(model_spec.get("use_responses_api", False)),
         }
     return parsed
 
@@ -249,7 +250,12 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
             selected_keys = entry.get("keys", provider_route_keys[provider])
             selected_keys = ensure_string_list(selected_keys, f"{entry_path}.keys")
             model_spec = provider_models[provider][model_id]
-            full_model_name = f"{provider_prefixes[provider]}/{model_spec['name']}"
+            model_litellm_params = copy.deepcopy(model_spec.get("litellm_params", {}))
+            use_responses_api = model_spec.get("use_responses_api", False)
+            if use_responses_api:
+                full_model_name = f"{provider_prefixes[provider]}/responses/{model_spec['name']}"
+            else:
+                full_model_name = f"{provider_prefixes[provider]}/{model_spec['name']}"
 
             for key_name in selected_keys:
                 if key_name not in provider_keys:
@@ -263,7 +269,7 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
                     continue
                 litellm_params = copy.deepcopy(key_spec["litellm_params"])
                 litellm_params["model"] = full_model_name
-                litellm_params.update(copy.deepcopy(model_spec.get("litellm_params", {})))
+                litellm_params.update(model_litellm_params)
                 litellm_params["order"] = order
                 deployment = {
                     "model_name": route,

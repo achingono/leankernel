@@ -4,8 +4,8 @@ FROM ghcr.io/berriai/litellm:main-latest
 RUN pip install --no-cache-dir psycopg2-binary redis httpx pyyaml
 
 # Copy source spec + compiler
-COPY config/litellm/config.yaml /app/litellm_spec.yaml
-COPY config/render_litellm_config.py /app/render_litellm_config.py
+COPY config.yaml /app/litellm_spec.yaml
+COPY render_litellm_config.py /app/render_litellm_config.py
 
 # Set working directory
 WORKDIR /app

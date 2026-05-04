@@ -67,3 +67,8 @@ coverage-report/
 
 # Local configuration files
 data/
+
+#Playwright
+.playwright/
+playwright-report/
+.playwright-mcp/

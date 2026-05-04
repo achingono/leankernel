@@ -43,18 +43,15 @@ providers:
       - id: gpt_5_4_1
         name: gpt-5.4-1
         max_tokens: 32768
-        litellm_params:
-          use_responses_api: true
+        use_responses_api: true
       - id: gpt_5_4_mini_1
         name: gpt-5.4-mini-1
         max_tokens: 32768
-        litellm_params:
-          use_responses_api: true
+        use_responses_api: true
       - id: gpt_5_4_nano_1
         name: gpt-5.4-nano-1
         max_tokens: 32768
-        litellm_params:
-          use_responses_api: true
+        use_responses_api: true
       - id: embedding_3_large
         name: text-embedding-3-large-1
         mode: embedding
@@ -76,6 +73,10 @@ providers:
       - id: gemma4_26b
         name: gemma4:26b
         max_tokens: 32768
+      - id: nomic_embed_text
+        name: nomic-embed-text
+        mode: embedding
+        dimensions: 768
   openai:
     keys:
       - source: env
@@ -183,11 +184,19 @@ routes:
       model: embedding_2
       keys: [gemini1, gemini2, gemini3]
       order: 2
+    - provider: ollama
+      model: nomic_embed_text
+      keys: [ollama1]
+      order: 3
   embedding-large:
     - provider: azure
       model: embedding_3_large
       keys: [azure2]
       order: 1
+    - provider: ollama
+      model: nomic_embed_text
+      keys: [ollama1]
+      order: 2
 
 aliases:
   gpt-4o-mini: small
@@ -210,7 +219,8 @@ router:
     small: [medium, large]
     medium: [small, large]
     large: [medium, small]
-    embedding-small: []
+    embedding-small: [embedding-large]
+    embedding-large: [embedding-small]
   alias_fallbacks:
     gpt-4o-mini: [medium, large]
     gpt-4o: [small, large]

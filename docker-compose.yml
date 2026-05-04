@@ -53,8 +53,8 @@ services:
   # ── LiteLLM Proxy (Model Router) ─────────────────────────────
   litellm:
     build:
-      context: .
-      dockerfile: config/litellm/Dockerfile
+      context: config/litellm
+      dockerfile: Dockerfile
     container_name: LeanKernel-litellm
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
