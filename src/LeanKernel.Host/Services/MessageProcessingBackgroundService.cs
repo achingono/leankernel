@@ -1,27 +1,31 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using LeanKernel.Host.Services.Channels;
 
 namespace LeanKernel.Host.Services;
 
 /// <summary>
 /// Background service that processes queued messages at regular intervals,
-/// especially at the start of active hours.
+/// especially at the start of active hours. Routes messages through appropriate channels.
 /// </summary>
 public sealed class MessageProcessingBackgroundService : BackgroundService
 {
     private readonly ILogger<MessageProcessingBackgroundService> _logger;
-    private readonly MessageQueueService _messageQueue;
+    private readonly IMessageQueue _messageQueue;
     private readonly TimeBoundaryService _timeBoundary;
+    private readonly ChannelRegistry _channelRegistry;
     private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(1);
 
     public MessageProcessingBackgroundService(
         ILogger<MessageProcessingBackgroundService> logger,
-        MessageQueueService messageQueue,
-        TimeBoundaryService timeBoundary)
+        IMessageQueue messageQueue,
+        TimeBoundaryService timeBoundary,
+        ChannelRegistry channelRegistry)
     {
         _logger = logger;
         _messageQueue = messageQueue;
         _timeBoundary = timeBoundary;
+        _channelRegistry = channelRegistry;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -81,16 +85,7 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
         {
             try
             {
-                // Here we would typically send the message to the appropriate channel
-                // For now, just log it and mark as delivered
-                _logger.LogInformation(
-                    "Delivering queued message {MessageId} to {Channel} (priority: {Priority})",
-                    message.Id,
-                    message.Channel,
-                    message.Priority);
-
-                // Mark as delivered
-                await _messageQueue.MarkDeliveredAsync(message.Id, ct);
+                await DeliverMessageAsync(message, ct);
             }
             catch (Exception ex)
             {
@@ -105,5 +100,77 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
             stats.TotalEnqueued,
             stats.PendingMessages,
             stats.DeliveredMessages);
+    }
+
+    private async Task DeliverMessageAsync(QueuedMessage message, CancellationToken ct)
+    {
+        // Resolve the channel adapter
+        var channel = _channelRegistry.GetChannel(message.Channel);
+
+        if (channel == null)
+        {
+            _logger.LogError(
+                "Channel '{ChannelName}' not available for message {MessageId}",
+                message.Channel,
+                message.Id);
+
+            await _messageQueue.MarkFailedAsync(
+                message.Id,
+                $"Channel '{message.Channel}' not configured",
+                ct);
+
+            return;
+        }
+
+        _logger.LogInformation(
+            "Delivering message {MessageId} to {Channel}/{Recipient}",
+            message.Id,
+            message.Channel,
+            message.Recipient);
+
+        // Attempt delivery
+        var result = await channel.DeliverAsync(message.Recipient, message.Content, ct);
+
+        if (result.Success)
+        {
+            // Mark as delivered
+            await _messageQueue.MarkDeliveredAsync(message.Id, ct);
+
+            _logger.LogInformation(
+                "Successfully delivered message {MessageId} via {Channel} (ref: {Reference})",
+                message.Id,
+                message.Channel,
+                result.DeliveryReference ?? "N/A");
+        }
+        else if (result.IsRetryable && result.SuggestedRetryDelay.HasValue)
+        {
+            // Schedule for retry
+            var nextRetryAt = DateTime.UtcNow.Add(result.SuggestedRetryDelay.Value);
+
+            await _messageQueue.MarkRetryableAsync(
+                message.Id,
+                result.Error ?? "Unknown error",
+                nextRetryAt,
+                ct);
+
+            _logger.LogWarning(
+                "Message {MessageId} failed (retryable), scheduled for retry at {RetryAt}: {Error}",
+                message.Id,
+                nextRetryAt,
+                result.Error ?? "Unknown error");
+        }
+        else
+        {
+            // Mark as failed (not retryable)
+            await _messageQueue.MarkFailedAsync(
+                message.Id,
+                result.Error ?? "Unknown error",
+                ct);
+
+            _logger.LogError(
+                "Message {MessageId} delivery failed (not retryable): {Error}",
+                message.Id,
+                result.Error ?? "Unknown error");
+        }
     }
 }

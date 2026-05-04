@@ -17,6 +17,13 @@ public sealed class LeanKernelConfig
     public AuthConfig Auth { get; set; } = new();
     public RoutingConfig Routing { get; set; } = new();
     public EngagementRules Engagement { get; set; } = new();
+
+    // Channel configuration for Phase 4
+    public string? SignalPhoneNumber { get; set; }
+    public string? SignalServerUrl { get; set; }
+    public string? SignalApiToken { get; set; }
+    public string? DiscordBotToken { get; set; }
+    public string? DiscordChannelId { get; set; }
 }
 
 public enum AuthMode { LocalPasscode, Oidc, Disabled }

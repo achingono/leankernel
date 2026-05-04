@@ -16,6 +16,8 @@ using LeanKernel.Host;
 using LeanKernel.Host.Data;
 using LeanKernel.Host.Services;
 using LeanKernel.Host.Services.Auth;
+using LeanKernel.Host.Services.Channels;
+using LeanKernel.Host.Services.Channels.Adapters;
 using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
 using LeanKernel.Scheduler;
@@ -185,6 +187,40 @@ try
         var logger = sp.GetRequiredService<ILogger<PersistentMessageQueueService>>();
         return new PersistentMessageQueueService(inMemoryQueue, dbContext, logger);
     });
+    
+    // Phase 4: Channel-specific message delivery
+    builder.Services.AddSingleton<ChannelRegistry>();
+    
+    // Register channel adapters
+    builder.Services.AddSingleton(sp =>
+    {
+        var logger = sp.GetRequiredService<ILogger<SignalChannelAdapter>>();
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+        var httpClient = httpClientFactory.CreateClient();
+        var LeanKernelConfig = sp.GetRequiredService<LeanKernelConfig>();
+        
+        var phoneNumber = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_PHONE") ?? LeanKernelConfig.SignalPhoneNumber;
+        var serverUrl = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_SERVER") ?? LeanKernelConfig.SignalServerUrl;
+        var apiToken = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_API_TOKEN") ?? LeanKernelConfig.SignalApiToken;
+        
+        return new SignalChannelAdapter(logger, httpClient, phoneNumber, serverUrl, apiToken);
+    });
+    
+    builder.Services.AddSingleton(sp =>
+    {
+        var logger = sp.GetRequiredService<ILogger<DiscordChannelAdapter>>();
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+        var httpClient = httpClientFactory.CreateClient();
+        var LeanKernelConfig = sp.GetRequiredService<LeanKernelConfig>();
+        
+        var botToken = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_BOT_TOKEN") ?? LeanKernelConfig.DiscordBotToken;
+        var channelId = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_CHANNEL_ID") ?? LeanKernelConfig.DiscordChannelId;
+        
+        return new DiscordChannelAdapter(logger, httpClient, botToken, channelId);
+    });
+    
+    // Initialize channels on startup
+    builder.Services.AddHostedService<ChannelInitializationService>();
     
     builder.Services.AddScoped<AgentsConfigurationStep>();
     builder.Services.AddHostedService<MessageProcessingBackgroundService>();

@@ -2,13 +2,14 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Host.Services;
+using LeanKernel.Host.Services.Channels;
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Host;
 
 public class MessageProcessingBackgroundServiceTests
 {
-    private static (MessageProcessingBackgroundService, MessageQueueService, TimeBoundaryService) CreateService()
+    private static (MessageProcessingBackgroundService, IMessageQueue, TimeBoundaryService, ChannelRegistry) CreateService()
     {
         var rules = new EngagementRules
         {
@@ -22,17 +23,20 @@ public class MessageProcessingBackgroundServiceTests
 
         var messageQueueLogger = Substitute.For<ILogger<MessageQueueService>>();
         var messageQueue = new MessageQueueService(timeBoundary, messageQueueLogger);
+        
+        var registryLogger = Substitute.For<ILogger<ChannelRegistry>>();
+        var channelRegistry = new ChannelRegistry(registryLogger);
 
         var serviceLogger = Substitute.For<ILogger<MessageProcessingBackgroundService>>();
-        var service = new MessageProcessingBackgroundService(serviceLogger, messageQueue, timeBoundary);
+        var service = new MessageProcessingBackgroundService(serviceLogger, (IMessageQueue)messageQueue, timeBoundary, channelRegistry);
 
-        return (service, messageQueue, timeBoundary);
+        return (service, (IMessageQueue)messageQueue, timeBoundary, channelRegistry);
     }
 
     [Fact]
     public async Task ExecuteAsync_ProcessesReadyMessages()
     {
-        var (service, messageQueue, _) = CreateService();
+        var (service, messageQueue, _, _) = CreateService();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
         // Enqueue some messages
@@ -79,9 +83,12 @@ public class MessageProcessingBackgroundServiceTests
 
         var messageQueueLogger = Substitute.For<ILogger<MessageQueueService>>();
         var messageQueue = new MessageQueueService(timeBoundary, messageQueueLogger);
+        
+        var registryLogger = Substitute.For<ILogger<ChannelRegistry>>();
+        var channelRegistry = new ChannelRegistry(registryLogger);
 
         var serviceLogger = Substitute.For<ILogger<MessageProcessingBackgroundService>>();
-        var service = new MessageProcessingBackgroundService(serviceLogger, messageQueue, timeBoundary);
+        var service = new MessageProcessingBackgroundService(serviceLogger, (IMessageQueue)messageQueue, timeBoundary, channelRegistry);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
@@ -108,7 +115,7 @@ public class MessageProcessingBackgroundServiceTests
     [Fact]
     public async Task ExecuteAsync_HandlesExceptions()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _) = CreateService();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
         // Start the service (should handle any exceptions gracefully)
