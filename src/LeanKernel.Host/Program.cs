@@ -41,6 +41,8 @@ try
     var runtimeConfigPath = Path.Combine(configuredDataDir, "runtime-settings.json");
     var onboardingStatePath = Path.Combine(configuredDataDir, "onboarding-state.json");
     builder.Configuration.AddJsonFile(runtimeConfigPath, optional: true, reloadOnChange: true);
+    // Re-apply environment variables so deployment-time values can override runtime overlay.
+    builder.Configuration.AddEnvironmentVariables();
 
     builder.Services.AddSingleton(new LeanKernelHostPaths
     {
