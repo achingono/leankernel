@@ -117,6 +117,64 @@ public class PersistentMessageQueueService : IMessageQueue
         }
     }
 
+    public async Task MarkFailedAsync(string messageId, string error, CancellationToken ct = default)
+    {
+        try
+        {
+            // Mark as failed in in-memory queue
+            await _inMemoryQueue.MarkFailedAsync(messageId, error, ct);
+
+            // Update database
+            var entity = await _dbContext.QueuedMessages
+                .FirstOrDefaultAsync(m => m.Id == messageId, ct);
+
+            if (entity != null)
+            {
+                entity.LastError = error;
+                entity.RetryCount++;
+                entity.UpdatedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync(ct);
+
+                _logger.LogWarning("Message {MessageId} marked as failed (attempt {Attempt}): {Error}",
+                    messageId, entity.RetryCount, error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error marking message {MessageId} as failed", messageId);
+        }
+    }
+
+    public async Task MarkRetryableAsync(string messageId, string error, DateTime nextRetryAt, CancellationToken ct = default)
+    {
+        try
+        {
+            // Mark as retryable in in-memory queue
+            await _inMemoryQueue.MarkRetryableAsync(messageId, error, nextRetryAt, ct);
+
+            // Update database
+            var entity = await _dbContext.QueuedMessages
+                .FirstOrDefaultAsync(m => m.Id == messageId, ct);
+
+            if (entity != null)
+            {
+                entity.LastError = error;
+                entity.NextRetryAt = nextRetryAt;
+                entity.RetryCount++;
+                entity.UpdatedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync(ct);
+
+                _logger.LogInformation(
+                    "Message {MessageId} scheduled for retry at {RetryAt} (attempt {Attempt}): {Error}",
+                    messageId, nextRetryAt, entity.RetryCount, error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error marking message {MessageId} as retryable", messageId);
+        }
+    }
+
     public async Task<MessageQueueStats> GetStatsAsync(CancellationToken ct = default)
     {
         try
@@ -180,7 +238,10 @@ public class PersistentMessageQueueService : IMessageQueue
                     IsUrgent = entity.IsUrgent,
                     Priority = entity.Priority,
                     IsDelivered = entity.IsDelivered,
-                    DeliveredAt = entity.DeliveredAt
+                    DeliveredAt = entity.DeliveredAt,
+                    RetryAttempts = entity.RetryCount,
+                    NextRetryAt = entity.NextRetryAt,
+                    LastError = entity.LastError
                 };
 
                 await _inMemoryQueue.EnqueueAsync(message, entity.IsUrgent, ct);

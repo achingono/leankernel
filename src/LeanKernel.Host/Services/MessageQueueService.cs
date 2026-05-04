@@ -27,6 +27,16 @@ public interface IMessageQueue
     Task MarkDeliveredAsync(string messageId, CancellationToken ct = default);
 
     /// <summary>
+    /// Mark a message as failed with error details.
+    /// </summary>
+    Task MarkFailedAsync(string messageId, string error, CancellationToken ct = default);
+
+    /// <summary>
+    /// Mark a message for retry with scheduled time.
+    /// </summary>
+    Task MarkRetryableAsync(string messageId, string error, DateTime nextRetryAt, CancellationToken ct = default);
+
+    /// <summary>
     /// Get queue statistics.
     /// </summary>
     Task<MessageQueueStats> GetStatsAsync(CancellationToken ct = default);
@@ -47,6 +57,9 @@ public sealed record QueuedMessage
     public int Priority { get; init; } = 5;
     public bool IsDelivered { get; init; }
     public DateTime? DeliveredAt { get; init; }
+    public int RetryAttempts { get; init; }
+    public DateTime? NextRetryAt { get; init; }
+    public string? LastError { get; init; }
 }
 
 /// <summary>
@@ -179,6 +192,60 @@ public sealed class MessageQueueService : IMessageQueue
         if (_messages.TryUpdate(messageId, deliveredMessage, message))
         {
             _logger.LogInformation("Message {MessageId} marked as delivered", messageId);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task MarkFailedAsync(string messageId, string error, CancellationToken ct = default)
+    {
+        if (!_messages.TryGetValue(messageId, out var message))
+        {
+            _logger.LogWarning("Message {MessageId} not found in queue", messageId);
+            return Task.CompletedTask;
+        }
+
+        var failedMessage = message with
+        {
+            LastError = error,
+            RetryAttempts = message.RetryAttempts + 1
+        };
+
+        if (_messages.TryUpdate(messageId, failedMessage, message))
+        {
+            _logger.LogWarning(
+                "Message {MessageId} marked as failed (attempt {Attempt}): {Error}",
+                messageId,
+                failedMessage.RetryAttempts,
+                error);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task MarkRetryableAsync(string messageId, string error, DateTime nextRetryAt, CancellationToken ct = default)
+    {
+        if (!_messages.TryGetValue(messageId, out var message))
+        {
+            _logger.LogWarning("Message {MessageId} not found in queue", messageId);
+            return Task.CompletedTask;
+        }
+
+        var retryMessage = message with
+        {
+            LastError = error,
+            NextRetryAt = nextRetryAt,
+            RetryAttempts = message.RetryAttempts + 1
+        };
+
+        if (_messages.TryUpdate(messageId, retryMessage, message))
+        {
+            _logger.LogInformation(
+                "Message {MessageId} scheduled for retry at {RetryAt} (attempt {Attempt}): {Error}",
+                messageId,
+                nextRetryAt,
+                retryMessage.RetryAttempts,
+                error);
         }
 
         return Task.CompletedTask;
