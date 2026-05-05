@@ -9,6 +9,7 @@ namespace LeanKernel.Host.Services.Channels.Adapters;
 public sealed class SignalChannelAdapter : IMessageChannel
 {
     private readonly ILogger<SignalChannelAdapter> _logger;
+    private readonly bool _isEnabled;
     private readonly string? _phoneNumber;
     private readonly string? _serverUrl;
     private readonly string? _apiToken;
@@ -19,6 +20,7 @@ public sealed class SignalChannelAdapter : IMessageChannel
     public string Name => "Signal";
 
     public bool IsConfigured =>
+        _isEnabled &&
         !string.IsNullOrWhiteSpace(_phoneNumber) &&
         !string.IsNullOrWhiteSpace(_serverUrl) &&
         !string.IsNullOrWhiteSpace(_apiToken);
@@ -28,15 +30,17 @@ public sealed class SignalChannelAdapter : IMessageChannel
         HttpClient httpClient,
         string? phoneNumber,
         string? serverUrl,
-        string? apiToken)
+        string? apiToken,
+        bool isEnabled = true)
     {
         _logger = logger;
         _httpClient = httpClient;
+        _isEnabled = isEnabled;
         _phoneNumber = phoneNumber;
         _serverUrl = serverUrl;
         _apiToken = apiToken;
 
-        if (!IsConfigured)
+        if (_isEnabled && !IsConfigured)
         {
             _logger.LogWarning("Signal channel is not properly configured");
         }
@@ -47,6 +51,14 @@ public sealed class SignalChannelAdapter : IMessageChannel
         string content,
         CancellationToken ct = default)
     {
+        if (!_isEnabled)
+        {
+            return ChannelDeliveryResult.Failed(
+                Name,
+                "Signal channel is disabled",
+                retryable: false);
+        }
+
         if (!IsConfigured)
         {
             return ChannelDeliveryResult.Failed(

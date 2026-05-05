@@ -16,6 +16,7 @@ services:
       - LEANKERNEL__LiteLlm__ApiKey=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
       - LEANKERNEL__Qdrant__Host=qdrant
       - LEANKERNEL__Qdrant__Port=6334
+      - LEANKERNEL__Signal__Enabled=${LEANKERNEL_SIGNAL_ENABLED:-false}
       - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
       - LEANKERNEL__Signal__AllowedSenders__0=${SIGNAL_ALLOWED_SENDER_0:-}
       - LEANKERNEL__Wiki__BasePath=/app/data/wiki

@@ -211,11 +211,18 @@ try
         var httpClient = httpClientFactory.CreateClient();
         var LeanKernelConfig = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
         
-        var phoneNumber = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_PHONE") ?? LeanKernelConfig.SignalPhoneNumber;
+        var enabledEnv = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_ENABLED");
+        var isEnabled = bool.TryParse(enabledEnv, out var parsedEnabled)
+            ? parsedEnabled
+            : LeanKernelConfig.Signal.Enabled;
+
+        var phoneNumber = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_PHONE")
+            ?? LeanKernelConfig.SignalPhoneNumber
+            ?? LeanKernelConfig.Signal.Account;
         var serverUrl = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_SERVER") ?? LeanKernelConfig.SignalServerUrl;
         var apiToken = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_API_TOKEN") ?? LeanKernelConfig.SignalApiToken;
         
-        return new SignalChannelAdapter(logger, httpClient, phoneNumber, serverUrl, apiToken);
+        return new SignalChannelAdapter(logger, httpClient, phoneNumber, serverUrl, apiToken, isEnabled);
     });
     
     builder.Services.AddSingleton(sp =>
