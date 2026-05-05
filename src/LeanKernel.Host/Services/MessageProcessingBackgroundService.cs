@@ -79,13 +79,9 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
     {
         // Check if we're in active hours
         var status = _timeBoundary.GetStatus();
-        if (!status.IsInActiveHours)
-        {
-            // Not in active hours, skip processing
-            return;
-        }
+        var inActiveHours = status.IsInActiveHours;
 
-        // Get ready messages (urgent messages and messages scheduled for now)
+        // Get ready messages
         var readyMessages = await _messageQueue.GetReadyMessagesAsync(ct);
 
         if (readyMessages.Count == 0)
@@ -93,10 +89,29 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
             return;
         }
 
-        _logger.LogInformation("Processing {Count} queued messages", readyMessages.Count);
+        // Filter messages to process:
+        // - In active hours: process all messages
+        // - Outside active hours: process only urgent messages (priority 1)
+        var messagesToProcess = inActiveHours
+            ? readyMessages
+            : readyMessages.Where(m => m.Priority == 1).ToList();
+
+        if (messagesToProcess.Count == 0)
+        {
+            if (readyMessages.Count > 0 && !inActiveHours)
+            {
+                _logger.LogDebug(
+                    "Not in active hours: {PendingCount} non-urgent messages waiting for active window at {NextActive}",
+                    readyMessages.Count,
+                    status.NextActiveWindow);
+            }
+            return;
+        }
+
+        _logger.LogInformation("Processing {Count} queued messages", messagesToProcess.Count);
 
         // Process each message
-        foreach (var message in readyMessages)
+        foreach (var message in messagesToProcess)
         {
             try
             {

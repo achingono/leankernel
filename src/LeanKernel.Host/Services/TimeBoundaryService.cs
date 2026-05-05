@@ -52,6 +52,19 @@ public sealed class TimeBoundaryService : ITimeBoundaryService
         
         // Parse timezone from engagement rules (default to UTC if not specified or invalid)
         var tzName = _rules.TimeBoundaries.Timezone ?? "UTC";
+        
+        // Map common timezone names to IANA timezone identifiers
+        tzName = tzName switch
+        {
+            "Eastern" => "America/New_York",
+            "Central" => "America/Chicago",
+            "Mountain" => "America/Denver",
+            "Pacific" => "America/Los_Angeles",
+            "GMT" => "Etc/UTC",
+            "UTC" => "Etc/UTC",
+            _ => tzName
+        };
+        
         try
         {
             _userTimeZone = TimeZoneInfo.FindSystemTimeZoneById(tzName);
