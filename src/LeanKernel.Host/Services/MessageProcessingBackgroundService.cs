@@ -59,7 +59,14 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
                 }
 
                 // Wait before checking again
-                await Task.Delay(_checkInterval, stoppingToken);
+                try
+                {
+                    await Task.Delay(_checkInterval, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }
         finally
