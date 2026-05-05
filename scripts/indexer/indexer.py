@@ -672,7 +672,7 @@ async def wait_for_dependencies():
                 # Check Qdrant
                 resp = await client.get(f"http://{QDRANT_HOST}:{QDRANT_PORT - 1}")
                 # Check LiteLLM
-                resp = await client.get(f"{LITELLM_URL}/health")
+                resp = await client.get(f"{LITELLM_URL}/health/liveliness")
             logger.info("Dependencies ready.")
             return
         except Exception:
