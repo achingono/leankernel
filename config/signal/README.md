@@ -24,3 +24,13 @@ signal-cli -u +1234567890 jsonRpc
 
 LeanKernel's `SignalChannel` adapter manages this process automatically.
 Set your phone number in `.env` as `SIGNAL_PHONE_NUMBER`.
+
+## Incoming attachments
+
+Received Signal attachments are downloaded by `signal-cli`. LeanKernel now also resolves attachment IDs via JSON-RPC and:
+
+- extracts inline text from text-like files (`.txt`, `.md`, `.csv`, `.json`, `.xml`, `.yaml`, logs, shell/config files)
+- injects extracted file text into the inbound prompt context
+- preserves attachment metadata in the session for observability
+
+Binary attachments are still noted, but their contents are not extracted automatically.

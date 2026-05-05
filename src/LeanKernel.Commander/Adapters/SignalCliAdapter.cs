@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Commander.Adapters;
@@ -17,6 +17,8 @@ public sealed class SignalCliAdapter : IAsyncDisposable
     private readonly string _cliPath;
     private readonly string _account;
     private readonly ILogger _logger;
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pendingRequests = new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
     private Process? _process;
     private CancellationTokenSource? _cts;
 
@@ -79,19 +81,67 @@ public sealed class SignalCliAdapter : IAsyncDisposable
 
     public async Task SendMessageAsync(string recipient, string message, CancellationToken ct)
     {
+        await SendRequestAsync("send", new Dictionary<string, object?>
+        {
+            ["recipient"] = new[] { recipient },
+            ["message"] = message
+        }, ct);
+    }
+
+    private async Task<JsonElement> SendRequestAsync(string method, object @params, CancellationToken ct)
+    {
+        var requestId = Guid.NewGuid().ToString("N");
         var request = new JsonRpcRequest
         {
-            Id = Guid.NewGuid().ToString("N"),
-            Method = "send",
-            Params = new SendParams
-            {
-                Recipient = [recipient],
-                Message = message
-            }
+            Id = requestId,
+            Method = method,
+            Params = @params
         };
 
-        var json = JsonSerializer.Serialize(request, SignalJsonContext.Default.JsonRpcRequest);
-        await WriteAsync(json, ct);
+        var tcs = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!_pendingRequests.TryAdd(requestId, tcs))
+            throw new InvalidOperationException($"Duplicate signal-cli request id generated: {requestId}");
+
+        using var registration = ct.Register(() =>
+        {
+            if (_pendingRequests.TryRemove(requestId, out var pending))
+                pending.TrySetCanceled(ct);
+        });
+
+        try
+        {
+            var json = JsonSerializer.Serialize(request);
+            await WriteAsync(json, ct);
+            return await tcs.Task.WaitAsync(ct);
+        }
+        catch
+        {
+            _pendingRequests.TryRemove(requestId, out _);
+            throw;
+        }
+    }
+
+    private async Task<byte[]> GetAttachmentBytesAsync(
+        string attachmentId,
+        string sender,
+        string? groupId,
+        CancellationToken ct)
+    {
+        Dictionary<string, object?> requestParams = new()
+        {
+            ["id"] = attachmentId
+        };
+
+        if (!string.IsNullOrWhiteSpace(groupId))
+            requestParams["groupId"] = groupId;
+        else
+            requestParams["recipient"] = sender;
+
+        var result = await SendRequestAsync("getAttachment", requestParams, ct);
+        if (result.ValueKind != JsonValueKind.String)
+            throw new InvalidOperationException($"Unexpected getAttachment result kind: {result.ValueKind}");
+
+        return Convert.FromBase64String(result.GetString() ?? string.Empty);
     }
 
     private async Task WriteAsync(string json, CancellationToken ct)
@@ -102,9 +152,17 @@ public sealed class SignalCliAdapter : IAsyncDisposable
             return;
         }
 
-        await _process.StandardInput.WriteLineAsync(json.AsMemory(), ct);
-        await _process.StandardInput.FlushAsync(ct);
-        _logger.LogDebug("Sent to signal-cli: {Json}", json);
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await _process.StandardInput.WriteLineAsync(json.AsMemory(), ct);
+            await _process.StandardInput.FlushAsync(ct);
+            _logger.LogDebug("Sent to signal-cli: {Json}", json);
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
     }
 
     private async Task ReadOutputLoopAsync(CancellationToken ct)
@@ -118,7 +176,7 @@ public sealed class SignalCliAdapter : IAsyncDisposable
                 var line = await _process.StandardOutput.ReadLineAsync(ct);
                 if (line is null) break; // process exited
 
-                ProcessLine(line);
+                ProcessLine(line, ct);
             }
         }
         catch (OperationCanceledException) { }
@@ -130,7 +188,7 @@ public sealed class SignalCliAdapter : IAsyncDisposable
         _logger.LogInformation("signal-cli output reader stopped");
     }
 
-    private void ProcessLine(string line)
+    private void ProcessLine(string line, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(line)) return;
 
@@ -139,13 +197,29 @@ public sealed class SignalCliAdapter : IAsyncDisposable
             var doc = JsonDocument.Parse(line);
             var root = doc.RootElement;
 
-            // JSON-RPC notification (no "id" or "id" is null) = incoming message
+            if (TryCompletePendingRequest(root))
+                return;
+
             if (root.TryGetProperty("method", out var method) &&
                 method.GetString() == "receive")
             {
                 if (root.TryGetProperty("params", out var parameters))
                 {
-                    ParseInboundMessage(parameters);
+                    var parametersClone = parameters.Clone();
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var inbound = await ParseInboundMessageAsync(parametersClone, ct);
+                            if (inbound is not null)
+                                OnMessage?.Invoke(inbound);
+                        }
+                        catch (OperationCanceledException) { }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to process Signal inbound attachment payload");
+                        }
+                    }, ct);
                 }
             }
         }
@@ -155,30 +229,160 @@ public sealed class SignalCliAdapter : IAsyncDisposable
         }
     }
 
-    private void ParseInboundMessage(JsonElement parameters)
+    private bool TryCompletePendingRequest(JsonElement root)
     {
-        var envelope = parameters.GetProperty("envelope");
-        var source = envelope.TryGetProperty("source", out var s) ? s.GetString() : null;
-        var dataMessage = envelope.TryGetProperty("dataMessage", out var dm) ? dm : (JsonElement?)null;
+        if (!root.TryGetProperty("id", out var idProperty))
+            return false;
 
-        if (source is null || dataMessage is null) return;
+        var requestId = idProperty.ValueKind switch
+        {
+            JsonValueKind.String => idProperty.GetString(),
+            JsonValueKind.Number => idProperty.GetRawText(),
+            _ => null
+        };
 
-        var body = dataMessage.Value.TryGetProperty("message", out var msg) ? msg.GetString() : null;
-        var timestamp = dataMessage.Value.TryGetProperty("timestamp", out var ts) ? ts.GetInt64() : 0;
+        if (string.IsNullOrWhiteSpace(requestId))
+            return false;
 
-        if (string.IsNullOrEmpty(body)) return;
+        if (!_pendingRequests.TryRemove(requestId, out var pending))
+            return true;
 
-        OnMessage?.Invoke(new SignalInboundMessage
+        if (root.TryGetProperty("error", out var error))
+        {
+            pending.TrySetException(new InvalidOperationException(
+                $"signal-cli returned an error: {error.GetRawText()}"));
+            return true;
+        }
+
+        if (root.TryGetProperty("result", out var result))
+        {
+            pending.TrySetResult(result.Clone());
+            return true;
+        }
+
+        pending.TrySetException(new InvalidOperationException("signal-cli response did not contain a result or error."));
+        return true;
+    }
+
+    private async Task<SignalInboundMessage?> ParseInboundMessageAsync(JsonElement parameters, CancellationToken ct)
+    {
+        JsonElement? envelope = null;
+
+        if (parameters.TryGetProperty("envelope", out var directEnvelope))
+            envelope = directEnvelope;
+        else if (parameters.TryGetProperty("result", out var result)
+                 && result.TryGetProperty("envelope", out var wrappedEnvelope))
+            envelope = wrappedEnvelope;
+
+        if (envelope is null)
+            return null;
+
+        var source = envelope.Value.TryGetProperty("source", out var sourceProperty)
+            ? sourceProperty.GetString()
+            : null;
+
+        if (string.IsNullOrWhiteSpace(source))
+            return null;
+
+        if (!envelope.Value.TryGetProperty("dataMessage", out var dataMessage))
+            return null;
+
+        var body = dataMessage.TryGetProperty("message", out var messageProperty)
+            ? messageProperty.GetString()
+            : null;
+        var timestamp = dataMessage.TryGetProperty("timestamp", out var timestampProperty)
+            ? timestampProperty.GetInt64()
+            : envelope.Value.TryGetProperty("timestamp", out var envelopeTimestamp)
+                ? envelopeTimestamp.GetInt64()
+                : 0;
+
+        var groupId = dataMessage.TryGetProperty("groupInfo", out var groupInfo)
+            && groupInfo.TryGetProperty("groupId", out var groupIdProperty)
+                ? groupIdProperty.GetString()
+                : null;
+
+        var attachments = await ResolveAttachmentsAsync(source, groupId, dataMessage, ct);
+        if (string.IsNullOrWhiteSpace(body) && attachments.Count == 0)
+            return null;
+
+        return new SignalInboundMessage
         {
             Sender = source,
-            Body = body,
-            TimestampMs = timestamp
-        });
+            Body = body ?? string.Empty,
+            TimestampMs = timestamp,
+            Attachments = attachments
+        };
+    }
+
+    private async Task<IReadOnlyList<SignalAttachmentInfo>> ResolveAttachmentsAsync(
+        string sender,
+        string? groupId,
+        JsonElement dataMessage,
+        CancellationToken ct)
+    {
+        if (!dataMessage.TryGetProperty("attachments", out var attachmentsElement)
+            || attachmentsElement.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var attachments = new List<SignalAttachmentInfo>();
+        foreach (var attachment in attachmentsElement.EnumerateArray())
+        {
+            var attachmentId = attachment.TryGetProperty("id", out var idProperty)
+                ? idProperty.GetString()
+                : null;
+            var fileName = attachment.TryGetProperty("filename", out var fileNameProperty)
+                ? fileNameProperty.GetString()
+                : null;
+            var contentType = attachment.TryGetProperty("contentType", out var contentTypeProperty)
+                ? contentTypeProperty.GetString()
+                : null;
+            var caption = attachment.TryGetProperty("caption", out var captionProperty)
+                ? captionProperty.GetString()
+                : null;
+            var size = attachment.TryGetProperty("size", out var sizeProperty)
+                ? sizeProperty.GetInt64()
+                : (long?)null;
+
+            string? extractedText = null;
+            if (!string.IsNullOrWhiteSpace(attachmentId))
+            {
+                try
+                {
+                    var bytes = await GetAttachmentBytesAsync(attachmentId, sender, groupId, ct);
+                    extractedText = SignalAttachmentTextExtractor.TryExtractText(contentType, fileName, bytes);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Failed to fetch Signal attachment {AttachmentId} from {Sender}",
+                        attachmentId,
+                        sender);
+                }
+            }
+
+            attachments.Add(new SignalAttachmentInfo
+            {
+                Id = attachmentId ?? string.Empty,
+                FileName = fileName,
+                ContentType = contentType,
+                Caption = caption,
+                Size = size,
+                ExtractedText = extractedText
+            });
+        }
+
+        return attachments;
     }
 
     public async ValueTask DisposeAsync()
     {
         _cts?.Cancel();
+
+        foreach (var pending in _pendingRequests.Values)
+            pending.TrySetCanceled();
+        _pendingRequests.Clear();
 
         if (_process is { HasExited: false })
         {
@@ -192,6 +396,7 @@ public sealed class SignalCliAdapter : IAsyncDisposable
 
         _process?.Dispose();
         _cts?.Dispose();
+        _writeLock.Dispose();
     }
 }
 
@@ -201,26 +406,25 @@ public sealed record SignalInboundMessage
     public required string Sender { get; init; }
     public required string Body { get; init; }
     public long TimestampMs { get; init; }
+    public IReadOnlyList<SignalAttachmentInfo> Attachments { get; init; } = [];
 }
 
-// JSON-RPC models for signal-cli communication
+[ExcludeFromCodeCoverage]
+public sealed record SignalAttachmentInfo
+{
+    public required string Id { get; init; }
+    public string? FileName { get; init; }
+    public string? ContentType { get; init; }
+    public long? Size { get; init; }
+    public string? Caption { get; init; }
+    public string? ExtractedText { get; init; }
+}
+
 [ExcludeFromCodeCoverage]
 internal sealed record JsonRpcRequest
 {
-    [JsonPropertyName("jsonrpc")] public string JsonRpc { get; init; } = "2.0";
-    [JsonPropertyName("id")] public required string Id { get; init; }
-    [JsonPropertyName("method")] public required string Method { get; init; }
-    [JsonPropertyName("params")] public required object Params { get; init; }
+    public string JsonRpc { get; init; } = "2.0";
+    public required string Id { get; init; }
+    public required string Method { get; init; }
+    public required object Params { get; init; }
 }
-
-[ExcludeFromCodeCoverage]
-internal sealed record SendParams
-{
-    [JsonPropertyName("recipient")] public required string[] Recipient { get; init; }
-    [JsonPropertyName("message")] public required string Message { get; init; }
-}
-
-[ExcludeFromCodeCoverage]
-[JsonSerializable(typeof(JsonRpcRequest))]
-[JsonSerializable(typeof(SendParams))]
-internal partial class SignalJsonContext : JsonSerializerContext;

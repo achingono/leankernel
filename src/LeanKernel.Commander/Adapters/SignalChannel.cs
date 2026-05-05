@@ -56,10 +56,13 @@ public sealed class SignalChannel : IChannel
 
         _adapter.OnMessage += msg =>
         {
+            var content = SignalInboundMessageFormatter.FormatContent(msg.Body, msg.Attachments);
+            var metadata = SignalInboundMessageFormatter.BuildMetadata(msg.Attachments);
             var normalized = MessageNormalizer.Normalize(
                 channelId: "signal",
                 senderId: msg.Sender,
-                rawContent: msg.Body);
+                rawContent: content,
+                metadata: metadata);
 
             _ = Task.Run(async () =>
             {
