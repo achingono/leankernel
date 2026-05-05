@@ -69,7 +69,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         var history = await AssembleHistoryAsync(sessionId, budget.ConversationBudget, ct);
 
         // Phase 5: Build final context
-        var systemPrompt = BuildSystemPrompt();
+        var systemPrompt = await BuildSystemPromptAsync(ct);
 
         var totalTokens = EstimateTokens(systemPrompt)
             + rankedWiki.Sum(s => s.EstimatedTokens)
@@ -258,13 +258,52 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         return result;
     }
 
-    private static string BuildSystemPrompt() =>
-        """
-        You are LeanKernel, a lean and efficient personal AI assistant.
-        You answer concisely and accurately using only the context provided.
-        If you don't have enough context, say so rather than guessing.
-        When you learn new facts, structure them as Who/What/Where/When/Why/How.
-        """;
+    private async Task<string> BuildSystemPromptAsync(CancellationToken ct)
+    {
+        var agentDir = Path.Combine(_config.Wiki.BasePath, ".LeanKernel", "agents", "main");
+        var soulPath = Path.Combine(agentDir, "SOUL.md");
+        var userPath = Path.Combine(agentDir, "USER.md");
+
+        var soulContent = File.Exists(soulPath)
+            ? await File.ReadAllTextAsync(soulPath, ct)
+            : null;
+
+        var userContent = File.Exists(userPath)
+            ? await File.ReadAllTextAsync(userPath, ct)
+            : null;
+
+        if (soulContent is null && userContent is null)
+        {
+            return """
+                You are LeanKernel, a lean and efficient personal AI assistant.
+                You answer concisely and accurately using only the context provided.
+                If you don't have enough context, say so rather than guessing.
+                When you learn new facts, structure them as Who/What/Where/When/Why/How.
+                """;
+        }
+
+        var sb = new System.Text.StringBuilder();
+
+        if (soulContent is not null)
+        {
+            sb.AppendLine(soulContent);
+        }
+        else
+        {
+            sb.AppendLine("You are LeanKernel, a lean and efficient personal AI assistant.");
+            sb.AppendLine("You answer concisely and accurately using only the context provided.");
+            sb.AppendLine("If you don't have enough context, say so rather than guessing.");
+            sb.AppendLine("When you learn new facts, structure them as Who/What/Where/When/Why/How.");
+        }
+
+        if (userContent is not null)
+        {
+            sb.AppendLine();
+            sb.AppendLine(userContent);
+        }
+
+        return sb.ToString().Trim();
+    }
 
     private static string FormatWikiEntryCompact(WikiEntry entry) =>
         $"[{entry.Dimension}:{entry.Subject}] " +
