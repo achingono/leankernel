@@ -16,6 +16,7 @@ services:
       - LEANKERNEL__LiteLlm__ApiKey=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
       - LEANKERNEL__Qdrant__Host=qdrant
       - LEANKERNEL__Qdrant__Port=6334
+      - LEANKERNEL__Qdrant__EmbeddingDimension=${EMBEDDING_DIMENSION:-3072}
       - LEANKERNEL__Signal__Enabled=${LEANKERNEL_SIGNAL_ENABLED:-true}
       - LEANKERNEL__Signal__CliPath=${LEANKERNEL_SIGNAL_CLI_PATH:-/usr/bin/signal-cli}
       - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
@@ -24,6 +25,7 @@ services:
       - LEANKERNEL__Agents__BasePath=/app/data/agents
       - LEANKERNEL__Knowledge__Enabled=true
       - LEANKERNEL__Knowledge__CollectionName=LEANKERNEL_knowledge
+      - LEANKERNEL__Knowledge__EmbeddingDimension=${EMBEDDING_DIMENSION:-3072}
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data:/app/data
