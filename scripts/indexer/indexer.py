@@ -13,6 +13,7 @@ import hashlib
 import json
 import logging
 import os
+import random
 import sqlite3
 import time
 from pathlib import Path
@@ -53,6 +54,9 @@ WIKI_DEBOUNCE = int(os.getenv("WIKI_DEBOUNCE_SECONDS", "5"))
 CHUNK_SIZE_TOKENS = int(os.getenv("CHUNK_SIZE_TOKENS", "500"))
 STATE_DB_PATH = os.getenv("STATE_DB_PATH", "/app/data/indexer-state.db")
 TAG_RULES_JSON = os.getenv("TAG_RULES_JSON", "[]")
+EMBEDDING_MAX_RETRIES = int(os.getenv("EMBEDDING_MAX_RETRIES", "6"))
+EMBEDDING_RETRY_BASE_SECONDS = float(os.getenv("EMBEDDING_RETRY_BASE_SECONDS", "0.75"))
+EMBEDDING_RETRY_MAX_SECONDS = float(os.getenv("EMBEDDING_RETRY_MAX_SECONDS", "12"))
 
 # Document extensions that should go through Unstructured
 UNSTRUCTURED_EXTENSIONS = {
@@ -141,14 +145,64 @@ class EmbeddingClient:
 
     async def embed(self, text: str) -> list[float]:
         """Generate embedding for a single text."""
-        response = await self.client.post(
-            f"{self.base_url}/embeddings",
-            json={"input": text, "model": self.model},
-            headers={"Authorization": f"Bearer {self.api_key}"},
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data["data"][0]["embedding"]
+        last_error: Exception | None = None
+        retryable_statuses = {408, 409, 425, 429, 500, 502, 503, 504}
+
+        for attempt in range(1, EMBEDDING_MAX_RETRIES + 1):
+            try:
+                response = await self.client.post(
+                    f"{self.base_url}/embeddings",
+                    json={"input": text, "model": self.model},
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data["data"][0]["embedding"]
+            except httpx.HTTPStatusError as e:
+                last_error = e
+                status = e.response.status_code
+                should_retry = status in retryable_statuses
+                if not should_retry or attempt == EMBEDDING_MAX_RETRIES:
+                    raise
+
+                retry_after = e.response.headers.get("retry-after")
+                if retry_after and retry_after.isdigit():
+                    delay = min(float(retry_after), EMBEDDING_RETRY_MAX_SECONDS)
+                else:
+                    delay = min(
+                        EMBEDDING_RETRY_BASE_SECONDS * (2 ** (attempt - 1)),
+                        EMBEDDING_RETRY_MAX_SECONDS,
+                    )
+                jitter = random.uniform(0.0, 0.2)
+                logger.warning(
+                    "Embedding transient HTTP %s (attempt %s/%s); retrying in %.2fs",
+                    status,
+                    attempt,
+                    EMBEDDING_MAX_RETRIES,
+                    delay + jitter,
+                )
+                await asyncio.sleep(delay + jitter)
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout, httpx.NetworkError) as e:
+                last_error = e
+                if attempt == EMBEDDING_MAX_RETRIES:
+                    raise
+                delay = min(
+                    EMBEDDING_RETRY_BASE_SECONDS * (2 ** (attempt - 1)),
+                    EMBEDDING_RETRY_MAX_SECONDS,
+                )
+                jitter = random.uniform(0.0, 0.2)
+                logger.warning(
+                    "Embedding connection error (attempt %s/%s): %r; retrying in %.2fs",
+                    attempt,
+                    EMBEDDING_MAX_RETRIES,
+                    e,
+                    delay + jitter,
+                )
+                await asyncio.sleep(delay + jitter)
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Embedding failed without an explicit exception")
 
     async def close(self):
         await self.client.aclose()
@@ -354,7 +408,7 @@ class Indexer:
                 try:
                     embedding = await self.embedding_client.embed(chunk_text_content)
                 except Exception as e:
-                    logger.error(f"Embedding failed for chunk {i} of {file_path}: {e}")
+                    logger.error(f"Embedding failed for chunk {i} of {file_path}: {e!r}")
                     failed_chunks += 1
                     continue
 

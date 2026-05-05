@@ -33,6 +33,7 @@ providers:
       - source: env
         name: AZURE_AI_API_KEY_2
         api_base_env: AZURE_AI_API_BASE_2
+        enabled: false  # alfer-mkokmbre-eastus2 currently unavailable
     models:
       - id: kimi_k2_6
         name: kimi-k2.6
@@ -187,15 +188,15 @@ routes:
     - provider: ollama
       model: nomic_embed_text
       keys: [ollama1]
-      order: 3
+      order: 3  # 768-dim fallback; only used if openai+gemini both fail
   embedding-large:
     - provider: azure
       model: embedding_3_large
       keys: [azure2]
       order: 1
-    - provider: ollama
-      model: nomic_embed_text
-      keys: [ollama1]
+    - provider: gemini
+      model: embedding_2
+      keys: [gemini1, gemini2, gemini3]
       order: 2
 
 aliases:
@@ -219,8 +220,6 @@ router:
     small: [medium, large]
     medium: [small, large]
     large: [medium, small]
-    embedding-small: [embedding-large]
-    embedding-large: [embedding-small]
   alias_fallbacks:
     gpt-4o-mini: [medium, large]
     gpt-4o: [small, large]

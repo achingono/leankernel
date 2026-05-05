@@ -59,6 +59,7 @@ services:
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
       - LITELLM_SALT_KEY=${LITELLM_SALT_KEY:-LeanKernel-salt-change-me}
+      - LITELLM_NUM_WORKERS=${LITELLM_NUM_WORKERS:-2}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}

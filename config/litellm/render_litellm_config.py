@@ -102,6 +102,8 @@ def parse_provider_models(provider_name: str, provider_spec: dict[str, Any]) -> 
     for idx, raw_model in enumerate(raw_models):
         model_path = f"{path}[{idx}]"
         model_spec = ensure_mapping(raw_model, model_path)
+        if not bool(model_spec.get("enabled", True)):
+            continue
         model_id = ensure_string(model_spec.get("id"), f"{model_path}.id")
         name = ensure_string(model_spec.get("name"), f"{model_path}.name")
         mode = model_spec.get("mode", "chat")
@@ -141,6 +143,7 @@ def parse_provider_keys(provider_name: str, provider_spec: dict[str, Any]) -> di
         for idx, key_ref in enumerate(keys, start=1):
             key_path = f"providers.{provider_name}.keys[{idx-1}]"
             key_spec = ensure_mapping(key_ref, key_path)
+            key_enabled = bool(key_spec.get("enabled", True))
             api_key_env = parse_env_ref(key_spec, key_path)
             api_base_env = key_spec.get("api_base_env")
             api_base_env_name = None
@@ -163,6 +166,7 @@ def parse_provider_keys(provider_name: str, provider_spec: dict[str, Any]) -> di
                 "provider": provider_name,
                 "required_env": required_env,
                 "litellm_params": litellm_params,
+                "enabled": key_enabled,
             }
     elif base_urls:
         for idx, base_ref in enumerate(base_urls, start=1):
@@ -174,6 +178,7 @@ def parse_provider_keys(provider_name: str, provider_spec: dict[str, Any]) -> di
                 "provider": provider_name,
                 "required_env": [base_env],
                 "litellm_params": litellm_params,
+                "enabled": True,
             }
     else:
         raise SpecValidationError(
@@ -215,18 +220,22 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
     for provider_name, raw_provider in providers.items():
         name = ensure_string(provider_name, "providers key")
         provider_spec = ensure_mapping(raw_provider, f"providers.{name}")
+        provider_enabled = bool(provider_spec.get("enabled", True))
         provider_prefixes[name] = infer_provider_prefix(name, provider_spec)
         provider_models[name] = parse_provider_models(name, provider_spec)
-        if not provider_models[name]:
+        if not provider_models[name] and provider_enabled:
             raise SpecValidationError(f"providers.{name}.models must include at least one model")
         parsed_keys = parse_provider_keys(name, provider_spec)
+        if not provider_enabled:
+            for key_data in parsed_keys.values():
+                key_data["enabled"] = False
         provider_keys.update(parsed_keys)
         provider_route_keys[name] = list(parsed_keys.keys())
 
     available_keys = {
         key_name
         for key_name, key_spec in provider_keys.items()
-        if all(has_value(env_name) for env_name in key_spec["required_env"])
+        if key_spec.get("enabled", True) and all(has_value(env_name) for env_name in key_spec["required_env"])
     }
 
     route_deployments: dict[str, list[dict[str, Any]]] = {route_name: [] for route_name in routes}
