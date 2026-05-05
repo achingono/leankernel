@@ -92,6 +92,35 @@ public sealed class ChatController : ControllerBase
             Queued = false
         });
     }
+
+    [HttpPost("deliver/{channel}")]
+    public async Task<IActionResult> DeliverViaChannel(
+        string channel,
+        [FromBody] ChannelDeliveryRequest request,
+        CancellationToken ct)
+    {
+        var messageId = Guid.NewGuid().ToString("N");
+
+        // Queue the message for delivery
+        await _messageQueue.EnqueueAsync(new QueuedMessage
+        {
+            Id = messageId,
+            Channel = channel,
+            Recipient = request.Recipient,
+            Content = request.Content,
+            EnqueuedAt = DateTime.UtcNow,
+            Priority = request.IsUrgent ? 1 : 5
+        }, request.IsUrgent, ct);
+
+        return Accepted(new
+        {
+            messageId,
+            channel,
+            recipient = request.Recipient,
+            queued = true,
+            message = "Message queued for delivery"
+        });
+    }
 }
 
 public sealed class ChatMessageRequest
@@ -108,4 +137,11 @@ public sealed class ChatMessageResponse
     public required string Response { get; init; }
     public DateTimeOffset Timestamp { get; init; }
     public bool Queued { get; init; }
+}
+
+public sealed class ChannelDeliveryRequest
+{
+    public required string Recipient { get; init; }
+    public required string Content { get; init; }
+    public bool IsUrgent { get; init; } = false;
 }
