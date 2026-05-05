@@ -70,6 +70,12 @@ UNSTRUCTURED_EXTENSIONS = {
 TEXT_EXTENSIONS = {".md", ".txt", ".json", ".yaml", ".yml", ".xml", ".log"}
 
 
+def should_ignore_path(file_path: str) -> bool:
+    """Ignore hidden files/directories (dotfiles) such as .health-check."""
+    parts = Path(file_path).parts
+    return any(part.startswith(".") for part in parts if part not in (".", ".."))
+
+
 class StateDB:
     """SQLite state tracking for indexed files."""
 
@@ -380,6 +386,9 @@ class Indexer:
 
     async def index_file(self, file_path: str):
         """Index a single file (wiki or document)."""
+        if should_ignore_path(file_path):
+            return
+
         if not os.path.isfile(file_path):
             return
 
@@ -503,6 +512,9 @@ class Indexer:
 
     def delete_file(self, file_path: str):
         """Remove all vectors for a deleted file. Only removes state on success."""
+        if should_ignore_path(file_path):
+            return
+
         try:
             self._delete_file_vectors(file_path)
             self.state.remove(file_path)
@@ -553,9 +565,9 @@ class Indexer:
                 continue
             for root, _, files in os.walk(base_path):
                 for filename in files:
-                    if filename.startswith("."):
-                        continue
                     file_path = os.path.join(root, filename)
+                    if should_ignore_path(file_path):
+                        continue
                     current_paths.add(file_path)
                     await self.index_file(file_path)
 
@@ -592,6 +604,8 @@ class IndexerEventHandler(FileSystemEventHandler):
 
     def on_deleted(self, event: FileSystemEvent):
         if not event.is_directory:
+            if should_ignore_path(event.src_path):
+                return
             self.loop.call_soon_threadsafe(
                 asyncio.ensure_future,
                 self._handle_delete(event.src_path),
@@ -599,7 +613,7 @@ class IndexerEventHandler(FileSystemEventHandler):
 
     def _schedule(self, path: str):
         """Schedule indexing with debounce."""
-        if os.path.basename(path).startswith("."):
+        if should_ignore_path(path):
             return
         self._pending[path] = time.time() + self.debounce
         self.loop.call_soon_threadsafe(
