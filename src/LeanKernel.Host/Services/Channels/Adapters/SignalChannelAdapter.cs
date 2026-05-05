@@ -160,23 +160,24 @@ public sealed class SignalChannelAdapter : IMessageChannel
         using var process = Process.Start(psi)
             ?? throw new InvalidOperationException($"Failed to start signal-cli process at {_cliPath}");
 
-        var outputTask = process.StandardOutput.ReadToEndAsync();
-        var errorTask = process.StandardError.ReadToEndAsync();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(30)); // 30 second timeout
 
-        var completed = await Task.WhenAny(
-            Task.WhenAll(outputTask, errorTask),
-            Task.Delay(30000, ct)); // 30 second timeout
-
-        if (completed == (Task)errorTask)
+        try
         {
-            process.Kill();
-            throw new TimeoutException("signal-cli command timed out");
+            await process.WaitForExitAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited)
+            {
+                process.Kill();
+            }
+            throw new TimeoutException("signal-cli command timed out after 30 seconds");
         }
 
-        process.WaitForExit();
-
-        var output = await outputTask;
-        var error = await errorTask;
+        var output = await process.StandardOutput.ReadToEndAsync();
+        var error = await process.StandardError.ReadToEndAsync();
 
         if (process.ExitCode != 0)
         {
