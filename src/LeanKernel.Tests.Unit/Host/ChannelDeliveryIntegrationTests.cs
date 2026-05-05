@@ -55,7 +55,7 @@ public sealed class ChannelDeliveryIntegrationTests
 
         // Act: Process the message (background service)
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var backgroundTask = backgroundService.ExecuteAsync(cts.Token);
+        var backgroundTask = backgroundService.RunAsync(cts.Token);
         
         // Give background service time to process
         await Task.Delay(2000);
@@ -99,7 +99,7 @@ public sealed class ChannelDeliveryIntegrationTests
 
         // Act
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var backgroundTask = backgroundService.ExecuteAsync(cts.Token);
+        var backgroundTask = backgroundService.RunAsync(cts.Token);
         await Task.Delay(2000);
         cts.Cancel();
 
@@ -142,7 +142,7 @@ public sealed class ChannelDeliveryIntegrationTests
 
         // Act
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await backgroundService.ExecuteAsync(cts.Token);
+        await backgroundService.RunAsync(cts.Token);
 
         // Assert: Message should have retry scheduled
         // (The message won't be in ready messages since it's scheduled for later)
@@ -194,7 +194,7 @@ public sealed class ChannelDeliveryIntegrationTests
 
         // Act
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await backgroundService.ExecuteAsync(cts.Token);
+        await backgroundService.RunAsync(cts.Token);
 
         // Assert: Message should still be pending (not delivered) since it's quiet hours
         var readyMessages = await messageQueue.GetReadyMessagesAsync();
@@ -245,7 +245,7 @@ public sealed class ChannelDeliveryIntegrationTests
 
         // Act
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var backgroundTask = backgroundService.ExecuteAsync(cts.Token);
+        var backgroundTask = backgroundService.RunAsync(cts.Token);
         await Task.Delay(2000);
         cts.Cancel();
 

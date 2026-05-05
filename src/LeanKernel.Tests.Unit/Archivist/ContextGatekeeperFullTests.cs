@@ -155,7 +155,7 @@ public class ContextGatekeeperFullTests
         var ctx = await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
 
         // Oldest turns should be compacted
-        Assert.True(ctx.History.Any(t => t.IsCompacted));
+        Assert.Contains(ctx.History, t => t.IsCompacted);
         // Recent turns should be full (600 chars)
         Assert.True(ctx.History.Last().Content.Length == 600);
     }

@@ -30,6 +30,14 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await RunAsync(stoppingToken);
+    }
+
+    /// <summary>
+    /// Public entry point for testing. Runs the message processing loop until cancellation.
+    /// </summary>
+    public async Task RunAsync(CancellationToken stoppingToken)
+    {
         _logger.LogInformation("MessageProcessingBackgroundService started");
 
         try
