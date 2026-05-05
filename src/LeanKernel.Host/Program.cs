@@ -37,6 +37,8 @@ try
     // Runtime config overlay persisted by onboarding
     var configuredWikiPath = builder.Configuration["LeanKernel:Wiki:BasePath"] ?? "/app/data/wiki";
     var configuredDataDir = ResolveWritableDataDirectory(configuredWikiPath);
+    var configuredAgentsPath = builder.Configuration["LeanKernel:Agents:BasePath"]
+        ?? Path.Combine(configuredDataDir, "agents");
 
     var runtimeConfigPath = Path.Combine(configuredDataDir, "runtime-settings.json");
     var onboardingStatePath = Path.Combine(configuredDataDir, "onboarding-state.json");
@@ -47,6 +49,7 @@ try
     builder.Services.AddSingleton(new LeanKernelHostPaths
     {
         DataDirectory = configuredDataDir,
+        AgentsDirectory = configuredAgentsPath,
         RuntimeConfigPath = runtimeConfigPath,
         OnboardingStatePath = onboardingStatePath
     });
@@ -175,7 +178,7 @@ try
     // Phase 3: Persistent Message Queue with Database Storage
     builder.Services.AddDbContext<MessageQueueDbContext>(options =>
     {
-        var dbPath = Path.Combine(configuredDataDir, ".LeanKernel", "messagequeue.db");
+        var dbPath = Path.Combine(configuredDataDir, "messagequeue.db");
         var dbDir = Path.GetDirectoryName(dbPath);
         if (dbDir != null && !Directory.Exists(dbDir))
         {

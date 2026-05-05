@@ -19,15 +19,12 @@ services:
       - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
       - LEANKERNEL__Signal__AllowedSenders__0=${SIGNAL_ALLOWED_SENDER_0:-}
       - LEANKERNEL__Wiki__BasePath=/app/data/wiki
+      - LEANKERNEL__Agents__BasePath=/app/data/agents
       - LEANKERNEL__Knowledge__Enabled=true
       - LEANKERNEL__Knowledge__CollectionName=LEANKERNEL_knowledge
       - TZ=${TZ:-America/Toronto}
     volumes:
-      - ./data/wiki:/app/data/wiki
-      - ./data/documents:/app/data/documents
-      - ./data/sessions:/app/data/sessions
-      - ./data/logs:/app/data/logs
-      - ./data/keys:/app/data/.keys
+      - ./data:/app/data
       - signal-config:/home/LeanKernel/.local/share/signal-cli
     depends_on:
       qdrant:
@@ -146,18 +143,18 @@ services:
       - QDRANT_PORT=6334
       - COLLECTION_NAME=LEANKERNEL_knowledge
       - WIKI_PATH=/app/data/wiki
-      - DOCUMENTS_PATH=/app/data/documents
+      - DOCUMENTS_PATH=/app/data/agents/main/documents
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-embedding-small}
       - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-3072}
       - RESCAN_INTERVAL_SECONDS=${INDEXER_RESCAN_INTERVAL:-300}
       - WIKI_DEBOUNCE_SECONDS=5
-      - STATE_DB_PATH=/app/data/indexer-state.db
-      - TAG_RULES_JSON=${TAG_RULES_JSON:-[{"pathPattern":"wiki/**","tags":["wiki"]},{"pathPattern":"documents/technical/**","tags":["technical"]},{"pathPattern":"documents/books/**","tags":["books","general"]}]}
+      - STATE_DB_PATH=/app/data/indexer-state/indexer-state.db
+      - TAG_RULES_JSON=${TAG_RULES_JSON:-[{"pathPattern":"wiki/**","tags":["wiki"]},{"pathPattern":"agents/main/documents/technical/**","tags":["technical"]},{"pathPattern":"agents/main/documents/books/**","tags":["books","general"]}]}
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data/wiki:/app/data/wiki
-      - ./data/documents:/app/data/documents
-      - indexer-state:/app/data
+      - ./data/agents:/app/data/agents
+      - indexer-state:/app/data/indexer-state
     depends_on:
       qdrant:
         condition: service_healthy

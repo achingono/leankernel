@@ -189,6 +189,7 @@ public class AgentsConfigurationStepTests
         var paths = new LeanKernelHostPaths
         {
             DataDirectory = Path.GetTempPath(),
+            AgentsDirectory = Path.Combine(Path.GetTempPath(), "agents"),
             RuntimeConfigPath = Path.Combine(Path.GetTempPath(), "runtime.json"),
             OnboardingStatePath = Path.Combine(Path.GetTempPath(), "onboarding.json")
         };
@@ -214,6 +215,7 @@ public class AgentsConfigurationStepTests
             var paths = new LeanKernelHostPaths
             {
                 DataDirectory = tempDir,
+                AgentsDirectory = Path.Combine(tempDir, "agents"),
                 RuntimeConfigPath = Path.Combine(tempDir, "runtime.json"),
                 OnboardingStatePath = Path.Combine(tempDir, "onboarding.json")
             };
@@ -223,7 +225,7 @@ public class AgentsConfigurationStepTests
             var result = await step.InitializeAsync("basic");
 
             Assert.True(result.Success);
-            var agentsPath = Path.Combine(tempDir, "wiki", ".LeanKernel", "AGENTS.md");
+            var agentsPath = Path.Combine(tempDir, "agents", "main", "AGENTS.md");
             Assert.True(File.Exists(agentsPath));
         }
         finally
@@ -244,6 +246,7 @@ public class AgentsConfigurationStepTests
             var paths = new LeanKernelHostPaths
             {
                 DataDirectory = tempDir,
+                AgentsDirectory = Path.Combine(tempDir, "agents"),
                 RuntimeConfigPath = Path.Combine(tempDir, "runtime.json"),
                 OnboardingStatePath = Path.Combine(tempDir, "onboarding.json")
             };

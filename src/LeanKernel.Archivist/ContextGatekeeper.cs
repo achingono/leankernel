@@ -260,7 +260,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 
     private async Task<string> BuildSystemPromptAsync(CancellationToken ct)
     {
-        var agentDir = Path.Combine(_config.Wiki.BasePath, ".LeanKernel", "agents", "main");
+        var agentDir = Path.Combine(_config.Agents.BasePath, "main");
         var soulPath = Path.Combine(agentDir, "SOUL.md");
         var userPath = Path.Combine(agentDir, "USER.md");
 

@@ -5,6 +5,7 @@ namespace LeanKernel.Host.Services;
 public sealed class LeanKernelHostPaths
 {
     public required string DataDirectory { get; init; }
+    public required string AgentsDirectory { get; init; }
     public required string RuntimeConfigPath { get; init; }
     public required string OnboardingStatePath { get; init; }
 }

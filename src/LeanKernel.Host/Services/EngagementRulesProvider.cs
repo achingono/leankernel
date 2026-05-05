@@ -22,7 +22,7 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
 
     public async Task<EngagementRules> LoadAsync(CancellationToken ct)
     {
-        var agentsPath = Path.Combine(_paths.DataDirectory, "wiki", ".LeanKernel", "AGENTS.md");
+        var agentsPath = Path.Combine(_paths.AgentsDirectory, "main", "AGENTS.md");
         
         if (!File.Exists(agentsPath))
         {

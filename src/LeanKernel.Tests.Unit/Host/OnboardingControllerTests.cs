@@ -21,6 +21,7 @@ public class OnboardingControllerTests
         var paths = new LeanKernelHostPaths
         {
             DataDirectory = Path.GetTempPath(),
+            AgentsDirectory = Path.Combine(Path.GetTempPath(), "agents"),
             RuntimeConfigPath = Path.Combine(Path.GetTempPath(), "runtime.json"),
             OnboardingStatePath = Path.Combine(Path.GetTempPath(), "onboarding.json")
         };

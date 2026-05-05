@@ -11,6 +11,7 @@ public sealed class LeanKernelConfig
     public QdrantConfig Qdrant { get; set; } = new();
     public SignalConfig Signal { get; set; } = new();
     public WikiConfig Wiki { get; set; } = new();
+    public AgentsConfig Agents { get; set; } = new();
     public KnowledgeConfig Knowledge { get; set; } = new();
     public ContextConfig Context { get; set; } = new();
     public SchedulerConfig Scheduler { get; set; } = new();
@@ -94,6 +95,11 @@ public sealed class SignalConfig
     public string[] AllowedSenders { get; set; } = [];
 }
 
+public sealed class AgentsConfig
+{
+    public string BasePath { get; set; } = "/app/data/agents";
+}
+
 public sealed class WikiConfig
 {
     public string BasePath { get; set; } = "/app/data/wiki";
@@ -117,7 +123,7 @@ public sealed class KnowledgeConfig
     public bool Enabled { get; set; } = true;
     public string CollectionName { get; set; } = "LEANKERNEL_knowledge";
     public int EmbeddingDimension { get; set; } = 1536;
-    public string DocumentsPath { get; set; } = "/app/data/documents";
+    public string DocumentsPath { get; set; } = "/app/data/agents/main/documents";
     public string[] DefaultDocumentTags { get; set; } = ["general"];
     public Dictionary<string, AgentScopeConfig> AgentScopes { get; set; } = new();
     public List<TagRule> TagRules { get; set; } = [];

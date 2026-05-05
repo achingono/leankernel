@@ -2,7 +2,7 @@ namespace LeanKernel.Core.Configuration;
 
 /// <summary>
 /// Represents the rules of engagement between user and agent(s).
-/// Loaded from data/wiki/.LeanKernel/AGENTS.md at startup.
+/// Loaded from data/agents/<agent>/AGENTS.md at startup.
 /// </summary>
 public sealed class EngagementRules
 {

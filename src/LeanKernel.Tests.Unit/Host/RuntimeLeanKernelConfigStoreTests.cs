@@ -17,6 +17,7 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
         _paths = new LeanKernelHostPaths
         {
             DataDirectory = _tempDir,
+            AgentsDirectory = Path.Combine(_tempDir, "agents"),
             RuntimeConfigPath = Path.Combine(_tempDir, "runtime-settings.json"),
             OnboardingStatePath = Path.Combine(_tempDir, "onboarding-state.json")
         };

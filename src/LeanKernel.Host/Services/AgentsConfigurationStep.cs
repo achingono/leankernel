@@ -27,7 +27,7 @@ public sealed class AgentsConfigurationStep
     /// </summary>
     public async Task<AgentsStepResult> InitializeAsync(string? preset = "basic", CancellationToken ct = default)
     {
-        var agentsPath = Path.Combine(_paths.DataDirectory, "wiki", ".LeanKernel", "AGENTS.md");
+        var agentsPath = Path.Combine(_paths.AgentsDirectory, "main", "AGENTS.md");
         var agentsDir = Path.GetDirectoryName(agentsPath);
 
         if (!Directory.Exists(agentsDir))
@@ -75,7 +75,7 @@ public sealed class AgentsConfigurationStep
     /// </summary>
     public async Task<AgentsStepResult> ValidateAsync(CancellationToken ct = default)
     {
-        var agentsPath = Path.Combine(_paths.DataDirectory, "wiki", ".LeanKernel", "AGENTS.md");
+        var agentsPath = Path.Combine(_paths.AgentsDirectory, "main", "AGENTS.md");
 
         if (!File.Exists(agentsPath))
         {
@@ -150,7 +150,7 @@ public sealed class AgentsConfigurationStep
     /// </summary>
     public async Task<AgentsStepResult> UpdateSectionAsync(string sectionName, string content, CancellationToken ct = default)
     {
-        var agentsPath = Path.Combine(_paths.DataDirectory, "wiki", ".LeanKernel", "AGENTS.md");
+        var agentsPath = Path.Combine(_paths.AgentsDirectory, "main", "AGENTS.md");
 
         if (!File.Exists(agentsPath))
         {
@@ -218,7 +218,7 @@ public sealed class AgentsConfigurationStep
     /// </summary>
     public async Task<string> GetAgentsMdAsync(CancellationToken ct = default)
     {
-        var agentsPath = Path.Combine(_paths.DataDirectory, "wiki", ".LeanKernel", "AGENTS.md");
+        var agentsPath = Path.Combine(_paths.AgentsDirectory, "main", "AGENTS.md");
 
         if (!File.Exists(agentsPath))
         {
