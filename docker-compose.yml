@@ -148,7 +148,7 @@ services:
       - WIKI_PATH=/app/data/wiki
       - DOCUMENTS_PATH=/app/data/documents
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-embedding-small}
-      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-1536}
+      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-3072}
       - RESCAN_INTERVAL_SECONDS=${INDEXER_RESCAN_INTERVAL:-300}
       - WIKI_DEBOUNCE_SECONDS=5
       - STATE_DB_PATH=/app/data/indexer-state.db

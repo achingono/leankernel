@@ -74,10 +74,10 @@ providers:
       - id: gemma4_26b
         name: gemma4:26b
         max_tokens: 32768
-      - id: nomic_embed_text
-        name: nomic-embed-text
+      - id: qwen3_embedding_8b
+        name: qwen3-embedding:8b
         mode: embedding
-        dimensions: 768
+        dimensions: 4096
   openai:
     keys:
       - source: env
@@ -177,18 +177,10 @@ routes:
       keys: [github_copilot1]
       order: 9
   embedding-small:
-    - provider: openai
-      model: text_embedding_3_small
-      keys: [openai1]
-      order: 1
-    - provider: gemini
-      model: embedding_2
-      keys: [gemini1, gemini2, gemini3]
-      order: 2
     - provider: ollama
-      model: nomic_embed_text
+      model: qwen3_embedding_8b
       keys: [ollama1]
-      order: 3  # 768-dim fallback; only used if openai+gemini both fail
+      order: 1
   embedding-large:
     - provider: azure
       model: embedding_3_large

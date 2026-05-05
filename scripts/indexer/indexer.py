@@ -48,7 +48,8 @@ COLLECTION_NAME = os.getenv("COLLECTION_NAME", "LEANKERNEL_knowledge")
 WIKI_PATH = os.getenv("WIKI_PATH", "/app/data/wiki")
 DOCUMENTS_PATH = os.getenv("DOCUMENTS_PATH", "/app/data/documents")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "embedding-small")
-EMBEDDING_DIMENSION = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
+EMBEDDING_DIMENSION = int(os.getenv("EMBEDDING_DIMENSION", "3072"))
+EMBEDDING_REQUEST_DIMENSION = int(os.getenv("EMBEDDING_REQUEST_DIMENSION", str(EMBEDDING_DIMENSION)))
 RESCAN_INTERVAL = int(os.getenv("RESCAN_INTERVAL_SECONDS", "300"))
 WIKI_DEBOUNCE = int(os.getenv("WIKI_DEBOUNCE_SECONDS", "5"))
 CHUNK_SIZE_TOKENS = int(os.getenv("CHUNK_SIZE_TOKENS", "500"))
@@ -137,10 +138,11 @@ class TagResolver:
 class EmbeddingClient:
     """Generates embeddings via LiteLLM API."""
 
-    def __init__(self, base_url: str, api_key: str, model: str):
+    def __init__(self, base_url: str, api_key: str, model: str, request_dimension: int | None = None):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
+        self.request_dimension = request_dimension
         self.client = httpx.AsyncClient(timeout=60.0)
 
     async def embed(self, text: str) -> list[float]:
@@ -150,14 +152,32 @@ class EmbeddingClient:
 
         for attempt in range(1, EMBEDDING_MAX_RETRIES + 1):
             try:
+                payload = {"input": text, "model": self.model}
+                if self.request_dimension and self.request_dimension > 0:
+                    # Some providers expect `dimensions`; others accept `dimension`.
+                    # LiteLLM drop_params=true will remove unsupported fields safely.
+                    payload["dimensions"] = self.request_dimension
+                    payload["dimension"] = self.request_dimension
+
                 response = await self.client.post(
                     f"{self.base_url}/embeddings",
-                    json={"input": text, "model": self.model},
+                    json=payload,
                     headers={"Authorization": f"Bearer {self.api_key}"},
                 )
                 response.raise_for_status()
                 data = response.json()
-                return data["data"][0]["embedding"]
+                embedding = data["data"][0]["embedding"]
+
+                if self.request_dimension and self.request_dimension > 0:
+                    if len(embedding) > self.request_dimension:
+                        embedding = embedding[: self.request_dimension]
+                    elif len(embedding) < self.request_dimension:
+                        raise RuntimeError(
+                            f"Embedding length {len(embedding)} is smaller than requested "
+                            f"dimension {self.request_dimension} for model {self.model}"
+                        )
+
+                return embedding
             except httpx.HTTPStatusError as e:
                 last_error = e
                 status = e.response.status_code
@@ -330,7 +350,12 @@ class Indexer:
     def __init__(self):
         self.state = StateDB(STATE_DB_PATH)
         self.tag_resolver = TagResolver(TAG_RULES_JSON, default_tags=["general"])
-        self.embedding_client = EmbeddingClient(LITELLM_URL, LITELLM_API_KEY, EMBEDDING_MODEL)
+        self.embedding_client = EmbeddingClient(
+            LITELLM_URL,
+            LITELLM_API_KEY,
+            EMBEDDING_MODEL,
+            request_dimension=EMBEDDING_REQUEST_DIMENSION,
+        )
         self.unstructured_client = UnstructuredClient(UNSTRUCTURED_API_URL)
         self.qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, prefer_grpc=True)
         self._ensure_collection()
