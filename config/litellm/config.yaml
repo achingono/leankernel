@@ -78,6 +78,28 @@ providers:
         name: qwen3-embedding:8b
         mode: embedding
         dimensions: 4096
+  nvidia:
+    litellm_provider: openai
+    keys:
+      - source: env
+        name: NVIDIA_API_KEY
+        api_base_env: NVIDIA_API_BASE
+    models:
+      - id: llama_3_2_3b
+        name: meta/llama-3.2-3b-instruct
+        max_tokens: 8192
+      - id: llama_4_maverick
+        name: meta/llama-4-maverick-17b-128e-instruct
+        max_tokens: 32768
+      - id: mistral_small_4
+        name: mistralai/mistral-small-4-119b-2603
+        max_tokens: 32768
+      - id: nemotron_super_49b
+        name: nvidia/llama-3.3-nemotron-super-49b-v1.5
+        max_tokens: 32768
+      - id: llama_3_3_70b
+        name: meta/llama-3.3-70b-instruct
+        max_tokens: 32768
   openai:
     keys:
       - source: env
@@ -90,26 +112,30 @@ providers:
 
 routes:
   small:
-    - provider: groq
-      model: scout
-      keys: [groq1, groq2]
-      order: 1
-    - provider: gemini
-      model: flash
-      keys: [gemini1, gemini2, gemini3]
-      order: 2
     - provider: azure
       model: gpt_5_4_nano_1
       keys: [azure1, azure2]
+      order: 1
+    - provider: groq
+      model: scout
+      keys: [groq1, groq2]
+      order: 2
+    - provider: nvidia
+      model: llama_3_2_3b
+      keys: [nvidia1]
       order: 3
+    - provider: gemini
+      model: flash
+      keys: [gemini1, gemini2, gemini3]
+      order: 4
     - provider: azure
       model: kimi_k2_6
       keys: [azure1, azure2]
-      order: 4
+      order: 5
     - provider: azure
       model: deepseek_v3_2
       keys: [azure1, azure2]
-      order: 5
+      order: 6
     - provider: ollama
       model: gemma4_26b
       keys: [ollama1]
@@ -119,26 +145,34 @@ routes:
       keys: [github_copilot1]
       order: 9
   medium:
-    - provider: gemini
-      model: flash
-      keys: [gemini1, gemini2, gemini3]
+    - provider: nvidia
+      model: llama_4_maverick
+      keys: [nvidia1]
+      order: 1
+    - provider: nvidia
+      model: mistral_small_4
+      keys: [nvidia1]
       order: 1
     - provider: azure
       model: gpt_5_4_mini_1
       keys: [azure1, azure2]
       order: 2
+    - provider: gemini
+      model: flash
+      keys: [gemini1, gemini2, gemini3]
+      order: 3
     - provider: azure
       model: deepseek_v3_2
       keys: [azure1, azure2]
-      order: 3
+      order: 4
     - provider: azure
       model: kimi_k2_6
       keys: [azure1, azure2]
-      order: 4
+      order: 5
     - provider: groq
       model: scout
       keys: [groq1, groq2]
-      order: 5
+      order: 6
     - provider: ollama
       model: gemma4_26b
       keys: [ollama1]
@@ -152,22 +186,30 @@ routes:
       model: gpt_5_4_1
       keys: [azure1, azure2]
       order: 1
+    - provider: nvidia
+      model: llama_3_3_70b
+      keys: [nvidia1]
+      order: 2
+    - provider: nvidia
+      model: nemotron_super_49b
+      keys: [nvidia1]
+      order: 2
     - provider: azure
       model: deepseek_v3_2
       keys: [azure1, azure2]
-      order: 2
+      order: 3
     - provider: azure
       model: kimi_k2_6
       keys: [azure1, azure2]
-      order: 3
+      order: 4
     - provider: gemini
       model: flash
       keys: [gemini1, gemini2, gemini3]
-      order: 4
+      order: 5
     - provider: groq
       model: scout
       keys: [groq1, groq2]
-      order: 5
+      order: 6
     - provider: ollama
       model: gemma4_26b
       keys: [ollama1]
@@ -201,13 +243,13 @@ aliases:
   gpt-5-mini: medium
 
 router:
-  routing_strategy: simple-shuffle
+  routing_strategy: least-busy
   enable_pre_call_checks: true
   num_retries: 7
   retry_after: 5
   timeout: 120
-  cooldown_time: 60
-  fallback_on_status_codes: [429, 500, 502, 503, 504]
+  cooldown_time: 300
+  fallback_on_status_codes: [404, 429, 500, 502, 503, 504]
   route_fallbacks:
     small: [medium, large]
     medium: [small, large]
