@@ -207,22 +207,20 @@ try
     builder.Services.AddSingleton(sp =>
     {
         var logger = sp.GetRequiredService<ILogger<SignalChannelAdapter>>();
-        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-        var httpClient = httpClientFactory.CreateClient();
         var LeanKernelConfig = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
         
-        var enabledEnv = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_ENABLED");
-        var isEnabled = bool.TryParse(enabledEnv, out var parsedEnabled)
+        var isEnabled = bool.TryParse(
+            Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_ENABLED"), 
+            out var parsedEnabled)
             ? parsedEnabled
             : LeanKernelConfig.Signal.Enabled;
 
-        var phoneNumber = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_PHONE")
-            ?? LeanKernelConfig.SignalPhoneNumber
+        var cliPath = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_CLI_PATH") 
+            ?? LeanKernelConfig.Signal.CliPath;
+        var account = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_ACCOUNT")
             ?? LeanKernelConfig.Signal.Account;
-        var serverUrl = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_SERVER") ?? LeanKernelConfig.SignalServerUrl;
-        var apiToken = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_API_TOKEN") ?? LeanKernelConfig.SignalApiToken;
-        
-        return new SignalChannelAdapter(logger, httpClient, phoneNumber, serverUrl, apiToken, isEnabled);
+
+        return new SignalChannelAdapter(logger, cliPath, account, isEnabled);
     });
     
     builder.Services.AddSingleton(sp =>

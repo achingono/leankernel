@@ -17,10 +17,8 @@ services:
       - LEANKERNEL__Qdrant__Host=qdrant
       - LEANKERNEL__Qdrant__Port=6334
       - LEANKERNEL__Signal__Enabled=${LEANKERNEL_SIGNAL_ENABLED:-true}
+      - LEANKERNEL__Signal__CliPath=${LEANKERNEL_SIGNAL_CLI_PATH:-/usr/bin/signal-cli}
       - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
-      - LEANKERNEL_SIGNAL_PHONE=${SIGNAL_PHONE_NUMBER:-}
-      - LEANKERNEL_SIGNAL_SERVER=${LEANKERNEL_SIGNAL_SERVER:-}
-      - LEANKERNEL_SIGNAL_API_TOKEN=${LEANKERNEL_SIGNAL_API_TOKEN:-}
       - LEANKERNEL__Signal__AllowedSenders__0=${SIGNAL_ALLOWED_SENDER_0:-}
       - LEANKERNEL__Wiki__BasePath=/app/data/wiki
       - LEANKERNEL__Agents__BasePath=/app/data/agents

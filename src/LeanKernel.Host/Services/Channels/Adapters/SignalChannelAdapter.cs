@@ -1,19 +1,18 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Host.Services.Channels.Adapters;
 
 /// <summary>
-/// Signal Messenger channel adapter for sending messages via Signal API.
-/// Requires Signal to be configured with API credentials in LeanKernelConfig.
+/// Signal Messenger channel adapter for sending messages via signal-cli.
+/// Uses the local signal-cli command with a pre-configured Signal account.
 /// </summary>
 public sealed class SignalChannelAdapter : IMessageChannel
 {
     private readonly ILogger<SignalChannelAdapter> _logger;
     private readonly bool _isEnabled;
-    private readonly string? _phoneNumber;
-    private readonly string? _serverUrl;
-    private readonly string? _apiToken;
-    private readonly HttpClient _httpClient;
+    private readonly string? _cliPath;
+    private readonly string? _account;
     private const int MaxRetries = 3;
     private const int BaseRetryDelaySeconds = 2;
 
@@ -21,24 +20,19 @@ public sealed class SignalChannelAdapter : IMessageChannel
 
     public bool IsConfigured =>
         _isEnabled &&
-        !string.IsNullOrWhiteSpace(_phoneNumber) &&
-        !string.IsNullOrWhiteSpace(_serverUrl) &&
-        !string.IsNullOrWhiteSpace(_apiToken);
+        !string.IsNullOrWhiteSpace(_cliPath) &&
+        !string.IsNullOrWhiteSpace(_account);
 
     public SignalChannelAdapter(
         ILogger<SignalChannelAdapter> logger,
-        HttpClient httpClient,
-        string? phoneNumber,
-        string? serverUrl,
-        string? apiToken,
+        string? cliPath,
+        string? account,
         bool isEnabled = true)
     {
         _logger = logger;
-        _httpClient = httpClient;
         _isEnabled = isEnabled;
-        _phoneNumber = phoneNumber;
-        _serverUrl = serverUrl;
-        _apiToken = apiToken;
+        _cliPath = cliPath;
+        _account = account;
 
         if (_isEnabled && !IsConfigured)
         {
@@ -85,8 +79,8 @@ public sealed class SignalChannelAdapter : IMessageChannel
 
         try
         {
-            var deliveryResult = await SendMessageWithRetryAsync(recipient, content, ct);
-            return deliveryResult;
+            var deliveryId = await SendWithRetryAsync(recipient, content, ct);
+            return ChannelDeliveryResult.Successful(Name, deliveryId);
         }
         catch (OperationCanceledException)
         {
@@ -95,14 +89,6 @@ public sealed class SignalChannelAdapter : IMessageChannel
                 "Message delivery was cancelled",
                 retryable: true,
                 TimeSpan.FromSeconds(BaseRetryDelaySeconds * 2));
-        }
-        catch (HttpRequestException ex)
-        {
-            return ChannelDeliveryResult.Failed(
-                Name,
-                $"Network error: {ex.Message}",
-                retryable: true,
-                TimeSpan.FromSeconds(BaseRetryDelaySeconds));
         }
         catch (Exception ex)
         {
@@ -114,7 +100,7 @@ public sealed class SignalChannelAdapter : IMessageChannel
         }
     }
 
-    private async Task<ChannelDeliveryResult> SendMessageWithRetryAsync(
+    private async Task<string> SendWithRetryAsync(
         string recipient,
         string content,
         CancellationToken ct)
@@ -123,16 +109,16 @@ public sealed class SignalChannelAdapter : IMessageChannel
         {
             try
             {
-                var deliveryId = await SendDirectAsync(recipient, content, ct);
+                var messageId = await InvokeSignalCliAsync(recipient, content, ct);
                 _logger.LogInformation(
-                    "Successfully sent Signal message to {Recipient} (ID: {DeliveryId}, attempt: {Attempt})",
+                    "Successfully sent Signal message to {Recipient} (ID: {MessageId}, attempt: {Attempt})",
                     recipient,
-                    deliveryId,
+                    messageId,
                     attempt + 1);
 
-                return ChannelDeliveryResult.Successful(Name, deliveryId);
+                return messageId;
             }
-            catch (HttpRequestException ex) when (attempt < MaxRetries - 1)
+            catch (Exception ex) when (attempt < MaxRetries - 1)
             {
                 var delay = BaseRetryDelaySeconds * (attempt + 1);
                 _logger.LogWarning(
@@ -143,7 +129,7 @@ public sealed class SignalChannelAdapter : IMessageChannel
 
                 await Task.Delay(TimeSpan.FromSeconds(delay), ct);
             }
-            catch (HttpRequestException ex)
+            catch (Exception ex)
             {
                 _logger.LogError(
                     "Signal delivery failed after {MaxRetries} attempts: {Error}",
@@ -153,62 +139,58 @@ public sealed class SignalChannelAdapter : IMessageChannel
             }
         }
 
-        // Should not reach here, but satisfy compiler
         throw new InvalidOperationException("Message delivery retry logic failed");
     }
 
-    private async Task<string> SendDirectAsync(
+    private async Task<string> InvokeSignalCliAsync(
         string recipient,
         string content,
         CancellationToken ct)
     {
-        var url = $"{_serverUrl!.TrimEnd('/')}/v1/send";
-        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        var psi = new ProcessStartInfo
         {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                { "message", content },
-                { "number", _phoneNumber! },
-                { "recipients", recipient }
-            })
+            FileName = _cliPath,
+            Arguments = $"--account {_account} send -m \"{EscapeShellArg(content)}\" {recipient}",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
         };
 
-        request.Headers.Add("Authorization", $"Bearer {_apiToken}");
+        using var process = Process.Start(psi)
+            ?? throw new InvalidOperationException($"Failed to start signal-cli process at {_cliPath}");
 
-        var response = await _httpClient.SendAsync(request, ct);
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
 
-        if (!response.IsSuccessStatusCode)
+        var completed = await Task.WhenAny(
+            Task.WhenAll(outputTask, errorTask),
+            Task.Delay(30000, ct)); // 30 second timeout
+
+        if (completed == (Task)errorTask)
         {
-            var errorContent = await response.Content.ReadAsStringAsync(ct);
-            throw new HttpRequestException(
-                $"Signal API returned {response.StatusCode}: {errorContent}");
+            process.Kill();
+            throw new TimeoutException("signal-cli command timed out");
         }
 
-        var responseContent = await response.Content.ReadAsStringAsync(ct);
-        return ExtractMessageId(responseContent);
+        process.WaitForExit();
+
+        var output = await outputTask;
+        var error = await errorTask;
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"signal-cli command failed with exit code {process.ExitCode}: {error}");
+        }
+
+        // Return a generated message ID (signal-cli doesn't provide one in standard output)
+        return Guid.NewGuid().ToString();
     }
 
-    private static string ExtractMessageId(string responseContent)
+    private static string EscapeShellArg(string arg)
     {
-        if (string.IsNullOrWhiteSpace(responseContent))
-            return Guid.NewGuid().ToString();
-
-        try
-        {
-            var idIndex = responseContent.IndexOf("\"id\"");
-            if (idIndex >= 0)
-            {
-                var colonIndex = responseContent.IndexOf(":", idIndex);
-                var quoteStart = responseContent.IndexOf("\"", colonIndex) + 1;
-                var quoteEnd = responseContent.IndexOf("\"", quoteStart);
-                return responseContent.Substring(quoteStart, quoteEnd - quoteStart);
-            }
-        }
-        catch
-        {
-            // Fall through to default ID
-        }
-
-        return Guid.NewGuid().ToString();
+        // Escape double quotes and backslashes for shell safety
+        return arg.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 }
