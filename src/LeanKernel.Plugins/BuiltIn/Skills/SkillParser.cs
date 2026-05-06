@@ -121,7 +121,7 @@ public sealed class SkillParser
 
             var metadata = ExtractDictionary(data, "metadata") ?? [];
             var runtime = ParseRuntime(ExtractDictionary(data, "runtime"));
-            var operations = ParseOperations(data["operations"] as IEnumerable);
+            var operations = ParseOperations(data.TryGetValue("operations", out var opsData) ? opsData as IEnumerable : null);
 
             var errors = ValidateDefinition(name, description, runtime, operations);
 
