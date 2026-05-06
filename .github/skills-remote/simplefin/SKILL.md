@@ -14,7 +14,7 @@ runtime:
   requires:
     bins:
       - name: simplefin-cli
-        minVersion: "0.0.2"
+        minVersion: "0.0.1"
   egress:
     allowHosts: []
 operations:
