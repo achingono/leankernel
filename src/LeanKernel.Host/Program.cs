@@ -18,6 +18,7 @@ using LeanKernel.Host.Services;
 using LeanKernel.Host.Services.Auth;
 using LeanKernel.Host.Services.Channels;
 using LeanKernel.Host.Services.Channels.Adapters;
+using LeanKernel.Host.Services.Skills;
 using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
 using LeanKernel.Plugins.BuiltIn.Skills;
@@ -150,6 +151,14 @@ try
     builder.Services.AddSingleton<ISkillRegistry, RuntimeSkillRegistry>();
     builder.Services.AddSingleton<DynamicSkillToolFactory>();
 
+    // Lifecycle listeners for skill changes
+    builder.Services.AddSingleton<IEnumerable<ISkillLifecycleListener>>(sp => []);
+
+    // Get skill directories for DynamicPluginHost initialization
+    var skillDirs = builder.Configuration["LeanKernel:Skills:BasePaths"]?.Split(',')
+        ?? [Path.Combine(configuredDataDir, "skills"),
+            Path.Combine(configuredDataDir, "../.github/skills-remote")];
+
     // Register DynamicPluginHost that wraps IToolRegistry for runtime skill loading
     builder.Services.AddSingleton(sp =>
     {
@@ -157,32 +166,29 @@ try
         var factory = sp.GetRequiredService<DynamicSkillToolFactory>();
         var logger = sp.GetRequiredService<ILogger<DynamicPluginHost>>();
 
-        var skillDirs = builder.Configuration["LeanKernel:Skills:BasePaths"]?.Split(',')
-            ?? [Path.Combine(configuredDataDir, "skills"),
-                Path.Combine(configuredDataDir, "../.github/skills-remote")];
-
-        // Watch for skill file changes (async but fire-and-forget)
-        foreach (var dir in skillDirs.Where(Directory.Exists))
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await ((RuntimeSkillRegistry)skillRegistry).WatchSkillDirectoryAsync(dir, CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Failed to watch skill directory: {Directory}", dir);
-                }
-            });
-        }
-
         var host = new DynamicPluginHost(skillRegistry, factory, logger);
-        _ = host.InitializeAsync(); // Initialize in background
         return host;
     });
 
     builder.Services.AddSingleton<IToolRegistry>(sp => sp.GetRequiredService<DynamicPluginHost>());
+
+    // Skill Hosted Service — synchronous initialization + hot reload
+    builder.Services.AddSingleton(sp =>
+    {
+        var skillRegistry = sp.GetRequiredService<ISkillRegistry>();
+        var pluginHost = sp.GetRequiredService<DynamicPluginHost>();
+        var listeners = sp.GetRequiredService<IEnumerable<ISkillLifecycleListener>>();
+        var logger = sp.GetRequiredService<ILogger<SkillHostedService>>();
+
+        return new SkillHostedService(
+            skillRegistry,
+            pluginHost,
+            listeners,
+            logger,
+            skillDirs.Where(Directory.Exists).ToArray());
+    });
+
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<SkillHostedService>());
 
     // Scheduler
     builder.Services.AddSingleton<IScheduler, CronScheduler>();

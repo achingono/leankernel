@@ -12,7 +12,7 @@ public interface ISkillRegistry
     Task<SkillDefinition?> GetSkillAsync(string skillName);
     Task<IReadOnlyDictionary<string, SkillDefinition>> GetAllSkillsAsync();
     Task RefreshSkillsAsync();
-    Task WatchSkillDirectoryAsync(string directory, CancellationToken ct);
+    Task InitializeAsync(IEnumerable<string> skillDirectories);
     List<string> GetQuarantinedSkills();
 }
 
@@ -42,6 +42,25 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
         _cache = cache;
         _logger = logger;
         _skillDirectories = [];
+    }
+
+    /// <summary>
+    /// Initialize the registry with skill directories.
+    /// Should be called once at startup.
+    /// </summary>
+    public async Task InitializeAsync(IEnumerable<string> skillDirectories)
+    {
+        foreach (var dir in skillDirectories)
+        {
+            if (Directory.Exists(dir))
+            {
+                _skillDirectories.Add(dir);
+            }
+        }
+
+        // Trigger discovery
+        await GetAllSkillsAsync();
+        _logger.LogInformation("RuntimeSkillRegistry initialized with {Count} directories", _skillDirectories.Count);
     }
 
     public async Task<SkillDefinition?> GetSkillAsync(string skillName)
@@ -108,7 +127,7 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
 
     private void OnSkillFileChanged()
     {
-        _logger.LogInformation("Skill file changed, refreshing cache");
+        _logger.LogDebug("Skill file changed, refreshing cache");
         _cache.Remove(CACHE_KEY);
     }
 

@@ -78,6 +78,7 @@ public sealed class DynamicSkillToolFactory
 
 /// <summary>
 /// Dynamically populated tool registry that loads skills from the filesystem.
+/// Supports hot reload when SKILL.md files change.
 /// </summary>
 public sealed class DynamicPluginHost : IToolRegistry
 {
@@ -113,10 +114,30 @@ public sealed class DynamicPluginHost : IToolRegistry
                 _tools[tool.Name] = tool;
                 _logger.LogInformation("Registered dynamic tool: {ToolName}", tool.Name);
             }
+            _logger.LogInformation("Dynamic plugin host initialized with {Count} tools", _tools.Count);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to initialize dynamic skill tools");
+        }
+    }
+
+    /// <summary>
+    /// Refresh the registry with updated skills from disk.
+    /// Called when SKILL.md files change (hot reload).
+    /// </summary>
+    public async Task RefreshAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Refreshing dynamic plugin host");
+            _tools.Clear();
+            await InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to refresh dynamic plugin host");
+            throw;
         }
     }
 
