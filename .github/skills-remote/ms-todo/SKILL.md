@@ -3,12 +3,9 @@ name: ms-todo
 description: "Manage Microsoft To Do list groups, lists, tasks, attachments, and checklist steps with ms-todo-cli. Use when a user wants you to capture follow-ups, create actionable reminders, review task lists, search tasks by keyword, or complete/update Microsoft To Do items that require their action. NOT for Outlook email, Outlook calendar, or general Microsoft Graph tasks outside To Do."
 metadata:
   {
-    "LeanKernel":
-      {
-        "emoji": "✅",
-        "homepage": "https://github.com/achingono/ms-todo-cli",
-        "requires": { "bins": ["ms-todo-cli"] },
-      },
+    "emoji": "✅",
+    "homepage": "https://github.com/achingono/ms-todo-cli",
+    "requires": { "bins": ["ms-todo-cli"] },
   }
 ---
 

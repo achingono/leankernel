@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using YamlDotNet.Serialization;
 
-namespace LeanKernel.Plugins.BuiltIn.OpenclaSkills;
+namespace LeanKernel.Plugins.BuiltIn.Skills;
 
 /// <summary>
 /// Parses SKILL.md files into structured SkillDefinition objects.
@@ -26,9 +26,11 @@ public sealed class SkillParser
     /// name: skill_name
     /// description: "..."
     /// metadata:
-    ///   LeanKernel:
-    ///     emoji: "📢"
-    ///     homepage: "https://..."
+    ///   emoji: "📢"
+    ///   homepage: "https://..."
+    ///   baseUrl: "http://..."
+    ///   cliCommand: "my-cli"
+    ///   authType: "none"
     /// ---
     /// </summary>
     public async Task<SkillDefinition?> ParseSkillFileAsync(string filePath)
@@ -107,7 +109,6 @@ public sealed class SkillParser
                 return null;
 
             var metadata = ExtractDictionary(data, "metadata") ?? [];
-            var LeanKernelMeta = ExtractDictionary(metadata, "LeanKernel") ?? [];
 
             var operationType = DetermineOperationType(metadata);
 
@@ -119,8 +120,8 @@ public sealed class SkillParser
                 BaseUrl = ExtractString(metadata, "baseUrl"),
                 CliCommand = ExtractString(metadata, "cliCommand"),
                 AuthType = ExtractString(metadata, "authType") ?? "none",
-                Emoji = ExtractString(LeanKernelMeta, "emoji"),
-                Homepage = ExtractString(LeanKernelMeta, "homepage"),
+                Emoji = ExtractString(metadata, "emoji"),
+                Homepage = ExtractString(metadata, "homepage"),
                 Metadata = metadata
             };
         }

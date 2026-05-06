@@ -5,7 +5,7 @@ using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 using Microsoft.Extensions.Logging;
 
-namespace LeanKernel.Plugins.BuiltIn.OpenclaSkills;
+namespace LeanKernel.Plugins.BuiltIn.Skills;
 
 /// <summary>
 /// Dynamic skill tool that wraps any loaded skill definition.

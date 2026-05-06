@@ -2,7 +2,7 @@ using LeanKernel.Core.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace LeanKernel.Plugins.BuiltIn.OpenclaSkills;
+namespace LeanKernel.Plugins.BuiltIn.Skills;
 
 /// <summary>
 /// Factory that creates ITool instances from loaded skill definitions.

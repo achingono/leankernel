@@ -27,12 +27,11 @@ The file starts with YAML frontmatter enclosed in `---` markers:
 name: skill_name
 description: "Short description of what this skill does"
 metadata:
-  LeanKernel:
-    emoji: "📢"
-    homepage: "https://example.com"
-    baseUrl: "http://host.docker.internal:3000"
-    cliCommand: "my-cli-tool"
-    authType: "none"
+  emoji: "📢"
+  homepage: "https://example.com"
+  baseUrl: "http://host.docker.internal:3000"
+  cliCommand: "my-cli-tool"
+  authType: "none"
 ---
 ```
 
@@ -42,11 +41,11 @@ metadata:
 |-------|------|----------|-------------|
 | `name` | string | ✓ | Skill identifier (lowercase, no spaces) |
 | `description` | string | ✓ | What the skill does (used in agent routing) |
-| `metadata.LeanKernel.emoji` | string | | Unicode emoji for UI display |
-| `metadata.LeanKernel.homepage` | string | | URL to skill documentation |
-| `metadata.LeanKernel.baseUrl` | string | | Base URL for HTTP operations |
-| `metadata.LeanKernel.cliCommand` | string | | CLI command name for CLI operations |
-| `metadata.LeanKernel.authType` | string | | Authentication: `none`, `bearer`, `api_key` |
+| `metadata.emoji` | string | | Unicode emoji for UI display |
+| `metadata.homepage` | string | | URL to skill documentation |
+| `metadata.baseUrl` | string | | Base URL for HTTP operations |
+| `metadata.cliCommand` | string | | CLI command name for CLI operations |
+| `metadata.authType` | string | | Authentication: `none`, `bearer`, `api_key` |
 
 ### Markdown Documentation
 
@@ -115,11 +114,10 @@ simplefin-cli accounts list
 name: weather_api
 description: "Get weather forecasts and conditions for any location using Weather API"
 metadata:
-  LeanKernel:
-    emoji: "⛅"
-    homepage: "https://weatherapi.com"
-    baseUrl: "https://api.weatherapi.com/v1"
-    authType: "api_key"
+  emoji: "⛅"
+  homepage: "https://weatherapi.com"
+  baseUrl: "https://api.weatherapi.com/v1"
+  authType: "api_key"
 ---
 
 # Weather API

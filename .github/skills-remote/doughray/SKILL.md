@@ -1,7 +1,7 @@
 ---
 name: doughray
 description: "Doughray personal finance API: read accounts, transactions, holdings, budgets, categories, goals, assets, and reports; trigger SimpleFin syncs; recategorize transactions; create or adjust budgets and savings goals; manage loan details (interest rates, terms, amortization). Use when the user asks for spending analysis, budget vs. actuals, net worth, dashboard summaries, transaction categorization changes, asset/valuation tracking, goal progress, or debt management. NOT for moving money, changing bank credentials, or anything outside this local Postgres-backed dataset."
-metadata: { "LeanKernel": { "emoji": "💰", "homepage": "https://money.emanate.ca" } }
+metadata: { "emoji": "💰", "homepage": "https://money.emanate.ca" }
 ---
 
 # Doughray

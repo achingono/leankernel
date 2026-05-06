@@ -20,7 +20,7 @@ using LeanKernel.Host.Services.Channels;
 using LeanKernel.Host.Services.Channels.Adapters;
 using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
-using LeanKernel.Plugins.BuiltIn.OpenclaSkills;
+using LeanKernel.Plugins.BuiltIn.Skills;
 using LeanKernel.Scheduler;
 using LeanKernel.Thinker;
 using LeanKernel.Thinker.Agents;
@@ -145,7 +145,7 @@ try
     builder.Services.AddSingleton<ITool, WikiQueryTool>();
     builder.Services.AddSingleton<ITool, KnowledgeSearchTool>();
 
-    // LeanKernel Skill System — Runtime skill loading from filesystem
+    // Skill System — Runtime skill loading from filesystem
     builder.Services.AddSingleton<SkillParser>();
     builder.Services.AddSingleton<ISkillRegistry, RuntimeSkillRegistry>();
     builder.Services.AddSingleton<DynamicSkillToolFactory>();

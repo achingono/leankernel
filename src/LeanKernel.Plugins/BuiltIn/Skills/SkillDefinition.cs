@@ -1,4 +1,4 @@
-namespace LeanKernel.Plugins.BuiltIn.OpenclaSkills;
+namespace LeanKernel.Plugins.BuiltIn.Skills;
 
 /// <summary>
 /// Represents a skill definition parsed from SKILL.md file with frontmatter.

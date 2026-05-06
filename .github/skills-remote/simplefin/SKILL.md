@@ -1,7 +1,7 @@
 ---
 name: simplefin
 description: "Inspect SimpleFin Bridge accounts and transactions with simplefin-cli. Use when the user wants balances, transaction history, or account-level cashflow analysis from linked financial institutions. NOT for moving money, changing bank settings, or anything outside the read-only SimpleFin Bridge dataset."
-metadata: { "LeanKernel": { "emoji": "💸", "homepage": "https://github.com/achingono/simplefin-cli", "requires": { "bins": ["simplefin-cli"] } } }
+metadata: { "emoji": "💸", "homepage": "https://github.com/achingono/simplefin-cli", "requires": { "bins": ["simplefin-cli"] } }
 ---
 
 # SimpleFin Bridge

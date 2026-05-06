@@ -3,11 +3,8 @@ name: screenshot-ocr
 description: "Read and analyze screenshots, PDFs, and images. Use vision models with fallback to PaddleOCR for text extraction when vision models are quota-limited or unavailable."
 metadata:
   {
-    "LeanKernel":
-      {
-        "emoji": "📸",
-        "requires": { "bins": ["paddleocr"] },
-      },
+    "emoji": "📸",
+    "requires": { "bins": ["paddleocr"] },
   }
 ---
 

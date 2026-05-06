@@ -3,10 +3,7 @@ name: emanate
 description: "Emanate social media automation API: create, schedule, and publish posts across Twitter/X, LinkedIn, Facebook, and Reddit. Use when: (1) drafting or generating social media posts, (2) scheduling posts for optimal engagement times, (3) publishing posts immediately, (4) checking post status or engagement analytics. NOT for: direct browser-based social media interactions, managing platform login sessions, or modifying engagement automation schedules."
 metadata:
   {
-    "LeanKernel":
-      {
-        "emoji": "📢",
-      },
+    "emoji": "📢",
   }
 ---
 

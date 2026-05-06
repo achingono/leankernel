@@ -2,7 +2,7 @@ using LeanKernel.Core.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
-namespace LeanKernel.Plugins.BuiltIn.OpenclaSkills;
+namespace LeanKernel.Plugins.BuiltIn.Skills;
 
 /// <summary>
 /// Interface for loading and discovering skills from the filesystem.
