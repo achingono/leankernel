@@ -4,7 +4,7 @@
 
 services:
   # ── LeanKernel Engine (Core Application) ───────────────────────────
-  LeanKernel-engine:
+  engine:
     build:
       context: .
       dockerfile: Dockerfile
@@ -22,7 +22,7 @@ services:
       - LEANKERNEL__Signal__CliPath=${LEANKERNEL_SIGNAL_CLI_PATH:-/usr/bin/signal-cli}
       - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
       - LEANKERNEL__Signal__AllowedSenders__0=${SIGNAL_ALLOWED_SENDER_0:-}
-      - LEANKERNEL__Signal__DaemonBaseUrl=http://LeanKernel-signal:8080
+      - LEANKERNEL__Signal__DaemonBaseUrl=http://signal:8080
       - LEANKERNEL__Wiki__BasePath=/app/data/wiki
       - LEANKERNEL__Agents__BasePath=/app/data/agents
       - LEANKERNEL__Knowledge__Enabled=true
@@ -33,13 +33,14 @@ services:
       - ./data:/app/data
       - signal-config:/home/LeanKernel/.local/share/signal-cli
     depends_on:
-      LeanKernel-signal:
+      signal:
         condition: service_healthy
       qdrant:
         condition: service_healthy
       litellm:
         condition: service_healthy
     ports:
+      - "${LEANKERNEL_PORT:-5080}:5080"            # Web UI + API + OpenAI-compatible
     restart: unless-stopped
     deploy:
       resources:
@@ -137,7 +138,7 @@ services:
       start_period: 30s
 
   # ── LeanKernel Indexer (Knowledge Pipeline Sidecar) ────────────────
-  LeanKernel-indexer:
+  indexer:
     build:
       context: ./scripts/indexer
       dockerfile: Dockerfile
@@ -178,7 +179,7 @@ services:
           memory: 128M
 
   # ── Signal Daemon (signal-cli HTTP sidecar) ──────────────────
-  LeanKernel-signal:
+  signal:
     build:
       context: ./scripts/signal-daemon
       dockerfile: Dockerfile
