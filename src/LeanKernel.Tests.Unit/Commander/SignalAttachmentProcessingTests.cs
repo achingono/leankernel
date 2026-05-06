@@ -25,6 +25,21 @@ public sealed class SignalAttachmentProcessingTests
         Assert.Null(text);
     }
 
+    [Theory]
+    [InlineData("text/plain", "notes.txt", true)]
+    [InlineData("application/json", "notes.bin", true)]
+    [InlineData("application/pdf", "notes.pdf", false)]
+    [InlineData("image/png", "diagram.png", false)]
+    public void CanExtractText_MatchesSupportedAttachmentTypes(
+        string contentType,
+        string fileName,
+        bool expected)
+    {
+        var canExtract = InboundAttachmentTextExtractor.CanExtractText(contentType, fileName);
+
+        Assert.Equal(expected, canExtract);
+    }
+
     [Fact]
     public void Formatter_EmbedsExtractedAttachmentTextAndMetadata()
     {

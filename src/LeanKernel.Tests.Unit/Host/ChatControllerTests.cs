@@ -12,6 +12,23 @@ namespace LeanKernel.Tests.Unit.Host;
 
 public class ChatControllerTests
 {
+    private static InboundAttachmentInputProcessor CreateAttachmentProcessor()
+    {
+        var extractor = Substitute.For<IAttachmentTextExtractionService>();
+        extractor.ExtractTextAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+                Task.FromResult(InboundAttachmentTextExtractor.TryExtractText(
+                    callInfo.ArgAt<string?>(0),
+                    callInfo.ArgAt<string?>(1),
+                    callInfo.ArgAt<byte[]>(2))));
+        extractor.CanExtractText(Arg.Any<string?>(), Arg.Any<string?>())
+            .Returns(callInfo => InboundAttachmentTextExtractor.CanExtractText(
+                callInfo.ArgAt<string?>(0),
+                callInfo.ArgAt<string?>(1)));
+
+        return new InboundAttachmentInputProcessor(extractor);
+    }
+
     private static (MessageQueueService, TimeBoundaryService) CreateDependencies()
     {
         var rules = new EngagementRules();
@@ -32,7 +49,7 @@ public class ChatControllerTests
             .Returns(Task.FromResult<IReadOnlyList<string>>(["s1", "s2"]));
 
         var (messageQueue, timeBoundary) = CreateDependencies();
-        var controller = new ChatController(sessions, Substitute.For<IThinkerService>(), messageQueue, timeBoundary);
+        var controller = new ChatController(sessions, Substitute.For<IThinkerService>(), messageQueue, timeBoundary, CreateAttachmentProcessor());
         var result = await controller.ListSessions(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -51,7 +68,7 @@ public class ChatControllerTests
             }));
 
         var (messageQueue, timeBoundary) = CreateDependencies();
-        var controller = new ChatController(sessions, Substitute.For<IThinkerService>(), messageQueue, timeBoundary);
+        var controller = new ChatController(sessions, Substitute.For<IThinkerService>(), messageQueue, timeBoundary, CreateAttachmentProcessor());
         var result = await controller.GetSession("s1", CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -65,7 +82,7 @@ public class ChatControllerTests
             .Returns("Hello back!");
 
         var (messageQueue, timeBoundary) = CreateDependencies();
-        var controller = new ChatController(Substitute.For<ISessionStore>(), thinker, messageQueue, timeBoundary);
+        var controller = new ChatController(Substitute.For<ISessionStore>(), thinker, messageQueue, timeBoundary, CreateAttachmentProcessor());
         var request = new ChatMessageRequest { Content = "Hello" };
         var result = await controller.SendMessage(request, CancellationToken.None);
 
@@ -81,7 +98,7 @@ public class ChatControllerTests
             .Returns("Urgent response");
 
         var (messageQueue, timeBoundary) = CreateDependencies();
-        var controller = new ChatController(Substitute.For<ISessionStore>(), thinker, messageQueue, timeBoundary);
+        var controller = new ChatController(Substitute.For<ISessionStore>(), thinker, messageQueue, timeBoundary, CreateAttachmentProcessor());
         
         var request = new ChatMessageRequest 
         { 
@@ -104,7 +121,7 @@ public class ChatControllerTests
             .Returns("Attachment response");
 
         var (messageQueue, timeBoundary) = CreateDependencies();
-        var controller = new ChatController(Substitute.For<ISessionStore>(), thinker, messageQueue, timeBoundary);
+        var controller = new ChatController(Substitute.For<ISessionStore>(), thinker, messageQueue, timeBoundary, CreateAttachmentProcessor());
 
         var request = new ChatMessageRequest
         {
@@ -138,7 +155,8 @@ public class ChatControllerTests
             Substitute.For<ISessionStore>(),
             Substitute.For<IThinkerService>(),
             messageQueue,
-            timeBoundary);
+            timeBoundary,
+            CreateAttachmentProcessor());
 
         var result = await controller.SendMessage(new ChatMessageRequest
         {

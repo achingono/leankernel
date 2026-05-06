@@ -1,0 +1,265 @@
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using LeanKernel.Core.Interfaces;
+using LeanKernel.Core.Models;
+
+namespace LeanKernel.Commander.Adapters;
+
+/// <summary>
+/// Signal adapter that communicates with the signal-daemon HTTP sidecar instead of
+/// spawning a signal-cli child process. Eliminates config-lock contention by moving
+/// the long-lived signal-cli jsonRpc process into its own container.
+/// </summary>
+public sealed class SignalRestApiAdapter : ISignalAdapter
+{
+    private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan TypingTimeout = TimeSpan.FromSeconds(5);
+
+    private readonly string _baseUrl;
+    private readonly string _account;
+    private readonly HttpClient _http;
+    private readonly ILogger _logger;
+    private readonly IAttachmentTextExtractionService _attachmentTextExtractor;
+    private CancellationTokenSource? _cts;
+    private Task? _receiveLoop;
+
+    public event Action<SignalInboundMessage>? OnMessage;
+    public event Action<string>? OnError;
+
+    public SignalRestApiAdapter(
+        string baseUrl,
+        string account,
+        HttpClient http,
+        ILogger logger,
+        IAttachmentTextExtractionService attachmentTextExtractor)
+    {
+        _baseUrl = baseUrl.TrimEnd('/');
+        _account = account;
+        _http = http;
+        _logger = logger;
+        _attachmentTextExtractor = attachmentTextExtractor;
+    }
+
+    public Task StartAsync(CancellationToken ct)
+    {
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _receiveLoop = Task.Run(() => ReceiveLoopAsync(_cts.Token), _cts.Token);
+        _logger.LogInformation("Signal REST adapter started (daemon: {BaseUrl}, account: {Account})", _baseUrl, _account);
+        return Task.CompletedTask;
+    }
+
+    public async Task SendMessageAsync(string recipient, string message, CancellationToken ct)
+    {
+        using var timeoutCts = new CancellationTokenSource(SendTimeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
+        var payload = new { message, number = _account, recipients = new[] { recipient } };
+        using var content = new StringContent(
+            JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+        try
+        {
+            using var response = await _http.PostAsync($"{_baseUrl}/v2/send", content, linkedCts.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(ct);
+                throw new InvalidOperationException(
+                    $"signal-daemon send returned {(int)response.StatusCode}: {body}");
+            }
+            _logger.LogDebug("Signal message sent to {Recipient} via daemon", recipient);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested && timeoutCts.IsCancellationRequested)
+        {
+            throw new TimeoutException($"signal-daemon /v2/send timed out after {SendTimeout.TotalSeconds:0} s");
+        }
+    }
+
+    public async Task SendTypingAsync(string recipient, bool stop, CancellationToken ct)
+    {
+        using var timeoutCts = new CancellationTokenSource(TypingTimeout);
+        var method = stop ? HttpMethod.Delete : HttpMethod.Put;
+        var url = $"{_baseUrl}/v1/typing-indicator/{Uri.EscapeDataString(_account)}";
+        var payload = new { recipient };
+        using var content = new StringContent(
+            JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+        using var request = new HttpRequestMessage(method, url) { Content = content };
+        try
+        {
+            using var response = await _http.SendAsync(request, timeoutCts.Token);
+            // Typing is best-effort — ignore response status.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("Typing indicator request failed (ignored): {Message}", ex.Message);
+        }
+    }
+
+    // ── Receive loop ────────────────────────────────────────────────────────
+
+    private async Task ReceiveLoopAsync(CancellationToken ct)
+    {
+        var pollUrl = $"{_baseUrl}/v1/receive/{Uri.EscapeDataString(_account)}?timeout=10";
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                using var response = await _http.GetAsync(pollUrl, ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("signal-daemon receive returned {Status}; retrying in 5 s",
+                        (int)response.StatusCode);
+                    await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                    continue;
+                }
+
+                var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(ct);
+                if (items is null) continue;
+
+                foreach (var item in items)
+                    await ProcessEventAsync(item, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "signal-daemon receive loop error; retrying in 5 s");
+                OnError?.Invoke(ex.Message);
+                try { await Task.Delay(TimeSpan.FromSeconds(5), ct); } catch { break; }
+            }
+        }
+
+        _logger.LogInformation("Signal REST receive loop stopped");
+    }
+
+    private async Task ProcessEventAsync(JsonElement item, CancellationToken ct)
+    {
+        try
+        {
+            if (!item.TryGetProperty("envelope", out var envelope))
+                return;
+
+            var source = envelope.TryGetProperty("source", out var sourceProp)
+                ? sourceProp.GetString()
+                : null;
+
+            if (string.IsNullOrWhiteSpace(source))
+                return;
+
+            if (!envelope.TryGetProperty("dataMessage", out var dataMsg))
+                return;
+
+            var body = dataMsg.TryGetProperty("message", out var msgProp)
+                ? msgProp.GetString()
+                : null;
+
+            var timestamp = dataMsg.TryGetProperty("timestamp", out var tsProp)
+                ? tsProp.GetInt64()
+                : envelope.TryGetProperty("timestamp", out var envTsProp)
+                    ? envTsProp.GetInt64()
+                    : 0L;
+
+            var attachments = await ResolveAttachmentsAsync(source, dataMsg, ct);
+
+            if (string.IsNullOrWhiteSpace(body) && attachments.Count == 0)
+                return;
+
+            _logger.LogDebug("Signal inbound from {Sender} ({Len} chars, {AttCount} attachments)",
+                source, body?.Length ?? 0, attachments.Count);
+
+            OnMessage?.Invoke(new SignalInboundMessage
+            {
+                Sender = source,
+                Body = body ?? string.Empty,
+                TimestampMs = timestamp,
+                Attachments = attachments
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error parsing inbound signal-daemon event");
+        }
+    }
+
+    private async Task<IReadOnlyList<InboundAttachment>> ResolveAttachmentsAsync(
+        string sender,
+        JsonElement dataMsg,
+        CancellationToken ct)
+    {
+        if (!dataMsg.TryGetProperty("attachments", out var attArr) ||
+            attArr.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var results = new List<InboundAttachment>();
+
+        foreach (var att in attArr.EnumerateArray())
+        {
+            var id = att.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+            var contentType = att.TryGetProperty("contentType", out var ctProp) ? ctProp.GetString() : null;
+            var fileName = att.TryGetProperty("filename", out var fnProp) ? fnProp.GetString() : null;
+            var caption = att.TryGetProperty("caption", out var capProp) ? capProp.GetString() : null;
+            var size = att.TryGetProperty("size", out var szProp) && szProp.TryGetInt64(out var sz)
+                ? sz
+                : (long?)null;
+
+            if (string.IsNullOrWhiteSpace(id))
+                continue;
+
+            string? extractedText = null;
+
+            if (_attachmentTextExtractor.CanExtractText(contentType, fileName))
+            {
+                try
+                {
+                    var bytes = await DownloadAttachmentAsync(id, ct);
+                    extractedText = await _attachmentTextExtractor.ExtractTextAsync(
+                        contentType, fileName, bytes, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to download/extract attachment {Id} from {Sender}", id, sender);
+                }
+            }
+
+            results.Add(new InboundAttachment
+            {
+                Id = id,
+                ContentType = contentType,
+                FileName = fileName,
+                Caption = caption,
+                Size = size,
+                ExtractedText = extractedText
+            });
+        }
+
+        return results;
+    }
+
+    private async Task<byte[]> DownloadAttachmentAsync(string attachmentId, CancellationToken ct)
+    {
+        var url = $"{_baseUrl}/v1/attachments/{Uri.EscapeDataString(attachmentId)}";
+        using var response = await _http.GetAsync(url, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
+    // ── IAsyncDisposable ─────────────────────────────────────────────────────
+
+    public async ValueTask DisposeAsync()
+    {
+        _cts?.Cancel();
+        if (_receiveLoop is not null)
+        {
+            try { await _receiveLoop; }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { _logger.LogDebug(ex, "Receive loop exit exception during dispose"); }
+        }
+        _cts?.Dispose();
+    }
+}

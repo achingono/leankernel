@@ -14,6 +14,23 @@ namespace LeanKernel.Tests.Unit.Host;
 
 public class OpenAiControllerTests
 {
+    private static InboundAttachmentInputProcessor CreateAttachmentProcessor()
+    {
+        var extractor = Substitute.For<IAttachmentTextExtractionService>();
+        extractor.ExtractTextAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+                Task.FromResult(InboundAttachmentTextExtractor.TryExtractText(
+                    callInfo.ArgAt<string?>(0),
+                    callInfo.ArgAt<string?>(1),
+                    callInfo.ArgAt<byte[]>(2))));
+        extractor.CanExtractText(Arg.Any<string?>(), Arg.Any<string?>())
+            .Returns(callInfo => InboundAttachmentTextExtractor.CanExtractText(
+                callInfo.ArgAt<string?>(0),
+                callInfo.ArgAt<string?>(1)));
+
+        return new InboundAttachmentInputProcessor(extractor);
+    }
+
     [Fact]
     public async Task ChatCompletions_ReturnsOpenAiFormat()
     {
@@ -21,7 +38,7 @@ public class OpenAiControllerTests
         thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
             .Returns("AI response");
 
-        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance);
+        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance, CreateAttachmentProcessor());
         var request = new OpenAiChatRequest
         {
             Model = "LeanKernel",
@@ -45,7 +62,7 @@ public class OpenAiControllerTests
         thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
             .Returns("ok");
 
-        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance);
+        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance, CreateAttachmentProcessor());
         var request = new OpenAiChatRequest
         {
             Messages =
@@ -70,7 +87,7 @@ public class OpenAiControllerTests
         thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
             .Returns("response text");
 
-        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance);
+        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance, CreateAttachmentProcessor());
         var request = new OpenAiChatRequest
         {
             Messages = [new OpenAiMessage { Role = "user", Content = "test input" }]
@@ -93,7 +110,7 @@ public class OpenAiControllerTests
         thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
             .Returns("ok");
 
-        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance);
+        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance, CreateAttachmentProcessor());
         var request = new OpenAiChatRequest { Model = "LeanKernel" };
 
         var result = await controller.ChatCompletions(request, CancellationToken.None);
@@ -107,7 +124,7 @@ public class OpenAiControllerTests
         thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
             .Returns("ok");
 
-        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance);
+        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance, CreateAttachmentProcessor());
         var request = new OpenAiChatRequest
         {
             User = "custom-user",
@@ -127,7 +144,7 @@ public class OpenAiControllerTests
         thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
             .Returns("ok");
 
-        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance);
+        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance, CreateAttachmentProcessor());
         var request = new OpenAiChatRequest
         {
             Messages =
@@ -164,7 +181,8 @@ public class OpenAiControllerTests
     {
         var controller = new OpenAiController(
             Substitute.For<IThinkerService>(),
-            NullLogger<OpenAiController>.Instance);
+            NullLogger<OpenAiController>.Instance,
+            CreateAttachmentProcessor());
 
         var result = await controller.ChatCompletions(new OpenAiChatRequest
         {
@@ -193,7 +211,10 @@ public class OpenAiControllerTests
     [Fact]
     public void ListModels_ReturnsLeanKernelModel()
     {
-        var controller = new OpenAiController(Substitute.For<IThinkerService>(), NullLogger<OpenAiController>.Instance);
+        var controller = new OpenAiController(
+            Substitute.For<IThinkerService>(),
+            NullLogger<OpenAiController>.Instance,
+            CreateAttachmentProcessor());
         var result = controller.ListModels();
 
         Assert.IsType<OkObjectResult>(result);

@@ -62,7 +62,7 @@ public static class InboundAttachmentTextExtractor
 
     public static string? TryExtractText(string? contentType, string? fileName, byte[] bytes)
     {
-        if (bytes.Length == 0 || !IsTextLike(contentType, fileName))
+        if (bytes.Length == 0 || !CanExtractText(contentType, fileName))
             return null;
 
         string text;
@@ -87,7 +87,7 @@ public static class InboundAttachmentTextExtractor
     public static string NormalizeText(string text) =>
         text.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
 
-    private static bool IsTextLike(string? contentType, string? fileName)
+    public static bool CanExtractText(string? contentType, string? fileName)
     {
         if (!string.IsNullOrWhiteSpace(contentType))
         {

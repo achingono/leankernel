@@ -13,6 +13,7 @@ services:
       - DOTNET_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5080
       - LEANKERNEL__LiteLlm__BaseUrl=http://litellm:4000
+      - LEANKERNEL__Unstructured__BaseUrl=http://unstructured:8000
       - LEANKERNEL__LiteLlm__ApiKey=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
       - LEANKERNEL__Qdrant__Host=qdrant
       - LEANKERNEL__Qdrant__Port=6334
@@ -21,6 +22,7 @@ services:
       - LEANKERNEL__Signal__CliPath=${LEANKERNEL_SIGNAL_CLI_PATH:-/usr/bin/signal-cli}
       - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
       - LEANKERNEL__Signal__AllowedSenders__0=${SIGNAL_ALLOWED_SENDER_0:-}
+      - LEANKERNEL__Signal__DaemonBaseUrl=http://LeanKernel-signal:8080
       - LEANKERNEL__Wiki__BasePath=/app/data/wiki
       - LEANKERNEL__Agents__BasePath=/app/data/agents
       - LEANKERNEL__Knowledge__Enabled=true
@@ -31,12 +33,13 @@ services:
       - ./data:/app/data
       - signal-config:/home/LeanKernel/.local/share/signal-cli
     depends_on:
+      LeanKernel-signal:
+        condition: service_healthy
       qdrant:
         condition: service_healthy
       litellm:
         condition: service_healthy
     ports:
-      - "${LEANKERNEL_PORT:-5080}:5080"            # Web UI + API + OpenAI-compatible
     restart: unless-stopped
     deploy:
       resources:
@@ -173,6 +176,34 @@ services:
           memory: 256M
         reservations:
           memory: 128M
+
+  # ── Signal Daemon (signal-cli HTTP sidecar) ──────────────────
+  LeanKernel-signal:
+    build:
+      context: ./scripts/signal-daemon
+      dockerfile: Dockerfile
+    container_name: LeanKernel-signal
+    environment:
+      - SIGNAL_ACCOUNT=${SIGNAL_PHONE_NUMBER:-}
+      - SIGNAL_CLI_PATH=/usr/bin/signal-cli
+      - SIGNAL_DATA_DIR=/home/LeanKernel/.local/share/signal-cli
+      - PORT=8080
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - signal-config:/home/LeanKernel/.local/share/signal-cli
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
 volumes:
   signal-config:

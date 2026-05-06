@@ -1,3 +1,4 @@
+using System.Net.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
@@ -7,8 +8,9 @@ using LeanKernel.Core.Models;
 namespace LeanKernel.Commander.Adapters;
 
 /// <summary>
-/// signal-cli adapter using JSON-RPC mode.
-/// Manages the signal-cli process and translates Signal messages to/from LeanKernelMessage.
+/// Signal channel — receives inbound messages and sends replies via Signal.
+/// Uses <see cref="SignalRestApiAdapter"/> when <c>Signal.DaemonBaseUrl</c> is configured,
+/// otherwise falls back to the local <see cref="SignalCliAdapter"/> child-process mode.
 /// </summary>
 public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
 {
@@ -17,15 +19,23 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
     private readonly LeanKernelConfig _config;
     private readonly string _cliPath;
     private readonly ILogger<SignalChannel> _logger;
+    private readonly IAttachmentTextExtractionService _attachmentTextExtractor;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly HashSet<string> _allowedSenders;
-    private SignalCliAdapter? _adapter;
+    private ISignalAdapter? _adapter;
 
     public event Func<LeanKernelMessage, CancellationToken, Task>? OnMessageReceived;
 
-    public SignalChannel(IOptions<LeanKernelConfig> config, ILogger<SignalChannel> logger)
+    public SignalChannel(
+        IOptions<LeanKernelConfig> config,
+        ILogger<SignalChannel> logger,
+        IAttachmentTextExtractionService attachmentTextExtractor,
+        IHttpClientFactory httpClientFactory)
     {
         _config = config.Value;
         _logger = logger;
+        _attachmentTextExtractor = attachmentTextExtractor;
+        _httpClientFactory = httpClientFactory;
         _cliPath = ResolveSignalCliPath(_config.Signal.CliPath) ?? _config.Signal.CliPath;
         _allowedSenders = (_config.Signal.AllowedSenders ?? [])
             .Where(sender => !string.IsNullOrWhiteSpace(sender))
@@ -49,10 +59,26 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
             return;
         }
 
-        _adapter = new SignalCliAdapter(
-            _cliPath,
-            _config.Signal.Account,
-            _logger);
+        if (!string.IsNullOrWhiteSpace(_config.Signal.DaemonBaseUrl))
+        {
+            var http = _httpClientFactory.CreateClient("signal-daemon");
+            _adapter = new SignalRestApiAdapter(
+                _config.Signal.DaemonBaseUrl,
+                _config.Signal.Account,
+                http,
+                _logger,
+                _attachmentTextExtractor);
+            _logger.LogInformation("Signal channel using HTTP daemon at {DaemonUrl}", _config.Signal.DaemonBaseUrl);
+        }
+        else
+        {
+            _adapter = new SignalCliAdapter(
+                _cliPath,
+                _config.Signal.Account,
+                _logger,
+                _attachmentTextExtractor);
+            _logger.LogInformation("Signal channel using local signal-cli process");
+        }
 
         _adapter.OnMessage += msg =>
         {
@@ -151,7 +177,7 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
     {
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(10);
 
-        private readonly SignalCliAdapter _adapter;
+        private readonly ISignalAdapter _adapter;
         private readonly string _recipientId;
         private readonly ILogger _logger;
         private readonly CancellationTokenSource _cts;
@@ -159,7 +185,7 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         private bool _disposed;
 
         private SignalTypingScope(
-            SignalCliAdapter adapter,
+            ISignalAdapter adapter,
             string recipientId,
             ILogger logger,
             CancellationTokenSource cts)
@@ -171,7 +197,7 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         }
 
         public static async Task<IAsyncDisposable> StartAsync(
-            SignalCliAdapter adapter,
+            ISignalAdapter adapter,
             string recipientId,
             ILogger logger,
             CancellationToken ct)

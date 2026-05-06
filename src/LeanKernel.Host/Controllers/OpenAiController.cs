@@ -19,11 +19,16 @@ public sealed class OpenAiController : ControllerBase
 {
     private readonly IThinkerService _thinker;
     private readonly ILogger<OpenAiController> _logger;
+    private readonly InboundAttachmentInputProcessor _attachmentProcessor;
 
-    public OpenAiController(IThinkerService thinker, ILogger<OpenAiController> logger)
+    public OpenAiController(
+        IThinkerService thinker,
+        ILogger<OpenAiController> logger,
+        InboundAttachmentInputProcessor attachmentProcessor)
     {
         _thinker = thinker;
         _logger = logger;
+        _attachmentProcessor = attachmentProcessor;
     }
 
     /// <summary>
@@ -43,7 +48,7 @@ public sealed class OpenAiController : ControllerBase
         IReadOnlyList<InboundAttachment> attachments;
         try
         {
-            attachments = InboundAttachmentInputProcessor.Process(lastUserMessage?.Attachments);
+            attachments = await _attachmentProcessor.ProcessAsync(lastUserMessage?.Attachments, ct);
         }
         catch (ArgumentException ex)
         {

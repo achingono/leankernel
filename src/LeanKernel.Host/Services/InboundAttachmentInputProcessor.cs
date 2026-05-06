@@ -1,3 +1,4 @@
+using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
 namespace LeanKernel.Host.Services;
@@ -5,9 +6,18 @@ namespace LeanKernel.Host.Services;
 /// <summary>
 /// Converts API attachment payloads into shared inbound attachment models.
 /// </summary>
-public static class InboundAttachmentInputProcessor
+public sealed class InboundAttachmentInputProcessor
 {
-    public static IReadOnlyList<InboundAttachment> Process(IReadOnlyList<InboundAttachmentInput>? attachments)
+    private readonly IAttachmentTextExtractionService _textExtractor;
+
+    public InboundAttachmentInputProcessor(IAttachmentTextExtractionService textExtractor)
+    {
+        _textExtractor = textExtractor;
+    }
+
+    public async Task<IReadOnlyList<InboundAttachment>> ProcessAsync(
+        IReadOnlyList<InboundAttachmentInput>? attachments,
+        CancellationToken ct)
     {
         if (attachments is null || attachments.Count == 0)
             return [];
@@ -29,10 +39,11 @@ public static class InboundAttachmentInputProcessor
                 try
                 {
                     var bytes = Convert.FromBase64String(ExtractBase64Payload(attachment.Base64Content));
-                    extractedText = InboundAttachmentTextExtractor.TryExtractText(
+                    extractedText = await _textExtractor.ExtractTextAsync(
                         attachment.ContentType,
                         attachment.FileName,
-                        bytes);
+                        bytes,
+                        ct);
                 }
                 catch (FormatException ex)
                 {

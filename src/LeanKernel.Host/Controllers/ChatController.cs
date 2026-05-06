@@ -16,17 +16,20 @@ public sealed class ChatController : ControllerBase
     private readonly IThinkerService _thinker;
     private readonly IMessageQueue _messageQueue;
     private readonly TimeBoundaryService _timeBoundary;
+    private readonly InboundAttachmentInputProcessor _attachmentProcessor;
 
     public ChatController(
         ISessionStore sessions,
         IThinkerService thinker,
         IMessageQueue messageQueue,
-        TimeBoundaryService timeBoundary)
+        TimeBoundaryService timeBoundary,
+        InboundAttachmentInputProcessor attachmentProcessor)
     {
         _sessions = sessions;
         _thinker = thinker;
         _messageQueue = messageQueue;
         _timeBoundary = timeBoundary;
+        _attachmentProcessor = attachmentProcessor;
     }
 
     [HttpGet("sessions")]
@@ -51,7 +54,7 @@ public sealed class ChatController : ControllerBase
         IReadOnlyList<InboundAttachment> attachments;
         try
         {
-            attachments = InboundAttachmentInputProcessor.Process(request.Attachments);
+            attachments = await _attachmentProcessor.ProcessAsync(request.Attachments, ct);
         }
         catch (ArgumentException ex)
         {

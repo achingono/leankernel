@@ -92,6 +92,12 @@ try
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {config.LiteLlm.ApiKey}");
     });
     builder.Services.AddHttpClient("onboarding-probe");
+    builder.Services.AddHttpClient("signal-daemon", client =>
+    {
+        // The long-poll endpoint blocks for up to 10 s; use a 60 s timeout so there is
+        // plenty of headroom for slow attachment downloads too.
+        client.Timeout = TimeSpan.FromSeconds(60);
+    });
 
     // Archivist
     builder.Services.AddSingleton<IKnowledgeSearchService, KnowledgeSearchService>();
@@ -148,6 +154,13 @@ try
     // Web API services
     builder.Services.AddSingleton<LogReaderService>();
     builder.Services.AddSingleton<FileBrowserService>();
+    builder.Services.AddHttpClient<IAttachmentTextExtractionService, AttachmentTextExtractionService>((sp, client) =>
+    {
+        var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
+        client.BaseAddress = new Uri(config.Unstructured.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(config.Unstructured.TimeoutSeconds);
+    });
+    builder.Services.AddTransient<InboundAttachmentInputProcessor>();
     builder.Services.AddSingleton<IOnboardingStateStore, OnboardingStateStore>();
     builder.Services.AddSingleton<IRuntimeLeanKernelConfigStore, RuntimeLeanKernelConfigStore>();
     builder.Services.AddSingleton<IOnboardingOrchestrator, OnboardingOrchestrator>();

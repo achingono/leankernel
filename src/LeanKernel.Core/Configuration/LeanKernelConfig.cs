@@ -10,6 +10,7 @@ public sealed class LeanKernelConfig
     public LiteLlmConfig LiteLlm { get; set; } = new();
     public QdrantConfig Qdrant { get; set; } = new();
     public SignalConfig Signal { get; set; } = new();
+    public UnstructuredConfig Unstructured { get; set; } = new();
     public WikiConfig Wiki { get; set; } = new();
     public AgentsConfig Agents { get; set; } = new();
     public KnowledgeConfig Knowledge { get; set; } = new();
@@ -93,6 +94,20 @@ public sealed class SignalConfig
     public string Account { get; set; } = "";
     public bool Enabled { get; set; } = true;
     public string[] AllowedSenders { get; set; } = [];
+
+    /// <summary>
+    /// Base URL of the signal-daemon HTTP sidecar (e.g. "http://LeanKernel-signal:8080").
+    /// When set, <see cref="SignalRestApiAdapter"/> is used instead of the local
+    /// signal-cli child process, which eliminates config-lock contention.
+    /// </summary>
+    public string DaemonBaseUrl { get; set; } = "";
+}
+
+public sealed class UnstructuredConfig
+{
+    public bool Enabled { get; set; } = true;
+    public string BaseUrl { get; set; } = "http://unstructured:8000";
+    public int TimeoutSeconds { get; set; } = 120;
 }
 
 public sealed class AgentsConfig
