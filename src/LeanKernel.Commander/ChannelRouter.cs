@@ -62,10 +62,27 @@ public sealed class ChannelRouter
         _logger.LogInformation("Message from {Sender} on {Channel}: {Content}",
             message.SenderId, message.ChannelId, Truncate(message.Content, 80));
 
+        IAsyncDisposable typingScope = NoopAsyncDisposable.Instance;
         try
         {
-            var response = await _thinker.ProcessAsync(message, ct);
-            await channel.SendAsync(message.SenderId, response, ct);
+            if (channel is ITypingIndicatorChannel typingChannel)
+            {
+                try
+                {
+                    typingScope = await typingChannel.BeginTypingAsync(message.SenderId, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to start typing indicator for {Channel}/{Recipient}",
+                        message.ChannelId, message.SenderId);
+                }
+            }
+
+            await using (typingScope)
+            {
+                var response = await _thinker.ProcessAsync(message, ct);
+                await channel.SendAsync(message.SenderId, response, ct);
+            }
         }
         catch (Exception ex)
         {

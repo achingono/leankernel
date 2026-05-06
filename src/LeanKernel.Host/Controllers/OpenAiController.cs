@@ -1,10 +1,10 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 using LeanKernel.Host.Services.Auth;
+using LeanKernel.Host.Services;
 
 namespace LeanKernel.Host.Controllers;
 
@@ -37,17 +37,31 @@ public sealed class OpenAiController : ControllerBase
         _logger.LogInformation("OpenAI-compat request: model={Model}, messages={Count}",
             request.Model, request.Messages?.Count ?? 0);
 
-        // Extract the last user message
         var lastUserMessage = request.Messages?
-            .LastOrDefault(m => m.Role == "user")?.Content ?? "";
+            .LastOrDefault(m => m.Role == "user");
+
+        IReadOnlyList<InboundAttachment> attachments;
+        try
+        {
+            attachments = InboundAttachmentInputProcessor.Process(lastUserMessage?.Attachments);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+
+        var formattedPrompt = InboundMessageContentFormatter.FormatContent(
+            lastUserMessage?.Content ?? string.Empty,
+            attachments);
 
         var message = new LeanKernelMessage
         {
             Id = Guid.NewGuid().ToString("N"),
             ChannelId = "openai-api",
             SenderId = request.User ?? "api-client",
-            Content = lastUserMessage,
-            Timestamp = DateTimeOffset.UtcNow
+            Content = formattedPrompt,
+            Timestamp = DateTimeOffset.UtcNow,
+            Metadata = InboundMessageContentFormatter.BuildMetadata("openai-api", attachments)
         };
 
         var response = await _thinker.ProcessAsync(message, ct);
@@ -70,9 +84,9 @@ public sealed class OpenAiController : ControllerBase
             ],
             Usage = new OpenAiUsage
             {
-                PromptTokens = EstimateTokens(lastUserMessage),
+                PromptTokens = EstimateTokens(formattedPrompt),
                 CompletionTokens = EstimateTokens(response),
-                TotalTokens = EstimateTokens(lastUserMessage) + EstimateTokens(response)
+                TotalTokens = EstimateTokens(formattedPrompt) + EstimateTokens(response)
             }
         });
     }
@@ -132,6 +146,9 @@ public sealed class OpenAiMessage
 
     [JsonPropertyName("content")]
     public required string Content { get; init; }
+
+    [JsonPropertyName("attachments")]
+    public List<InboundAttachmentInput>? Attachments { get; init; }
 }
 
 public sealed class OpenAiChatResponse

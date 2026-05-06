@@ -95,4 +95,65 @@ public class ChatControllerTests
         Assert.NotNull(result);
         Assert.True(result is OkObjectResult or AcceptedResult);
     }
+
+    [Fact]
+    public async Task SendMessage_WithAttachments_FormatsPromptContent()
+    {
+        var thinker = Substitute.For<IThinkerService>();
+        thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
+            .Returns("Attachment response");
+
+        var (messageQueue, timeBoundary) = CreateDependencies();
+        var controller = new ChatController(Substitute.For<ISessionStore>(), thinker, messageQueue, timeBoundary);
+
+        var request = new ChatMessageRequest
+        {
+            Content = "Please review these notes.",
+            Attachments =
+            [
+                new InboundAttachmentInput
+                {
+                    FileName = "meeting-notes.md",
+                    ContentType = "text/markdown",
+                    Text = "# Notes\n- Hiring plan"
+                }
+            ]
+        };
+
+        await controller.SendMessage(request, CancellationToken.None);
+
+        await thinker.Received(1).ProcessAsync(
+            Arg.Is<LeanKernelMessage>(message =>
+                message.Content.Contains("Received 1 attachment:")
+                && message.Content.Contains("meeting-notes.md")
+                && message.Metadata["web:attachment_count"] == "1"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SendMessage_InvalidAttachmentBase64_ReturnsBadRequest()
+    {
+        var (messageQueue, timeBoundary) = CreateDependencies();
+        var controller = new ChatController(
+            Substitute.For<ISessionStore>(),
+            Substitute.For<IThinkerService>(),
+            messageQueue,
+            timeBoundary);
+
+        var result = await controller.SendMessage(new ChatMessageRequest
+        {
+            Content = "bad file",
+            Attachments =
+            [
+                new InboundAttachmentInput
+                {
+                    FileName = "notes.txt",
+                    ContentType = "text/plain",
+                    Base64Content = "not-base64"
+                }
+            ]
+        }, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
 }

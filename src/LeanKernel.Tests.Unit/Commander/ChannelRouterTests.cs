@@ -170,6 +170,41 @@ public class ChannelRouterTests
         await ch.Received(1).SendAsync("u1", "AI response", Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task HandleMessage_TypingChannel_StartsAndDisposesTypingScope()
+    {
+        Func<LeanKernelMessage, CancellationToken, Task>? capturedHandler = null;
+        var channel = Substitute.For<IChannel, ITypingIndicatorChannel>();
+        channel.ChannelId.Returns("signal");
+        channel.IsAuthorizedSender(Arg.Any<string>()).Returns(true);
+        channel.When(c => c.OnMessageReceived += Arg.Any<Func<LeanKernelMessage, CancellationToken, Task>>())
+            .Do(ci => capturedHandler = ci.Arg<Func<LeanKernelMessage, CancellationToken, Task>>());
+
+        var typingScope = new TrackingAsyncDisposable();
+        var typingChannel = (ITypingIndicatorChannel)channel;
+        typingChannel.BeginTypingAsync("u1", Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<IAsyncDisposable>(typingScope));
+
+        var thinker = Substitute.For<IThinkerService>();
+        thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
+            .Returns("AI response");
+
+        var router = CreateRouter(thinker, [channel]);
+        await router.StartAsync(CancellationToken.None);
+
+        await capturedHandler!(new LeanKernelMessage
+        {
+            Id = "m1",
+            ChannelId = "signal",
+            SenderId = "u1",
+            Content = "Hello",
+            Timestamp = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+
+        await typingChannel.Received(1).BeginTypingAsync("u1", Arg.Any<CancellationToken>());
+        Assert.True(typingScope.Disposed);
+    }
+
     private static IChannel CreateChannel(string id)
     {
         var channel = Substitute.For<IChannel>();
@@ -195,4 +230,15 @@ public class ChannelRouterTests
 
     private static ChannelRouter CreateRouter(IThinkerService thinker, IEnumerable<IChannel> channels) =>
         new(thinker, channels, NullLogger<ChannelRouter>.Instance);
+
+    private sealed class TrackingAsyncDisposable : IAsyncDisposable
+    {
+        public bool Disposed { get; private set; }
+
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
+        }
+    }
 }

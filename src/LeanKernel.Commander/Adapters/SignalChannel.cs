@@ -10,7 +10,7 @@ namespace LeanKernel.Commander.Adapters;
 /// signal-cli adapter using JSON-RPC mode.
 /// Manages the signal-cli process and translates Signal messages to/from LeanKernelMessage.
 /// </summary>
-public sealed class SignalChannel : IChannel
+public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
 {
     public string ChannelId => "signal";
 
@@ -56,8 +56,8 @@ public sealed class SignalChannel : IChannel
 
         _adapter.OnMessage += msg =>
         {
-            var content = SignalInboundMessageFormatter.FormatContent(msg.Body, msg.Attachments);
-            var metadata = SignalInboundMessageFormatter.BuildMetadata(msg.Attachments);
+            var content = InboundMessageContentFormatter.FormatContent(msg.Body, msg.Attachments);
+            var metadata = InboundMessageContentFormatter.BuildMetadata("signal", msg.Attachments);
             var normalized = MessageNormalizer.Normalize(
                 channelId: "signal",
                 senderId: msg.Sender,
@@ -110,6 +110,22 @@ public sealed class SignalChannel : IChannel
         _logger.LogDebug("Signal message sent to {Recipient}", recipientId);
     }
 
+    public async ValueTask<IAsyncDisposable> BeginTypingAsync(string recipientId, CancellationToken ct)
+    {
+        if (_adapter is null || string.IsNullOrWhiteSpace(recipientId))
+            return NoopAsyncDisposable.Instance;
+
+        try
+        {
+            return await SignalTypingScope.StartAsync(_adapter, recipientId, _logger, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to start Signal typing indicator for {Recipient}", recipientId);
+            return NoopAsyncDisposable.Instance;
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_adapter is not null)
@@ -129,5 +145,97 @@ public sealed class SignalChannel : IChannel
         }
 
         return null;
+    }
+
+    private sealed class SignalTypingScope : IAsyncDisposable
+    {
+        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(10);
+
+        private readonly SignalCliAdapter _adapter;
+        private readonly string _recipientId;
+        private readonly ILogger _logger;
+        private readonly CancellationTokenSource _cts;
+        private Task? _loop;
+        private bool _disposed;
+
+        private SignalTypingScope(
+            SignalCliAdapter adapter,
+            string recipientId,
+            ILogger logger,
+            CancellationTokenSource cts)
+        {
+            _adapter = adapter;
+            _recipientId = recipientId;
+            _logger = logger;
+            _cts = cts;
+        }
+
+        public static async Task<IAsyncDisposable> StartAsync(
+            SignalCliAdapter adapter,
+            string recipientId,
+            ILogger logger,
+            CancellationToken ct)
+        {
+            await adapter.SendTypingAsync(recipientId, stop: false, ct);
+
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var scope = new SignalTypingScope(adapter, recipientId, logger, cts);
+            scope._loop = scope.RunAsync();
+            return scope;
+        }
+
+        private async Task RunAsync()
+        {
+            try
+            {
+                while (!_cts.IsCancellationRequested)
+                {
+                    await Task.Delay(RefreshInterval, _cts.Token);
+                    if (_cts.IsCancellationRequested)
+                        break;
+
+                    await _adapter.SendTypingAsync(_recipientId, stop: false, _cts.Token);
+                }
+            }
+            catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Signal typing refresh failed for {Recipient}", _recipientId);
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            _cts.Cancel();
+
+            try
+            {
+                if (_loop is not null)
+                    await _loop;
+            }
+            catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+            {
+            }
+
+            try
+            {
+                using var stopCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await _adapter.SendTypingAsync(_recipientId, stop: true, stopCts.Token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to stop Signal typing indicator for {Recipient}", _recipientId);
+            }
+            finally
+            {
+                _cts.Dispose();
+            }
+        }
     }
 }

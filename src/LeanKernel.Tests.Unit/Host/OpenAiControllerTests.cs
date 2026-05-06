@@ -6,6 +6,7 @@ using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 using LeanKernel.Host.Controllers;
+using LeanKernel.Host.Services;
 using NSubstitute;
 using Xunit;
 
@@ -117,6 +118,76 @@ public class OpenAiControllerTests
         await thinker.Received(1).ProcessAsync(
             Arg.Is<LeanKernelMessage>(m => m.SenderId == "custom-user"),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ChatCompletions_FormatsAttachmentContent()
+    {
+        var thinker = Substitute.For<IThinkerService>();
+        thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
+            .Returns("ok");
+
+        var controller = new OpenAiController(thinker, NullLogger<OpenAiController>.Instance);
+        var request = new OpenAiChatRequest
+        {
+            Messages =
+            [
+                new OpenAiMessage
+                {
+                    Role = "user",
+                    Content = "Summarize this file.",
+                    Attachments =
+                    [
+                        new InboundAttachmentInput
+                        {
+                            FileName = "summary.txt",
+                            ContentType = "text/plain",
+                            Text = "Alpha\nBeta"
+                        }
+                    ]
+                }
+            ]
+        };
+
+        await controller.ChatCompletions(request, CancellationToken.None);
+
+        await thinker.Received(1).ProcessAsync(
+            Arg.Is<LeanKernelMessage>(message =>
+                message.Content.Contains("Received 1 attachment:")
+                && message.Content.Contains("summary.txt")
+                && message.Metadata["openai-api:attachment_count"] == "1"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ChatCompletions_InvalidAttachmentBase64_ReturnsBadRequest()
+    {
+        var controller = new OpenAiController(
+            Substitute.For<IThinkerService>(),
+            NullLogger<OpenAiController>.Instance);
+
+        var result = await controller.ChatCompletions(new OpenAiChatRequest
+        {
+            Messages =
+            [
+                new OpenAiMessage
+                {
+                    Role = "user",
+                    Content = "test",
+                    Attachments =
+                    [
+                        new InboundAttachmentInput
+                        {
+                            FileName = "broken.txt",
+                            ContentType = "text/plain",
+                            Base64Content = "%%%bad%%%"
+                        }
+                    ]
+                }
+            ]
+        }, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]

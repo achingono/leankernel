@@ -1,5 +1,5 @@
 using System.Text;
-using LeanKernel.Commander.Adapters;
+using LeanKernel.Core.Models;
 
 namespace LeanKernel.Tests.Unit.Commander;
 
@@ -10,7 +10,7 @@ public sealed class SignalAttachmentProcessingTests
     {
         var bytes = Encoding.UTF8.GetBytes("Line one\nLine two");
 
-        var text = SignalAttachmentTextExtractor.TryExtractText("text/plain", "notes.txt", bytes);
+        var text = InboundAttachmentTextExtractor.TryExtractText("text/plain", "notes.txt", bytes);
 
         Assert.Equal("Line one\nLine two", text);
     }
@@ -20,7 +20,7 @@ public sealed class SignalAttachmentProcessingTests
     {
         var bytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x00, 0x01, 0x02, 0x03 };
 
-        var text = SignalAttachmentTextExtractor.TryExtractText("image/png", "diagram.png", bytes);
+        var text = InboundAttachmentTextExtractor.TryExtractText("image/png", "diagram.png", bytes);
 
         Assert.Null(text);
     }
@@ -30,7 +30,7 @@ public sealed class SignalAttachmentProcessingTests
     {
         var attachments = new[]
         {
-            new SignalAttachmentInfo
+            new InboundAttachment
             {
                 Id = "att-1",
                 FileName = "meeting-notes.md",
@@ -38,7 +38,7 @@ public sealed class SignalAttachmentProcessingTests
                 Size = 42,
                 ExtractedText = "# Notes\n- Budget approved"
             },
-            new SignalAttachmentInfo
+            new InboundAttachment
             {
                 Id = "att-2",
                 FileName = "photo.png",
@@ -47,10 +47,10 @@ public sealed class SignalAttachmentProcessingTests
             }
         };
 
-        var content = SignalInboundMessageFormatter.FormatContent(
+        var content = InboundMessageContentFormatter.FormatContent(
             "Here are the notes from my meeting with Phil yesterday.",
             attachments);
-        var metadata = SignalInboundMessageFormatter.BuildMetadata(attachments);
+        var metadata = InboundMessageContentFormatter.BuildMetadata("signal", attachments);
 
         Assert.Contains("Received 2 attachments:", content);
         Assert.Contains("meeting-notes.md", content);

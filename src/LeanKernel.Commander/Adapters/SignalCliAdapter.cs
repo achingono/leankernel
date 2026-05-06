@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using LeanKernel.Core.Models;
 
 namespace LeanKernel.Commander.Adapters;
 
@@ -86,6 +87,19 @@ public sealed class SignalCliAdapter : IAsyncDisposable
             ["recipient"] = new[] { recipient },
             ["message"] = message
         }, ct);
+    }
+
+    public async Task SendTypingAsync(string recipient, bool stop, CancellationToken ct)
+    {
+        var request = new Dictionary<string, object?>
+        {
+            ["recipient"] = recipient
+        };
+
+        if (stop)
+            request["stop"] = true;
+
+        await SendRequestAsync("sendTyping", request, ct);
     }
 
     private async Task<JsonElement> SendRequestAsync(string method, object @params, CancellationToken ct)
@@ -314,7 +328,7 @@ public sealed class SignalCliAdapter : IAsyncDisposable
         };
     }
 
-    private async Task<IReadOnlyList<SignalAttachmentInfo>> ResolveAttachmentsAsync(
+    private async Task<IReadOnlyList<InboundAttachment>> ResolveAttachmentsAsync(
         string sender,
         string? groupId,
         JsonElement dataMessage,
@@ -326,7 +340,7 @@ public sealed class SignalCliAdapter : IAsyncDisposable
             return [];
         }
 
-        var attachments = new List<SignalAttachmentInfo>();
+        var attachments = new List<InboundAttachment>();
         foreach (var attachment in attachmentsElement.EnumerateArray())
         {
             var attachmentId = attachment.TryGetProperty("id", out var idProperty)
@@ -351,7 +365,7 @@ public sealed class SignalCliAdapter : IAsyncDisposable
                 try
                 {
                     var bytes = await GetAttachmentBytesAsync(attachmentId, sender, groupId, ct);
-                    extractedText = SignalAttachmentTextExtractor.TryExtractText(contentType, fileName, bytes);
+                    extractedText = InboundAttachmentTextExtractor.TryExtractText(contentType, fileName, bytes);
                 }
                 catch (Exception ex)
                 {
@@ -362,7 +376,7 @@ public sealed class SignalCliAdapter : IAsyncDisposable
                 }
             }
 
-            attachments.Add(new SignalAttachmentInfo
+            attachments.Add(new InboundAttachment
             {
                 Id = attachmentId ?? string.Empty,
                 FileName = fileName,
@@ -406,18 +420,7 @@ public sealed record SignalInboundMessage
     public required string Sender { get; init; }
     public required string Body { get; init; }
     public long TimestampMs { get; init; }
-    public IReadOnlyList<SignalAttachmentInfo> Attachments { get; init; } = [];
-}
-
-[ExcludeFromCodeCoverage]
-public sealed record SignalAttachmentInfo
-{
-    public required string Id { get; init; }
-    public string? FileName { get; init; }
-    public string? ContentType { get; init; }
-    public long? Size { get; init; }
-    public string? Caption { get; init; }
-    public string? ExtractedText { get; init; }
+    public IReadOnlyList<InboundAttachment> Attachments { get; init; } = [];
 }
 
 [ExcludeFromCodeCoverage]

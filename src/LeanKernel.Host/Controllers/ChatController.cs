@@ -48,13 +48,24 @@ public sealed class ChatController : ControllerBase
         [FromBody] ChatMessageRequest request,
         CancellationToken ct)
     {
+        IReadOnlyList<InboundAttachment> attachments;
+        try
+        {
+            attachments = InboundAttachmentInputProcessor.Process(request.Attachments);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+
         var message = new LeanKernelMessage
         {
             Id = Guid.NewGuid().ToString("N"),
             ChannelId = "web",
             SenderId = request.SenderId ?? "web-user",
-            Content = request.Content,
-            Timestamp = DateTimeOffset.UtcNow
+            Content = InboundMessageContentFormatter.FormatContent(request.Content, attachments),
+            Timestamp = DateTimeOffset.UtcNow,
+            Metadata = InboundMessageContentFormatter.BuildMetadata("web", attachments)
         };
 
         // Check if we're in quiet hours
@@ -129,6 +140,7 @@ public sealed class ChatMessageRequest
     public string? SenderId { get; init; }
     public string? SessionId { get; init; }
     public bool? IsUrgent { get; init; }
+    public List<InboundAttachmentInput>? Attachments { get; init; }
 }
 
 public sealed class ChatMessageResponse
