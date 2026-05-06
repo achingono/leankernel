@@ -19,8 +19,9 @@ public sealed class DynamicSkillTool : ITool
     private readonly IBinaryResolver _binaryResolver;
     private readonly ILogger<DynamicSkillTool> _logger;
 
-    public string Name => _skillDef.Name;
+    public string Name => NormalizeToolName(_skillDef.Name);
     public string Description => _skillDef.Description;
+    public string Category => GetCategory();
     public string ParametersSchema => BuildParametersSchema();
 
     public DynamicSkillTool(
@@ -33,6 +34,27 @@ public sealed class DynamicSkillTool : ITool
         _httpClient = httpClient;
         _binaryResolver = binaryResolver;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Normalize skill tool names by removing the "_skill" suffix.
+    /// Example: "ms-todo_skill" -> "ms-todo"
+    /// </summary>
+    private static string NormalizeToolName(string name)
+    {
+        if (name.EndsWith("_skill", StringComparison.OrdinalIgnoreCase))
+            return name[..^6]; // Remove last 6 characters
+        return name;
+    }
+
+    /// <summary>
+    /// Get the category from skill metadata or use a default.
+    /// </summary>
+    private string GetCategory()
+    {
+        if (_skillDef.Metadata.TryGetValue("category", out var category))
+            return category?.ToString() ?? "general";
+        return "general";
     }
 
     public async Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)

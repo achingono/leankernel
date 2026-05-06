@@ -55,6 +55,7 @@ public class ToolFunctionAdapterTests
     {
         public string Name => name;
         public string Description => description;
+        public string Category => "general";
         public string ParametersSchema => "{}";
 
         public Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct) =>

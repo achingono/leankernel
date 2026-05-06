@@ -13,8 +13,11 @@ public sealed record AgentDefinition
     /// <summary>Maximum token budget this agent can use for context.</summary>
     public int MaxContextTokens { get; init; } = 4_000;
 
-    /// <summary>Tools this agent can access.</summary>
+    /// <summary>Specific tools this agent is allowed to use.</summary>
     public List<string> AllowedTools { get; init; } = [];
+
+    /// <summary>Tool categories this agent is allowed to use.</summary>
+    public List<string> AllowedCategories { get; init; } = [];
 
     /// <summary>Categories of tasks this agent handles.</summary>
     public List<string> Categories { get; init; } = [];

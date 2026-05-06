@@ -1,6 +1,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Interfaces;
+using LeanKernel.Thinker.Agents;
 
 namespace LeanKernel.Thinker;
 
@@ -27,7 +28,18 @@ public sealed class ToolFunctionAdapter
     /// </summary>
     public IReadOnlyList<AITool> BuildTools()
     {
+        return BuildToolsForAgent(null);
+    }
+
+    /// <summary>
+    /// Build tools for a specific agent, enforcing AllowedTools and AllowedCategories constraints.
+    /// </summary>
+    /// <param name="agent">Agent definition containing constraints. If null, returns all tools.</param>
+    /// <returns>Filtered list of tools the agent is allowed to use.</returns>
+    public IReadOnlyList<AITool> BuildToolsForAgent(AgentDefinition? agent)
+    {
         var tools = _registry.Tools.Values
+            .Where(tool => IsToolAllowedForAgent(tool, agent))
             .Select(tool =>
             {
                 var capturedTool = tool;
@@ -45,7 +57,34 @@ public sealed class ToolFunctionAdapter
             .Cast<AITool>()
             .ToList();
 
-        _logger.LogInformation("Built {Count} AI tools from registry", tools.Count);
+        _logger.LogInformation("Built {Count} AI tools{Agent} from registry", 
+            tools.Count, 
+            agent != null ? $" for agent '{agent.Name}'" : "");
+        
         return tools;
+    }
+
+    /// <summary>
+    /// Check if a tool is allowed for an agent based on AllowedTools and AllowedCategories.
+    /// </summary>
+    private bool IsToolAllowedForAgent(ITool tool, AgentDefinition? agent)
+    {
+        if (agent == null)
+            return true; // No agent constraint, allow all tools
+
+        // Check explicit tool name allowlist
+        if (agent.AllowedTools.Count > 0 && agent.AllowedTools.Contains(tool.Name, StringComparer.OrdinalIgnoreCase))
+            return true;
+
+        // Check category-based allowlist
+        if (agent.AllowedCategories.Count > 0 && agent.AllowedCategories.Contains(tool.Category, StringComparer.OrdinalIgnoreCase))
+            return true;
+
+        // If either list is defined and tool doesn't match, disallow
+        if (agent.AllowedTools.Count > 0 || agent.AllowedCategories.Count > 0)
+            return false;
+
+        // If no constraints defined, allow
+        return true;
     }
 }

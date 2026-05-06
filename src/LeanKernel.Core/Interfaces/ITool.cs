@@ -11,6 +11,9 @@ public interface ITool
     string Name { get; }
     string Description { get; }
 
+    /// <summary>Category/domain of this tool (e.g., "scheduling", "search", "code").</summary>
+    string Category { get; }
+
     /// <summary>JSON Schema describing the tool's parameters.</summary>
     string ParametersSchema { get; }
 

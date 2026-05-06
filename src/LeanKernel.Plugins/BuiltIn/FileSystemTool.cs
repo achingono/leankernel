@@ -19,6 +19,7 @@ public sealed class FileSystemTool : ITool
 
     public string Name => "file_read";
     public string Description => "Read a local file from the data directory.";
+    public string Category => ToolCategory.FileSystem.ToString().ToLower();
     public string ParametersSchema => """
         {
           "type": "object",

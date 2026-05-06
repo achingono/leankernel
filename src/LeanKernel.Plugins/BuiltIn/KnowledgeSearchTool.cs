@@ -17,6 +17,7 @@ public sealed class KnowledgeSearchTool : ITool
 
     public string Name => "search_knowledge";
     public string Description => "Search the unified knowledge base (wiki + documents) for relevant content.";
+    public string Category => ToolCategory.Wiki.ToString().ToLower();
     public string ParametersSchema => """
         {
           "type": "object",

@@ -61,7 +61,8 @@ public sealed class ResearchWorker : WorkerAgent
                 Description = "Research and summarize information from the web",
                 SystemPrompt = "You are a research assistant. Search for information and provide concise, factual summaries. Always cite your sources.",
                 MaxContextTokens = 4_000,
-                AllowedTools = ["screenshot_ocr_skill", "doughray_skill", "simplefin_skill"],
+                AllowedTools = ["screenshot_ocr", "doughray", "simplefin"],
+                AllowedCategories = ["research", "information", "search"],
                 Categories = ["research", "information", "search"]
             },
             agentFactory,
@@ -82,7 +83,8 @@ public sealed class CodeWorker : WorkerAgent
                 Description = "Generate, review, and explain code",
                 SystemPrompt = "You are a coding assistant. Write clean, efficient code. Explain your approach briefly. Focus on correctness and readability.",
                 MaxContextTokens = 8_000,
-                AllowedTools = ["screenshot_ocr_skill"],
+                AllowedTools = ["screenshot_ocr"],
+                AllowedCategories = ["code", "programming", "development"],
                 Categories = ["code", "programming", "development"]
             },
             agentFactory,
@@ -103,7 +105,8 @@ public sealed class ScheduleWorker : WorkerAgent
                 Description = "Manage schedules, reminders, and calendar events",
                 SystemPrompt = "You are a scheduling assistant. Help organize time, set reminders, and manage calendar events. Be precise with dates and times.",
                 MaxContextTokens = 2_000,
-                AllowedTools = ["mstodo_skill", "emanate_skill"],
+                AllowedTools = ["mstodo", "emanate"],
+                AllowedCategories = ["schedule", "calendar", "reminder"],
                 Categories = ["schedule", "calendar", "reminder"]
             },
             agentFactory,

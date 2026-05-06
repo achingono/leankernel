@@ -14,6 +14,7 @@ public sealed class WikiQueryTool : ITool
 
     public string Name => "wiki_query";
     public string Description => "Search the 5W1H knowledge wiki for stored facts.";
+    public string Category => ToolCategory.Wiki.ToString().ToLower();
     public string ParametersSchema => """
         {
           "type": "object",

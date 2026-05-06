@@ -19,6 +19,7 @@ public sealed class ReminderTool : ITool
 
     public string Name => "reminder";
     public string Description => "Create a scheduled reminder.";
+    public string Category => ToolCategory.Scheduling.ToString().ToLower();
     public string ParametersSchema => """
         {
           "type": "object",

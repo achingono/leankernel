@@ -19,6 +19,7 @@ public sealed class WebSearchTool : ITool
 
     public string Name => "web_search";
     public string Description => "Search the web for current information.";
+    public string Category => ToolCategory.Information.ToString().ToLower();
     public string ParametersSchema => """
         {
           "type": "object",
