@@ -1,7 +1,76 @@
 ---
 name: simplefin
 description: "Inspect SimpleFin Bridge accounts and transactions with simplefin-cli. Use when the user wants balances, transaction history, or account-level cashflow analysis from linked financial institutions. NOT for moving money, changing bank settings, or anything outside the read-only SimpleFin Bridge dataset."
-metadata: { "emoji": "💸", "homepage": "https://github.com/achingono/simplefin-cli", "requires": { "bins": ["simplefin-cli"] } }
+metadata:
+  emoji: "💸"
+  homepage: "https://github.com/achingono/simplefin-cli"
+  category: financial
+  tags: [finance, accounts, transactions, read-only]
+runtime:
+  type: cli
+  command: simplefin-cli
+  auth:
+    type: none
+  requires:
+    bins:
+      - name: simplefin-cli
+        minVersion: "0.0.2"
+  egress:
+    allowHosts: []
+operations:
+  - id: status
+    summary: "Show CLI configuration and link status."
+    invoke:
+      argv: [status]
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: setup
+    summary: "Exchange SimpleFin setup token for access URL."
+    invoke:
+      argv: [setup]
+      flags:
+        token: null
+    parameters:
+      type: object
+      properties:
+        token:
+          type: string
+          description: "Base64-encoded SimpleFin setup token"
+      required: [token]
+      additionalProperties: false
+  - id: list_accounts
+    summary: "List all linked accounts."
+    invoke:
+      argv: [account, list]
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: list_transactions
+    summary: "List transactions, optionally filtered by account and date range."
+    invoke:
+      argv: [transaction, list]
+      flags:
+        accountId: "--account-id"
+        startDate: "--start-date"
+        endDate: "--end-date"
+    parameters:
+      type: object
+      properties:
+        accountId:
+          type: string
+          description: "Account ID to filter transactions"
+        startDate:
+          type: string
+          format: date
+          description: "Start date (inclusive, ISO 8601)"
+        endDate:
+          type: string
+          format: date
+          description: "End date (exclusive, ISO 8601)"
+      additionalProperties: false
 ---
 
 # SimpleFin Bridge

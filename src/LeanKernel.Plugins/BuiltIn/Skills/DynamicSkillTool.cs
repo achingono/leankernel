@@ -20,15 +20,7 @@ public sealed class DynamicSkillTool : ITool
 
     public string Name => _skillDef.Name;
     public string Description => _skillDef.Description;
-    public string ParametersSchema => _skillDef.ParametersSchema ?? """
-        {
-          "type": "object",
-          "properties": {
-            "operation": { "type": "string", "description": "Operation to perform" }
-          },
-          "required": ["operation"]
-        }
-        """;
+    public string ParametersSchema => BuildParametersSchema();
 
     public DynamicSkillTool(
         SkillDefinition skillDef,
@@ -46,19 +38,30 @@ public sealed class DynamicSkillTool : ITool
 
         try
         {
+            if (_skillDef.Runtime == null)
+                return FailResult(sw, "Skill has no runtime configuration");
+
             using var doc = JsonDocument.Parse(parametersJson);
             var root = doc.RootElement;
-            var operation = root.GetProperty("operation").GetString() ?? "";
 
-            if (!_skillDef.Operations.TryGetValue(operation, out var op))
-                return FailResult(sw, $"Unknown operation '{operation}'. Available: {string.Join(", ", _skillDef.Operations.Keys)}");
+            if (!root.TryGetProperty("operation", out var opProp))
+                return FailResult(sw, "Missing required 'operation' parameter");
 
-            var result = _skillDef.OperationType switch
+            var operationId = opProp.GetString() ?? "";
+            var op = _skillDef.Operations.FirstOrDefault(o => o.Id == operationId);
+
+            if (op == null)
+                return FailResult(sw, $"Unknown operation '{operationId}'. Available: {string.Join(", ", _skillDef.Operations.Select(o => o.Id))}");
+
+            if (op.Invoke == null)
+                return FailResult(sw, $"Operation '{operationId}' has no invoke configuration");
+
+            var result = _skillDef.Runtime.Type switch
             {
                 "http" => await ExecuteHttpOperation(op, root, ct),
                 "cli" => await ExecuteCliOperation(op, root, ct),
                 "composite" => await ExecuteCompositeOperation(op, root, ct),
-                _ => $"Unsupported operation type: {_skillDef.OperationType}"
+                _ => $"Unsupported operation type: {_skillDef.Runtime.Type}"
             };
 
             return new ToolResult
@@ -78,20 +81,21 @@ public sealed class DynamicSkillTool : ITool
 
     private async Task<string> ExecuteHttpOperation(SkillOperation op, JsonElement root, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(_skillDef.BaseUrl) || string.IsNullOrWhiteSpace(op.Endpoint))
-            return "HTTP operation requires BaseUrl and Endpoint";
+        if (_skillDef.Runtime?.BaseUrl == null || op.Invoke?.HttpPath == null)
+            return "HTTP operation requires BaseUrl and httpPath";
 
-        var url = _skillDef.BaseUrl.TrimEnd('/') + "/" + op.Endpoint.TrimStart('/');
+        var url = _skillDef.Runtime.BaseUrl.TrimEnd('/') + op.Invoke.HttpPath;
 
         try
         {
-            HttpResponseMessage response = op.HttpMethod switch
+            var method = op.Invoke.HttpMethod ?? "GET";
+            HttpResponseMessage response = method switch
             {
                 "GET" => await _httpClient.GetAsync(url, ct),
                 "POST" => await _httpClient.PostAsync(url, BuildRequestContent(root), ct),
                 "PATCH" => await _httpClient.PatchAsync(url, BuildRequestContent(root), ct),
                 "DELETE" => await _httpClient.DeleteAsync(url, ct),
-                _ => throw new NotSupportedException($"HTTP method {op.HttpMethod} not supported")
+                _ => throw new NotSupportedException($"HTTP method {method} not supported")
             };
 
             return await response.Content.ReadAsStringAsync(ct);
@@ -104,17 +108,20 @@ public sealed class DynamicSkillTool : ITool
 
     private async Task<string> ExecuteCliOperation(SkillOperation op, JsonElement root, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(_skillDef.CliCommand))
-            return "CLI operation requires CliCommand";
+        if (_skillDef.Runtime?.Command == null)
+            return "CLI operation requires runtime.command";
+
+        if (op.Invoke?.Argv == null || op.Invoke.Argv.Count == 0)
+            return "CLI operation requires invoke.argv";
 
         var args = BuildCliArgs(op, root);
-        return await ExecuteCommand(_skillDef.CliCommand, args, ct);
+        return await ExecuteCommand(_skillDef.Runtime.Command, args, ct);
     }
 
     private async Task<string> ExecuteCompositeOperation(SkillOperation op, JsonElement root, CancellationToken ct)
     {
         // Try HTTP first, then fall back to CLI
-        if (!string.IsNullOrWhiteSpace(_skillDef.BaseUrl))
+        if (_skillDef.Runtime?.BaseUrl != null)
         {
             try
             {
@@ -123,12 +130,12 @@ public sealed class DynamicSkillTool : ITool
             catch { /* fall through to CLI */ }
         }
 
-        if (!string.IsNullOrWhiteSpace(_skillDef.CliCommand))
+        if (_skillDef.Runtime?.Command != null)
         {
             return await ExecuteCliOperation(op, root, ct);
         }
 
-        return "Composite operation requires either BaseUrl or CliCommand";
+        return "Composite operation requires either baseUrl or command";
     }
 
     private static HttpContent BuildRequestContent(JsonElement root)
@@ -139,24 +146,30 @@ public sealed class DynamicSkillTool : ITool
 
     private static string BuildCliArgs(SkillOperation op, JsonElement root)
     {
-        var args = new StringBuilder();
+        var args = new List<string>();
 
-        // Add operation name if present
-        if (!string.IsNullOrWhiteSpace(op.Endpoint))
-            args.Append(op.Endpoint).Append(" ");
+        // Add base argv
+        if (op.Invoke?.Argv != null)
+            args.AddRange(op.Invoke.Argv);
 
-        // Add parameters from JSON
-        foreach (var property in root.EnumerateObject())
+        // Add flags from parameters
+        if (op.Invoke?.Flags != null)
         {
-            if (property.Name != "operation")
+            foreach (var (paramName, flagName) in op.Invoke.Flags)
             {
-                var value = property.Value.GetString();
-                if (!string.IsNullOrWhiteSpace(value))
-                    args.Append($"--{property.Name} \"{value}\" ");
+                if (root.TryGetProperty(paramName, out var value))
+                {
+                    var strValue = value.GetString();
+                    if (!string.IsNullOrWhiteSpace(strValue))
+                    {
+                        args.Add(flagName);
+                        args.Add(strValue);
+                    }
+                }
             }
         }
 
-        return args.ToString().Trim();
+        return string.Join(" ", args);
     }
 
     private async Task<string> ExecuteCommand(string command, string args, CancellationToken ct)
@@ -174,7 +187,8 @@ public sealed class DynamicSkillTool : ITool
         using var process = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start {command}");
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(30));
+        var timeout = _skillDef.Runtime?.TimeoutSeconds ?? 30;
+        cts.CancelAfter(TimeSpan.FromSeconds(timeout));
 
         try
         {
@@ -192,6 +206,38 @@ public sealed class DynamicSkillTool : ITool
             process.Kill();
             return "Command execution timed out";
         }
+    }
+
+    private string BuildParametersSchema()
+    {
+        if (_skillDef.Operations.Count == 0)
+            return """
+                {
+                  "type": "object",
+                  "properties": {
+                    "operation": { "type": "string", "description": "Operation to perform" }
+                  },
+                  "required": ["operation"]
+                }
+                """;
+
+        var operationEnum = _skillDef.Operations.Select(o => o.Id).ToList();
+        var enumJson = string.Join(", ", operationEnum.Select(o => $"\"{o}\""));
+        var operationDesc = string.Join(", ", operationEnum);
+
+        return $$"""
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [{{enumJson}}],
+                  "description": "Operation to perform: {{operationDesc}}"
+                }
+              },
+              "required": ["operation"]
+            }
+            """;
     }
 
     private ToolResult FailResult(Stopwatch sw, string error)

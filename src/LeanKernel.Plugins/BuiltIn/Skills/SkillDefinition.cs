@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LeanKernel.Plugins.BuiltIn.Skills;
 
 /// <summary>
@@ -6,48 +8,89 @@ namespace LeanKernel.Plugins.BuiltIn.Skills;
 /// </summary>
 public sealed record SkillDefinition(
     string Name,
-    string Description,
-    string OperationType)
+    string Description)
 {
-    public string? Category { get; init; }
-    public string? Emoji { get; init; }
-    public string? Homepage { get; init; }
-    public string? BaseUrl { get; init; }
-    public string? CliCommand { get; init; }
-    public string AuthType { get; init; } = "none";
-    public Dictionary<string, SkillOperation> Operations { get; init; } = [];
-    public string? ParametersSchema { get; init; }
-    public List<SkillExample> Examples { get; init; } = [];
     public Dictionary<string, object> Metadata { get; init; } = [];
+    public SkillRuntime? Runtime { get; init; }
+    public List<SkillOperation> Operations { get; init; } = [];
+    public List<SkillExample> Examples { get; init; } = [];
     public string? SourcePath { get; init; }
     public DateTime LoadedAt { get; init; } = DateTime.UtcNow;
+    public List<string> ValidationErrors { get; init; } = [];
+}
+
+/// <summary>
+/// Runtime configuration for a skill.
+/// Defines type (cli/http/composite), command, auth, binary requirements, and egress policy.
+/// </summary>
+public sealed record SkillRuntime(
+    string Type,
+    string? Command = null,
+    string? BaseUrl = null)
+{
+    public SkillAuth Auth { get; init; } = new(Type: "none");
+    public SkillRequires Requires { get; init; } = new();
+    public SkillEgress Egress { get; init; } = new();
+    public Dictionary<string, string>? Env { get; init; }
+    public int? TimeoutSeconds { get; init; }
+}
+
+/// <summary>
+/// Authentication configuration for a skill.
+/// </summary>
+public sealed record SkillAuth(
+    string Type = "none",
+    string? SecretRef = null);
+
+/// <summary>
+/// Binary requirements for a skill.
+/// </summary>
+public sealed record SkillRequires(
+    List<BinaryRequirement>? Bins = null)
+{
+    public List<BinaryRequirement> Bins { get; } = Bins ?? [];
+}
+
+/// <summary>
+/// Specification for a required binary/executable.
+/// </summary>
+public sealed record BinaryRequirement(
+    string Name,
+    string? MinVersion = null,
+    string? ChecksumSha256 = null);
+
+/// <summary>
+/// Egress policy for HTTP skills.
+/// </summary>
+public sealed record SkillEgress(
+    List<string>? AllowHosts = null)
+{
+    public List<string> AllowHosts { get; } = AllowHosts ?? [];
 }
 
 /// <summary>
 /// Represents a single operation within a skill.
+/// Defines how to invoke the operation and what parameters it accepts.
 /// </summary>
-public sealed class SkillOperation
+public sealed record SkillOperation(
+    string Id,
+    string Summary)
 {
-    public required string Name { get; init; }
-    public required string Description { get; init; }
+    public SkillInvoke? Invoke { get; init; }
+    public Dictionary<string, object>? Parameters { get; init; }
+}
 
-    /// <summary>HTTP endpoint or CLI subcommand</summary>
-    public string? Endpoint { get; init; }
-
-    /// <summary>HTTP method (GET, POST, PATCH, DELETE)</summary>
-    public string HttpMethod { get; init; } = "GET";
-
-    /// <summary>Request body template or CLI args</summary>
-    public string? RequestTemplate { get; init; }
-
-    /// <summary>Response transformation or parsing logic</summary>
-    public string? ResponseParser { get; init; }
-
-    /// <summary>Required parameters</summary>
-    public List<string> RequiredParams { get; init; } = [];
-
-    /// <summary>Optional parameters</summary>
-    public List<string> OptionalParams { get; init; } = [];
+/// <summary>
+/// Invocation details for an operation (argv or HTTP endpoint).
+/// </summary>
+public sealed record SkillInvoke(
+    List<string>? Argv = null,
+    Dictionary<string, string>? Flags = null,
+    string? HttpMethod = null,
+    string? HttpPath = null)
+{
+    public List<string> Argv { get; } = Argv ?? [];
+    public Dictionary<string, string> Flags { get; } = Flags ?? [];
 }
 
 /// <summary>

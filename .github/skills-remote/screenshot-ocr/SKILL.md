@@ -2,10 +2,117 @@
 name: screenshot-ocr
 description: "Read and analyze screenshots, PDFs, and images. Use vision models with fallback to PaddleOCR for text extraction when vision models are quota-limited or unavailable."
 metadata:
-  {
-    "emoji": "📸",
-    "requires": { "bins": ["paddleocr"] },
-  }
+  emoji: "📸"
+  category: vision
+  tags: [ocr, vision, images, screenshots, paddleocr]
+runtime:
+  type: cli
+  command: paddleocr
+  auth:
+    type: none
+  requires:
+    bins:
+      - name: paddleocr
+        minVersion: "2.7.0"
+  egress:
+    allowHosts: []
+operations:
+  - id: extract_text
+    summary: "Extract text from an image or screenshot using PaddleOCR."
+    invoke:
+      argv: [extract]
+      flags:
+        image: "--image"
+        lang: "--lang"
+    parameters:
+      type: object
+      properties:
+        image:
+          type: string
+          description: "Path to image or screenshot file"
+        lang:
+          type: string
+          enum: [en, zh, fr, de, es, ja, ko, ar, ru, hi]
+          description: "Language for OCR (default: en)"
+      required: [image]
+      additionalProperties: false
+  - id: extract_with_confidence
+    summary: "Extract text with confidence scores for verification."
+    invoke:
+      argv: [extract, --with-confidence]
+      flags:
+        image: "--image"
+        lang: "--lang"
+        min_confidence: "--min-confidence"
+    parameters:
+      type: object
+      properties:
+        image:
+          type: string
+          description: "Path to image or screenshot file"
+        lang:
+          type: string
+          enum: [en, zh, fr, de, es, ja, ko, ar, ru, hi]
+          description: "Language for OCR (default: en)"
+        min_confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: "Minimum confidence threshold (default 0.0)"
+      required: [image]
+      additionalProperties: false
+  - id: extract_structured
+    summary: "Extract structured text with layout/table detection."
+    invoke:
+      argv: [extract, --structured]
+      flags:
+        image: "--image"
+        lang: "--lang"
+        detect_tables: "--detect-tables"
+    parameters:
+      type: object
+      properties:
+        image:
+          type: string
+          description: "Path to image or screenshot file"
+        lang:
+          type: string
+          enum: [en, zh, fr, de, es, ja, ko, ar, ru, hi]
+          description: "Language for OCR (default: en)"
+        detect_tables:
+          type: boolean
+          description: "Detect and structure tables (default false)"
+      required: [image]
+      additionalProperties: false
+  - id: extract_from_pdf
+    summary: "Extract text from a PDF file, page by page."
+    invoke:
+      argv: [extract-pdf]
+      flags:
+        pdf: "--pdf"
+        lang: "--lang"
+        start_page: "--start-page"
+        end_page: "--end-page"
+    parameters:
+      type: object
+      properties:
+        pdf:
+          type: string
+          description: "Path to PDF file"
+        lang:
+          type: string
+          enum: [en, zh, fr, de, es, ja, ko, ar, ru, hi]
+          description: "Language for OCR (default: en)"
+        start_page:
+          type: integer
+          minimum: 1
+          description: "Start page number (1-indexed)"
+        end_page:
+          type: integer
+          minimum: 1
+          description: "End page number (1-indexed)"
+      required: [pdf]
+      additionalProperties: false
 ---
 
 # Screenshot & Image OCR Strategy

@@ -1,7 +1,164 @@
 ---
 name: doughray
 description: "Doughray personal finance API: read accounts, transactions, holdings, budgets, categories, goals, assets, and reports; trigger SimpleFin syncs; recategorize transactions; create or adjust budgets and savings goals; manage loan details (interest rates, terms, amortization). Use when the user asks for spending analysis, budget vs. actuals, net worth, dashboard summaries, transaction categorization changes, asset/valuation tracking, goal progress, or debt management. NOT for moving money, changing bank credentials, or anything outside this local Postgres-backed dataset."
-metadata: { "emoji": "💰", "homepage": "https://money.emanate.ca" }
+metadata:
+  emoji: "💰"
+  homepage: "https://money.emanate.ca"
+  category: financial
+  tags: [finance, budgets, goals, accounts, transactions]
+runtime:
+  type: http
+  baseUrl: "http://192.168.1.41:3030"
+  auth:
+    type: none
+  requires:
+    bins: []
+  egress:
+    allowHosts:
+      - "192.168.1.41:3030"
+operations:
+  - id: health
+    summary: "Check Doughray API health status."
+    invoke:
+      httpMethod: GET
+      httpPath: "/api/health"
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: dashboard_summary
+    summary: "Get dashboard summary with key financial metrics."
+    invoke:
+      httpMethod: GET
+      httpPath: "/api/dashboard/summary"
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: list_accounts
+    summary: "List all financial accounts."
+    invoke:
+      httpMethod: GET
+      httpPath: "/api/accounts"
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: list_transactions
+    summary: "List transactions with optional filtering."
+    invoke:
+      httpMethod: GET
+      httpPath: "/api/transactions"
+      flags:
+        accountId: "accountId"
+        categoryId: "categoryId"
+        startDate: "startDate"
+        endDate: "endDate"
+        limit: "limit"
+        offset: "offset"
+    parameters:
+      type: object
+      properties:
+        accountId:
+          type: string
+          description: "Filter by account ID"
+        categoryId:
+          type: string
+          description: "Filter by category ID"
+        startDate:
+          type: string
+          format: date
+          description: "Start date (ISO 8601)"
+        endDate:
+          type: string
+          format: date
+          description: "End date (ISO 8601)"
+        limit:
+          type: integer
+          description: "Results limit (default 50)"
+        offset:
+          type: integer
+          description: "Pagination offset (default 0)"
+      additionalProperties: false
+  - id: list_categories
+    summary: "List all transaction categories."
+    invoke:
+      httpMethod: GET
+      httpPath: "/api/categories"
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: list_budgets
+    summary: "List all budgets."
+    invoke:
+      httpMethod: GET
+      httpPath: "/api/budgets"
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: create_budget
+    summary: "Create a new budget for a category."
+    invoke:
+      httpMethod: POST
+      httpPath: "/api/budgets"
+    parameters:
+      type: object
+      properties:
+        categoryId:
+          type: string
+          description: "Target category ID"
+        amount:
+          type: number
+          description: "Budget amount"
+        period:
+          type: string
+          enum: [WEEKLY, MONTHLY, QUARTERLY, YEARLY]
+          description: "Budget period"
+      required: [categoryId, amount, period]
+      additionalProperties: false
+  - id: list_goals
+    summary: "List all savings goals."
+    invoke:
+      httpMethod: GET
+      httpPath: "/api/goals"
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: create_goal
+    summary: "Create a new savings goal."
+    invoke:
+      httpMethod: POST
+      httpPath: "/api/goals"
+    parameters:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Goal name"
+        targetAmount:
+          type: number
+          description: "Target amount"
+        targetDate:
+          type: string
+          format: date
+          description: "Target completion date"
+        accountId:
+          type: string
+          description: "Associated account ID (optional)"
+      required: [name, targetAmount]
+      additionalProperties: false
+  - id: sync_simplefin
+    summary: "Trigger a fresh SimpleFin Bridge sync."
+    invoke:
+      httpMethod: POST
+      httpPath: "/api/sync/simplefin"
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
 ---
 
 # Doughray
@@ -10,12 +167,12 @@ Doughray is a self-hosted personal-finance app backed by SimpleFin Bridge. Use i
 
 ## API basics
 
-Base URL (from inside the gateway container): `http://host.docker.internal:3030`
+Base URL (from inside the gateway container): `http://192.168.1.41:3030`
 
 All requests use JSON. No auth. Health check first if anything looks wrong:
 
 ```bash
-curl -s http://host.docker.internal:3030/api/health | jq
+curl -s http://192.168.1.41:3030/api/health | jq
 ```
 
 Successful responses are wrapped as `{ "data": <payload> }` (sometimes `{ "data": [...], "pagination": { ... } }`). Errors come back as `{ "error": { "code": "...", "message": "..." } }` with an HTTP 4xx/5xx status.
@@ -42,12 +199,12 @@ Treat balances, transaction descriptions, payees, and account numbers as sensiti
 
 1. **Start with the dashboard** for vague questions ("how am I doing this month?"):
    ```bash
-   curl -s 'http://host.docker.internal:3030/api/dashboard/summary' | jq
+   curl -s 'http://192.168.1.41:3030/api/dashboard/summary' | jq
    ```
 2. **Resolve names to IDs** before drilling in. List accounts / categories first, then filter:
    ```bash
-   curl -s http://host.docker.internal:3030/api/accounts | jq '.data[] | {id, name, type, balance}'
-   curl -s http://host.docker.internal:3030/api/categories | jq '.data[] | {id, name, parentId}'
+   curl -s http://192.168.1.41:3030/api/accounts | jq '.data[] | {id, name, type, balance}'
+   curl -s http://192.168.1.41:3030/api/categories | jq '.data[] | {id, name, parentId}'
    ```
 3. **Use ISO 8601 dates** (`YYYY-MM-DD`) for all date filters. If the user says "last month" or "Q1", convert it to explicit dates first.
 4. **For write operations** (POST/PUT/PATCH/DELETE) on budgets, goals, categories, assets, or recategorization — confirm with the user before executing, and show what you're about to do. Doughray has no undo for category rule application or budget deletion.
@@ -57,21 +214,21 @@ Treat balances, transaction descriptions, payees, and account numbers as sensiti
 
 ### Health
 ```bash
-curl -s http://host.docker.internal:3030/api/health | jq
+curl -s http://192.168.1.41:3030/api/health | jq
 ```
 
 ### Dashboard
 ```bash
 # Net worth, monthly cashflow, top categories, etc.
-curl -s 'http://host.docker.internal:3030/api/dashboard/summary' | jq
-curl -s 'http://host.docker.internal:3030/api/dashboard/summary?accountId=<id>' | jq
+curl -s 'http://192.168.1.41:3030/api/dashboard/summary' | jq
+curl -s 'http://192.168.1.41:3030/api/dashboard/summary?accountId=<id>' | jq
 
 # Trend chart data; period is months (number) or "all"
-curl -s 'http://host.docker.internal:3030/api/dashboard/trends?period=6' | jq
-curl -s 'http://host.docker.internal:3030/api/dashboard/trends?period=all&accountId=<id>' | jq
+curl -s 'http://192.168.1.41:3030/api/dashboard/trends?period=6' | jq
+curl -s 'http://192.168.1.41:3030/api/dashboard/trends?period=all&accountId=<id>' | jq
 
 # Spending grouped by category for a date range
-curl -s 'http://host.docker.internal:3030/api/dashboard/spending-by-category?startDate=2026-01-01&endDate=2026-02-01' | jq
+curl -s 'http://192.168.1.41:3030/api/dashboard/spending-by-category?startDate=2026-01-01&endDate=2026-02-01' | jq
 ```
 
 ### Accounts
@@ -79,11 +236,11 @@ curl -s 'http://host.docker.internal:3030/api/dashboard/spending-by-category?sta
 List, read, create, and manage accounts. Liability accounts (CREDIT_CARD, LOAN, MORTGAGE) can be created manually with optional loan details.
 
 ```bash
-curl -s http://host.docker.internal:3030/api/accounts | jq
-curl -s http://host.docker.internal:3030/api/accounts/<id> | jq
+curl -s http://192.168.1.41:3030/api/accounts | jq
+curl -s http://192.168.1.41:3030/api/accounts/<id> | jq
 
 # Create a liability account (CREDIT_CARD, LOAN, or MORTGAGE) with optional loan details
-curl -s -X POST http://host.docker.internal:3030/api/accounts \
+curl -s -X POST http://192.168.1.41:3030/api/accounts \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "TD Mortgage",
@@ -112,17 +269,17 @@ curl -s -X POST http://host.docker.internal:3030/api/accounts \
   }' | jq
 
 # Manual balance update (one of these fields):
-curl -s -X PATCH http://host.docker.internal:3030/api/accounts/<id>/balance \
+curl -s -X PATCH http://192.168.1.41:3030/api/accounts/<id>/balance \
   -H 'Content-Type: application/json' \
   -d '{"balance": 1234.56}' | jq
 
 # Re-link an account to a different institution name
-curl -s -X PATCH http://host.docker.internal:3030/api/accounts/<id>/institution \
+curl -s -X PATCH http://192.168.1.41:3030/api/accounts/<id>/institution \
   -H 'Content-Type: application/json' \
   -d '{"institutionName": "RBC"}' | jq
 
 # Generic patch (rename, hide, etc.)
-curl -s -X PATCH http://host.docker.internal:3030/api/accounts/<id> \
+curl -s -X PATCH http://192.168.1.41:3030/api/accounts/<id> \
   -H 'Content-Type: application/json' \
   -d '{"name": "New nickname"}' | jq
 ```
@@ -135,11 +292,11 @@ Loan details are optional metadata for liability accounts (MORTGAGE, AUTO_LOAN, 
 
 ```bash
 # Read loan details (included in GET /api/accounts/<id> response under .loanDetails)
-curl -s http://host.docker.internal:3030/api/accounts/<id> | jq '.data.loanDetails'
+curl -s http://192.168.1.41:3030/api/accounts/<id> | jq '.data.loanDetails'
 
 # Create or update loan details for an account
 # All fields are optional except loanType
-curl -s -X PATCH http://host.docker.internal:3030/api/accounts/<id>/loan-details \
+curl -s -X PATCH http://192.168.1.41:3030/api/accounts/<id>/loan-details \
   -H 'Content-Type: application/json' \
   -d '{
     "loanType": "MORTGAGE",
@@ -196,10 +353,10 @@ Manage tax-deductible registered account metadata (RRSP, TFSA, RESP, RIF, RDSP).
 
 ```bash
 # Read registered details for an account
-curl -s http://host.docker.internal:3030/api/accounts/<id>/registered-details | jq
+curl -s http://192.168.1.41:3030/api/accounts/<id>/registered-details | jq
 
 # Create or update registered details
-curl -s -X PATCH http://host.docker.internal:3030/api/accounts/<id>/registered-details \
+curl -s -X PATCH http://192.168.1.41:3030/api/accounts/<id>/registered-details \
   -H 'Content-Type: application/json' \
   -d '{
     "registrationType": "RRSP",
@@ -213,7 +370,7 @@ curl -s -X PATCH http://host.docker.internal:3030/api/accounts/<id>/registered-d
   }' | jq
 
 # Example: RESP with beneficiary (beneficiaryName and beneficiaryDateOfBirth required)
-curl -s -X PATCH http://host.docker.internal:3030/api/accounts/<id>/registered-details \
+curl -s -X PATCH http://192.168.1.41:3030/api/accounts/<id>/registered-details \
   -H 'Content-Type: application/json' \
   -d '{
     "registrationType": "RESP",
@@ -251,10 +408,10 @@ Track credit card account metadata: limits, utilization, APR, rewards, annual fe
 
 ```bash
 # Read credit card details for an account
-curl -s http://host.docker.internal:3030/api/accounts/<id>/credit-card-details | jq
+curl -s http://192.168.1.41:3030/api/accounts/<id>/credit-card-details | jq
 
 # Create or update credit card details
-curl -s -X PATCH http://host.docker.internal:3030/api/accounts/<id>/credit-card-details \
+curl -s -X PATCH http://192.168.1.41:3030/api/accounts/<id>/credit-card-details \
   -H 'Content-Type: application/json' \
   -d '{
     "creditLimit": 10000,
@@ -305,29 +462,29 @@ Query parameters: `accountId`, `categoryId`, `startDate`, `endDate`, `search`, `
 
 ```bash
 # List with filters
-curl -s 'http://host.docker.internal:3030/api/transactions?startDate=2026-01-01&endDate=2026-02-01&limit=100' | jq
-curl -s 'http://host.docker.internal:3030/api/transactions?accountId=<id>&categoryId=<id>' | jq
-curl -s 'http://host.docker.internal:3030/api/transactions?search=uber' | jq
+curl -s 'http://192.168.1.41:3030/api/transactions?startDate=2026-01-01&endDate=2026-02-01&limit=100' | jq
+curl -s 'http://192.168.1.41:3030/api/transactions?accountId=<id>&categoryId=<id>' | jq
+curl -s 'http://192.168.1.41:3030/api/transactions?search=uber' | jq
 
 # Distinct categories present in a filtered set (useful for building UIs / summaries)
-curl -s 'http://host.docker.internal:3030/api/transactions/filter-categories?startDate=2026-01-01&endDate=2026-02-01' | jq
+curl -s 'http://192.168.1.41:3030/api/transactions/filter-categories?startDate=2026-01-01&endDate=2026-02-01' | jq
 
 # Edit a single transaction (e.g., fix payee, set memo)
-curl -s -X PATCH http://host.docker.internal:3030/api/transactions/<id> \
+curl -s -X PATCH http://192.168.1.41:3030/api/transactions/<id> \
   -H 'Content-Type: application/json' \
   -d '{"description": "Corrected payee", "categoryId": "<id>"}' | jq
 
 # Preview the impact of a recategorization before applying it
-curl -s 'http://host.docker.internal:3030/api/transactions/<id>/recategorize-preview?scope=all-past-and-future' | jq
+curl -s 'http://192.168.1.41:3030/api/transactions/<id>/recategorize-preview?scope=all-past-and-future' | jq
 
 # Apply a recategorization. scope must be one of:
 #   single-instance | all-past | all-future | all-past-and-future
-curl -s -X POST http://host.docker.internal:3030/api/transactions/<id>/recategorize \
+curl -s -X POST http://192.168.1.41:3030/api/transactions/<id>/recategorize \
   -H 'Content-Type: application/json' \
   -d '{"categoryId": "<id>", "scope": "all-past-and-future"}' | jq
 
 # Bulk import transactions (rare; only if user has a CSV export)
-curl -s -X POST http://host.docker.internal:3030/api/transactions/import \
+curl -s -X POST http://192.168.1.41:3030/api/transactions/import \
   -H 'Content-Type: application/json' \
   -d '{ "transactions": [ ... ] }' | jq
 ```
@@ -336,47 +493,47 @@ curl -s -X POST http://host.docker.internal:3030/api/transactions/import \
 
 ### Categories
 ```bash
-curl -s http://host.docker.internal:3030/api/categories | jq
+curl -s http://192.168.1.41:3030/api/categories | jq
 
-curl -s -X POST http://host.docker.internal:3030/api/categories \
+curl -s -X POST http://192.168.1.41:3030/api/categories \
   -H 'Content-Type: application/json' \
   -d '{"name": "Subscriptions", "icon": "📺", "color": "#7c3aed", "parentId": "<optional-parent-id>"}' | jq
 
-curl -s -X PATCH http://host.docker.internal:3030/api/categories/<id> \
+curl -s -X PATCH http://192.168.1.41:3030/api/categories/<id> \
   -H 'Content-Type: application/json' \
   -d '{"name": "New name"}' | jq
 ```
 
 ### Category rules
 ```bash
-curl -s 'http://host.docker.internal:3030/api/category-rules?page=1&limit=50' | jq
-curl -s -X DELETE http://host.docker.internal:3030/api/category-rules/<id> | jq
+curl -s 'http://192.168.1.41:3030/api/category-rules?page=1&limit=50' | jq
+curl -s -X DELETE http://192.168.1.41:3030/api/category-rules/<id> | jq
 ```
 
 ### Budgets
 `period` ∈ `WEEKLY` | `MONTHLY` | `QUARTERLY` | `YEARLY` (default `MONTHLY`). Dates are ISO strings.
 
 ```bash
-curl -s http://host.docker.internal:3030/api/budgets | jq
+curl -s http://192.168.1.41:3030/api/budgets | jq
 
-curl -s -X POST http://host.docker.internal:3030/api/budgets \
+curl -s -X POST http://192.168.1.41:3030/api/budgets \
   -H 'Content-Type: application/json' \
   -d '{"categoryId": "<id>", "amount": 400, "period": "MONTHLY", "startDate": "2026-01-01"}' | jq
 
-curl -s -X PUT http://host.docker.internal:3030/api/budgets/<id> \
+curl -s -X PUT http://192.168.1.41:3030/api/budgets/<id> \
   -H 'Content-Type: application/json' \
   -d '{"amount": 500}' | jq
 
-curl -s -X DELETE http://host.docker.internal:3030/api/budgets/<id> | jq
+curl -s -X DELETE http://192.168.1.41:3030/api/budgets/<id> | jq
 ```
 
 ### Goals
 ```bash
-curl -s http://host.docker.internal:3030/api/goals | jq
-curl -s 'http://host.docker.internal:3030/api/goals?status=ACTIVE' | jq
-curl -s http://host.docker.internal:3030/api/goals/<id> | jq
+curl -s http://192.168.1.41:3030/api/goals | jq
+curl -s 'http://192.168.1.41:3030/api/goals?status=ACTIVE' | jq
+curl -s http://192.168.1.41:3030/api/goals/<id> | jq
 
-curl -s -X POST http://host.docker.internal:3030/api/goals \
+curl -s -X POST http://192.168.1.41:3030/api/goals \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "Emergency fund",
@@ -386,26 +543,26 @@ curl -s -X POST http://host.docker.internal:3030/api/goals \
     "accountIds": ["<account-id>"]
   }' | jq
 
-curl -s -X PUT http://host.docker.internal:3030/api/goals/<id> \
+curl -s -X PUT http://192.168.1.41:3030/api/goals/<id> \
   -H 'Content-Type: application/json' \
   -d '{"targetAmount": 12000}' | jq
 
 # status ∈ ACTIVE | COMPLETED | PAUSED | CANCELLED
-curl -s -X PATCH http://host.docker.internal:3030/api/goals/<id>/status \
+curl -s -X PATCH http://192.168.1.41:3030/api/goals/<id>/status \
   -H 'Content-Type: application/json' \
   -d '{"status": "COMPLETED"}' | jq
 
-curl -s -X DELETE http://host.docker.internal:3030/api/goals/<id> | jq
+curl -s -X DELETE http://192.168.1.41:3030/api/goals/<id> | jq
 ```
 
 ### Assets
 `type` ∈ `REAL_ESTATE` | `AUTOMOBILE` | `STOCK`. Dates are ISO 8601 datetimes.
 
 ```bash
-curl -s http://host.docker.internal:3030/api/assets | jq
-curl -s http://host.docker.internal:3030/api/assets/<id> | jq
+curl -s http://192.168.1.41:3030/api/assets | jq
+curl -s http://192.168.1.41:3030/api/assets/<id> | jq
 
-curl -s -X POST http://host.docker.internal:3030/api/assets \
+curl -s -X POST http://192.168.1.41:3030/api/assets \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "Primary residence",
@@ -416,47 +573,47 @@ curl -s -X POST http://host.docker.internal:3030/api/assets \
     "address": "..."
   }' | jq
 
-curl -s -X PUT http://host.docker.internal:3030/api/assets/<id> \
+curl -s -X PUT http://192.168.1.41:3030/api/assets/<id> \
   -H 'Content-Type: application/json' \
   -d '{"currentValue": 540000}' | jq
 
 # Append a valuation snapshot (preferred over editing currentValue if you want history)
-curl -s -X POST http://host.docker.internal:3030/api/assets/<id>/valuations \
+curl -s -X POST http://192.168.1.41:3030/api/assets/<id>/valuations \
   -H 'Content-Type: application/json' \
   -d '{"value": 540000, "source": "Zillow estimate"}' | jq
 
-curl -s -X DELETE http://host.docker.internal:3030/api/assets/<id> | jq
+curl -s -X DELETE http://192.168.1.41:3030/api/assets/<id> | jq
 ```
 
 ### Holdings (investment positions)
 ```bash
-curl -s http://host.docker.internal:3030/api/holdings | jq
-curl -s http://host.docker.internal:3030/api/holdings/history | jq
+curl -s http://192.168.1.41:3030/api/holdings | jq
+curl -s http://192.168.1.41:3030/api/holdings/history | jq
 ```
 
 ### Reports (saved expense analyses)
 ```bash
-curl -s 'http://host.docker.internal:3030/api/reports?page=1&limit=10' | jq
-curl -s http://host.docker.internal:3030/api/reports/<id> | jq
+curl -s 'http://192.168.1.41:3030/api/reports?page=1&limit=10' | jq
+curl -s http://192.168.1.41:3030/api/reports/<id> | jq
 
 # Generate a generic report
-curl -s -X POST http://host.docker.internal:3030/api/reports \
+curl -s -X POST http://192.168.1.41:3030/api/reports \
   -H 'Content-Type: application/json' \
   -d '{}' | jq
 
 # Generate an expense-analysis report (LLM-powered narrative)
-curl -s -X POST http://host.docker.internal:3030/api/reports/expense-analysis \
+curl -s -X POST http://192.168.1.41:3030/api/reports/expense-analysis \
   -H 'Content-Type: application/json' \
   -d '{}' | jq
 ```
 
 ### Sync (SimpleFin)
 ```bash
-curl -s http://host.docker.internal:3030/api/sync/status | jq
-curl -s 'http://host.docker.internal:3030/api/sync/history?limit=5' | jq
+curl -s http://192.168.1.41:3030/api/sync/status | jq
+curl -s 'http://192.168.1.41:3030/api/sync/history?limit=5' | jq
 
 # Trigger a pull from SimpleFin Bridge
-curl -s -X POST http://host.docker.internal:3030/api/sync/trigger | jq
+curl -s -X POST http://192.168.1.41:3030/api/sync/trigger | jq
 ```
 
 ## Confirmation rules

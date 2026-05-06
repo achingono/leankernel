@@ -2,11 +2,204 @@
 name: ms-todo
 description: "Manage Microsoft To Do list groups, lists, tasks, attachments, and checklist steps with ms-todo-cli. Use when a user wants you to capture follow-ups, create actionable reminders, review task lists, search tasks by keyword, or complete/update Microsoft To Do items that require their action. NOT for Outlook email, Outlook calendar, or general Microsoft Graph tasks outside To Do."
 metadata:
-  {
-    "emoji": "✅",
-    "homepage": "https://github.com/achingono/ms-todo-cli",
-    "requires": { "bins": ["ms-todo-cli"] },
-  }
+  emoji: "✅"
+  homepage: "https://github.com/achingono/ms-todo-cli"
+  category: productivity
+  tags: [todo, tasks, productivity, lists]
+runtime:
+  type: cli
+  command: ms-todo-cli
+  auth:
+    type: none
+  requires:
+    bins:
+      - name: ms-todo-cli
+        minVersion: "0.0.2"
+  egress:
+    allowHosts: []
+operations:
+  - id: auth_status
+    summary: "Check authentication status."
+    invoke:
+      argv: [auth, status]
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: auth_login
+    summary: "Authenticate with Microsoft (interactive device-code flow)."
+    invoke:
+      argv: [auth, login]
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: capability_probe
+    summary: "Probe feature capabilities for the current tenant."
+    invoke:
+      argv: [capability, probe]
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: group_list
+    summary: "List all list groups."
+    invoke:
+      argv: [group, list]
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: group_create
+    summary: "Create a new list group."
+    invoke:
+      argv: [group, create]
+      flags:
+        name: null
+    parameters:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Name for the new group"
+      required: [name]
+      additionalProperties: false
+  - id: list_list
+    summary: "List all To Do lists."
+    invoke:
+      argv: [list, list]
+    parameters:
+      type: object
+      properties: {}
+      additionalProperties: false
+  - id: list_create
+    summary: "Create a new To Do list."
+    invoke:
+      argv: [list, create]
+      flags:
+        name: null
+    parameters:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Name for the new list"
+      required: [name]
+      additionalProperties: false
+  - id: task_list
+    summary: "List tasks in a To Do list."
+    invoke:
+      argv: [task, list]
+      flags:
+        listId: "--list-id"
+    parameters:
+      type: object
+      properties:
+        listId:
+          type: string
+          description: "List ID to filter tasks"
+      required: [listId]
+      additionalProperties: false
+  - id: task_create
+    summary: "Create a new task."
+    invoke:
+      argv: [task, create]
+      flags:
+        listId: "--list-id"
+        title: "--title"
+        due: "--due"
+        priority: "--priority"
+    parameters:
+      type: object
+      properties:
+        listId:
+          type: string
+          description: "Target list ID"
+        title:
+          type: string
+          description: "Task title"
+        due:
+          type: string
+          format: date-time
+          description: "Due date/time (ISO 8601)"
+        priority:
+          type: string
+          enum: [low, normal, high]
+          description: "Task priority"
+      required: [listId, title]
+      additionalProperties: false
+  - id: task_search
+    summary: "Search for tasks across lists."
+    invoke:
+      argv: [task, search]
+      flags:
+        query: "--query"
+    parameters:
+      type: object
+      properties:
+        query:
+          type: string
+          description: "Search keyword"
+      required: [query]
+      additionalProperties: false
+  - id: task_complete
+    summary: "Mark a task as complete."
+    invoke:
+      argv: [task, complete]
+      flags:
+        taskId: "--task-id"
+        listId: "--list-id"
+    parameters:
+      type: object
+      properties:
+        taskId:
+          type: string
+          description: "Task ID to complete"
+        listId:
+          type: string
+          description: "List ID containing the task"
+      required: [taskId, listId]
+      additionalProperties: false
+  - id: step_list
+    summary: "List checklist steps for a task."
+    invoke:
+      argv: [step, list]
+      flags:
+        taskId: "--task-id"
+        listId: "--list-id"
+    parameters:
+      type: object
+      properties:
+        taskId:
+          type: string
+          description: "Task ID"
+        listId:
+          type: string
+          description: "List ID containing the task"
+      required: [taskId, listId]
+      additionalProperties: false
+  - id: step_create
+    summary: "Create a checklist step for a task."
+    invoke:
+      argv: [step, create]
+      flags:
+        taskId: "--task-id"
+        listId: "--list-id"
+        title: "--title"
+    parameters:
+      type: object
+      properties:
+        taskId:
+          type: string
+          description: "Task ID"
+        listId:
+          type: string
+          description: "List ID containing the task"
+        title:
+          type: string
+          description: "Step title"
+      required: [taskId, listId, title]
+      additionalProperties: false
 ---
 
 # Microsoft To Do
