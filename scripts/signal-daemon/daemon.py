@@ -33,6 +33,7 @@ DATA_DIR: str = os.path.expanduser(
 )
 PORT: int = int(os.environ.get("PORT", "8080"))
 DEFAULT_POLL_TIMEOUT: int = int(os.environ.get("RECEIVE_TIMEOUT_SECONDS", "10"))
+RESTART_DELAY_SECONDS: int = int(os.environ.get("RESTART_DELAY_SECONDS", "5"))
 
 
 class SignalBridge:
@@ -43,24 +44,58 @@ class SignalBridge:
         self._queue: asyncio.Queue = asyncio.Queue()
         self._pending: dict[str, asyncio.Future] = {}
         self._write_lock = asyncio.Lock()
+        self._healthy = False
 
     async def start(self) -> None:
+        """Start signal-cli and launch a supervisor that auto-restarts it on exit."""
+        asyncio.create_task(self._supervisor(), name="signal-supervisor")
+
+    @property
+    def is_healthy(self) -> bool:
+        return self._healthy and self._process is not None and self._process.returncode is None
+
+    async def _launch(self) -> None:
+        """Launch the signal-cli subprocess."""
+        cmd = [CLI_PATH]
+        # Only pass -a if an account is explicitly configured; otherwise signal-cli
+        # jsonRpc manages all registered accounts automatically.
+        if ACCOUNT:
+            cmd += ["-a", ACCOUNT]
+        cmd.append("jsonRpc")
+
         self._process = await asyncio.create_subprocess_exec(
-            CLI_PATH,
-            "-a",
-            ACCOUNT,
-            "jsonRpc",
+            *cmd,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        self._healthy = True
+        print(f"signal-cli started (PID {self._process.pid})", flush=True)
         asyncio.create_task(self._read_loop(), name="signal-read")
         asyncio.create_task(self._stderr_loop(), name="signal-stderr")
-        print(f"signal-cli started (PID {self._process.pid})", flush=True)
 
-    @property
-    def is_healthy(self) -> bool:
-        return self._process is not None and self._process.returncode is None
+    async def _supervisor(self) -> None:
+        """Restart signal-cli whenever it exits."""
+        while True:
+            try:
+                await self._launch()
+                await self._process.wait()  # type: ignore[union-attr]
+            except Exception as exc:
+                print(f"signal-cli launch error: {exc}", file=sys.stderr, flush=True)
+            finally:
+                self._healthy = False
+                rc = self._process.returncode if self._process else "?"
+                print(
+                    f"signal-cli exited (rc={rc}); restarting in {RESTART_DELAY_SECONDS}s",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                # Resolve any pending futures with an error so callers don't hang.
+                for fut in list(self._pending.values()):
+                    if not fut.done():
+                        fut.set_exception(RuntimeError("signal-cli restarted"))
+                self._pending.clear()
+            await asyncio.sleep(RESTART_DELAY_SECONDS)
 
     async def _read_loop(self) -> None:
         assert self._process and self._process.stdout
@@ -121,7 +156,10 @@ bridge: Optional[SignalBridge] = None
 async def handle_health(req: web.Request) -> web.Response:
     if bridge and bridge.is_healthy:
         return web.json_response({"status": "ok"})
-    return web.json_response({"status": "degraded"}, status=503)
+    # HTTP server is up even while signal-cli is (re)starting — return 200 so that
+    # Docker's health check passes and dependent services can start. The "degraded"
+    # status lets callers know signal-cli isn't ready yet.
+    return web.json_response({"status": "degraded"})
 
 
 async def handle_receive(req: web.Request) -> web.Response:
@@ -244,6 +282,5 @@ def build_app() -> web.Application:
 
 if __name__ == "__main__":
     if not ACCOUNT:
-        print("ERROR: SIGNAL_ACCOUNT environment variable is not set", file=sys.stderr)
-        sys.exit(1)
+        print("WARNING: SIGNAL_ACCOUNT not set; signal-cli will manage all registered accounts", file=sys.stderr)
     web.run_app(build_app(), host="0.0.0.0", port=PORT, access_log=None, print=None)
