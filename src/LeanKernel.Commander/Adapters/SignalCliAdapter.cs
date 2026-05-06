@@ -91,15 +91,16 @@ public sealed class SignalCliAdapter : IAsyncDisposable
 
     public async Task SendTypingAsync(string recipient, bool stop, CancellationToken ct)
     {
-        var request = new Dictionary<string, object?>
+        var @params = new Dictionary<string, object?>
         {
             ["recipient"] = recipient
         };
 
         if (stop)
-            request["stop"] = true;
+            @params["stop"] = true;
 
-        await SendRequestAsync("sendTyping", request, ct);
+        // sendTyping is fire-and-forget — send as a notification (no id, no response expected)
+        await SendNotificationAsync("sendTyping", @params, ct);
     }
 
     private async Task<JsonElement> SendRequestAsync(string method, object @params, CancellationToken ct)
@@ -135,6 +136,15 @@ public sealed class SignalCliAdapter : IAsyncDisposable
         }
     }
 
+    private async Task SendNotificationAsync(string method, object @params, CancellationToken ct)
+    {
+        var notification = new JsonRpcNotification { Method = method, Params = @params };
+        var json = JsonSerializer.Serialize(notification);
+        await WriteAsync(json, ct);
+    }
+
+    private static readonly TimeSpan AttachmentFetchTimeout = TimeSpan.FromSeconds(30);
+
     private async Task<byte[]> GetAttachmentBytesAsync(
         string attachmentId,
         string sender,
@@ -151,7 +161,10 @@ public sealed class SignalCliAdapter : IAsyncDisposable
         else
             requestParams["recipient"] = sender;
 
-        var result = await SendRequestAsync("getAttachment", requestParams, ct);
+        using var timeoutCts = new CancellationTokenSource(AttachmentFetchTimeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
+        var result = await SendRequestAsync("getAttachment", requestParams, linkedCts.Token);
         if (result.ValueKind != JsonValueKind.String)
             throw new InvalidOperationException($"Unexpected getAttachment result kind: {result.ValueKind}");
 
@@ -428,6 +441,14 @@ internal sealed record JsonRpcRequest
 {
     public string JsonRpc { get; init; } = "2.0";
     public required string Id { get; init; }
+    public required string Method { get; init; }
+    public required object Params { get; init; }
+}
+
+[ExcludeFromCodeCoverage]
+internal sealed record JsonRpcNotification
+{
+    public string JsonRpc { get; init; } = "2.0";
     public required string Method { get; init; }
     public required object Params { get; init; }
 }
