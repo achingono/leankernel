@@ -13,9 +13,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install signal-cli-native from the official packaging repository
-RUN curl -s https://packaging.gitlab.io/signal-cli/signal-cli-native.gpg | gpg --dearmor -o /usr/share/keyrings/signal-cli-native.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/signal-cli-native.gpg] https://packaging.gitlab.io/signal-cli bookworm main" \
-       > /etc/apt/sources.list.d/signal-cli-native.list \
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://packaging.gitlab.io/signal-cli/gpg.key \
+       | gpg --dearmor -o /etc/apt/keyrings/signal-cli.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/signal-cli.gpg] https://packaging.gitlab.io/signal-cli signalcli main" \
+       > /etc/apt/sources.list.d/signal-cli.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends signal-cli-native \
     && rm -rf /var/lib/apt/lists/*
