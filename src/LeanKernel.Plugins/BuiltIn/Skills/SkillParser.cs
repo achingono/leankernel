@@ -362,9 +362,95 @@ public sealed class SkillParser
         {
             if (op.Invoke == null)
                 errors.Add($"Operation '{op.Id}' missing 'invoke' block");
+            else
+                ValidateOperation(op, errors);
+
+            if (op.Parameters != null)
+                ValidateJsonSchema(op.Id, op.Parameters, errors);
         }
 
+        if (runtime?.Requires.Bins.Count > 0)
+            ValidateBinaryRequirements(runtime.Requires.Bins, errors);
+
         return errors;
+    }
+
+    /// <summary>
+    /// Validate a single operation's structure and flags.
+    /// </summary>
+    private void ValidateOperation(SkillOperation op, List<string> errors)
+    {
+        if (op.Invoke == null)
+            return;
+
+        // For CLI operations, validate argv is not empty
+        if (op.Invoke.Argv.Count == 0)
+            errors.Add($"Operation '{op.Id}' has empty argv for CLI/composite operation");
+
+        // Validate that all flags map to documented parameters
+        if (op.Invoke.Flags.Count > 0 && op.Parameters != null)
+        {
+            var paramProps = ExtractParameterProperties(op.Parameters);
+            foreach (var flagName in op.Invoke.Flags.Keys)
+            {
+                if (!paramProps.Contains(flagName))
+                    errors.Add($"Operation '{op.Id}' flag '{flagName}' not declared in parameters");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extract property names from a JSON Schema object.
+    /// </summary>
+    private HashSet<string> ExtractParameterProperties(Dictionary<string, object> schema)
+    {
+        var props = new HashSet<string>();
+
+        if (schema.TryGetValue("properties", out var propObj) && propObj is Dictionary<string, object> properties)
+        {
+            foreach (var key in properties.Keys)
+                props.Add(key);
+        }
+
+        return props;
+    }
+
+    /// <summary>
+    /// Validate JSON Schema structure.
+    /// </summary>
+    private void ValidateJsonSchema(string operationId, Dictionary<string, object> schema, List<string> errors)
+    {
+        if (!schema.ContainsKey("type"))
+            errors.Add($"Operation '{operationId}' parameters missing 'type' field");
+
+        if (schema.TryGetValue("type", out var typeObj) && typeObj?.ToString() != "object")
+            errors.Add($"Operation '{operationId}' parameters type must be 'object'");
+    }
+
+    /// <summary>
+    /// Validate binary requirements.
+    /// </summary>
+    private void ValidateBinaryRequirements(List<BinaryRequirement> bins, List<string> errors)
+    {
+        foreach (var bin in bins)
+        {
+            if (string.IsNullOrWhiteSpace(bin.Name))
+                errors.Add("Binary requirement missing 'name'");
+
+            if (!string.IsNullOrWhiteSpace(bin.ChecksumSha256) && !IsValidSha256(bin.ChecksumSha256))
+                errors.Add($"Binary '{bin.Name}' has invalid SHA256 checksum format");
+        }
+    }
+
+    /// <summary>
+    /// Check if a string is a valid SHA256 hex string.
+    /// </summary>
+    private bool IsValidSha256(string? hex)
+    {
+        if (string.IsNullOrWhiteSpace(hex))
+            return false;
+
+        return hex.Length == 64 && hex.All(c => "0123456789abcdefABCDEF".Contains(c));
     }
 
     /// <summary>

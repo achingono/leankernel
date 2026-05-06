@@ -13,6 +13,7 @@ public interface ISkillRegistry
     Task<IReadOnlyDictionary<string, SkillDefinition>> GetAllSkillsAsync();
     Task RefreshSkillsAsync();
     Task WatchSkillDirectoryAsync(string directory, CancellationToken ct);
+    List<string> GetQuarantinedSkills();
 }
 
 /// <summary>
@@ -26,6 +27,7 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
     private readonly ILogger<RuntimeSkillRegistry> _logger;
     private readonly HashSet<string> _skillDirectories;
     private const string CACHE_KEY = "skills:all";
+    private const string QUARANTINED_KEY = "skills:quarantined";
     private const int CACHE_DURATION_MINUTES = 60;
 
     public RuntimeSkillRegistry(
@@ -60,9 +62,17 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
         return skills;
     }
 
+    public List<string> GetQuarantinedSkills()
+    {
+        if (_cache.TryGetValue(QUARANTINED_KEY, out List<string>? quarantined))
+            return quarantined ?? [];
+        return [];
+    }
+
     public Task RefreshSkillsAsync()
     {
         _cache.Remove(CACHE_KEY);
+        _cache.Remove(QUARANTINED_KEY);
         return Task.CompletedTask;
     }
 
@@ -102,6 +112,7 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
     private async Task<Dictionary<string, SkillDefinition>> DiscoverSkillsAsync()
     {
         var skills = new Dictionary<string, SkillDefinition>(StringComparer.OrdinalIgnoreCase);
+        var quarantined = new List<string>();
 
         foreach (var directory in _skillDirectories)
         {
@@ -114,18 +125,44 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
                     var definition = await _parser.ParseSkillFileAsync(filePath);
                     if (definition != null && !string.IsNullOrWhiteSpace(definition.Name))
                     {
-                        skills[definition.Name] = definition;
-                        _logger.LogInformation("Loaded skill: {SkillName} from {FilePath}", definition.Name, filePath);
+                        if (definition.ValidationErrors.Count > 0)
+                        {
+                            _logger.LogWarning(
+                                "Skill {SkillName} has validation errors and is quarantined: {Errors}",
+                                definition.Name,
+                                string.Join("; ", definition.ValidationErrors));
+                            quarantined.Add($"{definition.Name}: {string.Join("; ", definition.ValidationErrors)}");
+                        }
+                        else
+                        {
+                            skills[definition.Name] = definition;
+                            _logger.LogInformation("Loaded skill: {SkillName} from {FilePath}", definition.Name, filePath);
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to load skill from {FilePath}", filePath);
+                    _logger.LogError(ex, "Failed to parse skill from {FilePath}", filePath);
+                    var skillName = Path.GetFileName(Path.GetDirectoryName(filePath)) ?? "unknown";
+                    quarantined.Add($"{skillName}: parse error - {ex.Message}");
                 }
             }
         }
 
-        _logger.LogInformation("Discovered {Count} skills", skills.Count);
+        _logger.LogInformation("Discovered {Count} valid skills", skills.Count);
+        if (quarantined.Count > 0)
+        {
+            _logger.LogWarning("Quarantined {Count} invalid skills", quarantined.Count);
+            foreach (var item in quarantined)
+                _logger.LogWarning("  - {QuarantinedSkill}", item);
+
+            var cacheOptions = new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(CACHE_DURATION_MINUTES)
+            };
+            _cache.Set(QUARANTINED_KEY, quarantined, cacheOptions);
+        }
+
         return skills;
     }
 }
