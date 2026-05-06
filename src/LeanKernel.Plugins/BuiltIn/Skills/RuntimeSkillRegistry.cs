@@ -23,6 +23,7 @@ public interface ISkillRegistry
 public sealed class RuntimeSkillRegistry : ISkillRegistry
 {
     private readonly SkillParser _parser;
+    private readonly IBinaryResolver _binaryResolver;
     private readonly IMemoryCache _cache;
     private readonly ILogger<RuntimeSkillRegistry> _logger;
     private readonly HashSet<string> _skillDirectories;
@@ -32,10 +33,12 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
 
     public RuntimeSkillRegistry(
         SkillParser parser,
+        IBinaryResolver binaryResolver,
         IMemoryCache cache,
         ILogger<RuntimeSkillRegistry> logger)
     {
         _parser = parser;
+        _binaryResolver = binaryResolver;
         _cache = cache;
         _logger = logger;
         _skillDirectories = [];
@@ -135,8 +138,20 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
                         }
                         else
                         {
+                            // Check binary availability
+                            var unavailableReason = CheckBinaryAvailability(definition);
+                            if (unavailableReason != null)
+                            {
+                                _logger.LogWarning("Skill {SkillName} is unavailable: {Reason}", definition.Name, unavailableReason);
+                                definition = definition with
+                                {
+                                    IsAvailable = false,
+                                    UnavailableReason = unavailableReason
+                                };
+                            }
+
                             skills[definition.Name] = definition;
-                            _logger.LogInformation("Loaded skill: {SkillName} from {FilePath}", definition.Name, filePath);
+                            _logger.LogInformation("Loaded skill: {SkillName} from {FilePath} (available: {Available})", definition.Name, filePath, definition.IsAvailable);
                         }
                     }
                 }
@@ -149,7 +164,7 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
             }
         }
 
-        _logger.LogInformation("Discovered {Count} valid skills", skills.Count);
+        _logger.LogInformation("Discovered {Count} skills ({Available} available)", skills.Count, skills.Values.Count(s => s.IsAvailable));
         if (quarantined.Count > 0)
         {
             _logger.LogWarning("Quarantined {Count} invalid skills", quarantined.Count);
@@ -164,5 +179,24 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
         }
 
         return skills;
+    }
+
+    /// <summary>
+    /// Check if all required binaries for a skill are available.
+    /// Returns null if all are available, or an error message if not.
+    /// </summary>
+    private string? CheckBinaryAvailability(SkillDefinition definition)
+    {
+        if (definition.Runtime?.Requires.Bins.Count == 0)
+            return null;
+
+        var missingBins = new List<string>();
+        foreach (var bin in definition.Runtime?.Requires.Bins ?? [])
+        {
+            if (!_binaryResolver.IsBinaryAvailable(bin.Name, bin.MinVersion))
+                missingBins.Add($"{bin.Name} (required: {bin.MinVersion ?? "any"})");
+        }
+
+        return missingBins.Count > 0 ? $"Missing binaries: {string.Join(", ", missingBins)}" : null;
     }
 }

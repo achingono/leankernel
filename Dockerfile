@@ -35,6 +35,74 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     signal-cli --version && \
     rm -rf /var/lib/apt/lists/*
 
+# Install skill binaries (Tier 1 - image-managed)
+# Setup directories
+RUN mkdir -p /opt/LeanKernel/tools/ms-todo-cli/0.0.2 && \
+    mkdir -p /opt/LeanKernel/tools/simplefin-cli/0.0.2 && \
+    mkdir -p /opt/LeanKernel/tools/paddleocr/2.7.0 && \
+    mkdir -p /usr/local/bin
+
+# ms-todo-cli v0.0.2
+RUN curl -fsSL -o /tmp/ms-todo-cli.tar.gz \
+    "https://github.com/achingono/ms-todo-cli/releases/download/v0.0.2/ms-todo-cli-ubuntu-latest.tar.gz" && \
+    tar -xzf /tmp/ms-todo-cli.tar.gz -C /opt/LeanKernel/tools/ms-todo-cli/0.0.2 && \
+    cd /opt/LeanKernel/tools/ms-todo-cli/0.0.2 && \
+    npm ci --omit=dev --omit=optional --no-fund --no-audit && \
+    chmod +x /opt/LeanKernel/tools/ms-todo-cli/0.0.2/dist/cli.js && \
+    ln -sf /opt/LeanKernel/tools/ms-todo-cli/0.0.2/dist/cli.js /usr/local/bin/ms-todo-cli && \
+    rm -f /tmp/ms-todo-cli.tar.gz
+
+# simplefin-cli v0.0.2
+RUN curl -fsSL -o /tmp/simplefin-cli.tar.gz \
+    "https://github.com/achingono/simplefin-cli/releases/download/v0.0.2/simplefin-cli-ubuntu-latest.tar.gz" && \
+    tar -xzf /tmp/simplefin-cli.tar.gz -C /opt/LeanKernel/tools/simplefin-cli/0.0.2 && \
+    cd /opt/LeanKernel/tools/simplefin-cli/0.0.2 && \
+    npm ci --omit=dev --omit=optional --no-fund --no-audit && \
+    chmod +x /opt/LeanKernel/tools/simplefin-cli/0.0.2/dist/cli.js && \
+    ln -sf /opt/LeanKernel/tools/simplefin-cli/0.0.2/dist/cli.js /usr/local/bin/simplefin-cli && \
+    rm -f /tmp/simplefin-cli.tar.gz
+
+# paddleocr via pip
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3-pip && \
+    pip install --no-cache-dir paddleocr==2.7.0 paddlepaddle && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf ~/.cache/pip
+
+# Create tools manifest
+RUN cat > /opt/LeanKernel/tools/tools-manifest.json << 'EOF'
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "signal-cli-native",
+      "version": "0.13.x",
+      "path": "/usr/bin/signal-cli",
+      "type": "system"
+    },
+    {
+      "name": "ms-todo-cli",
+      "version": "0.0.2",
+      "path": "/usr/local/bin/ms-todo-cli",
+      "type": "npm"
+    },
+    {
+      "name": "simplefin-cli",
+      "version": "0.0.2",
+      "path": "/usr/local/bin/simplefin-cli",
+      "type": "npm"
+    },
+    {
+      "name": "paddleocr",
+      "version": "2.7.0",
+      "path": "/usr/local/bin/paddleocr",
+      "type": "python",
+      "note": "Available as python module; invoke via: python3 -m paddleocr"
+    }
+  ]
+}
+EOF
+
 # Create non-root user
 RUN useradd -m -s /bin/bash LeanKernel
 USER LeanKernel

@@ -16,6 +16,7 @@ public sealed class DynamicSkillTool : ITool
 {
     private readonly SkillDefinition _skillDef;
     private readonly HttpClient _httpClient;
+    private readonly IBinaryResolver _binaryResolver;
     private readonly ILogger<DynamicSkillTool> _logger;
 
     public string Name => _skillDef.Name;
@@ -25,10 +26,12 @@ public sealed class DynamicSkillTool : ITool
     public DynamicSkillTool(
         SkillDefinition skillDef,
         HttpClient httpClient,
+        IBinaryResolver binaryResolver,
         ILogger<DynamicSkillTool> logger)
     {
         _skillDef = skillDef;
         _httpClient = httpClient;
+        _binaryResolver = binaryResolver;
         _logger = logger;
     }
 
@@ -38,6 +41,9 @@ public sealed class DynamicSkillTool : ITool
 
         try
         {
+            if (!_skillDef.IsAvailable)
+                return FailResult(sw, $"Skill is unavailable: {_skillDef.UnavailableReason ?? "unknown reason"}");
+
             if (_skillDef.Runtime == null)
                 return FailResult(sw, "Skill has no runtime configuration");
 
@@ -114,8 +120,13 @@ public sealed class DynamicSkillTool : ITool
         if (op.Invoke?.Argv == null || op.Invoke.Argv.Count == 0)
             return "CLI operation requires invoke.argv";
 
+        // Resolve binary path
+        var binaryPath = _binaryResolver.ResolveBinary(_skillDef.Runtime.Command);
+        if (binaryPath == null)
+            return $"Binary '{_skillDef.Runtime.Command}' not found (check requires.bins)";
+
         var args = BuildCliArgs(op, root);
-        return await ExecuteCommand(_skillDef.Runtime.Command, args, ct);
+        return await ExecuteCommand(binaryPath, args, ct);
     }
 
     private async Task<string> ExecuteCompositeOperation(SkillOperation op, JsonElement root, CancellationToken ct)

@@ -11,15 +11,18 @@ namespace LeanKernel.Plugins.BuiltIn.Skills;
 public sealed class DynamicSkillToolFactory
 {
     private readonly ISkillRegistry _skillRegistry;
+    private readonly IBinaryResolver _binaryResolver;
     private readonly HttpClient _httpClient;
     private readonly ILoggerFactory _loggerFactory;
 
     public DynamicSkillToolFactory(
         ISkillRegistry skillRegistry,
+        IBinaryResolver binaryResolver,
         HttpClient httpClient,
         ILoggerFactory loggerFactory)
     {
         _skillRegistry = skillRegistry;
+        _binaryResolver = binaryResolver;
         _httpClient = httpClient;
         _loggerFactory = loggerFactory;
     }
@@ -34,11 +37,12 @@ public sealed class DynamicSkillToolFactory
             return null;
 
         var logger = _loggerFactory.CreateLogger<DynamicSkillTool>();
-        return new DynamicSkillTool(skill, _httpClient, logger);
+        return new DynamicSkillTool(skill, _httpClient, _binaryResolver, logger);
     }
 
     /// <summary>
     /// Create all available tools from discovered skills.
+    /// Only creates tools for skills that are available (not quarantined or missing binaries).
     /// </summary>
     public async Task<IReadOnlyList<ITool>> CreateAllToolsAsync()
     {
@@ -47,8 +51,11 @@ public sealed class DynamicSkillToolFactory
 
         foreach (var skillDef in skills.Values)
         {
-            var logger = _loggerFactory.CreateLogger<DynamicSkillTool>();
-            tools.Add(new DynamicSkillTool(skillDef, _httpClient, logger));
+            if (skillDef.IsAvailable)
+            {
+                var logger = _loggerFactory.CreateLogger<DynamicSkillTool>();
+                tools.Add(new DynamicSkillTool(skillDef, _httpClient, _binaryResolver, logger));
+            }
         }
 
         return tools;

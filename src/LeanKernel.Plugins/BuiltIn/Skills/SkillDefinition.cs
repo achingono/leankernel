@@ -17,6 +17,8 @@ public sealed record SkillDefinition(
     public string? SourcePath { get; init; }
     public DateTime LoadedAt { get; init; } = DateTime.UtcNow;
     public List<string> ValidationErrors { get; init; } = [];
+    public bool IsAvailable { get; init; } = true;
+    public string? UnavailableReason { get; init; }
 }
 
 /// <summary>
