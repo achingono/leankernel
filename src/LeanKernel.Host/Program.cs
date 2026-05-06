@@ -141,18 +141,48 @@ try
     builder.Services.AddSingleton<IChannel, SignalChannel>();
     builder.Services.AddSingleton<ChannelRouter>();
 
-    // Plugins
+    // Plugins — Built-in tools
     builder.Services.AddSingleton<ITool, WikiQueryTool>();
     builder.Services.AddSingleton<ITool, KnowledgeSearchTool>();
 
-    // LeanKernel Skills
-    builder.Services.AddSingleton<ITool, EmanateSkillTool>();
-    builder.Services.AddSingleton<ITool, DoughraySkillTool>();
-    builder.Services.AddSingleton<ITool, SimpleFinSkillTool>();
-    builder.Services.AddSingleton<ITool, MsTodoSkillTool>();
-    builder.Services.AddSingleton<ITool, ScreenshotOcrSkillTool>();
+    // LeanKernel Skill System — Runtime skill loading from filesystem
+    builder.Services.AddSingleton<SkillParser>();
+    builder.Services.AddSingleton<ISkillRegistry, RuntimeSkillRegistry>();
+    builder.Services.AddSingleton<DynamicSkillToolFactory>();
 
-    builder.Services.AddSingleton<IToolRegistry, PluginHost>();
+    // Register DynamicPluginHost that wraps IToolRegistry for runtime skill loading
+    builder.Services.AddSingleton(sp =>
+    {
+        var skillRegistry = sp.GetRequiredService<ISkillRegistry>();
+        var factory = sp.GetRequiredService<DynamicSkillToolFactory>();
+        var logger = sp.GetRequiredService<ILogger<DynamicPluginHost>>();
+
+        var skillDirs = builder.Configuration["LeanKernel:Skills:BasePaths"]?.Split(',')
+            ?? [Path.Combine(configuredDataDir, "skills"),
+                Path.Combine(configuredDataDir, "../.github/skills-remote")];
+
+        // Watch for skill file changes (async but fire-and-forget)
+        foreach (var dir in skillDirs.Where(Directory.Exists))
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await ((RuntimeSkillRegistry)skillRegistry).WatchSkillDirectoryAsync(dir, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to watch skill directory: {Directory}", dir);
+                }
+            });
+        }
+
+        var host = new DynamicPluginHost(skillRegistry, factory, logger);
+        _ = host.InitializeAsync(); // Initialize in background
+        return host;
+    });
+
+    builder.Services.AddSingleton<IToolRegistry>(sp => sp.GetRequiredService<DynamicPluginHost>());
 
     // Scheduler
     builder.Services.AddSingleton<IScheduler, CronScheduler>();
