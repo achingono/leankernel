@@ -12,18 +12,15 @@ public sealed class DynamicSkillToolFactory
 {
     private readonly ISkillRegistry _skillRegistry;
     private readonly IBinaryResolver _binaryResolver;
-    private readonly HttpClient _httpClient;
     private readonly ILoggerFactory _loggerFactory;
 
     public DynamicSkillToolFactory(
         ISkillRegistry skillRegistry,
         IBinaryResolver binaryResolver,
-        HttpClient httpClient,
         ILoggerFactory loggerFactory)
     {
         _skillRegistry = skillRegistry;
         _binaryResolver = binaryResolver;
-        _httpClient = httpClient;
         _loggerFactory = loggerFactory;
     }
 
@@ -36,8 +33,9 @@ public sealed class DynamicSkillToolFactory
         if (skill == null)
             return null;
 
+        var httpClient = CreateHttpClientForSkill(skill);
         var logger = _loggerFactory.CreateLogger<DynamicSkillTool>();
-        return new DynamicSkillTool(skill, _httpClient, _binaryResolver, logger);
+        return new DynamicSkillTool(skill, httpClient, _binaryResolver, logger);
     }
 
     /// <summary>
@@ -53,12 +51,28 @@ public sealed class DynamicSkillToolFactory
         {
             if (skillDef.IsAvailable)
             {
+                var httpClient = CreateHttpClientForSkill(skillDef);
                 var logger = _loggerFactory.CreateLogger<DynamicSkillTool>();
-                tools.Add(new DynamicSkillTool(skillDef, _httpClient, _binaryResolver, logger));
+                tools.Add(new DynamicSkillTool(skillDef, httpClient, _binaryResolver, logger));
             }
         }
 
         return tools;
+    }
+
+    /// <summary>
+    /// Create an HttpClient with egress policy for a skill.
+    /// </summary>
+    private static HttpClient CreateHttpClientForSkill(SkillDefinition skill)
+    {
+        var allowHosts = skill.Runtime?.Egress.AllowHosts ?? [];
+        var policy = new SkillEgressPolicy(allowHosts);
+        var handler = new EgressPolicyHandler(policy);
+        var httpClient = new HttpClient(handler, disposeHandler: true)
+        {
+            Timeout = TimeSpan.FromSeconds(skill.Runtime?.TimeoutSeconds ?? 30)
+        };
+        return httpClient;
     }
 }
 

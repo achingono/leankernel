@@ -155,7 +155,7 @@ public sealed class DynamicSkillTool : ITool
         return new StringContent(json, Encoding.UTF8, "application/json");
     }
 
-    private static string BuildCliArgs(SkillOperation op, JsonElement root)
+    private static List<string> BuildCliArgs(SkillOperation op, JsonElement root)
     {
         var args = new List<string>();
 
@@ -180,20 +180,25 @@ public sealed class DynamicSkillTool : ITool
             }
         }
 
-        return string.Join(" ", args);
+        return args;
     }
 
-    private async Task<string> ExecuteCommand(string command, string args, CancellationToken ct)
+    private async Task<string> ExecuteCommand(string command, List<string> args, CancellationToken ct)
     {
+        const int MaxOutputSize = 1024 * 1024; // 1 MiB cap per stream
+
         var psi = new ProcessStartInfo
         {
             FileName = command,
-            Arguments = args,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+
+        // Use ArgumentList to avoid shell injection (.NET 6+)
+        foreach (var arg in args)
+            psi.ArgumentList.Add(arg);
 
         using var process = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start {command}");
 
@@ -203,20 +208,60 @@ public sealed class DynamicSkillTool : ITool
 
         try
         {
-            await process.WaitForExitAsync(cts.Token);
-            if (process.ExitCode != 0)
-            {
-                var error = await process.StandardError.ReadToEndAsync();
-                return $"Command failed with exit code {process.ExitCode}: {error}";
-            }
+            // Read stdout and stderr concurrently to avoid deadlock
+            var stdoutTask = ReadStreamAsync(process.StandardOutput, MaxOutputSize, cts.Token);
+            var stderrTask = ReadStreamAsync(process.StandardError, MaxOutputSize, cts.Token);
 
-            return await process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitAsync(cts.Token);
+
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+
+            if (process.ExitCode != 0)
+                return $"Command failed with exit code {process.ExitCode}: {stderr}";
+
+            return stdout;
         }
         catch (OperationCanceledException)
         {
             process.Kill();
             return "Command execution timed out";
         }
+    }
+
+    /// <summary>
+    /// Read from a stream with size cap to avoid memory exhaustion.
+    /// </summary>
+    private static async Task<string> ReadStreamAsync(StreamReader reader, int maxSize, CancellationToken ct)
+    {
+        var buffer = new char[Math.Min(4096, maxSize)];
+        var result = new StringBuilder(Math.Min(maxSize, 8192));
+        int charsRead;
+
+        try
+        {
+            while ((charsRead = await reader.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                if (result.Length + charsRead > maxSize)
+                {
+                    result.Append(new string(buffer, 0, Math.Min(charsRead, maxSize - result.Length)));
+                    result.Append("\n[OUTPUT TRUNCATED]");
+                    break;
+                }
+
+                result.Append(buffer, 0, charsRead);
+
+                // Check for cancellation
+                if (ct.IsCancellationRequested)
+                    break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Timeout or cancellation
+        }
+
+        return result.ToString();
     }
 
     private string BuildParametersSchema()
