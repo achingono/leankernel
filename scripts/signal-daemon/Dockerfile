@@ -1,8 +1,5 @@
 FROM debian:bookworm-slim
 
-ARG LEANKERNEL_USER=LeanKernel
-ARG LEANKERNEL_UID=1001
-
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -22,13 +19,7 @@ RUN mkdir -p /etc/apt/keyrings \
     && apt-get install -y --no-install-recommends signal-cli-native \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a dedicated user that matches the UID used in LeanKernel-engine so that
-# the shared signal-config Docker volume has consistent ownership.
-RUN useradd -u ${LEANKERNEL_UID} -m -s /bin/bash ${LEANKERNEL_USER}
-
 COPY daemon.py /app/daemon.py
-
-USER ${LEANKERNEL_USER}
 
 EXPOSE 8080
 

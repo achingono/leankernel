@@ -28,8 +28,8 @@ from aiohttp import web
 
 ACCOUNT: str = os.environ.get("SIGNAL_ACCOUNT", "")
 CLI_PATH: str = os.environ.get("SIGNAL_CLI_PATH", "/usr/bin/signal-cli")
-DATA_DIR: str = os.path.expanduser(
-    os.environ.get("SIGNAL_DATA_DIR", "~/.local/share/signal-cli")
+DATA_DIR: str = os.environ.get("SIGNAL_DATA_DIR") or os.path.join(
+    os.path.expanduser("~"), ".local", "share", "signal-cli"
 )
 PORT: int = int(os.environ.get("PORT", "8080"))
 DEFAULT_POLL_TIMEOUT: int = int(os.environ.get("RECEIVE_TIMEOUT_SECONDS", "10"))
@@ -56,7 +56,7 @@ class SignalBridge:
 
     async def _launch(self) -> None:
         """Launch the signal-cli subprocess."""
-        cmd = [CLI_PATH]
+        cmd = [CLI_PATH, "--config", DATA_DIR]
         # Only pass -a if an account is explicitly configured; otherwise signal-cli
         # jsonRpc manages all registered accounts automatically.
         if ACCOUNT:
