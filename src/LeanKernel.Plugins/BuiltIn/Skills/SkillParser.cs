@@ -109,7 +109,12 @@ public sealed class SkillParser
     {
         try
         {
-            var data = _yamlDeserializer.Deserialize<Dictionary<string, object>>(frontmatter);
+            // YamlDotNet deserializes to Dictionary<object, object>, need to normalize to Dictionary<string, object>
+            var rawData = _yamlDeserializer.Deserialize<Dictionary<object, object>>(frontmatter);
+            if (rawData == null)
+                return null;
+
+            var data = NormalizeDictionary(rawData);
             if (data == null)
                 return null;
 
@@ -285,8 +290,8 @@ public sealed class SkillParser
         if (invokeData == null)
             return null;
 
-        var argv = ParseStringList(invokeData["argv"] as IEnumerable);
-        var flags = ParseStringDict(invokeData["flags"] as Dictionary<string, object>);
+        var argv = invokeData.TryGetValue("argv", out var argvData) ? ParseStringList(argvData as IEnumerable) : [];
+        var flags = invokeData.TryGetValue("flags", out var flagsData) ? ParseStringDict(flagsData as Dictionary<string, object>) : [];
         var httpMethod = ExtractString(invokeData, "httpMethod");
         var httpPath = ExtractString(invokeData, "httpPath");
 
@@ -383,8 +388,8 @@ public sealed class SkillParser
         if (op.Invoke == null)
             return;
 
-        // For CLI operations, validate argv is not empty
-        if (op.Invoke.Argv.Count == 0)
+        // For CLI/composite operations (no httpMethod/httpPath), validate argv is not empty
+        if (string.IsNullOrEmpty(op.Invoke.HttpMethod) && op.Invoke.Argv.Count == 0)
             errors.Add($"Operation '{op.Id}' has empty argv for CLI/composite operation");
 
         // Validate that all flags map to documented parameters
@@ -451,6 +456,52 @@ public sealed class SkillParser
             return false;
 
         return hex.Length == 64 && hex.All(c => "0123456789abcdefABCDEF".Contains(c));
+    }
+
+    /// <summary>
+    /// Extract examples from bash code blocks.
+    /// </summary>
+    private static Dictionary<string, object>? NormalizeDictionary(Dictionary<object, object>? dict)
+    {
+        if (dict == null)
+            return null;
+
+        var normalized = new Dictionary<string, object>();
+        foreach (var kvp in dict)
+        {
+            var key = kvp.Key?.ToString() ?? "";
+            if (string.IsNullOrEmpty(key))
+                continue;
+
+            object? value = kvp.Value;
+
+            // Recursively normalize nested dictionaries
+            if (value is Dictionary<object, object> nestedDict)
+            {
+                value = NormalizeDictionary(nestedDict);
+            }
+            // Convert lists of dictionaries
+            else if (value is List<object> list)
+            {
+                var normalizedList = new List<object>();
+                foreach (var item in list)
+                {
+                    if (item is Dictionary<object, object> itemDict)
+                    {
+                        normalizedList.Add(NormalizeDictionary(itemDict) ?? item);
+                    }
+                    else
+                    {
+                        normalizedList.Add(item);
+                    }
+                }
+                value = normalizedList;
+            }
+
+            normalized[key] = value!;
+        }
+
+        return normalized;
     }
 
     /// <summary>
