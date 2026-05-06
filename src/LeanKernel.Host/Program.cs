@@ -20,6 +20,7 @@ using LeanKernel.Host.Services.Channels;
 using LeanKernel.Host.Services.Channels.Adapters;
 using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
+using LeanKernel.Plugins.BuiltIn.OpenclaSkills;
 using LeanKernel.Scheduler;
 using LeanKernel.Thinker;
 using LeanKernel.Thinker.Agents;
@@ -143,6 +144,14 @@ try
     // Plugins
     builder.Services.AddSingleton<ITool, WikiQueryTool>();
     builder.Services.AddSingleton<ITool, KnowledgeSearchTool>();
+
+    // LeanKernel Skills
+    builder.Services.AddSingleton<ITool, EmanateSkillTool>();
+    builder.Services.AddSingleton<ITool, DoughraySkillTool>();
+    builder.Services.AddSingleton<ITool, SimpleFinSkillTool>();
+    builder.Services.AddSingleton<ITool, MsTodoSkillTool>();
+    builder.Services.AddSingleton<ITool, ScreenshotOcrSkillTool>();
+
     builder.Services.AddSingleton<IToolRegistry, PluginHost>();
 
     // Scheduler
