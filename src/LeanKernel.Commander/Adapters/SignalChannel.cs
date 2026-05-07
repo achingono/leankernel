@@ -225,6 +225,7 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
             }
             catch (OperationCanceledException) when (_cts.IsCancellationRequested)
             {
+                _logger.LogDebug("Signal typing refresh cancelled for {Recipient}", _recipientId);
             }
             catch (Exception ex)
             {
@@ -247,6 +248,7 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
             }
             catch (OperationCanceledException) when (_cts.IsCancellationRequested)
             {
+                _logger.LogDebug("Signal typing loop cancelled for {Recipient}", _recipientId);
             }
 
             try

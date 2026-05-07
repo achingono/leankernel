@@ -159,11 +159,7 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
                 ? msgProp.GetString()
                 : null;
 
-            var timestamp = dataMsg.TryGetProperty("timestamp", out var tsProp)
-                ? tsProp.GetInt64()
-                : envelope.TryGetProperty("timestamp", out var envTsProp)
-                    ? envTsProp.GetInt64()
-                    : 0L;
+            var timestamp = GetSignalTimestamp(dataMsg, envelope);
 
             var attachments = await ResolveAttachmentsAsync(source, dataMsg, ct);
 
@@ -257,9 +253,22 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
         if (_receiveLoop is not null)
         {
             try { await _receiveLoop; }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("Signal receive loop cancelled during dispose");
+            }
             catch (Exception ex) { _logger.LogDebug(ex, "Receive loop exit exception during dispose"); }
         }
         _cts?.Dispose();
+    }
+
+    private static long GetSignalTimestamp(JsonElement dataMessage, JsonElement envelope)
+    {
+        if (dataMessage.TryGetProperty("timestamp", out var timestampProperty))
+            return timestampProperty.GetInt64();
+
+        return envelope.TryGetProperty("timestamp", out var envelopeTimestamp)
+            ? envelopeTimestamp.GetInt64()
+            : 0;
     }
 }

@@ -242,8 +242,6 @@ public sealed class SignalCliAdapter : ISignalAdapter
 
     private async Task<byte[]> GetAttachmentBytesAsync(
         string attachmentId,
-        string _,
-        string? __,
         CancellationToken ct)
     {
         var localAttachmentPath = ResolveLocalAttachmentPath(attachmentId);
@@ -339,8 +337,9 @@ public sealed class SignalCliAdapter : ISignalAdapter
                 {
                     process.Kill(entireProcessTree: true);
                 }
-                catch
+                catch (InvalidOperationException ex)
                 {
+                    _logger.LogDebug(ex, "signal-cli fallback process already exited before it could be killed");
                 }
             }
 
@@ -383,7 +382,10 @@ public sealed class SignalCliAdapter : ISignalAdapter
                 ProcessLine(line, ct);
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            _logger.LogDebug("signal-cli output reader cancelled");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error reading signal-cli output");
@@ -418,7 +420,10 @@ public sealed class SignalCliAdapter : ISignalAdapter
                             if (inbound is not null)
                                 OnMessage?.Invoke(inbound);
                         }
-                        catch (OperationCanceledException) { }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                        {
+                            _logger.LogDebug("Signal inbound processing cancelled");
+                        }
                         catch (Exception ex)
                         {
                             _logger.LogWarning(ex, "Failed to process Signal inbound attachment payload");
@@ -494,11 +499,7 @@ public sealed class SignalCliAdapter : ISignalAdapter
         var body = dataMessage.TryGetProperty("message", out var messageProperty)
             ? messageProperty.GetString()
             : null;
-        var timestamp = dataMessage.TryGetProperty("timestamp", out var timestampProperty)
-            ? timestampProperty.GetInt64()
-            : envelope.Value.TryGetProperty("timestamp", out var envelopeTimestamp)
-                ? envelopeTimestamp.GetInt64()
-                : 0;
+        var timestamp = GetSignalTimestamp(dataMessage, envelope.Value);
 
         var groupId = dataMessage.TryGetProperty("groupInfo", out var groupInfo)
             && groupInfo.TryGetProperty("groupId", out var groupIdProperty)
@@ -556,7 +557,7 @@ public sealed class SignalCliAdapter : ISignalAdapter
             {
                 try
                 {
-                    var bytes = await GetAttachmentBytesAsync(attachmentId!, sender, groupId, ct);
+                    var bytes = await GetAttachmentBytesAsync(attachmentId!, ct);
                     extractedText = await _attachmentTextExtractor.ExtractTextAsync(
                         contentType,
                         fileName,
@@ -601,13 +602,26 @@ public sealed class SignalCliAdapter : ISignalAdapter
                 _process.Kill(entireProcessTree: true);
                 await _process.WaitForExitAsync();
             }
-            catch { }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogDebug(ex, "signal-cli process already exited before disposal could kill it");
+            }
         }
 
         _process?.Dispose();
         _cts?.Dispose();
         _writeLock.Dispose();
         _restartLock.Dispose();
+    }
+
+    private static long GetSignalTimestamp(JsonElement dataMessage, JsonElement envelope)
+    {
+        if (dataMessage.TryGetProperty("timestamp", out var timestampProperty))
+            return timestampProperty.GetInt64();
+
+        return envelope.TryGetProperty("timestamp", out var envelopeTimestamp)
+            ? envelopeTimestamp.GetInt64()
+            : 0;
     }
 }
 

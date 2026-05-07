@@ -415,7 +415,8 @@ static bool CanWriteToDirectory(string directoryPath)
     {
         Directory.CreateDirectory(directoryPath);
         var probePath = Path.Combine(directoryPath, $".LeanKernel-write-probe-{Guid.NewGuid():N}");
-        using (File.Create(probePath)) { }
+        using var probe = File.Create(probePath);
+        probe.WriteByte(0);
         File.Delete(probePath);
         return true;
     }
