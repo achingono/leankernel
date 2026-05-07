@@ -68,14 +68,13 @@ public class MessageProcessingBackgroundServiceTests
     [Fact]
     public async Task ExecuteAsync_SkipsProcessingWhenNotInActiveHours()
     {
-        // Create rules with very restrictive active hours (e.g., midnight to 1am)
+        // Create rules with active hours that are closed for the whole day.
         var rules = new EngagementRules
         {
             TimeBoundaries = new TimeBoundaries
             {
                 Timezone = "UTC",
-                ActiveHoursStart = 0,  // Midnight
-                ActiveHoursEnd = 1     // 1 AM (will be outside these hours most of the time)
+                ActiveHoursEnd = 0
             }
         };
         var timeBoundaryLogger = Substitute.For<ILogger<TimeBoundaryService>>();
@@ -107,9 +106,9 @@ public class MessageProcessingBackgroundServiceTests
         await Task.Delay(1000);
         await service.StopAsync(cts.Token);
 
-        // Message should still be pending (not delivered)
-        var readyMessages = await messageQueue.GetReadyMessagesAsync();
-        // May be empty if outside active hours, which is expected
+        var stats = await messageQueue.GetStatsAsync();
+        Assert.Equal(1, stats.PendingMessages);
+        Assert.Equal(0, stats.DeliveredMessages);
     }
 
     [Fact]

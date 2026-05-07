@@ -55,6 +55,9 @@ public class WikiStoreTests : IDisposable
     public async Task DeleteAsync_NonExistent_NoOp()
     {
         await _store.DeleteAsync("who-ghost", CancellationToken.None);
+
+        var result = await _store.GetAsync("who-ghost", CancellationToken.None);
+        Assert.Null(result);
     }
 
     [Fact]

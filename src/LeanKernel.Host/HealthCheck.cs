@@ -25,7 +25,7 @@ public sealed class LeanKernelHealthCheck : IHealthCheck
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
         var config = _getConfig();
         var data = new Dictionary<string, object>
@@ -46,7 +46,7 @@ public sealed class LeanKernelHealthCheck : IHealthCheck
         try
         {
             var testFile = Path.Combine(wikiPath, ".health-check");
-            await File.WriteAllTextAsync(testFile, "ok", ct);
+            await File.WriteAllTextAsync(testFile, "ok", cancellationToken);
             File.Delete(testFile);
         }
         catch (Exception ex)

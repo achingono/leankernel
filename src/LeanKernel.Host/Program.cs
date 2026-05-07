@@ -162,11 +162,10 @@ try
     // Register DynamicPluginHost that wraps IToolRegistry for runtime skill loading
     builder.Services.AddSingleton(sp =>
     {
-        var skillRegistry = sp.GetRequiredService<ISkillRegistry>();
         var factory = sp.GetRequiredService<DynamicSkillToolFactory>();
         var logger = sp.GetRequiredService<ILogger<DynamicPluginHost>>();
 
-        var host = new DynamicPluginHost(skillRegistry, factory, logger);
+        var host = new DynamicPluginHost(factory, logger);
         return host;
     });
 
@@ -450,11 +449,11 @@ public sealed class LeanKernelHostedService : BackgroundService
         _logger = logger;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken ct)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("LeanKernel engine starting...");
         var waitingLogged = false;
-        while (!ct.IsCancellationRequested && !await _onboardingState.IsCompletedAsync(ct))
+        while (!stoppingToken.IsCancellationRequested && !await _onboardingState.IsCompletedAsync(stoppingToken))
         {
             if (!waitingLogged)
             {
@@ -462,29 +461,29 @@ public sealed class LeanKernelHostedService : BackgroundService
                 waitingLogged = true;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         }
 
-        if (ct.IsCancellationRequested)
+        if (stoppingToken.IsCancellationRequested)
             return;
 
         var router = _services.GetRequiredService<ChannelRouter>();
-        await router.StartAsync(ct);
+        await router.StartAsync(stoppingToken);
 
         var taskRunner = _services.GetRequiredService<LeanKernel.Scheduler.ProactiveTaskRunner>();
-        await taskRunner.StartAsync(ct);
+        await taskRunner.StartAsync(stoppingToken);
 
         _logger.LogInformation("LeanKernel engine running. Waiting for messages.");
 
         try
         {
-            await Task.Delay(Timeout.Infinite, ct);
+            await Task.Delay(Timeout.Infinite, stoppingToken);
         }
         catch (OperationCanceledException)
         {
             _logger.LogInformation("LeanKernel engine shutting down...");
         }
 
-        await router.StopAsync(ct);
+        await router.StopAsync(stoppingToken);
     }
 }

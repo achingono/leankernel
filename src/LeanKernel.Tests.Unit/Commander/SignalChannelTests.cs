@@ -36,10 +36,14 @@ public class SignalChannelTests
             CreateExtractor(),
             CreateHttpClientFactory());
 
-        // Should not throw when signal is disabled
-        await channel.StartAsync(CancellationToken.None);
-        await channel.StopAsync(CancellationToken.None);
-        await channel.DisposeAsync();
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            await channel.StartAsync(CancellationToken.None);
+            await channel.StopAsync(CancellationToken.None);
+            await channel.DisposeAsync();
+        });
+
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -55,8 +59,10 @@ public class SignalChannelTests
             CreateExtractor(),
             CreateHttpClientFactory());
 
-        // Without starting, adapter is null — SendAsync should handle gracefully
-        await channel.SendAsync("recipient", "message", CancellationToken.None);
+        var exception = await Record.ExceptionAsync(
+            () => channel.SendAsync("recipient", "message", CancellationToken.None));
+
+        Assert.Null(exception);
     }
 
     [Fact]

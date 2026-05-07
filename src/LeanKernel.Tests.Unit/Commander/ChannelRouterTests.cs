@@ -41,8 +41,10 @@ public class ChannelRouterTests
     {
         var thinker = Substitute.For<IThinkerService>();
         var router = CreateRouter(thinker, []);
-        await router.StartAsync(CancellationToken.None);
-        // No exceptions
+
+        var exception = await Record.ExceptionAsync(() => router.StartAsync(CancellationToken.None));
+
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -90,8 +92,10 @@ public class ChannelRouterTests
             Content = "Hello", Timestamp = DateTimeOffset.UtcNow
         };
 
-        // Should not throw
         await capturedHandler!(msg, CancellationToken.None);
+
+        await ch.DidNotReceiveWithAnyArgs()
+            .SendAsync(default!, default!, default);
     }
 
     [Fact]

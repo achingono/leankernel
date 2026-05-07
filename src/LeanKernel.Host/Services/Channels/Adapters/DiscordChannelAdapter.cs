@@ -235,7 +235,7 @@ public sealed class DiscordChannelAdapter : IMessageChannel
 /// <summary>
 /// Exception thrown when Discord rate limit is hit.
 /// </summary>
-internal sealed class RateLimitedException : Exception
+public sealed class RateLimitedException : Exception
 {
     public int RetryAfterSeconds { get; }
 

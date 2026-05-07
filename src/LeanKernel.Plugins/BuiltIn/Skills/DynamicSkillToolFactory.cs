@@ -82,7 +82,6 @@ public sealed class DynamicSkillToolFactory
 /// </summary>
 public sealed class DynamicPluginHost : IToolRegistry
 {
-    private readonly ISkillRegistry _skillRegistry;
     private readonly DynamicSkillToolFactory _factory;
     private readonly Dictionary<string, ITool> _tools;
     private readonly ILogger<DynamicPluginHost> _logger;
@@ -90,11 +89,9 @@ public sealed class DynamicPluginHost : IToolRegistry
     public IReadOnlyDictionary<string, ITool> Tools => _tools;
 
     public DynamicPluginHost(
-        ISkillRegistry skillRegistry,
         DynamicSkillToolFactory factory,
         ILogger<DynamicPluginHost> logger)
     {
-        _skillRegistry = skillRegistry;
         _factory = factory;
         _logger = logger;
         _tools = new Dictionary<string, ITool>(StringComparer.OrdinalIgnoreCase);

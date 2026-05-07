@@ -36,15 +36,15 @@ public sealed class SkillHostedService : IHostedService
         _skillDirectories = skillDirectories;
     }
 
-    public async Task StartAsync(CancellationToken ct)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting Skill Hosted Service");
 
         // Synchronously initialize skills
-        await InitializeSkillsAsync(ct);
+        await InitializeSkillsAsync(cancellationToken);
 
         // Set up watchers for each skill directory
-        _watcherCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _watcherCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         foreach (var directory in _skillDirectories.Where(Directory.Exists))
         {
             SetupFileWatcher(directory, _watcherCts.Token);
@@ -53,7 +53,7 @@ public sealed class SkillHostedService : IHostedService
         _logger.LogInformation("Skill Hosted Service started successfully");
     }
 
-    public async Task StopAsync(CancellationToken ct)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Stopping Skill Hosted Service");
 

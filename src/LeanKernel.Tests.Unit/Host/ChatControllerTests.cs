@@ -31,7 +31,14 @@ public class ChatControllerTests
 
     private static (MessageQueueService, TimeBoundaryService) CreateDependencies()
     {
-        var rules = new EngagementRules();
+        var rules = new EngagementRules
+        {
+            TimeBoundaries = new TimeBoundaries
+            {
+                ActiveHoursStart = null,
+                ActiveHoursEnd = null
+            }
+        };
         var timeBoundaryLogger = Substitute.For<ILogger<TimeBoundaryService>>();
         var timeBoundary = new TimeBoundaryService(rules, timeBoundaryLogger);
         

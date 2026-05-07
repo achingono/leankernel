@@ -45,29 +45,33 @@ def normalize_filename(filename: str) -> str:
     return filename.replace("\\", "/")
 
 
+def should_skip_file(filename: str) -> bool:
+    return "/LeanKernel.Tests." in filename or "/obj/" in filename or "/bin/" in filename
+
+
+def iter_coverage_lines(report: Path):
+    root = ET.parse(report).getroot()
+    for class_node in root.findall(".//class"):
+        filename = class_node.attrib.get("filename")
+        if not filename:
+            continue
+
+        normalized = normalize_filename(filename)
+        if should_skip_file(normalized):
+            continue
+
+        for line in class_node.findall("./lines/line"):
+            number_text = line.attrib.get("number")
+            if number_text is not None:
+                yield (normalized, int(number_text)), int(line.attrib.get("hits", "0"))
+
+
 def aggregate_coverage(reports: list[Path]) -> tuple[int, int]:
     lines: dict[tuple[str, int], int] = {}
 
     for report in reports:
-        root = ET.parse(report).getroot()
-        for class_node in root.findall(".//class"):
-            filename = class_node.attrib.get("filename")
-            if not filename:
-                continue
-
-            normalized = normalize_filename(filename)
-            if "/LeanKernel.Tests." in normalized or "/obj/" in normalized or "/bin/" in normalized:
-                continue
-
-            for line in class_node.findall("./lines/line"):
-                number_text = line.attrib.get("number")
-                hits_text = line.attrib.get("hits", "0")
-                if number_text is None:
-                    continue
-
-                key = (normalized, int(number_text))
-                hits = int(hits_text)
-                lines[key] = max(lines.get(key, 0), hits)
+        for key, hits in iter_coverage_lines(report):
+            lines[key] = max(lines.get(key, 0), hits)
 
     covered = sum(1 for hits in lines.values() if hits > 0)
     return covered, len(lines)
