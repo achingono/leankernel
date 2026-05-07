@@ -24,6 +24,7 @@ bld/
 project.lock.json
 artifacts/
 **/Properties/launchSettings.json
+**/TestResults/
 
 # NuGet
 **/[Pp]ackages/*
@@ -64,6 +65,13 @@ signal-config/
 # Code coverage
 coverage-results/
 coverage-report/
+*.coverage
+*.coveragexml
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
 
 # Local configuration files
 /data/
