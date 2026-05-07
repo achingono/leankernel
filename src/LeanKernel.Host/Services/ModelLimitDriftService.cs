@@ -33,13 +33,18 @@ public sealed class ModelLimitDriftService : IModelLimitDriftService
         var reportFile = Path.Combine(Path.GetTempPath(), $"LeanKernel-drift-{Guid.NewGuid():N}.json");
         try
         {
-            var psi = new ProcessStartInfo("python3", $"\"{_scriptPath}\" --config \"{_configPath}\" --drift-report \"{reportFile}\"")
+            var psi = new ProcessStartInfo("python3")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            psi.ArgumentList.Add(_scriptPath);
+            psi.ArgumentList.Add("--config");
+            psi.ArgumentList.Add(_configPath);
+            psi.ArgumentList.Add("--drift-report");
+            psi.ArgumentList.Add(reportFile);
 
             using var process = Process.Start(psi);
             if (process is null)
