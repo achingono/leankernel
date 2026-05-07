@@ -38,44 +38,17 @@ public sealed class LogReaderService
     {
         var lines = new List<LogLine>();
         var files = ListLogFiles();
+        var filter = LogSearchFilter.Create(query, level, since);
 
         foreach (var file in files)
         {
             var fullPath = Path.Combine(_logDirectory, file);
-            if (!File.Exists(fullPath)) continue;
+            if (!File.Exists(fullPath))
+                continue;
 
-            var fileLines = await File.ReadAllLinesAsync(fullPath, ct);
-            foreach (var line in fileLines)
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                // Level filter
-                if (!string.IsNullOrEmpty(level))
-                {
-                    var upperLevel = level.ToUpperInvariant();
-                    if (!line.Contains(upperLevel, StringComparison.OrdinalIgnoreCase))
-                        continue;
-                }
-
-                // Query filter
-                if (!string.IsNullOrEmpty(query) &&
-                    !line.Contains(query, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                // Since filter
-                if (!string.IsNullOrEmpty(since) && DateTimeOffset.TryParse(since, out var sinceDate))
-                {
-                    var timestamp = ExtractTimestamp(line);
-                    if (timestamp.HasValue && timestamp.Value < sinceDate)
-                        continue;
-                }
-
-                lines.Add(new LogLine { Content = line, File = file });
-
-                if (lines.Count >= limit) break;
-            }
-
-            if (lines.Count >= limit) break;
+            await AddMatchingLinesAsync(fullPath, file, filter, limit, lines, ct);
+            if (HasReachedLimit(lines, limit))
+                break;
         }
 
         return new LogSearchResult
@@ -84,6 +57,53 @@ public sealed class LogReaderService
             TotalFiles = files.Count
         };
     }
+
+    private static async Task AddMatchingLinesAsync(
+        string fullPath,
+        string file,
+        LogSearchFilter filter,
+        int limit,
+        List<LogLine> results,
+        CancellationToken ct)
+    {
+        var fileLines = await File.ReadAllLinesAsync(fullPath, ct);
+        foreach (var line in fileLines)
+        {
+            if (!ShouldIncludeLine(line, filter))
+                continue;
+
+            results.Add(new LogLine { Content = line, File = file });
+            if (HasReachedLimit(results, limit))
+                break;
+        }
+    }
+
+    private static bool ShouldIncludeLine(string line, LogSearchFilter filter)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+            return false;
+
+        if (!string.IsNullOrEmpty(filter.Level) &&
+            !line.Contains(filter.Level, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (!string.IsNullOrEmpty(filter.Query) &&
+            !line.Contains(filter.Query, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return IsAfterSince(line, filter.Since);
+    }
+
+    private static bool IsAfterSince(string line, DateTimeOffset? since)
+    {
+        if (!since.HasValue)
+            return true;
+
+        var timestamp = ExtractTimestamp(line);
+        return !timestamp.HasValue || timestamp.Value >= since.Value;
+    }
+
+    private static bool HasReachedLimit(List<LogLine> lines, int limit) => lines.Count >= limit;
 
     private static DateTimeOffset? ExtractTimestamp(string line)
     {
@@ -97,6 +117,18 @@ public sealed class LogReaderService
                 return null; // Time-only, can't compare to date
         }
         return null;
+    }
+
+    private sealed record LogSearchFilter(string? Query, string? Level, DateTimeOffset? Since)
+    {
+        public static LogSearchFilter Create(string? query, string? level, string? since)
+        {
+            var parsedSince = DateTimeOffset.TryParse(since, out var sinceDate)
+                ? sinceDate
+                : (DateTimeOffset?)null;
+
+            return new LogSearchFilter(query, level?.ToUpperInvariant(), parsedSince);
+        }
     }
 }
 

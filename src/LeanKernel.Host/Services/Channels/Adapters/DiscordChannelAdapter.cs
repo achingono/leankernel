@@ -74,14 +74,6 @@ public sealed class DiscordChannelAdapter : IMessageChannel
                 retryable: true,
                 TimeSpan.FromSeconds(BaseRetryDelaySeconds * 2));
         }
-        catch (RateLimitedException rle)
-        {
-            return ChannelDeliveryResult.Failed(
-                Name,
-                $"Rate limited: {rle.Message}",
-                retryable: true,
-                TimeSpan.FromSeconds(rle.RetryAfterSeconds));
-        }
         catch (HttpRequestException ex)
         {
             return ChannelDeliveryResult.Failed(
@@ -108,21 +100,36 @@ public sealed class DiscordChannelAdapter : IMessageChannel
         {
             try
             {
-                var messageId = await SendDirectAsync(content, ct);
+                var result = await SendDirectAsync(content, ct);
+                if (result.RetryAfterSeconds is { } retryAfterSeconds)
+                {
+                    if (attempt < MaxRetries - 1)
+                    {
+                        _logger.LogWarning(
+                            "Discord rate limited, retrying in {Delay}s",
+                            retryAfterSeconds);
+
+                        await Task.Delay(TimeSpan.FromSeconds(retryAfterSeconds), ct);
+                        continue;
+                    }
+
+                    _logger.LogError(
+                        "Discord rate limited and exhausted retries. Retry after: {Delay}s",
+                        retryAfterSeconds);
+
+                    return ChannelDeliveryResult.Failed(
+                        Name,
+                        $"Rate limited: Rate limited, retry after {retryAfterSeconds}s",
+                        retryable: true,
+                        TimeSpan.FromSeconds(retryAfterSeconds));
+                }
+
                 _logger.LogInformation(
                     "Successfully sent Discord message (ID: {MessageId}, attempt: {Attempt})",
-                    messageId,
+                    result.MessageId,
                     attempt + 1);
 
-                return ChannelDeliveryResult.Successful(Name, messageId);
-            }
-            catch (RateLimitedException rle) when (attempt < MaxRetries - 1)
-            {
-                _logger.LogWarning(
-                    "Discord rate limited, retrying in {Delay}s",
-                    rle.RetryAfterSeconds);
-
-                await Task.Delay(TimeSpan.FromSeconds(rle.RetryAfterSeconds), ct);
+                return ChannelDeliveryResult.Successful(Name, result.MessageId!);
             }
             catch (HttpRequestException ex) when (attempt < MaxRetries - 1)
             {
@@ -134,13 +141,6 @@ public sealed class DiscordChannelAdapter : IMessageChannel
                     delay);
 
                 await Task.Delay(TimeSpan.FromSeconds(delay), ct);
-            }
-            catch (RateLimitedException rle)
-            {
-                _logger.LogError(
-                    "Discord rate limited and exhausted retries. Retry after: {Delay}s",
-                    rle.RetryAfterSeconds);
-                throw;
             }
             catch (HttpRequestException ex)
             {
@@ -155,7 +155,7 @@ public sealed class DiscordChannelAdapter : IMessageChannel
         throw new InvalidOperationException("Message delivery retry logic failed");
     }
 
-    private async Task<string> SendDirectAsync(string content, CancellationToken ct)
+    private async Task<DiscordSendResult> SendDirectAsync(string content, CancellationToken ct)
     {
         var url = $"{DiscordApiBase}/channels/{_channelId}/messages";
         var payload = new
@@ -178,7 +178,7 @@ public sealed class DiscordChannelAdapter : IMessageChannel
         if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
         {
             var retryAfter = ExtractRetryAfter(response.Headers);
-            throw new RateLimitedException(retryAfter);
+            return DiscordSendResult.RateLimited(retryAfter);
         }
 
         if (!response.IsSuccessStatusCode)
@@ -189,7 +189,7 @@ public sealed class DiscordChannelAdapter : IMessageChannel
         }
 
         var responseContent = await response.Content.ReadAsStringAsync(ct);
-        return ExtractMessageId(responseContent);
+        return DiscordSendResult.Successful(ExtractMessageId(responseContent));
     }
 
     private static int ExtractRetryAfter(System.Net.Http.Headers.HttpResponseHeaders headers)
@@ -230,14 +230,10 @@ public sealed class DiscordChannelAdapter : IMessageChannel
         return Guid.NewGuid().ToString();
     }
 
-    public sealed class RateLimitedException : Exception
+    private sealed record DiscordSendResult(string? MessageId, int? RetryAfterSeconds)
     {
-        public int RetryAfterSeconds { get; }
+        public static DiscordSendResult Successful(string messageId) => new(messageId, null);
 
-        public RateLimitedException(int retryAfterSeconds)
-            : base($"Rate limited, retry after {retryAfterSeconds}s")
-        {
-            RetryAfterSeconds = retryAfterSeconds;
-        }
+        public static DiscordSendResult RateLimited(int retryAfterSeconds) => new(null, retryAfterSeconds);
     }
 }

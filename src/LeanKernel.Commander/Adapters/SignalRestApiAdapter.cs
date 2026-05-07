@@ -196,45 +196,57 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
 
         foreach (var att in attArr.EnumerateArray())
         {
-            var id = att.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
-            var contentType = att.TryGetProperty("contentType", out var ctProp) ? ctProp.GetString() : null;
-            var fileName = att.TryGetProperty("filename", out var fnProp) ? fnProp.GetString() : null;
-            var caption = att.TryGetProperty("caption", out var capProp) ? capProp.GetString() : null;
-            var size = att.TryGetProperty("size", out var szProp) && szProp.TryGetInt64(out var sz)
-                ? sz
-                : (long?)null;
-
-            if (string.IsNullOrWhiteSpace(id))
+            if (!TryReadAttachmentMetadata(att, out var metadata))
                 continue;
 
-            string? extractedText = null;
-
-            if (_attachmentTextExtractor.CanExtractText(contentType, fileName))
-            {
-                try
-                {
-                    var bytes = await DownloadAttachmentAsync(id, ct);
-                    extractedText = await _attachmentTextExtractor.ExtractTextAsync(
-                        contentType, fileName, bytes, ct);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to download/extract attachment {Id} from {Sender}", id, sender);
-                }
-            }
+            var extractedText = await TryExtractAttachmentTextAsync(metadata, sender, ct);
 
             results.Add(new InboundAttachment
             {
-                Id = id,
-                ContentType = contentType,
-                FileName = fileName,
-                Caption = caption,
-                Size = size,
+                Id = metadata.Id,
+                ContentType = metadata.ContentType,
+                FileName = metadata.FileName,
+                Caption = metadata.Caption,
+                Size = metadata.Size,
                 ExtractedText = extractedText
             });
         }
 
         return results;
+    }
+
+    private static bool TryReadAttachmentMetadata(JsonElement attachment, out AttachmentMetadata metadata)
+    {
+        var id = attachment.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+        metadata = new AttachmentMetadata(
+            Id: id ?? string.Empty,
+            ContentType: attachment.TryGetProperty("contentType", out var ctProp) ? ctProp.GetString() : null,
+            FileName: attachment.TryGetProperty("filename", out var fnProp) ? fnProp.GetString() : null,
+            Caption: attachment.TryGetProperty("caption", out var capProp) ? capProp.GetString() : null,
+            Size: attachment.TryGetProperty("size", out var szProp) && szProp.TryGetInt64(out var sz) ? sz : null);
+
+        return !string.IsNullOrWhiteSpace(id);
+    }
+
+    private async Task<string?> TryExtractAttachmentTextAsync(
+        AttachmentMetadata metadata,
+        string sender,
+        CancellationToken ct)
+    {
+        if (!_attachmentTextExtractor.CanExtractText(metadata.ContentType, metadata.FileName))
+            return null;
+
+        try
+        {
+            var bytes = await DownloadAttachmentAsync(metadata.Id, ct);
+            return await _attachmentTextExtractor.ExtractTextAsync(
+                metadata.ContentType, metadata.FileName, bytes, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to download/extract attachment {Id} from {Sender}", metadata.Id, sender);
+            return null;
+        }
     }
 
     private async Task<byte[]> DownloadAttachmentAsync(string attachmentId, CancellationToken ct)
@@ -271,4 +283,11 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
             ? envelopeTimestamp.GetInt64()
             : 0;
     }
+
+    private sealed record AttachmentMetadata(
+        string Id,
+        string? ContentType,
+        string? FileName,
+        string? Caption,
+        long? Size);
 }

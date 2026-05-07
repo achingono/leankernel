@@ -10,6 +10,35 @@ using LeanKernel.Core.Models;
 namespace LeanKernel.Thinker.Routing;
 
 /// <summary>
+/// Aggregates collaborators used by the model routing service.
+/// </summary>
+public sealed class ModelRoutingDependencies
+{
+    public ModelRoutingDependencies(
+        TaskComplexityScorer scorer,
+        PolicyModelSelector selector,
+        ResponseQualityGate qualityGate,
+        ProviderHealthTracker healthTracker,
+        SpendGuard spendGuard,
+        AgentFactory agentFactory)
+    {
+        Scorer = scorer;
+        Selector = selector;
+        QualityGate = qualityGate;
+        HealthTracker = healthTracker;
+        SpendGuard = spendGuard;
+        AgentFactory = agentFactory;
+    }
+
+    public TaskComplexityScorer Scorer { get; }
+    public PolicyModelSelector Selector { get; }
+    public ResponseQualityGate QualityGate { get; }
+    public ProviderHealthTracker HealthTracker { get; }
+    public SpendGuard SpendGuard { get; }
+    public AgentFactory AgentFactory { get; }
+}
+
+/// <summary>
 /// Orchestrates intelligent model selection, invocation, quality checking,
 /// and escalation for a single request (FR-1 through FR-8).
 /// </summary>
@@ -25,21 +54,16 @@ public sealed class ModelRoutingService
     private readonly ILogger<ModelRoutingService> _logger;
 
     public ModelRoutingService(
-        TaskComplexityScorer scorer,
-        PolicyModelSelector selector,
-        ResponseQualityGate qualityGate,
-        ProviderHealthTracker healthTracker,
-        SpendGuard spendGuard,
-        AgentFactory agentFactory,
+        ModelRoutingDependencies dependencies,
         IOptions<LeanKernelConfig> config,
         ILogger<ModelRoutingService> logger)
     {
-        _scorer = scorer;
-        _selector = selector;
-        _qualityGate = qualityGate;
-        _healthTracker = healthTracker;
-        _spendGuard = spendGuard;
-        _agentFactory = agentFactory;
+        _scorer = dependencies.Scorer;
+        _selector = dependencies.Selector;
+        _qualityGate = dependencies.QualityGate;
+        _healthTracker = dependencies.HealthTracker;
+        _spendGuard = dependencies.SpendGuard;
+        _agentFactory = dependencies.AgentFactory;
         _config = config.Value.Routing;
         _logger = logger;
     }
@@ -79,21 +103,8 @@ public sealed class ModelRoutingService
 
         foreach (var candidate in candidates)
         {
-            if (attemptCount >= _config.MaxProviderAttempts)
-            {
-                _logger.LogWarning(
-                    "Routing [{RequestId}]: max attempts ({Max}) reached",
-                    requestId, _config.MaxProviderAttempts);
+            if (ShouldStopRouting(attemptCount, budgetDeadline, requestId))
                 break;
-            }
-
-            if (DateTimeOffset.UtcNow >= budgetDeadline)
-            {
-                _logger.LogWarning(
-                    "Routing [{RequestId}]: selection time budget exhausted",
-                    requestId);
-                break;
-            }
 
             if (_healthTracker.IsOnCooldown(candidate.Alias))
             {
@@ -107,37 +118,20 @@ public sealed class ModelRoutingService
             attemptCount++;
             fallbackPath.Add(candidate.Alias);
 
-            _logger.LogDebug(
-                "Routing [{RequestId}]: attempt {Attempt} via alias '{Alias}' (tier={Tier}, paid={Paid})",
-                requestId, attemptCount, candidate.Alias, candidate.Tier, candidate.IsPaid);
-
-            string? response = null;
-            try
+            LogCandidateAttempt(requestId, attemptCount, candidate);
+            var attempt = await InvokeCandidateSafelyAsync(candidate, requestId, systemInstructions, tools, prompt, ct);
+            if (attempt.SelectionReason is not null)
             {
-                response = await InvokeAsync(candidate.Alias, systemInstructions, tools, prompt, ct);
-            }
-            catch (Exception ex) when (IsTransientFailure(ex, out var statusCode))
-            {
-                _logger.LogWarning(
-                    "Routing [{RequestId}]: transient failure on '{Alias}' (status={Status}), marking cooldown",
-                    requestId, candidate.Alias, statusCode);
-
-                _healthTracker.MarkCooledDown(candidate.Alias);
-                selectionReason = $"fallback:transient_{statusCode}";
+                selectionReason = attempt.SelectionReason;
                 continue;
             }
 
-            lastResponse = response ?? string.Empty;
+            lastResponse = attempt.Response ?? string.Empty;
 
             // FR-4: Quality gate — only when EnableQualityEscalation=true (Phase 3+).
-            if (_config.EnableQualityEscalation &&
-                !_qualityGate.Passes(lastResponse, prompt, constraintCount, out var failReason))
+            if (ShouldEscalateForQuality(lastResponse, prompt, constraintCount, candidate, requestId, out var failReason))
             {
                 qualityGateTriggered = true;
-                _logger.LogInformation(
-                    "Routing [{RequestId}]: quality gate failed on '{Alias}' ({Reason}), escalating",
-                    requestId, candidate.Alias, failReason);
-
                 selectionReason = $"escalation:quality_gate({failReason})";
                 continue;
             }
@@ -179,6 +173,80 @@ public sealed class ModelRoutingService
         EmitSelectionLog(metadata);
 
         return (finalResponse, metadata);
+    }
+
+    private bool ShouldStopRouting(int attemptCount, DateTimeOffset budgetDeadline, string requestId)
+    {
+        if (attemptCount >= _config.MaxProviderAttempts)
+        {
+            _logger.LogWarning(
+                "Routing [{RequestId}]: max attempts ({Max}) reached",
+                requestId, _config.MaxProviderAttempts);
+            return true;
+        }
+
+        if (DateTimeOffset.UtcNow < budgetDeadline)
+            return false;
+
+        _logger.LogWarning(
+            "Routing [{RequestId}]: selection time budget exhausted",
+            requestId);
+        return true;
+    }
+
+    private void LogCandidateAttempt(string requestId, int attemptCount, RouteCandidate candidate)
+    {
+        _logger.LogDebug(
+            "Routing [{RequestId}]: attempt {Attempt} via alias '{Alias}' (tier={Tier}, paid={Paid})",
+            requestId, attemptCount, candidate.Alias, candidate.Tier, candidate.IsPaid);
+    }
+
+    private async Task<CandidateAttemptResult> InvokeCandidateSafelyAsync(
+        RouteCandidate candidate,
+        string requestId,
+        string systemInstructions,
+        IReadOnlyList<AITool>? tools,
+        string prompt,
+        CancellationToken ct)
+    {
+        try
+        {
+            var response = await InvokeAsync(candidate.Alias, systemInstructions, tools, prompt, ct);
+            return new CandidateAttemptResult(response, null);
+        }
+        catch (Exception ex) when (IsTransientFailure(ex, out var statusCode))
+        {
+            _logger.LogWarning(
+                "Routing [{RequestId}]: transient failure on '{Alias}' (status={Status}), marking cooldown",
+                requestId, candidate.Alias, statusCode);
+
+            _healthTracker.MarkCooledDown(candidate.Alias);
+            return new CandidateAttemptResult(null, $"fallback:transient_{statusCode}");
+        }
+    }
+
+    private bool ShouldEscalateForQuality(
+        string response,
+        string prompt,
+        int constraintCount,
+        RouteCandidate candidate,
+        string requestId,
+        out string failReason)
+    {
+        failReason = string.Empty;
+        if (!_config.EnableQualityEscalation)
+            return false;
+
+        if (_qualityGate.Passes(response, prompt, constraintCount, out var reason))
+        {
+            return false;
+        }
+
+        failReason = reason ?? "quality_gate_failed";
+        _logger.LogInformation(
+            "Routing [{RequestId}]: quality gate failed on '{Alias}' ({Reason}), escalating",
+            requestId, candidate.Alias, failReason);
+        return true;
     }
 
     private async Task<string> InvokeAsync(
@@ -251,4 +319,6 @@ public sealed class ModelRoutingService
 
         return false;
     }
+
+    private sealed record CandidateAttemptResult(string? Response, string? SelectionReason);
 }

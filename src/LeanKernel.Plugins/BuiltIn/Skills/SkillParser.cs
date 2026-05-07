@@ -252,29 +252,38 @@ public sealed class SkillParser
 
         foreach (var item in operationsData)
         {
-            var opDict = item as Dictionary<string, object>;
-            if (opDict != null)
-            {
-                var id = ExtractString(opDict, "id");
-                var summary = ExtractString(opDict, "summary");
-
-                if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(summary))
-                {
-                    var invoke = TryExtractDictionary(opDict, "invoke", out var invokeData)
-                        ? ParseInvoke(invokeData)
-                        : null;
-                    var parameters = opDict.ContainsKey("parameters") ? (opDict["parameters"] as Dictionary<string, object>) : null;
-
-                    operations.Add(new SkillOperation(Id: id, Summary: summary)
-                    {
-                        Invoke = invoke,
-                        Parameters = parameters
-                    });
-                }
-            }
+            if (TryParseOperation(item, out var operation))
+                operations.Add(operation);
         }
 
         return operations;
+    }
+
+    private bool TryParseOperation(object? item, out SkillOperation operation)
+    {
+        operation = null!;
+
+        if (item is not Dictionary<string, object> opDict)
+            return false;
+
+        var id = ExtractString(opDict, "id");
+        var summary = ExtractString(opDict, "summary");
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(summary))
+            return false;
+
+        var invoke = TryExtractDictionary(opDict, "invoke", out var invokeData)
+            ? ParseInvoke(invokeData)
+            : null;
+        var parameters = opDict.ContainsKey("parameters")
+            ? opDict["parameters"] as Dictionary<string, object>
+            : null;
+
+        operation = new SkillOperation(Id: id, Summary: summary)
+        {
+            Invoke = invoke,
+            Parameters = parameters
+        };
+        return true;
     }
 
     /// <summary>
@@ -341,21 +350,39 @@ public sealed class SkillParser
     {
         var errors = new List<string>();
 
-        if (runtime == null)
-            errors.Add("Missing required 'runtime' block");
-
-        if (runtime?.Type == "http" && string.IsNullOrWhiteSpace(runtime.BaseUrl))
-            errors.Add("HTTP skill requires 'runtime.baseUrl'");
-
-        if ((runtime?.Type == "cli" || runtime?.Type == "composite") && string.IsNullOrWhiteSpace(runtime?.Command))
-            errors.Add("CLI/composite skill requires 'runtime.command'");
-
-        if (runtime?.Type == "http" && runtime.Egress.AllowHosts.Count == 0)
-            errors.Add("HTTP skill requires non-empty 'runtime.egress.allowHosts'");
+        ValidateRuntime(runtime, errors);
 
         if (operations.Count == 0)
             errors.Add("At least one operation is required");
 
+        ValidateOperations(operations, errors);
+
+        if (runtime?.Requires.Bins.Count > 0)
+            ValidateBinaryRequirements(runtime.Requires.Bins, errors);
+
+        return errors;
+    }
+
+    private void ValidateRuntime(SkillRuntime? runtime, List<string> errors)
+    {
+        if (runtime == null)
+        {
+            errors.Add("Missing required 'runtime' block");
+            return;
+        }
+
+        if (runtime.Type == "http" && string.IsNullOrWhiteSpace(runtime.BaseUrl))
+            errors.Add("HTTP skill requires 'runtime.baseUrl'");
+
+        if ((runtime.Type == "cli" || runtime.Type == "composite") && string.IsNullOrWhiteSpace(runtime.Command))
+            errors.Add("CLI/composite skill requires 'runtime.command'");
+
+        if (runtime.Type == "http" && runtime.Egress.AllowHosts.Count == 0)
+            errors.Add("HTTP skill requires non-empty 'runtime.egress.allowHosts'");
+    }
+
+    private void ValidateOperations(List<SkillOperation> operations, List<string> errors)
+    {
         foreach (var op in operations)
         {
             if (op.Invoke == null)
@@ -366,11 +393,6 @@ public sealed class SkillParser
             if (op.Parameters != null)
                 ValidateJsonSchema(op.Id, op.Parameters, errors);
         }
-
-        if (runtime?.Requires.Bins.Count > 0)
-            ValidateBinaryRequirements(runtime.Requires.Bins, errors);
-
-        return errors;
     }
 
     /// <summary>

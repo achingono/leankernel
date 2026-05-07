@@ -50,33 +50,11 @@ public class ToolRegistryGenerator : IIncrementalGenerator
         var symbol = context.SemanticModel.GetDeclaredSymbol(classDecl) as INamedTypeSymbol;
         if (symbol == null) return null;
 
-        string name = null;
-        string description = null;
-        string category = "General";
+        var attr = symbol.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.Name == "ToolMetadataAttribute");
+        if (attr == null) return null;
 
-        foreach (var attr in symbol.GetAttributes())
-        {
-            if (attr.AttributeClass == null) continue;
-            var attrName = attr.AttributeClass.Name;
-            if (attrName != "ToolMetadataAttribute") continue;
-
-            foreach (var arg in attr.NamedArguments)
-            {
-                switch (arg.Key)
-                {
-                    case "Name":
-                        name = arg.Value.Value as string;
-                        break;
-                    case "Description":
-                        description = arg.Value.Value as string;
-                        break;
-                    case "Category":
-                        var catVal = arg.Value.Value;
-                        if (catVal != null) category = catVal.ToString();
-                        break;
-                }
-            }
-        }
+        var (name, description, category) = ReadToolMetadata(attr);
 
         if (name == null || description == null) return null;
 
@@ -85,6 +63,31 @@ public class ToolRegistryGenerator : IIncrementalGenerator
             name,
             description,
             category);
+    }
+
+    private static (string Name, string Description, string Category) ReadToolMetadata(AttributeData attr)
+    {
+        string name = null;
+        string description = null;
+        string category = "General";
+
+        foreach (var arg in attr.NamedArguments)
+        {
+            switch (arg.Key)
+            {
+                case "Name":
+                    name = arg.Value.Value as string;
+                    break;
+                case "Description":
+                    description = arg.Value.Value as string;
+                    break;
+                case "Category":
+                    category = arg.Value.Value?.ToString() ?? category;
+                    break;
+            }
+        }
+
+        return (name, description, category);
     }
 
     private static void GenerateRegistry(

@@ -56,14 +56,7 @@ public sealed class WikiStore : IWikiStore
             var entries = await ListByDimensionAsync(dim, ct);
             foreach (var entry in entries)
             {
-                if (query.MinConfidence > 0 && entry.Facts.All(f => f.Confidence < query.MinConfidence))
-                    continue;
-
-                if (query.MaxAge.HasValue && entry.LastAccessed < DateTimeOffset.UtcNow - query.MaxAge.Value)
-                    continue;
-
-                if (!string.IsNullOrEmpty(query.TextQuery) &&
-                    !MatchesText(entry, query.TextQuery))
+                if (!MatchesQuery(entry, query))
                     continue;
 
                 results.Add(entry);
@@ -72,6 +65,17 @@ public sealed class WikiStore : IWikiStore
         }
 
         return results;
+    }
+
+    private static bool MatchesQuery(WikiEntry entry, WikiQuery query)
+    {
+        if (query.MinConfidence > 0 && entry.Facts.All(f => f.Confidence < query.MinConfidence))
+            return false;
+
+        if (query.MaxAge.HasValue && entry.LastAccessed < DateTimeOffset.UtcNow - query.MaxAge.Value)
+            return false;
+
+        return string.IsNullOrEmpty(query.TextQuery) || MatchesText(entry, query.TextQuery);
     }
 
     public async Task UpsertAsync(WikiEntry entry, CancellationToken ct)
@@ -188,12 +192,8 @@ public sealed class WikiStore : IWikiStore
 
         var lines = content.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
 
-        // Parse frontmatter
-        if (lines.Count < 3 || lines[0] != "---") return null;
-        var endIdx = lines.IndexOf("---", 1);
-        if (endIdx < 0) return null;
-
-        var frontmatter = ParseFrontmatter(lines.Skip(1).Take(endIdx - 1));
+        if (!TryReadFrontmatter(lines, out var endIdx, out var frontmatter))
+            return null;
 
         var id = frontmatter.GetValueOrDefault("id", fallbackId);
         var dimensionStr = frontmatter.GetValueOrDefault("dimension", "what");
@@ -206,6 +206,43 @@ public sealed class WikiStore : IWikiStore
 
         // Parse body (after frontmatter)
         var bodyLines = lines.Skip(endIdx + 1).ToList();
+        var (facts, relations) = ParseBodyLines(bodyLines, dimension);
+
+        return new WikiEntry
+        {
+            Id = id,
+            Dimension = dimension,
+            Subject = subject,
+            Facts = facts,
+            Relations = relations,
+            LastAccessed = lastAccessed,
+            AccessCount = accessCount
+        };
+    }
+
+    private static bool TryReadFrontmatter(
+        List<string> lines,
+        out int endIdx,
+        out Dictionary<string, string> frontmatter)
+    {
+        endIdx = -1;
+        frontmatter = [];
+
+        if (lines.Count < 3 || lines[0] != "---")
+            return false;
+
+        endIdx = lines.IndexOf("---", 1);
+        if (endIdx < 0)
+            return false;
+
+        frontmatter = ParseFrontmatter(lines.Skip(1).Take(endIdx - 1));
+        return true;
+    }
+
+    private static (List<WikiFact> Facts, List<string> Relations) ParseBodyLines(
+        List<string> bodyLines,
+        WikiDimension dimension)
+    {
         var facts = new List<WikiFact>();
         var relations = new List<string>();
         var inRelatedSection = false;
@@ -218,46 +255,42 @@ public sealed class WikiStore : IWikiStore
                 continue;
             }
 
-            if (line.StartsWith("## ") && !line.StartsWith("## Related", StringComparison.OrdinalIgnoreCase))
+            if (line.StartsWith("## "))
             {
                 inRelatedSection = false;
                 continue;
             }
 
             if (inRelatedSection)
-            {
-                var relMatch = RelatedLinkRegex.Match(line);
-                if (relMatch.Success)
-                {
-                    var linkPath = relMatch.Groups["path"].Value;
-                    var relationId = ExtractRelationId(linkPath, dimension);
-                    if (!string.IsNullOrEmpty(relationId))
-                        relations.Add(relationId);
-                }
-            }
+                AddRelation(line, dimension, relations);
             else
-            {
-                var factMatch = FactLineRegex.Match(line);
-                if (factMatch.Success)
-                {
-                    var claim = factMatch.Groups["claim"].Value.Trim();
-                    var meta = factMatch.Groups["meta"].Value;
-                    var fact = ParseFact(claim, meta);
-                    facts.Add(fact);
-                }
-            }
+                AddFact(line, facts);
         }
 
-        return new WikiEntry
-        {
-            Id = id,
-            Dimension = dimension,
-            Subject = subject,
-            Facts = facts,
-            Relations = relations,
-            LastAccessed = lastAccessed,
-            AccessCount = accessCount
-        };
+        return (facts, relations);
+    }
+
+    private static void AddRelation(string line, WikiDimension dimension, List<string> relations)
+    {
+        var relMatch = RelatedLinkRegex.Match(line);
+        if (!relMatch.Success)
+            return;
+
+        var linkPath = relMatch.Groups["path"].Value;
+        var relationId = ExtractRelationId(linkPath, dimension);
+        if (!string.IsNullOrEmpty(relationId))
+            relations.Add(relationId);
+    }
+
+    private static void AddFact(string line, List<WikiFact> facts)
+    {
+        var factMatch = FactLineRegex.Match(line);
+        if (!factMatch.Success)
+            return;
+
+        var claim = factMatch.Groups["claim"].Value.Trim();
+        var meta = factMatch.Groups["meta"].Value;
+        facts.Add(ParseFact(claim, meta));
     }
 
     private static Dictionary<string, string> ParseFrontmatter(IEnumerable<string> lines)

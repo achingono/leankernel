@@ -48,10 +48,16 @@ public class ThinkerServiceTests
         registry.Tools.Returns(new Dictionary<string, ITool>());
         var toolAdapter = new ToolFunctionAdapter(registry, NullLogger<ToolFunctionAdapter>.Instance);
         var promptAssembler = new PromptAssembler(NullLogger<PromptAssembler>.Instance);
+        var dependencies = new ThinkerServiceDependencies(
+            _gatekeeper,
+            _sessions,
+            _wiki,
+            factory,
+            toolAdapter,
+            promptAssembler);
 
         return new ThinkerService(
-            _gatekeeper, _sessions, _wiki,
-            factory, toolAdapter, promptAssembler,
+            dependencies,
             _config, NullLogger<ThinkerService>.Instance);
     }
 

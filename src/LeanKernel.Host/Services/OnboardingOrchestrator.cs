@@ -263,19 +263,8 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
         try
         {
             var availableModels = await GetAvailableLiteLlmModelIdsAsync(cfg, ct);
-            var probeCandidates = new HashSet<string>(StringComparer.Ordinal);
-            var configuredEmbeddingModel = cfg.LiteLlm.EmbeddingModel?.Trim();
-
-            if (!string.IsNullOrWhiteSpace(configuredEmbeddingModel))
-            {
-                if (availableModels.Count == 0 || availableModels.Contains(configuredEmbeddingModel))
-                    probeCandidates.Add(configuredEmbeddingModel);
-            }
-
-            foreach (var availableModel in availableModels.Where(IsLikelyEmbeddingModelId))
-                probeCandidates.Add(availableModel);
-
-            if (probeCandidates.Count == 0)
+            var orderedCandidates = BuildEmbeddingProbeCandidates(cfg, availableModels);
+            if (orderedCandidates.Count == 0)
             {
                 return new OnboardingStepResult
                 {
@@ -287,64 +276,22 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
 
             var client = _httpClientFactory.CreateClient("onboarding-probe");
             var endpoint = BuildEndpoint(cfg.LiteLlm.BaseUrl, "v1/embeddings");
-            var orderedCandidates = probeCandidates.ToList();
             string? lastFailure = null;
 
             foreach (var model in orderedCandidates)
             {
-                var payload = JsonSerializer.Serialize(new
-                {
+                var probe = await ProbeEmbeddingModelAsync(
+                    client,
+                    endpoint,
+                    cfg.LiteLlm.ApiKey,
                     model,
-                    input = new[] { "onboarding readiness probe" }
-                });
+                    orderedCandidates.Count,
+                    ct);
 
-                using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", cfg.LiteLlm.ApiKey);
-                request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+                if (probe.Result is not null)
+                    return probe.Result;
 
-                using var response = await client.SendAsync(request, ct);
-                if (!response.IsSuccessStatusCode)
-                {
-                    var responseBody = await response.Content.ReadAsStringAsync(ct);
-                    lastFailure = $"Embedding probe for '{model}' returned {(int)response.StatusCode}.";
-
-                    // Keep trying if this specific model is unavailable/mismatched.
-                    if ((response.StatusCode == HttpStatusCode.BadRequest || response.StatusCode == HttpStatusCode.NotFound)
-                        && orderedCandidates.Count > 1)
-                    {
-                        continue;
-                    }
-
-                    // If LiteLLM reports invalid model and we have no alternate embedding model, treat as optional.
-                    if (response.StatusCode == HttpStatusCode.BadRequest &&
-                        responseBody.Contains("Invalid model name", StringComparison.OrdinalIgnoreCase) &&
-                        orderedCandidates.Count == 1)
-                    {
-                        return new OnboardingStepResult
-                        {
-                            Step = "embeddings",
-                            Success = true,
-                            Message = "Configured embedding model is unavailable in LiteLLM; skipping embedding probe."
-                        };
-                    }
-
-                    continue;
-                }
-
-                await using var stream = await response.Content.ReadAsStreamAsync(ct);
-                using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-                if (!doc.RootElement.TryGetProperty("data", out var data) || data.GetArrayLength() == 0)
-                {
-                    lastFailure = $"Embedding probe for '{model}' returned no vectors.";
-                    continue;
-                }
-
-                return new OnboardingStepResult
-                {
-                    Step = "embeddings",
-                    Success = true,
-                    Message = $"Embedding endpoint is operational (model: {model})."
-                };
+                lastFailure = probe.LastFailure ?? lastFailure;
             }
 
             return new OnboardingStepResult
@@ -363,6 +310,84 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
                 Message = $"Embedding probe failed: {ex.Message}"
             };
         }
+    }
+
+    private static List<string> BuildEmbeddingProbeCandidates(
+        LeanKernelConfig cfg,
+        HashSet<string> availableModels)
+    {
+        var probeCandidates = new HashSet<string>(StringComparer.Ordinal);
+        var configuredEmbeddingModel = cfg.LiteLlm.EmbeddingModel?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(configuredEmbeddingModel) &&
+            (availableModels.Count == 0 || availableModels.Contains(configuredEmbeddingModel)))
+        {
+            probeCandidates.Add(configuredEmbeddingModel);
+        }
+
+        foreach (var availableModel in availableModels.Where(IsLikelyEmbeddingModelId))
+            probeCandidates.Add(availableModel);
+
+        return probeCandidates.ToList();
+    }
+
+    private static async Task<EmbeddingProbeOutcome> ProbeEmbeddingModelAsync(
+        HttpClient client,
+        Uri endpoint,
+        string apiKey,
+        string model,
+        int candidateCount,
+        CancellationToken ct)
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            model,
+            input = new[] { "onboarding readiness probe" }
+        });
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        using var response = await client.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+            return await HandleFailedEmbeddingProbeAsync(response, model, candidateCount, ct);
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+        if (!doc.RootElement.TryGetProperty("data", out var data) || data.GetArrayLength() == 0)
+            return EmbeddingProbeOutcome.Failed($"Embedding probe for '{model}' returned no vectors.");
+
+        return EmbeddingProbeOutcome.Completed(new OnboardingStepResult
+        {
+            Step = "embeddings",
+            Success = true,
+            Message = $"Embedding endpoint is operational (model: {model})."
+        });
+    }
+
+    private static async Task<EmbeddingProbeOutcome> HandleFailedEmbeddingProbeAsync(
+        HttpResponseMessage response,
+        string model,
+        int candidateCount,
+        CancellationToken ct)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync(ct);
+        var lastFailure = $"Embedding probe for '{model}' returned {(int)response.StatusCode}.";
+
+        if (response.StatusCode == HttpStatusCode.BadRequest &&
+            responseBody.Contains("Invalid model name", StringComparison.OrdinalIgnoreCase) &&
+            candidateCount == 1)
+        {
+            return EmbeddingProbeOutcome.Completed(new OnboardingStepResult
+            {
+                Step = "embeddings",
+                Success = true,
+                Message = "Configured embedding model is unavailable in LiteLLM; skipping embedding probe."
+            });
+        }
+
+        return EmbeddingProbeOutcome.Failed(lastFailure);
     }
 
     private async Task<HashSet<string>> GetAvailableLiteLlmModelIdsAsync(LeanKernelConfig cfg, CancellationToken ct)
@@ -492,5 +517,12 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
     {
         var normalizedBase = baseUrl.TrimEnd('/') + "/";
         return new Uri(new Uri(normalizedBase), relativePath);
+    }
+
+    private sealed record EmbeddingProbeOutcome(OnboardingStepResult? Result, string? LastFailure)
+    {
+        public static EmbeddingProbeOutcome Completed(OnboardingStepResult result) => new(result, null);
+
+        public static EmbeddingProbeOutcome Failed(string lastFailure) => new(null, lastFailure);
     }
 }

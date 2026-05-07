@@ -254,25 +254,32 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
         var inList = false;
         foreach (var line in lines)
         {
-            if (line.Contains(listName, StringComparison.OrdinalIgnoreCase) ||
-                line.Contains(sectionTitle, StringComparison.OrdinalIgnoreCase))
+            if (!inList)
             {
-                inList = true;
+                inList = IsListStart(line, listName, sectionTitle);
                 continue;
             }
 
-            if (inList)
-            {
-                if (line.StartsWith("##")) break;
-                if (line.StartsWith("- "))
-                {
-                    var item = line.Substring(2).Trim().Trim('`', '*', '"');
-                    if (!string.IsNullOrWhiteSpace(item))
-                        items.Add(item);
-                }
-            }
+            if (line.StartsWith("##"))
+                break;
+
+            AddListItem(line, items);
         }
 
         return items;
+    }
+
+    private static bool IsListStart(string line, string listName, string sectionTitle)
+        => line.Contains(listName, StringComparison.OrdinalIgnoreCase) ||
+           line.Contains(sectionTitle, StringComparison.OrdinalIgnoreCase);
+
+    private static void AddListItem(string line, List<string> items)
+    {
+        if (!line.StartsWith("- "))
+            return;
+
+        var item = line.Substring(2).Trim().Trim('`', '*', '"');
+        if (!string.IsNullOrWhiteSpace(item))
+            items.Add(item);
     }
 }

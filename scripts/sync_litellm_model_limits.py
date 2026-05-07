@@ -68,15 +68,100 @@ def canonical_azure_model_name(deployment_name: str) -> str:
 	return re.sub(r"-\d+$", "", deployment_name)
 
 
-def update_gemini_limits(config: dict[str, Any]) -> int:
+def provider_config(config: dict[str, Any], name: str) -> dict[str, Any] | None:
 	providers = config.get("providers", {})
-	gemini = providers.get("gemini")
-	if not isinstance(gemini, dict):
-		return 0
-	key_name, _ = first_env_key(gemini)
+	provider = providers.get(name) if isinstance(providers, dict) else None
+	return provider if isinstance(provider, dict) else None
+
+
+def provider_api_key(provider_spec: dict[str, Any]) -> str | None:
+	key_name, _ = first_env_key(provider_spec)
 	if not key_name:
-		return 0
+		return None
 	api_key = os.getenv(key_name, "")
+	return api_key or None
+
+
+def metadata_by_id(data: dict[str, Any], collection_key: str = "data") -> dict[str, dict[str, Any]]:
+	by_id: dict[str, dict[str, Any]] = {}
+	for raw in data.get(collection_key, []):
+		rid = raw.get("id")
+		if isinstance(rid, str):
+			by_id[rid] = raw
+	return by_id
+
+
+def gemini_metadata_by_name(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
+	by_name: dict[str, dict[str, Any]] = {}
+	for raw in data.get("models", []):
+		name = raw.get("name")
+		if isinstance(name, str) and name.startswith("models/"):
+			by_name[name.replace("models/", "", 1)] = raw
+	return by_name
+
+
+def updateable_model_name(model: Any) -> str | None:
+	if not isinstance(model, dict) or model.get("mode") == "embedding":
+		return None
+	name = model.get("name")
+	return name if isinstance(name, str) else None
+
+
+def update_model_field(
+	provider: str,
+	model: dict[str, Any],
+	model_id: str,
+	model_name: str,
+	field: str,
+	new_value: Any,
+) -> int:
+	if not isinstance(new_value, int) or model.get(field) == new_value:
+		return 0
+	record_drift(provider, model_id, model_name, field, model.get(field), new_value)
+	model[field] = new_value
+	return 1
+
+
+def apply_model_limits(
+	provider: str,
+	model: dict[str, Any],
+	model_name: str,
+	out_limit: Any,
+	in_limit: Any,
+) -> int:
+	model_id = model.get("id", model_name)
+	return update_model_field(provider, model, model_id, model_name, "max_tokens", out_limit) + update_model_field(
+		provider,
+		model,
+		model_id,
+		model_name,
+		"context_window",
+		in_limit,
+	)
+
+
+def update_provider_limits(
+	provider: str,
+	provider_spec: dict[str, Any],
+	metadata_for_name: Any,
+	limits_from_metadata: Any,
+) -> int:
+	changed = 0
+	for model in provider_spec.get("models", []):
+		name = updateable_model_name(model)
+		if not name:
+			continue
+		meta = metadata_for_name(name)
+		if meta:
+			changed += apply_model_limits(provider, model, name, *limits_from_metadata(meta))
+	return changed
+
+
+def update_gemini_limits(config: dict[str, Any]) -> int:
+	gemini = provider_config(config, "gemini")
+	if not gemini:
+		return 0
+	api_key = provider_api_key(gemini)
 	if not api_key:
 		return 0
 
@@ -86,117 +171,71 @@ def update_gemini_limits(config: dict[str, Any]) -> int:
 	if not data:
 		return 0
 
-	by_name: dict[str, dict[str, Any]] = {}
-	for raw in data.get("models", []):
-		name = raw.get("name")
-		if isinstance(name, str) and name.startswith("models/"):
-			by_name[name.replace("models/", "", 1)] = raw
+	by_name = gemini_metadata_by_name(data)
+	return update_provider_limits(
+		"gemini",
+		gemini,
+		by_name.get,
+		lambda meta: (meta.get("outputTokenLimit"), meta.get("inputTokenLimit")),
+	)
 
-	changed = 0
-	for model in gemini.get("models", []):
-		if not isinstance(model, dict) or model.get("mode") == "embedding":
+
+def azure_models_request(ref: Any) -> tuple[str, dict[str, str]] | None:
+	if not isinstance(ref, dict):
+		return None
+	key_name = ref.get("name")
+	api_base_env = ref.get("api_base_env")
+	if not isinstance(key_name, str) or not isinstance(api_base_env, str):
+		return None
+	api_key = os.getenv(key_name, "").strip()
+	base = os.getenv(api_base_env, "").strip().rstrip("/")
+	if not api_key or not base:
+		return None
+	return f"{base}/openai/v1/models", {"api-key": api_key, "Authorization": f"Bearer {api_key}"}
+
+
+def fetch_azure_metadata(azure: dict[str, Any]) -> dict[str, Any] | None:
+	keys = azure.get("keys", [])
+	if not isinstance(keys, list):
+		return None
+
+	for ref in keys:
+		request = azure_models_request(ref)
+		if not request:
 			continue
-		name = model.get("name")
-		if not isinstance(name, str):
-			continue
-		meta = by_name.get(name)
-		if not meta:
-			continue
-		model_id = model.get("id", name)
-		output_limit = meta.get("outputTokenLimit")
-		input_limit = meta.get("inputTokenLimit")
-		if isinstance(output_limit, int) and model.get("max_tokens") != output_limit:
-			record_drift("gemini", model_id, name, "max_tokens", model.get("max_tokens"), output_limit)
-			model["max_tokens"] = output_limit
-			changed += 1
-		if isinstance(input_limit, int) and model.get("context_window") != input_limit:
-			record_drift("gemini", model_id, name, "context_window", model.get("context_window"), input_limit)
-			model["context_window"] = input_limit
-			changed += 1
-	return changed
+		url, headers = request
+		data = fetch_json(url, headers=headers)
+		if data:
+			return data
+	return None
 
 
 def update_azure_limits(config: dict[str, Any]) -> int:
-	providers = config.get("providers", {})
-	azure = providers.get("azure")
-	if not isinstance(azure, dict):
+	azure = provider_config(config, "azure")
+	if not azure:
 		return 0
 
-	data: dict[str, Any] | None = None
-	keys = azure.get("keys", [])
-	if not isinstance(keys, list):
-		return 0
-
-	for ref in keys:
-		if not isinstance(ref, dict):
-			continue
-		key_name = ref.get("name")
-		api_base_env = ref.get("api_base_env")
-		if not isinstance(key_name, str) or not isinstance(api_base_env, str):
-			continue
-		api_key = os.getenv(key_name, "").strip()
-		base = os.getenv(api_base_env, "").strip().rstrip("/")
-		if not api_key or not base:
-			continue
-
-		data = fetch_json(
-			f"{base}/openai/v1/models",
-			headers={"api-key": api_key, "Authorization": f"Bearer {api_key}"},
-		)
-		if data:
-			break
-
+	data = fetch_azure_metadata(azure)
 	if not data:
 		return 0
 
-	by_id: dict[str, dict[str, Any]] = {}
-	for raw in data.get("data", []):
-		rid = raw.get("id")
-		if isinstance(rid, str):
-			by_id[rid] = raw
-
-	changed = 0
-	for model in azure.get("models", []):
-		if not isinstance(model, dict) or model.get("mode") == "embedding":
-			continue
-		name = model.get("name")
-		if not isinstance(name, str):
-			continue
-
-		# Azure deployment names in this repo use suffixes like -1, while model metadata often does not.
-		candidates = [name, canonical_azure_model_name(name)]
-		meta = None
-		for candidate in candidates:
-			meta = by_id.get(candidate)
-			if meta:
-				break
-		if not meta:
-			continue
-
-		model_id = model.get("id", name)
-		out_limit = meta.get("output_token_limit") or meta.get("max_output_tokens")
-		in_limit = meta.get("input_token_limit") or meta.get("context_length")
-
-		if isinstance(out_limit, int) and model.get("max_tokens") != out_limit:
-			record_drift("azure", model_id, name, "max_tokens", model.get("max_tokens"), out_limit)
-			model["max_tokens"] = out_limit
-			changed += 1
-		if isinstance(in_limit, int) and model.get("context_window") != in_limit:
-			record_drift("azure", model_id, name, "context_window", model.get("context_window"), in_limit)
-			model["context_window"] = in_limit
-			changed += 1
-	return changed
+	by_id = metadata_by_id(data)
+	return update_provider_limits(
+		"azure",
+		azure,
+		lambda name: by_id.get(name) or by_id.get(canonical_azure_model_name(name)),
+		lambda meta: (
+			meta.get("output_token_limit") or meta.get("max_output_tokens"),
+			meta.get("input_token_limit") or meta.get("context_length"),
+		),
+	)
 
 
 def update_groq_limits(config: dict[str, Any]) -> int:
-	providers = config.get("providers", {})
-	groq = providers.get("groq")
-	if not isinstance(groq, dict):
+	groq = provider_config(config, "groq")
+	if not groq:
 		return 0
-	key_name, _ = first_env_key(groq)
-	if not key_name:
-		return 0
-	api_key = os.getenv(key_name, "")
+	api_key = provider_api_key(groq)
 	if not api_key:
 		return 0
 
@@ -207,34 +246,13 @@ def update_groq_limits(config: dict[str, Any]) -> int:
 	if not data:
 		return 0
 
-	by_id: dict[str, dict[str, Any]] = {}
-	for raw in data.get("data", []):
-		rid = raw.get("id")
-		if isinstance(rid, str):
-			by_id[rid] = raw
-
-	changed = 0
-	for model in groq.get("models", []):
-		if not isinstance(model, dict) or model.get("mode") == "embedding":
-			continue
-		name = model.get("name")
-		if not isinstance(name, str):
-			continue
-		meta = by_id.get(name)
-		if not meta:
-			continue
-		model_id = model.get("id", name)
-		out_limit = meta.get("max_completion_tokens")
-		in_limit = meta.get("context_window")
-		if isinstance(out_limit, int) and model.get("max_tokens") != out_limit:
-			record_drift("groq", model_id, name, "max_tokens", model.get("max_tokens"), out_limit)
-			model["max_tokens"] = out_limit
-			changed += 1
-		if isinstance(in_limit, int) and model.get("context_window") != in_limit:
-			record_drift("groq", model_id, name, "context_window", model.get("context_window"), in_limit)
-			model["context_window"] = in_limit
-			changed += 1
-	return changed
+	by_id = metadata_by_id(data)
+	return update_provider_limits(
+		"groq",
+		groq,
+		by_id.get,
+		lambda meta: (meta.get("max_completion_tokens"), meta.get("context_window")),
+	)
 
 
 def parse_args() -> argparse.Namespace:

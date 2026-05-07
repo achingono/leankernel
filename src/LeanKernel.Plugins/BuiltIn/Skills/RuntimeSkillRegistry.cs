@@ -142,44 +142,7 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
 
             foreach (var filePath in skillFiles)
             {
-                try
-                {
-                    var definition = await _parser.ParseSkillFileAsync(filePath);
-                    if (definition != null && !string.IsNullOrWhiteSpace(definition.Name))
-                    {
-                        if (definition.ValidationErrors.Count > 0)
-                        {
-                            _logger.LogWarning(
-                                "Skill {SkillName} has validation errors and is quarantined: {Errors}",
-                                definition.Name,
-                                string.Join("; ", definition.ValidationErrors));
-                            quarantined.Add($"{definition.Name}: {string.Join("; ", definition.ValidationErrors)}");
-                        }
-                        else
-                        {
-                            // Check binary availability
-                            var unavailableReason = CheckBinaryAvailability(definition);
-                            if (unavailableReason != null)
-                            {
-                                _logger.LogWarning("Skill {SkillName} is unavailable: {Reason}", definition.Name, unavailableReason);
-                                definition = definition with
-                                {
-                                    IsAvailable = false,
-                                    UnavailableReason = unavailableReason
-                                };
-                            }
-
-                            skills[definition.Name] = definition;
-                            _logger.LogInformation("Loaded skill: {SkillName} from {FilePath} (available: {Available})", definition.Name, filePath, definition.IsAvailable);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to parse skill from {FilePath}", filePath);
-                    var skillName = Path.GetFileName(Path.GetDirectoryName(filePath)) ?? "unknown";
-                    quarantined.Add($"{skillName}: parse error - {ex.Message}");
-                }
+                await DiscoverSkillFileAsync(filePath, skills, quarantined);
             }
         }
 
@@ -198,6 +161,64 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
         }
 
         return skills;
+    }
+
+    private async Task DiscoverSkillFileAsync(
+        string filePath,
+        Dictionary<string, SkillDefinition> skills,
+        List<string> quarantined)
+    {
+        try
+        {
+            var definition = await _parser.ParseSkillFileAsync(filePath);
+            if (definition == null || string.IsNullOrWhiteSpace(definition.Name))
+                return;
+
+            if (QuarantineIfInvalid(definition, quarantined))
+                return;
+
+            definition = ApplyAvailability(definition);
+            skills[definition.Name] = definition;
+            _logger.LogInformation(
+                "Loaded skill: {SkillName} from {FilePath} (available: {Available})",
+                definition.Name,
+                filePath,
+                definition.IsAvailable);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to parse skill from {FilePath}", filePath);
+            var skillName = Path.GetFileName(Path.GetDirectoryName(filePath)) ?? "unknown";
+            quarantined.Add($"{skillName}: parse error - {ex.Message}");
+        }
+    }
+
+    private bool QuarantineIfInvalid(SkillDefinition definition, List<string> quarantined)
+    {
+        if (definition.ValidationErrors.Count == 0)
+            return false;
+
+        var errors = string.Join("; ", definition.ValidationErrors);
+        _logger.LogWarning(
+            "Skill {SkillName} has validation errors and is quarantined: {Errors}",
+            definition.Name,
+            errors);
+        quarantined.Add($"{definition.Name}: {errors}");
+        return true;
+    }
+
+    private SkillDefinition ApplyAvailability(SkillDefinition definition)
+    {
+        var unavailableReason = CheckBinaryAvailability(definition);
+        if (unavailableReason == null)
+            return definition;
+
+        _logger.LogWarning("Skill {SkillName} is unavailable: {Reason}", definition.Name, unavailableReason);
+        return definition with
+        {
+            IsAvailable = false,
+            UnavailableReason = unavailableReason
+        };
     }
 
     /// <summary>

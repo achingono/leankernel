@@ -1,9 +1,12 @@
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Enums;
+using LeanKernel.Thinker;
 using LeanKernel.Thinker.Routing;
+using System.Net;
 
 namespace LeanKernel.Tests.Unit.Thinker.Routing;
 
@@ -323,5 +326,149 @@ public class PolicyModelSelectorTests
         var selector = CreateSelector(spend: spend, hardLimit: 1);
         var candidates = selector.BuildCandidates(TaskComplexity.Small);
         Assert.DoesNotContain(candidates, c => c.IsPaid);
+    }
+}
+
+public class ModelRoutingServiceTests
+{
+    [Fact]
+    public async Task RouteAsync_ReturnsFirstAcceptedCandidate()
+    {
+        var service = CreateService(new RoutingTestChatClient("accepted response"));
+
+        var (response, metadata) = await service.RouteAsync(
+            "req-1",
+            "Answer the question",
+            existingContextTokens: 0,
+            systemInstructions: "system",
+            tools: null,
+            CancellationToken.None);
+
+        Assert.Equal("accepted response", response);
+        Assert.Equal("small", metadata.SelectedAlias);
+        Assert.Equal("free_first", metadata.SelectionReason);
+        Assert.Equal(1, metadata.AttemptCount);
+        Assert.False(metadata.QualityGateTriggered);
+    }
+
+    [Fact]
+    public async Task RouteAsync_TransientFailureFallsBackAndCoolsDownAlias()
+    {
+        var health = new ProviderHealthTracker(TimeSpan.FromMinutes(5));
+        var service = CreateService(
+            new RoutingTestChatClient(
+                new HttpRequestException("Service unavailable", null, HttpStatusCode.ServiceUnavailable),
+                "fallback response"),
+            health);
+
+        var (response, metadata) = await service.RouteAsync(
+            "req-2",
+            "Answer the question",
+            existingContextTokens: 0,
+            systemInstructions: "system",
+            tools: null,
+            CancellationToken.None);
+
+        Assert.Equal("fallback response", response);
+        Assert.Equal("medium", metadata.SelectedAlias);
+        Assert.Equal("fallback:transient_503", metadata.SelectionReason);
+        Assert.Equal(2, metadata.AttemptCount);
+        Assert.True(health.IsOnCooldown("small"));
+        Assert.Equal(["small", "medium"], metadata.FallbackPath);
+    }
+
+    [Fact]
+    public async Task RouteAsync_QualityFailureEscalatesToNextCandidate()
+    {
+        var service = CreateService(
+            new RoutingTestChatClient("short", "this response is long enough to pass the quality gate"),
+            enableQualityEscalation: true,
+            qualityMinOutputLength: 20);
+
+        var (response, metadata) = await service.RouteAsync(
+            "req-3",
+            "Explain the result",
+            existingContextTokens: 0,
+            systemInstructions: "system",
+            tools: null,
+            CancellationToken.None);
+
+        Assert.Equal("this response is long enough to pass the quality gate", response);
+        Assert.Equal("medium", metadata.SelectedAlias);
+        Assert.StartsWith("escalation:quality_gate(output_too_short", metadata.SelectionReason);
+        Assert.Equal(2, metadata.AttemptCount);
+        Assert.True(metadata.QualityGateTriggered);
+    }
+
+    private static ModelRoutingService CreateService(
+        RoutingTestChatClient chatClient,
+        ProviderHealthTracker? health = null,
+        bool enableQualityEscalation = false,
+        int qualityMinOutputLength = 80)
+    {
+        var config = Options.Create(new LeanKernelConfig
+        {
+            Routing = new RoutingConfig
+            {
+                SmallAlias = "small",
+                MediumAlias = "medium",
+                LargeAlias = "large",
+                MaxProviderAttempts = 4,
+                MaxSelectionBudgetMs = 10_000,
+                EnableQualityEscalation = enableQualityEscalation,
+                QualityMinOutputLength = qualityMinOutputLength
+            }
+        });
+        health ??= new ProviderHealthTracker(TimeSpan.FromMinutes(5));
+        var spend = new SpendGuard(config, NullLogger<SpendGuard>.Instance);
+        var dependencies = new ModelRoutingDependencies(
+            new TaskComplexityScorer(config),
+            new PolicyModelSelector(config, health, spend),
+            new ResponseQualityGate(config),
+            health,
+            spend,
+            new AgentFactory(chatClient, NullLogger<AgentFactory>.Instance));
+
+        return new ModelRoutingService(
+            dependencies,
+            config,
+            NullLogger<ModelRoutingService>.Instance);
+    }
+
+    private sealed class RoutingTestChatClient : IChatClient
+    {
+        private readonly Queue<object> _responses;
+
+        public RoutingTestChatClient(params object[] responses)
+        {
+            _responses = new Queue<object>(responses);
+        }
+
+        public ChatClientMetadata Metadata => new();
+
+        public void Dispose()
+        {
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceType == typeof(IChatClient) ? this : null;
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            var next = _responses.Count > 0 ? _responses.Dequeue() : string.Empty;
+            if (next is Exception exception)
+                throw exception;
+
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, next.ToString())));
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
     }
 }

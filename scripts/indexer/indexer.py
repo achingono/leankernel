@@ -14,10 +14,11 @@ import json
 import logging
 import os
 import random
+import re
 import sqlite3
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 from qdrant_client import QdrantClient
@@ -58,6 +59,14 @@ TAG_RULES_JSON = os.getenv("TAG_RULES_JSON", "[]")
 EMBEDDING_MAX_RETRIES = int(os.getenv("EMBEDDING_MAX_RETRIES", "6"))
 EMBEDDING_RETRY_BASE_SECONDS = float(os.getenv("EMBEDDING_RETRY_BASE_SECONDS", "0.75"))
 EMBEDDING_RETRY_MAX_SECONDS = float(os.getenv("EMBEDDING_RETRY_MAX_SECONDS", "12"))
+RETRYABLE_EMBEDDING_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
+RETRYABLE_EMBEDDING_ERRORS = (
+    httpx.ConnectError,
+    httpx.ReadTimeout,
+    httpx.WriteTimeout,
+    httpx.PoolTimeout,
+    httpx.NetworkError,
+)
 
 # Document extensions that should go through Unstructured
 UNSTRUCTURED_EXTENSIONS = {
@@ -154,81 +163,90 @@ class EmbeddingClient:
     async def embed(self, text: str) -> list[float]:
         """Generate embedding for a single text."""
         last_error: Exception | None = None
-        retryable_statuses = {408, 409, 425, 429, 500, 502, 503, 504}
 
         for attempt in range(1, EMBEDDING_MAX_RETRIES + 1):
             try:
-                payload = {"input": text, "model": self.model}
-                if self.request_dimension and self.request_dimension > 0:
-                    # Some providers expect `dimensions`; others accept `dimension`.
-                    # LiteLLM drop_params=true will remove unsupported fields safely.
-                    payload["dimensions"] = self.request_dimension
-                    payload["dimension"] = self.request_dimension
-
-                response = await self.client.post(
-                    f"{self.base_url}/embeddings",
-                    json=payload,
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                )
-                response.raise_for_status()
-                data = response.json()
-                embedding = data["data"][0]["embedding"]
-
-                if self.request_dimension and self.request_dimension > 0:
-                    if len(embedding) > self.request_dimension:
-                        embedding = embedding[: self.request_dimension]
-                    elif len(embedding) < self.request_dimension:
-                        raise RuntimeError(
-                            f"Embedding length {len(embedding)} is smaller than requested "
-                            f"dimension {self.request_dimension} for model {self.model}"
-                        )
-
-                return embedding
+                return await self._embed_once(text)
             except httpx.HTTPStatusError as e:
                 last_error = e
                 status = e.response.status_code
-                should_retry = status in retryable_statuses
-                if not should_retry or attempt == EMBEDDING_MAX_RETRIES:
+                if status not in RETRYABLE_EMBEDDING_STATUSES or attempt == EMBEDDING_MAX_RETRIES:
                     raise
 
-                retry_after = e.response.headers.get("retry-after")
-                if retry_after and retry_after.isdigit():
-                    delay = min(float(retry_after), EMBEDDING_RETRY_MAX_SECONDS)
-                else:
-                    delay = min(
-                        EMBEDDING_RETRY_BASE_SECONDS * (2 ** (attempt - 1)),
-                        EMBEDDING_RETRY_MAX_SECONDS,
-                    )
-                jitter = random.uniform(0.0, 0.2)
-                logger.warning(
-                    "Embedding transient HTTP %s (attempt %s/%s); retrying in %.2fs",
-                    status,
-                    attempt,
-                    EMBEDDING_MAX_RETRIES,
-                    delay + jitter,
-                )
-                await asyncio.sleep(delay + jitter)
-            except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout, httpx.NetworkError) as e:
+                await self._sleep_after_http_error(e, attempt)
+            except RETRYABLE_EMBEDDING_ERRORS as e:
                 last_error = e
                 if attempt == EMBEDDING_MAX_RETRIES:
                     raise
-                delay = min(
-                    EMBEDDING_RETRY_BASE_SECONDS * (2 ** (attempt - 1)),
-                    EMBEDDING_RETRY_MAX_SECONDS,
-                )
-                jitter = random.uniform(0.0, 0.2)
-                logger.warning(
-                    "Embedding connection error (attempt %s/%s): %r; retrying in %.2fs",
-                    attempt,
-                    EMBEDDING_MAX_RETRIES,
-                    e,
-                    delay + jitter,
-                )
-                await asyncio.sleep(delay + jitter)
+                await self._sleep_after_connection_error(e, attempt)
 
         if last_error is not None:
             raise last_error
         raise RuntimeError("Embedding failed without an explicit exception")
+
+    async def _embed_once(self, text: str) -> list[float]:
+        response = await self.client.post(
+            f"{self.base_url}/embeddings",
+            json=self._embedding_payload(text),
+            headers={"Authorization": f"Bearer {self.api_key}"},
+        )
+        response.raise_for_status()
+        embedding = response.json()["data"][0]["embedding"]
+        return self._fit_requested_dimension(embedding)
+
+    def _embedding_payload(self, text: str) -> dict[str, Any]:
+        payload: dict[str, Any] = {"input": text, "model": self.model}
+        if self.request_dimension and self.request_dimension > 0:
+            # Some providers expect `dimensions`; others accept `dimension`.
+            # LiteLLM drop_params=true will remove unsupported fields safely.
+            payload["dimensions"] = self.request_dimension
+            payload["dimension"] = self.request_dimension
+        return payload
+
+    def _fit_requested_dimension(self, embedding: list[float]) -> list[float]:
+        if not self.request_dimension or self.request_dimension <= 0:
+            return embedding
+        if len(embedding) > self.request_dimension:
+            return embedding[: self.request_dimension]
+        if len(embedding) < self.request_dimension:
+            raise RuntimeError(
+                f"Embedding length {len(embedding)} is smaller than requested "
+                f"dimension {self.request_dimension} for model {self.model}"
+            )
+        return embedding
+
+    async def _sleep_after_http_error(self, error: httpx.HTTPStatusError, attempt: int):
+        delay = self._retry_delay(attempt, error.response.headers.get("retry-after"))
+        logger.warning(
+            "Embedding transient HTTP %s (attempt %s/%s); retrying in %.2fs",
+            error.response.status_code,
+            attempt,
+            EMBEDDING_MAX_RETRIES,
+            delay,
+        )
+        await asyncio.sleep(delay)
+
+    async def _sleep_after_connection_error(self, error: Exception, attempt: int):
+        delay = self._retry_delay(attempt)
+        logger.warning(
+            "Embedding connection error (attempt %s/%s): %r; retrying in %.2fs",
+            attempt,
+            EMBEDDING_MAX_RETRIES,
+            error,
+            delay,
+        )
+        await asyncio.sleep(delay)
+
+    @staticmethod
+    def _retry_delay(attempt: int, retry_after: str | None = None) -> float:
+        if retry_after and retry_after.isdigit():
+            delay = min(float(retry_after), EMBEDDING_RETRY_MAX_SECONDS)
+        else:
+            delay = min(
+                EMBEDDING_RETRY_BASE_SECONDS * (2 ** (attempt - 1)),
+                EMBEDDING_RETRY_MAX_SECONDS,
+            )
+        return delay + random.uniform(0.0, 0.2)
 
     async def close(self):
         await self.client.aclose()
@@ -272,39 +290,14 @@ def parse_wiki_markdown(file_path: str) -> dict | None:
     if len(lines) < 3 or lines[0].strip() != "---":
         return None
 
-    # Find end of frontmatter
-    end_idx = -1
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end_idx = i
-            break
-
-    if end_idx < 0:
+    end_idx = find_frontmatter_end(lines)
+    if end_idx is None:
         return None
 
-    # Parse frontmatter (simple key: value)
-    frontmatter = {}
-    for line in lines[1:end_idx]:
-        colon_idx = line.find(":")
-        if colon_idx > 0:
-            key = line[:colon_idx].strip()
-            value = line[colon_idx + 1:].strip()
-            frontmatter[key] = value
-
-    # Body is everything after frontmatter
+    frontmatter = parse_frontmatter_lines(lines[1:end_idx])
     body_lines = lines[end_idx + 1:]
     body = "\n".join(body_lines).strip()
-
-    # Extract facts (lines starting with "- ")
-    facts = []
-    for line in body_lines:
-        line = line.strip()
-        if line.startswith("- ") and not line.startswith("- ["):
-            # Remove HTML comment metadata
-            import re
-            claim = re.sub(r"\s*<!--\{[^}]*\}-->$", "", line[2:])
-            if claim:
-                facts.append(claim)
+    facts = extract_wiki_facts(body_lines)
 
     return {
         "id": frontmatter.get("id", ""),
@@ -312,9 +305,43 @@ def parse_wiki_markdown(file_path: str) -> dict | None:
         "subject": frontmatter.get("subject", ""),
         "body": body,
         "facts": facts,
-        "text_for_embedding": f"{frontmatter.get('dimension', '')}:{frontmatter.get('subject', '')} — "
-        + "; ".join(facts) if facts else body,
+        "text_for_embedding": text_for_wiki_embedding(frontmatter, facts, body),
     }
+
+
+def find_frontmatter_end(lines: list[str]) -> int | None:
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return i
+    return None
+
+
+def parse_frontmatter_lines(lines: list[str]) -> dict[str, str]:
+    frontmatter = {}
+    for line in lines:
+        colon_idx = line.find(":")
+        if colon_idx > 0:
+            key = line[:colon_idx].strip()
+            value = line[colon_idx + 1:].strip()
+            frontmatter[key] = value
+    return frontmatter
+
+
+def extract_wiki_facts(body_lines: list[str]) -> list[str]:
+    facts = []
+    for line in body_lines:
+        line = line.strip()
+        if line.startswith("- ") and not line.startswith("- ["):
+            claim = re.sub(r"\s*<!--\{[^}]*\}-->$", "", line[2:])
+            if claim:
+                facts.append(claim)
+    return facts
+
+
+def text_for_wiki_embedding(frontmatter: dict[str, str], facts: list[str], body: str) -> str:
+    if not facts:
+        return body
+    return f"{frontmatter.get('dimension', '')}:{frontmatter.get('subject', '')} — " + "; ".join(facts)
 
 
 def compute_file_hash(file_path: str) -> str:
@@ -348,6 +375,38 @@ def chunk_text(text: str, max_tokens: int = 500) -> list[str]:
         chunks.append(current_chunk.strip())
 
     return chunks if chunks else [text[:max_chars]]
+
+
+def source_metadata(file_path: str) -> tuple[str, str]:
+    """Return source_file payload path and source_type for a file."""
+    if file_path.startswith(WIKI_PATH):
+        return "wiki/" + os.path.relpath(file_path, WIKI_PATH), "wiki"
+    if file_path.startswith(DOCUMENTS_PATH):
+        return "documents/" + os.path.relpath(file_path, DOCUMENTS_PATH), "document"
+    return os.path.basename(file_path), "document"
+
+
+def chunk_payload(
+    chunk_text_content: str,
+    chunk_index: int,
+    source_type: str,
+    relative_path: str,
+    tags: list[str],
+    wiki_data: dict | None,
+) -> dict[str, Any]:
+    payload = {
+        "source_type": source_type,
+        "source_file": relative_path,
+        "chunk_index": chunk_index,
+        "text": chunk_text_content,
+        "tags": tags,
+        "indexed_at": int(time.time()),
+    }
+    if source_type == "wiki" and wiki_data:
+        payload["entry_id"] = wiki_data["id"]
+        payload["dimension"] = wiki_data["dimension"]
+        payload["subject"] = wiki_data["subject"]
+    return payload
 
 
 class Indexer:
@@ -399,72 +458,27 @@ class Indexer:
             logger.debug(f"Skipping unchanged file: {file_path}")
             return
 
-        # Determine relative path for tag resolution
-        if file_path.startswith(WIKI_PATH):
-            relative_path = "wiki/" + os.path.relpath(file_path, WIKI_PATH)
-            source_type = "wiki"
-        elif file_path.startswith(DOCUMENTS_PATH):
-            relative_path = "documents/" + os.path.relpath(file_path, DOCUMENTS_PATH)
-            source_type = "document"
-        else:
-            relative_path = os.path.basename(file_path)
-            source_type = "document"
-
+        relative_path, source_type = source_metadata(file_path)
         tags = self.tag_resolver.resolve(relative_path)
         ext = os.path.splitext(file_path)[1].lower()
 
         try:
-            if source_type == "wiki" and ext == ".md":
-                chunks = await self._process_wiki_file(file_path)
-            elif ext in UNSTRUCTURED_EXTENSIONS:
-                chunks = await self._process_unstructured_file(file_path)
-            elif ext in TEXT_EXTENSIONS:
-                chunks = await self._process_text_file(file_path)
-            else:
-                logger.warning(f"Unsupported file type: {file_path}")
+            chunks = await self._process_file_by_type(file_path, source_type, ext)
+            if chunks is None:
                 return
-
             if not chunks:
                 logger.warning(f"No content extracted from: {file_path}")
                 return
 
-            # Delete old vectors for this file (best-effort during re-index)
-            try:
-                self._delete_file_vectors(file_path)
-            except Exception as e:
-                logger.debug(f"Pre-index delete skipped for {file_path}: {e}")
-
-            # Generate embeddings and upsert
-            points = []
+            self._delete_existing_vectors_for_reindex(file_path)
             expected_chunks = len(chunks)
-            failed_chunks = 0
-            for i, chunk_text_content in enumerate(chunks):
-                try:
-                    embedding = await self.embedding_client.embed(chunk_text_content)
-                except Exception as e:
-                    logger.error(f"Embedding failed for chunk {i} of {file_path}: {e!r}")
-                    failed_chunks += 1
-                    continue
-
-                point_id = self._generate_point_id(file_path, i)
-                payload = {
-                    "source_type": source_type,
-                    "source_file": relative_path,
-                    "chunk_index": i,
-                    "text": chunk_text_content,
-                    "tags": tags,
-                    "indexed_at": int(time.time()),
-                }
-
-                # Add wiki-specific metadata
-                if source_type == "wiki":
-                    wiki_data = parse_wiki_markdown(file_path)
-                    if wiki_data:
-                        payload["entry_id"] = wiki_data["id"]
-                        payload["dimension"] = wiki_data["dimension"]
-                        payload["subject"] = wiki_data["subject"]
-
-                points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
+            points, failed_chunks = await self._build_points(
+                file_path,
+                chunks,
+                source_type,
+                relative_path,
+                tags,
+            )
 
             if failed_chunks > 0 and not points:
                 logger.error(f"All chunks failed for {file_path}, skipping state update")
@@ -482,6 +496,82 @@ class Indexer:
 
         except Exception as e:
             logger.error(f"Failed to index {file_path}: {e}")
+
+    async def _process_file_by_type(self, file_path: str, source_type: str, ext: str) -> list[str] | None:
+        if source_type == "wiki" and ext == ".md":
+            return await self._process_wiki_file(file_path)
+        if ext in UNSTRUCTURED_EXTENSIONS:
+            return await self._process_unstructured_file(file_path)
+        if ext in TEXT_EXTENSIONS:
+            return await self._process_text_file(file_path)
+
+        logger.warning(f"Unsupported file type: {file_path}")
+        return None
+
+    def _delete_existing_vectors_for_reindex(self, file_path: str):
+        try:
+            self._delete_file_vectors(file_path)
+        except Exception as e:
+            logger.debug(f"Pre-index delete skipped for {file_path}: {e}")
+
+    async def _build_points(
+        self,
+        file_path: str,
+        chunks: list[str],
+        source_type: str,
+        relative_path: str,
+        tags: list[str],
+    ) -> tuple[list[PointStruct], int]:
+        points = []
+        failed_chunks = 0
+        wiki_data = parse_wiki_markdown(file_path) if source_type == "wiki" else None
+
+        for i, chunk_text_content in enumerate(chunks):
+            point = await self._build_point(
+                file_path,
+                i,
+                chunk_text_content,
+                source_type,
+                relative_path,
+                tags,
+                wiki_data,
+            )
+            if point:
+                points.append(point)
+            else:
+                failed_chunks += 1
+
+        return points, failed_chunks
+
+    async def _build_point(
+        self,
+        file_path: str,
+        chunk_index: int,
+        chunk_text_content: str,
+        source_type: str,
+        relative_path: str,
+        tags: list[str],
+        wiki_data: dict | None,
+    ) -> PointStruct | None:
+        try:
+            embedding = await self.embedding_client.embed(chunk_text_content)
+        except Exception as e:
+            logger.error(f"Embedding failed for chunk {chunk_index} of {file_path}: {e!r}")
+            return None
+
+        payload = chunk_payload(
+            chunk_text_content,
+            chunk_index,
+            source_type,
+            relative_path,
+            tags,
+            wiki_data,
+        )
+        return PointStruct(
+            id=self._generate_point_id(file_path, chunk_index),
+            vector=embedding,
+            payload=payload,
+        )
 
     async def _process_wiki_file(self, file_path: str) -> list[str]:
         """Process a wiki markdown file into text chunks."""
@@ -599,8 +689,7 @@ class IndexerEventHandler(FileSystemEventHandler):
             self._schedule(event.src_path)
 
     def on_modified(self, event: FileSystemEvent):
-        if not event.is_directory:
-            self._schedule(event.src_path)
+        self.on_created(event)
 
     def on_deleted(self, event: FileSystemEvent):
         if not event.is_directory:

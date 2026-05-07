@@ -94,34 +94,7 @@ public sealed class BinaryResolver : IBinaryResolver
             var root = doc.RootElement;
 
             if (root.TryGetProperty("tools", out var toolsArray))
-            {
-                foreach (var toolElem in toolsArray.EnumerateArray())
-                {
-                    if (toolElem.TryGetProperty("name", out var nameElem) &&
-                        toolElem.TryGetProperty("version", out var versionElem) &&
-                        toolElem.TryGetProperty("path", out var pathElem) &&
-                        toolElem.TryGetProperty("type", out var typeElem))
-                    {
-                        var name = nameElem.GetString();
-                        var version = versionElem.GetString();
-                        var path = pathElem.GetString();
-                        var type = typeElem.GetString();
-
-                        if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(version) &&
-                            !string.IsNullOrWhiteSpace(path) && !string.IsNullOrWhiteSpace(type))
-                        {
-                            _manifest[name] = new BinaryInfo
-                            {
-                                Name = name,
-                                Version = version,
-                                Path = path,
-                                Type = type,
-                                Note = toolElem.TryGetProperty("note", out var noteElem) ? noteElem.GetString() : null
-                            };
-                        }
-                    }
-                }
-            }
+                LoadTools(toolsArray);
 
             _logger.LogInformation("Loaded {Count} tools from manifest", _manifest.Count);
         }
@@ -129,6 +102,61 @@ public sealed class BinaryResolver : IBinaryResolver
         {
             _logger.LogError(ex, "Failed to load tools manifest from {Path}", manifestPath);
         }
+    }
+
+    private void LoadTools(JsonElement toolsArray)
+    {
+        foreach (var toolElem in toolsArray.EnumerateArray())
+        {
+            if (TryCreateBinaryInfo(toolElem, out var info))
+                _manifest[info.Name] = info;
+        }
+    }
+
+    private static bool TryCreateBinaryInfo(JsonElement toolElem, out BinaryInfo info)
+    {
+        info = null!;
+
+        if (!TryReadRequiredToolFields(toolElem, out var name, out var version, out var path, out var type))
+            return false;
+
+        info = new BinaryInfo
+        {
+            Name = name,
+            Version = version,
+            Path = path,
+            Type = type,
+            Note = toolElem.TryGetProperty("note", out var noteElem) ? noteElem.GetString() : null
+        };
+        return true;
+    }
+
+    private static bool TryReadRequiredToolFields(
+        JsonElement toolElem,
+        out string name,
+        out string version,
+        out string path,
+        out string type)
+    {
+        name = version = path = type = string.Empty;
+
+        if (!toolElem.TryGetProperty("name", out var nameElem) ||
+            !toolElem.TryGetProperty("version", out var versionElem) ||
+            !toolElem.TryGetProperty("path", out var pathElem) ||
+            !toolElem.TryGetProperty("type", out var typeElem))
+        {
+            return false;
+        }
+
+        name = nameElem.GetString() ?? string.Empty;
+        version = versionElem.GetString() ?? string.Empty;
+        path = pathElem.GetString() ?? string.Empty;
+        type = typeElem.GetString() ?? string.Empty;
+
+        return !string.IsNullOrWhiteSpace(name) &&
+               !string.IsNullOrWhiteSpace(version) &&
+               !string.IsNullOrWhiteSpace(path) &&
+               !string.IsNullOrWhiteSpace(type);
     }
 
     /// <summary>

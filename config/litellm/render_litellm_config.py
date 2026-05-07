@@ -136,56 +136,87 @@ def parse_provider_keys(provider_name: str, provider_spec: dict[str, Any]) -> di
     keys = ensure_list(provider_spec.get("keys", []), f"providers.{provider_name}.keys")
     base_urls = ensure_list(provider_spec.get("base_url", []), f"providers.{provider_name}.base_url")
 
-    parsed: dict[str, dict[str, Any]] = {}
     prefix = provider_name
 
     if keys:
-        for idx, key_ref in enumerate(keys, start=1):
-            key_path = f"providers.{provider_name}.keys[{idx-1}]"
-            key_spec = ensure_mapping(key_ref, key_path)
-            key_enabled = bool(key_spec.get("enabled", True))
-            api_key_env = parse_env_ref(key_spec, key_path)
-            api_base_env = key_spec.get("api_base_env")
-            api_base_env_name = None
-            if api_base_env is not None:
-                api_base_env_name = ensure_string(api_base_env, f"{key_path}.api_base_env")
-            elif base_urls:
-                url_ref = parse_env_ref(
-                    base_urls[min(idx - 1, len(base_urls) - 1)],
-                    f"providers.{provider_name}.base_url[{min(idx - 1, len(base_urls) - 1)}]",
-                )
-                api_base_env_name = url_ref
-
-            required_env = [api_key_env]
-            litellm_params: dict[str, Any] = {"api_key": f"os.environ/{api_key_env}"}
-            if api_base_env_name:
-                required_env.append(api_base_env_name)
-                litellm_params["api_base"] = f"os.environ/{api_base_env_name}"
-
-            parsed[f"{prefix}{idx}"] = {
-                "provider": provider_name,
-                "required_env": required_env,
-                "litellm_params": litellm_params,
-                "enabled": key_enabled,
-            }
-    elif base_urls:
-        for idx, base_ref in enumerate(base_urls, start=1):
-            base_env = parse_env_ref(base_ref, f"providers.{provider_name}.base_url[{idx-1}]")
-            litellm_params: dict[str, Any] = {"api_base": f"os.environ/{base_env}"}
-            if provider_name in {"ollama", "local"}:
-                litellm_params["api_key"] = "local"
-            parsed[f"{prefix}{idx}"] = {
-                "provider": provider_name,
-                "required_env": [base_env],
-                "litellm_params": litellm_params,
-                "enabled": True,
-            }
-    else:
-        raise SpecValidationError(
-            f"providers.{provider_name} must define at least one key or base_url entry"
+        return dict(
+            provider_key_entry(provider_name, prefix, idx, key_ref, base_urls)
+            for idx, key_ref in enumerate(keys, start=1)
         )
 
-    return parsed
+    if base_urls:
+        return dict(
+            provider_base_url_entry(provider_name, prefix, idx, base_ref)
+            for idx, base_ref in enumerate(base_urls, start=1)
+        )
+
+    raise SpecValidationError(
+        f"providers.{provider_name} must define at least one key or base_url entry"
+    )
+
+
+def provider_key_entry(
+    provider_name: str,
+    prefix: str,
+    idx: int,
+    key_ref: Any,
+    base_urls: list[Any],
+) -> tuple[str, dict[str, Any]]:
+    key_path = f"providers.{provider_name}.keys[{idx-1}]"
+    key_spec = ensure_mapping(key_ref, key_path)
+    api_key_env = parse_env_ref(key_spec, key_path)
+    api_base_env_name = provider_key_base_env(provider_name, key_spec, key_path, base_urls, idx)
+
+    required_env = [api_key_env]
+    litellm_params: dict[str, Any] = {"api_key": f"os.environ/{api_key_env}"}
+    if api_base_env_name:
+        required_env.append(api_base_env_name)
+        litellm_params["api_base"] = f"os.environ/{api_base_env_name}"
+
+    return f"{prefix}{idx}", {
+        "provider": provider_name,
+        "required_env": required_env,
+        "litellm_params": litellm_params,
+        "enabled": bool(key_spec.get("enabled", True)),
+    }
+
+
+def provider_key_base_env(
+    provider_name: str,
+    key_spec: dict[str, Any],
+    key_path: str,
+    base_urls: list[Any],
+    idx: int,
+) -> str | None:
+    api_base_env = key_spec.get("api_base_env")
+    if api_base_env is not None:
+        return ensure_string(api_base_env, f"{key_path}.api_base_env")
+    if not base_urls:
+        return None
+
+    base_idx = min(idx - 1, len(base_urls) - 1)
+    return parse_env_ref(
+        base_urls[base_idx],
+        f"providers.{provider_name}.base_url[{base_idx}]",
+    )
+
+
+def provider_base_url_entry(
+    provider_name: str,
+    prefix: str,
+    idx: int,
+    base_ref: Any,
+) -> tuple[str, dict[str, Any]]:
+    base_env = parse_env_ref(base_ref, f"providers.{provider_name}.base_url[{idx-1}]")
+    litellm_params: dict[str, Any] = {"api_base": f"os.environ/{base_env}"}
+    if provider_name in {"ollama", "local"}:
+        litellm_params["api_key"] = "local"
+    return f"{prefix}{idx}", {
+        "provider": provider_name,
+        "required_env": [base_env],
+        "litellm_params": litellm_params,
+        "enabled": True,
+    }
 
 
 def normalize_fallbacks(
@@ -206,12 +237,14 @@ def normalize_fallbacks(
     return result
 
 
-def build_output(spec: dict[str, Any]) -> dict[str, Any]:
-    providers = ensure_mapping(spec.get("providers"), "providers")
-    routes = ensure_mapping(spec.get("routes"), "routes")
-    aliases = ensure_mapping(spec.get("aliases", {}), "aliases")
-    router = ensure_mapping(spec.get("router", {}), "router")
-
+def parse_providers(
+    providers: dict[str, Any],
+) -> tuple[
+    dict[str, dict[str, dict[str, Any]]],
+    dict[str, dict[str, Any]],
+    dict[str, list[str]],
+    dict[str, str],
+]:
     provider_models: dict[str, dict[str, dict[str, Any]]] = {}
     provider_keys: dict[str, dict[str, Any]] = {}
     provider_route_keys: dict[str, list[str]] = {}
@@ -232,62 +265,137 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
         provider_keys.update(parsed_keys)
         provider_route_keys[name] = list(parsed_keys.keys())
 
-    available_keys = {
+    return provider_models, provider_keys, provider_route_keys, provider_prefixes
+
+
+def enabled_key_names(provider_keys: dict[str, dict[str, Any]]) -> set[str]:
+    return {
         key_name
         for key_name, key_spec in provider_keys.items()
         if key_spec.get("enabled", True) and all(has_value(env_name) for env_name in key_spec["required_env"])
     }
 
-    route_deployments: dict[str, list[dict[str, Any]]] = {route_name: [] for route_name in routes}
+
+def model_full_name(provider_prefix: str, model_spec: dict[str, Any]) -> str:
+    if model_spec.get("use_responses_api", False):
+        return f"{provider_prefix}/responses/{model_spec['name']}"
+    return f"{provider_prefix}/{model_spec['name']}"
+
+
+def build_route_deployments(
+    routes: dict[str, Any],
+    provider_models: dict[str, dict[str, dict[str, Any]]],
+    provider_keys: dict[str, dict[str, Any]],
+    provider_route_keys: dict[str, list[str]],
+    provider_prefixes: dict[str, str],
+    available_keys: set[str],
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+    route_deployments: dict[str, list[dict[str, Any]]] = {}
     model_list: list[dict[str, Any]] = []
 
     for route_name, raw_entries in routes.items():
         route = ensure_string(route_name, "routes key")
+        route_deployments[route] = []
         entries = ensure_list(raw_entries, f"routes.{route}")
         for idx, raw_entry in enumerate(entries):
-            entry_path = f"routes.{route}[{idx}]"
-            entry = ensure_mapping(raw_entry, entry_path)
-            provider = ensure_string(entry.get("provider"), f"{entry_path}.provider")
-            model_id = ensure_string(entry.get("model"), f"{entry_path}.model")
-            order = ensure_number(entry.get("order"), f"{entry_path}.order")
-            if provider not in provider_models:
-                raise SpecValidationError(f"{entry_path}.provider '{provider}' is not defined")
-            if model_id not in provider_models[provider]:
-                raise SpecValidationError(
-                    f"{entry_path}.model '{model_id}' is not defined under providers.{provider}.models"
-                )
-            selected_keys = entry.get("keys", provider_route_keys[provider])
-            selected_keys = ensure_string_list(selected_keys, f"{entry_path}.keys")
-            model_spec = provider_models[provider][model_id]
-            model_litellm_params = copy.deepcopy(model_spec.get("litellm_params", {}))
-            use_responses_api = model_spec.get("use_responses_api", False)
-            if use_responses_api:
-                full_model_name = f"{provider_prefixes[provider]}/responses/{model_spec['name']}"
-            else:
-                full_model_name = f"{provider_prefixes[provider]}/{model_spec['name']}"
+            deployments = route_entry_deployments(
+                route,
+                idx,
+                raw_entry,
+                provider_models,
+                provider_keys,
+                provider_route_keys,
+                provider_prefixes,
+                available_keys,
+            )
+            route_deployments[route].extend(deployments)
+            model_list.extend(copy.deepcopy(deployment) for deployment in deployments)
 
-            for key_name in selected_keys:
-                if key_name not in provider_keys:
-                    raise SpecValidationError(f"{entry_path}.keys references unknown key '{key_name}'")
-                key_spec = provider_keys[key_name]
-                if key_spec["provider"] != provider:
-                    raise SpecValidationError(
-                        f"{entry_path}.keys '{key_name}' belongs to provider '{key_spec['provider']}', not '{provider}'"
-                    )
-                if key_name not in available_keys:
-                    continue
-                litellm_params = copy.deepcopy(key_spec["litellm_params"])
-                litellm_params["model"] = full_model_name
-                litellm_params.update(model_litellm_params)
-                litellm_params["order"] = order
-                deployment = {
-                    "model_name": route,
-                    "litellm_params": litellm_params,
-                    "model_info": copy.deepcopy(model_spec["model_info"]),
-                }
-                route_deployments[route].append(deployment)
-                model_list.append(copy.deepcopy(deployment))
+    return route_deployments, model_list
 
+
+def route_entry_deployments(
+    route: str,
+    idx: int,
+    raw_entry: Any,
+    provider_models: dict[str, dict[str, dict[str, Any]]],
+    provider_keys: dict[str, dict[str, Any]],
+    provider_route_keys: dict[str, list[str]],
+    provider_prefixes: dict[str, str],
+    available_keys: set[str],
+) -> list[dict[str, Any]]:
+    entry_path = f"routes.{route}[{idx}]"
+    entry = ensure_mapping(raw_entry, entry_path)
+    provider = ensure_string(entry.get("provider"), f"{entry_path}.provider")
+    model_id = ensure_string(entry.get("model"), f"{entry_path}.model")
+    order = ensure_number(entry.get("order"), f"{entry_path}.order")
+
+    if provider not in provider_models:
+        raise SpecValidationError(f"{entry_path}.provider '{provider}' is not defined")
+    if model_id not in provider_models[provider]:
+        raise SpecValidationError(
+            f"{entry_path}.model '{model_id}' is not defined under providers.{provider}.models"
+        )
+
+    model_spec = provider_models[provider][model_id]
+    selected_keys = entry.get("keys", provider_route_keys[provider])
+    return [
+        deployment
+        for key_name in ensure_string_list(selected_keys, f"{entry_path}.keys")
+        if (
+            deployment := route_key_deployment(
+                route,
+                key_name,
+                entry_path,
+                provider,
+                model_spec,
+                order,
+                provider_keys,
+                provider_prefixes,
+                available_keys,
+            )
+        )
+    ]
+
+
+def route_key_deployment(
+    route: str,
+    key_name: str,
+    entry_path: str,
+    provider: str,
+    model_spec: dict[str, Any],
+    order: int | float,
+    provider_keys: dict[str, dict[str, Any]],
+    provider_prefixes: dict[str, str],
+    available_keys: set[str],
+) -> dict[str, Any] | None:
+    if key_name not in provider_keys:
+        raise SpecValidationError(f"{entry_path}.keys references unknown key '{key_name}'")
+
+    key_spec = provider_keys[key_name]
+    if key_spec["provider"] != provider:
+        raise SpecValidationError(
+            f"{entry_path}.keys '{key_name}' belongs to provider '{key_spec['provider']}', not '{provider}'"
+        )
+    if key_name not in available_keys:
+        return None
+
+    litellm_params = copy.deepcopy(key_spec["litellm_params"])
+    litellm_params["model"] = model_full_name(provider_prefixes[provider], model_spec)
+    litellm_params.update(copy.deepcopy(model_spec.get("litellm_params", {})))
+    litellm_params["order"] = order
+    return {
+        "model_name": route,
+        "litellm_params": litellm_params,
+        "model_info": copy.deepcopy(model_spec["model_info"]),
+    }
+
+
+def add_alias_deployments(
+    aliases: dict[str, Any],
+    route_deployments: dict[str, list[dict[str, Any]]],
+    model_list: list[dict[str, Any]],
+) -> dict[str, str]:
     alias_map: dict[str, str] = {}
     for alias_name, route_name in aliases.items():
         alias = ensure_string(alias_name, "aliases key")
@@ -300,8 +408,15 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
             alias_deployment["model_name"] = alias
             model_list.append(alias_deployment)
 
-    route_names = set(route_deployments.keys())
-    alias_names = set(alias_map.keys())
+    return alias_map
+
+
+def build_router_settings(
+    router: dict[str, Any],
+    route_names: set[str],
+    alias_names: set[str],
+    alias_map: dict[str, str],
+) -> dict[str, Any]:
     fallback_targets = route_names | alias_names
 
     route_fallbacks = normalize_fallbacks(
@@ -324,6 +439,10 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
     router_settings["fallbacks"] = route_fallbacks + alias_fallbacks
     router_settings["model_group_alias"] = alias_map
 
+    return router_settings
+
+
+def build_general_settings(router: dict[str, Any]) -> dict[str, Any]:
     general_settings = copy.deepcopy(GENERAL_SETTINGS_DEFAULT)
     if "fallback_on_status_codes" in router:
         general_settings["fallback_on_status_codes"] = ensure_list(
@@ -332,10 +451,35 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
     else:
         general_settings["fallback_on_status_codes"] = [429, 500, 502, 503, 504]
 
+    return general_settings
+
+
+def build_output(spec: dict[str, Any]) -> dict[str, Any]:
+    providers = ensure_mapping(spec.get("providers"), "providers")
+    routes = ensure_mapping(spec.get("routes"), "routes")
+    aliases = ensure_mapping(spec.get("aliases", {}), "aliases")
+    router = ensure_mapping(spec.get("router", {}), "router")
+
+    provider_models, provider_keys, provider_route_keys, provider_prefixes = parse_providers(providers)
+    route_deployments, model_list = build_route_deployments(
+        routes,
+        provider_models,
+        provider_keys,
+        provider_route_keys,
+        provider_prefixes,
+        enabled_key_names(provider_keys),
+    )
+    alias_map = add_alias_deployments(aliases, route_deployments, model_list)
+
     return {
         "model_list": model_list,
-        "router_settings": router_settings,
-        "general_settings": general_settings,
+        "router_settings": build_router_settings(
+            router,
+            set(route_deployments.keys()),
+            set(alias_map.keys()),
+            alias_map,
+        ),
+        "general_settings": build_general_settings(router),
         "litellm_settings": copy.deepcopy(LITELLM_SETTINGS_DEFAULT),
     }
 

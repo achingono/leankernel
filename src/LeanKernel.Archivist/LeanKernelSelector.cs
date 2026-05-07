@@ -45,12 +45,22 @@ public static class LeanKernelSelector
         double recencyDecay,
         double dimensionMatch,
         double interactionFrequency,
-        double semWeight = 0.40,
-        double recWeight = 0.20,
-        double dimWeight = 0.25,
-        double freqWeight = 0.15)
-        => (semanticSimilarity * semWeight)
-         + (recencyDecay * recWeight)
-         + (dimensionMatch * dimWeight)
-         + (interactionFrequency * freqWeight);
+        RelevanceScoreWeights? weights = null)
+    {
+        weights ??= RelevanceScoreWeights.Default;
+
+        return (semanticSimilarity * weights.Semantic)
+             + (recencyDecay * weights.Recency)
+             + (dimensionMatch * weights.Dimension)
+             + (interactionFrequency * weights.Frequency);
+    }
+}
+
+public sealed record RelevanceScoreWeights(
+    double Semantic = 0.40,
+    double Recency = 0.20,
+    double Dimension = 0.25,
+    double Frequency = 0.15)
+{
+    public static RelevanceScoreWeights Default { get; } = new();
 }

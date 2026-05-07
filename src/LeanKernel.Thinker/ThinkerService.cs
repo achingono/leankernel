@@ -11,6 +11,35 @@ using LeanKernel.Thinker.Routing;
 namespace LeanKernel.Thinker;
 
 /// <summary>
+/// Aggregates collaborators used by the thinker service.
+/// </summary>
+public sealed class ThinkerServiceDependencies
+{
+    public ThinkerServiceDependencies(
+        IContextGatekeeper gatekeeper,
+        ISessionStore sessions,
+        IWikiStore wiki,
+        AgentFactory agentFactory,
+        ToolFunctionAdapter toolAdapter,
+        PromptAssembler promptAssembler)
+    {
+        Gatekeeper = gatekeeper;
+        Sessions = sessions;
+        Wiki = wiki;
+        AgentFactory = agentFactory;
+        ToolAdapter = toolAdapter;
+        PromptAssembler = promptAssembler;
+    }
+
+    public IContextGatekeeper Gatekeeper { get; }
+    public ISessionStore Sessions { get; }
+    public IWikiStore Wiki { get; }
+    public AgentFactory AgentFactory { get; }
+    public ToolFunctionAdapter ToolAdapter { get; }
+    public PromptAssembler PromptAssembler { get; }
+}
+
+/// <summary>
 /// Main reasoning loop. Takes a message, obtains gated context
 /// from the Archivist, sends to LLM via MAF ChatClientAgent, and
 /// persists learned facts back to the wiki.
@@ -29,23 +58,18 @@ public sealed class ThinkerService : IThinkerService
     private readonly ILogger<ThinkerService> _logger;
 
     public ThinkerService(
-        IContextGatekeeper gatekeeper,
-        ISessionStore sessions,
-        IWikiStore wiki,
-        AgentFactory agentFactory,
-        ToolFunctionAdapter toolAdapter,
-        PromptAssembler promptAssembler,
+        ThinkerServiceDependencies dependencies,
         IOptions<LeanKernelConfig> config,
         ILogger<ThinkerService> logger,
         ModelRoutingService? routing = null,
         SelectionLogStore? selectionLog = null)
     {
-        _gatekeeper = gatekeeper;
-        _sessions = sessions;
-        _wiki = wiki;
-        _agentFactory = agentFactory;
-        _toolAdapter = toolAdapter;
-        _promptAssembler = promptAssembler;
+        _gatekeeper = dependencies.Gatekeeper;
+        _sessions = dependencies.Sessions;
+        _wiki = dependencies.Wiki;
+        _agentFactory = dependencies.AgentFactory;
+        _toolAdapter = dependencies.ToolAdapter;
+        _promptAssembler = dependencies.PromptAssembler;
         _routing = routing;
         _selectionLog = selectionLog;
         _config = config.Value;
