@@ -50,7 +50,7 @@ public sealed class ChannelDeliveryIntegrationTests
             IsUrgent = true // Urgent to bypass active hours check
         };
 
-        var enqueueResult = await messageQueue.EnqueueAsync(message);
+        var enqueueResult = await messageQueue.EnqueueAsync(message, isUrgent: true);
         Assert.True(enqueueResult.Success);
 
         // Act: Process the message (background service)
@@ -95,7 +95,7 @@ public sealed class ChannelDeliveryIntegrationTests
             IsUrgent = true
         };
 
-        await messageQueue.EnqueueAsync(message);
+        await messageQueue.EnqueueAsync(message, isUrgent: true);
 
         // Act
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -103,9 +103,11 @@ public sealed class ChannelDeliveryIntegrationTests
         await Task.Delay(2000);
         cts.Cancel();
 
-        // Assert: Message should be marked as failed (not in ready messages)
         var readyMessages = await messageQueue.GetReadyMessagesAsync();
-        Assert.Empty(readyMessages);
+        var failedMessage = Assert.Single(readyMessages);
+        Assert.Equal("test-msg-2", failedMessage.Id);
+        Assert.Equal(1, failedMessage.RetryAttempts);
+        Assert.Equal("Channel 'NonExistentChannel' not configured", failedMessage.LastError);
     }
 
     [Fact]
@@ -138,7 +140,7 @@ public sealed class ChannelDeliveryIntegrationTests
             IsUrgent = true
         };
 
-        await messageQueue.EnqueueAsync(message);
+        await messageQueue.EnqueueAsync(message, isUrgent: true);
 
         // Act
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -153,14 +155,13 @@ public sealed class ChannelDeliveryIntegrationTests
     [Fact]
     public async Task MessageDelivery_BatchesDuringQuietHours()
     {
-        // Arrange: Create rules with very restrictive active hours
+        // Arrange: Create rules with active hours that are closed for the whole day.
         var rules = new EngagementRules
         {
             TimeBoundaries = new TimeBoundaries
             {
                 Timezone = "UTC",
-                ActiveHoursStart = 12, // Noon
-                ActiveHoursEnd = 13    // 1 PM (current time likely outside these hours)
+                ActiveHoursEnd = 0
             }
         };
 
@@ -196,9 +197,9 @@ public sealed class ChannelDeliveryIntegrationTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await backgroundService.RunAsync(cts.Token);
 
-        // Assert: Message should still be pending (not delivered) since it's quiet hours
-        var readyMessages = await messageQueue.GetReadyMessagesAsync();
-        // May be empty if we're outside active hours, which is expected
+        var stats = await messageQueue.GetStatsAsync();
+        Assert.Equal(1, stats.PendingMessages);
+        Assert.Equal(0, stats.DeliveredMessages);
     }
 
     [Fact]
@@ -210,8 +211,7 @@ public sealed class ChannelDeliveryIntegrationTests
             TimeBoundaries = new TimeBoundaries
             {
                 Timezone = "UTC",
-                ActiveHoursStart = 12,
-                ActiveHoursEnd = 13
+                ActiveHoursEnd = 0
             }
         };
 
@@ -260,8 +260,9 @@ public sealed class ChannelDeliveryIntegrationTests
         {
             TimeBoundaries = new TimeBoundaries
             {
-                Timezone = "UTC"
-                // Default active hours are 8 AM to 10 PM, so we're likely in active hours
+                Timezone = "UTC",
+                ActiveHoursStart = null,
+                ActiveHoursEnd = null
             }
         };
     }
