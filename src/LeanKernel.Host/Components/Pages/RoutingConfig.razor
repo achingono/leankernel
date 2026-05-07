@@ -1,0 +1,391 @@
+@page "/admin/routing-config"
+@using System.Diagnostics.CodeAnalysis
+@using System.Net.Http.Json
+@using LeanKernel.Host.Models.Routing
+@attribute [ExcludeFromCodeCoverage]
+@inject HttpClient Http
+@rendermode InteractiveServer
+
+<div class="page-header">
+    <h1><span class="text-neon"><LeanKernelIcon Name="routing" /></span> Routing Config</h1>
+    <p class="subtitle">Manage providers, models, route lanes, and aliases</p>
+</div>
+
+@if (_loadError != null)
+{
+    <div class="glass-card border-warning" style="margin-bottom: 1rem;">
+        <p class="text-warning" style="margin: 0;">⚠ Failed to load routing config: @_loadError</p>
+    </div>
+}
+
+@if (_saveResult != null)
+{
+    <div class="glass-card @(_saveResult.HasErrors ? "border-warning" : "border-success")" style="margin-bottom: 1rem;">
+        @if (_saveResult.Saved)
+        {
+            <p class="text-cyan" style="margin: 0 0 0.25rem;">✓ Configuration saved successfully.</p>
+        }
+        else if (_saveResult.IsDryRun && !_saveResult.HasErrors)
+        {
+            <p class="text-cyan" style="margin: 0 0 0.25rem;">✓ Dry-run complete — no validation errors.</p>
+        }
+        else if (_saveResult.HasErrors)
+        {
+            <p class="text-warning" style="margin: 0 0 0.25rem;">⚠ Validation errors prevented save.</p>
+        }
+
+        @if (_saveResult.ValidationErrors.Count > 0)
+        {
+            <ul style="margin: 0.25rem 0 0; padding-left: 1.5rem; font-size: 0.85rem;">
+                @foreach (var e in _saveResult.ValidationErrors)
+                {
+                    <li class="@(e.Severity == "error" ? "text-warning" : "text-muted")">[@e.Severity] @e.Message</li>
+                }
+            </ul>
+        }
+
+        @if (!string.IsNullOrEmpty(_saveResult.Diff))
+        {
+            <details style="margin-top: 0.75rem;">
+                <summary style="cursor: pointer; color: var(--text-muted); font-size: 0.85rem;">Show YAML diff</summary>
+                <pre style="margin-top: 0.5rem; font-size: 0.75rem; overflow-x: auto; background: rgba(0,0,0,0.3); padding: 0.75rem; border-radius: 4px;">@_saveResult.Diff</pre>
+            </details>
+        }
+    </div>
+}
+
+@if (_loading)
+{
+    <div class="glass-card" style="text-align: center; padding: 3rem;">
+        <p class="text-muted">Loading routing configuration...</p>
+    </div>
+}
+else if (_response != null)
+{
+    var config = _response.Config;
+
+    <!-- Validation summary -->
+    @if (_response.ValidationErrors.Count > 0)
+    {
+        <div class="glass-card border-warning" style="margin-bottom: 1rem;">
+            <p class="text-warning" style="margin: 0 0 0.5rem;"><strong>Validation Issues</strong></p>
+            <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.85rem;">
+                @foreach (var e in _response.ValidationErrors)
+                {
+                    <li class="@(e.Severity == "error" ? "text-warning" : "text-muted")">[@e.Severity] @e.Message</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="content-grid stagger-in">
+
+        <!-- Provider Inventory -->
+        <div class="glass-card" style="grid-column: 1 / -1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 class="text-cyan">Provider Inventory</h3>
+            </div>
+            @foreach (var (providerName, provider) in config.Providers)
+            {
+                <div class="glass-card" style="margin-bottom: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <strong>@providerName</strong>
+                        @if (!string.IsNullOrEmpty(provider.LitellmProvider))
+                        {
+                            <span class="badge">via @provider.LitellmProvider</span>
+                        }
+                    </div>
+
+                    <!-- Key Slots -->
+                    <div style="margin-bottom: 0.5rem;">
+                        <span class="setting-label" style="font-size: 0.8rem;">Key Slots</span>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;">
+                            @foreach (var ks in GetKeyStatuses(providerName))
+                            {
+                                <span class="badge @(ks.Configured ? "badge-success" : "badge-warning")" title="@ks.EnvVar">
+                                    @ks.SlotName @(ks.Configured ? "✓" : "✗")
+                                    @if (!ks.Enabled) { <span style="opacity: 0.6;"> (disabled)</span> }
+                                </span>
+                            }
+                            @if (!GetKeyStatuses(providerName).Any())
+                            {
+                                <span class="text-muted" style="font-size: 0.8rem;">No key slots</span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Model Catalog -->
+                    <div>
+                        <span class="setting-label" style="font-size: 0.8rem;">Models</span>
+                        <div style="overflow-x: auto; margin-top: 0.25rem;">
+                            <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="color: var(--text-muted);">
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">ID</th>
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Name</th>
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Mode</th>
+                                        <th style="text-align: right; padding: 0.25rem 0.5rem;">Max Tokens</th>
+                                        <th style="text-align: right; padding: 0.25rem 0.5rem;">Dimensions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var model in provider.Models)
+                                    {
+                                        <tr style="border-top: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 0.25rem 0.5rem; font-family: monospace; color: #00d4ff;">@model.Id</td>
+                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted);">@model.Name</td>
+                                            <td style="padding: 0.25rem 0.5rem;">
+                                                @if (!string.IsNullOrEmpty(model.Mode))
+                                                {
+                                                    <span class="badge">@model.Mode</span>
+                                                }
+                                                else
+                                                {
+                                                    <span style="color: var(--text-muted);">chat</span>
+                                                }
+                                            </td>
+                                            <td style="padding: 0.25rem 0.5rem; text-align: right;">@(model.MaxTokens > 0 ? model.MaxTokens.ToString("N0") : "—")</td>
+                                            <td style="padding: 0.25rem 0.5rem; text-align: right;">@(model.Dimensions.HasValue ? model.Dimensions.Value.ToString() : "—")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Route Lanes -->
+        <div class="glass-card" style="grid-column: 1 / -1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 class="text-cyan">Route Lanes</h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn-secondary btn-sm" @onclick="() => DryRun()" disabled="@_saving">Validate</button>
+                    <button class="btn-primary btn-sm" @onclick="() => Save()" disabled="@_saving">Save Config</button>
+                </div>
+            </div>
+
+            @{
+                var chatLanes = config.Routes.Where(r => !r.Key.StartsWith("embedding")).OrderBy(r => r.Key).ToList();
+                var embeddingLanes = config.Routes.Where(r => r.Key.StartsWith("embedding")).OrderBy(r => r.Key).ToList();
+            }
+
+            @if (chatLanes.Any())
+            {
+                <h4 style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 0.75rem;">Chat Lanes</h4>
+                @foreach (var (lane, entries) in chatLanes)
+                {
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <strong style="color: #00d4ff;">@lane</strong>
+                            <span class="badge">@entries.Count route(s)</span>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="color: var(--text-muted);">
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Order</th>
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Provider</th>
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Model</th>
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Key Slots</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var entry in entries.OrderBy(e => e.Order))
+                                    {
+                                        <tr style="border-top: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted);">@entry.Order</td>
+                                            <td style="padding: 0.25rem 0.5rem; font-weight: 500;">@entry.Provider</td>
+                                            <td style="padding: 0.25rem 0.5rem; font-family: monospace; color: #00d4ff;">@entry.Model</td>
+                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted); font-size: 0.75rem;">@string.Join(", ", entry.Keys)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            }
+
+            @if (embeddingLanes.Any())
+            {
+                <h4 style="color: var(--text-muted); font-size: 0.85rem; margin: 1rem 0 0.75rem;">Embedding Lanes</h4>
+                @foreach (var (lane, entries) in embeddingLanes)
+                {
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <strong style="color: #a78bfa;">@lane</strong>
+                            <span class="badge">embedding</span>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="color: var(--text-muted);">
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Order</th>
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Provider</th>
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Model</th>
+                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Key Slots</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var entry in entries.OrderBy(e => e.Order))
+                                    {
+                                        <tr style="border-top: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted);">@entry.Order</td>
+                                            <td style="padding: 0.25rem 0.5rem; font-weight: 500;">@entry.Provider</td>
+                                            <td style="padding: 0.25rem 0.5rem; font-family: monospace; color: #a78bfa;">@entry.Model</td>
+                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted); font-size: 0.75rem;">@string.Join(", ", entry.Keys)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Aliases -->
+        <div class="glass-card">
+            <h3 class="text-cyan" style="margin-bottom: 1rem;">Alias Mappings</h3>
+            @if (config.Aliases.Count == 0)
+            {
+                <p class="text-muted">No aliases defined.</p>
+            }
+            else
+            {
+                <div class="diagnostic-panel">
+                    @foreach (var (alias, target) in config.Aliases)
+                    {
+                        <div class="diagnostic-row">
+                            <span class="diagnostic-label" style="font-family: monospace;">@alias</span>
+                            <span class="diagnostic-value" style="color: #00d4ff;">→ @target</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Router Policy -->
+        <div class="glass-card">
+            <h3 class="text-cyan" style="margin-bottom: 1rem;">Router Policy</h3>
+            <div class="diagnostic-panel">
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label">Strategy</span>
+                    <span class="diagnostic-value">@config.Router.RoutingStrategy</span>
+                </div>
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label">Pre-call Checks</span>
+                    <span class="diagnostic-value">@config.Router.EnablePreCallChecks</span>
+                </div>
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label">Retries</span>
+                    <span class="diagnostic-value">@config.Router.NumRetries</span>
+                </div>
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label">Retry After</span>
+                    <span class="diagnostic-value">@config.Router.RetryAfter s</span>
+                </div>
+                <div class="diagnostic-row">
+                    <span class="diagnostic-label">Timeout</span>
+                    <span class="diagnostic-value">@config.Router.Timeout s</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private string? _loadError;
+    private bool _saving;
+    private RoutingConfigResponse? _response;
+    private SaveDisplayResult? _saveResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConfig();
+    }
+
+    private async Task LoadConfig()
+    {
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            _response = await Http.GetFromJsonAsync<RoutingConfigResponse>("/api/routing-config");
+        }
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task DryRun()
+    {
+        if (_response is null) return;
+        await SendSave(dryRun: true);
+    }
+
+    private async Task Save()
+    {
+        if (_response is null) return;
+        await SendSave(dryRun: false);
+    }
+
+    private async Task SendSave(bool dryRun)
+    {
+        if (_response is null) return;
+        _saving = true;
+        _saveResult = null;
+
+        try
+        {
+            var request = new RoutingConfigSaveRequest { Config = _response.Config, DryRun = dryRun };
+            var response = await Http.PutAsJsonAsync("/api/routing-config", request);
+            var result = await response.Content.ReadFromJsonAsync<RoutingConfigSaveResponse>();
+
+            _saveResult = new SaveDisplayResult
+            {
+                Saved = result?.Saved ?? false,
+                IsDryRun = dryRun,
+                Diff = result?.YamlDiff ?? "",
+                ValidationErrors = result?.ValidationErrors ?? [],
+                HasErrors = result?.ValidationErrors.Any(e => e.Severity == "error") ?? false
+            };
+
+            if (result?.Saved == true)
+                await LoadConfig();
+        }
+        catch (Exception ex)
+        {
+            _saveResult = new SaveDisplayResult
+            {
+                HasErrors = true,
+                ValidationErrors = [new RoutingValidationError { Code = "EXCEPTION", Message = ex.Message, Severity = "error" }]
+            };
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private IEnumerable<ProviderKeyStatus> GetKeyStatuses(string providerName)
+        => _response?.KeyStatuses.Where(k => k.Provider == providerName) ?? [];
+
+    private sealed class SaveDisplayResult
+    {
+        public bool Saved { get; init; }
+        public bool IsDryRun { get; init; }
+        public string Diff { get; init; } = "";
+        public List<RoutingValidationError> ValidationErrors { get; init; } = [];
+        public bool HasErrors { get; init; }
+    }
+}

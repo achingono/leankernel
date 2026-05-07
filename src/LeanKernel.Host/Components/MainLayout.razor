@@ -70,6 +70,10 @@
                     <LeanKernelIcon Name="routing" Class="nav-icon" />
                     @if (!SidebarCollapsed) { <span>Routing</span> }
                 </NavLink>
+                <NavLink href="/admin/routing-config" class="nav-item" role="listitem" aria-label="Routing Config">
+                    <LeanKernelIcon Name="routing" Class="nav-icon" />
+                    @if (!SidebarCollapsed) { <span>Route Config</span> }
+                </NavLink>
 
                 <div class="nav-spacer"></div>
                 <button class="nav-item nav-logout" @onclick="LogoutAsync" aria-label="Logout">
