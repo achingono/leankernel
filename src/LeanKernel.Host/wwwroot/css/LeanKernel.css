@@ -76,6 +76,7 @@ html {
 
 .LeanKernel-main {
     flex: 1;
+    min-width: 0;
     margin-left: var(--sidebar-width);
     padding: 2rem;
     position: relative;
@@ -245,6 +246,7 @@ html {
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
+    min-width: 0;
     padding: 1.5rem;
     box-shadow: var(--shadow-card);
     transition: all var(--transition-smooth);
@@ -699,8 +701,8 @@ h3 {
 }
 
 .setting-row {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
     align-items: center;
     padding: 0.5rem 0;
     gap: 1rem;
@@ -709,7 +711,7 @@ h3 {
 .setting-label {
     color: var(--text-secondary);
     font-size: 0.85rem;
-    min-width: 180px;
+    min-width: 0;
 }
 
 .setting-input {
@@ -720,8 +722,9 @@ h3 {
     color: var(--text-primary);
     font-family: var(--font-mono);
     font-size: 0.8rem;
-    flex: 1;
-    max-width: 400px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
     outline: none;
     transition: border-color var(--transition-fast);
 }
@@ -1066,6 +1069,11 @@ h3 {
         grid-template-columns: 1fr;
     }
 
+    .setting-row {
+        grid-template-columns: 1fr;
+        align-items: flex-start;
+    }
+
     .files-layout {
         grid-template-columns: 1fr;
         height: auto;
@@ -1084,19 +1092,5 @@ h3 {
 
     .toolbar-row {
         gap: 0.5rem;
-    }
-
-    .setting-row {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .setting-label {
-        min-width: 0;
-    }
-
-    .setting-input {
-        max-width: none;
-        width: 100%;
     }
 }

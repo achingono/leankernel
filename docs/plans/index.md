@@ -6,6 +6,7 @@ This section contains execution-ready product requirements documents (PRDs) for 
 
 | Document | Roadmap Item | Outcome |
 | -------- | ------------ | ------- |
+| [admin-console-customization-prd.md](admin-console-customization-prd.md) | Upgrade runtime settings, LiteLLM routing management, and onboarding UX | Safer customization with a more maintainable admin console |
 | [autonomy-policy-engine-prd.md](autonomy-policy-engine-prd.md) | Add autonomy policy engine and per-tool approval gates | Safer rollout from suggest-only to controlled automation |
 | [run-replay-provenance-prd.md](run-replay-provenance-prd.md) | Ship run replay, cost timeline, and context provenance views | Faster debugging and higher operator trust |
 | [budget-guardrails-fallback-prd.md](budget-guardrails-fallback-prd.md) | Implement budget enforcement with graceful fallback routing | Predictable spend with resilient answer quality |
