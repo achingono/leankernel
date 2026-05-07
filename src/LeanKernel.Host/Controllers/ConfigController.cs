@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Host.Models.Admin;
+using LeanKernel.Host.Services;
 using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
@@ -13,10 +14,12 @@ namespace LeanKernel.Host.Controllers;
 public sealed class ConfigController : ControllerBase
 {
     private readonly IOptions<LeanKernelConfig> _config;
+    private readonly IRuntimeLeanKernelConfigStore _store;
 
-    public ConfigController(IOptions<LeanKernelConfig> config)
+    public ConfigController(IOptions<LeanKernelConfig> config, IRuntimeLeanKernelConfigStore store)
     {
         _config = config;
+        _store = store;
     }
 
     /// <summary>
@@ -191,6 +194,248 @@ public sealed class ConfigController : ControllerBase
             Mutable = true,
             Description = description
         };
+
+    /// <summary>
+    /// Applies a partial config update to the runtime settings file.
+    /// Only non-null patch values are applied; secrets cannot be changed here.
+    /// Returns a diff of applied changes and the updated full config.
+    /// </summary>
+    [HttpPatch]
+    public async Task<IActionResult> PatchConfig(
+        [FromBody] AdminConfigPatchRequest patch,
+        CancellationToken ct)
+    {
+        var current = _store.GetCurrent();
+        var (updated, changes) = ApplyPatch(current, patch);
+
+        if (changes.Count == 0)
+            return Ok(new AdminConfigPatchResponse { Changes = [], UpdatedConfig = BuildResponse(updated) });
+
+        await _store.SaveAsync(updated, ct);
+        return Ok(new AdminConfigPatchResponse { Changes = changes, UpdatedConfig = BuildResponse(updated) });
+    }
+
+    public static (LeanKernelConfig updated, List<ConfigChange> changes) ApplyPatch(
+        LeanKernelConfig current,
+        AdminConfigPatchRequest patch)
+    {
+        var changes = new List<ConfigChange>();
+
+        // Clone the current config to apply changes
+        var liteLlm = current.LiteLlm;
+        var qdrant = current.Qdrant;
+        var signal = current.Signal;
+        var unstructured = current.Unstructured;
+        var wiki = current.Wiki;
+        var agents = current.Agents;
+        var knowledge = current.Knowledge;
+        var context = current.Context;
+        var scheduler = current.Scheduler;
+        var routing = current.Routing;
+
+        if (patch.LiteLlm is { } lp)
+        {
+            liteLlm = new LiteLlmConfig
+            {
+                BaseUrl = ApplyString(liteLlm.BaseUrl, lp.BaseUrl, "LiteLlm", "BaseUrl", changes),
+                ApiKey = liteLlm.ApiKey, // never overwritten via PATCH
+                DefaultModel = ApplyString(liteLlm.DefaultModel, lp.DefaultModel, "LiteLlm", "DefaultModel", changes),
+                EmbeddingModel = ApplyString(liteLlm.EmbeddingModel, lp.EmbeddingModel, "LiteLlm", "EmbeddingModel", changes),
+                ContextWindowTokens = ApplyInt(liteLlm.ContextWindowTokens, lp.ContextWindowTokens, "LiteLlm", "ContextWindowTokens", changes)
+            };
+        }
+
+        if (patch.Qdrant is { } qp)
+        {
+            qdrant = new QdrantConfig
+            {
+                Host = ApplyString(qdrant.Host, qp.Host, "Qdrant", "Host", changes, restartRequired: true),
+                Port = ApplyInt(qdrant.Port, qp.Port, "Qdrant", "Port", changes, restartRequired: true),
+                CollectionName = ApplyString(qdrant.CollectionName, qp.CollectionName, "Qdrant", "CollectionName", changes, restartRequired: true),
+                EmbeddingDimension = ApplyInt(qdrant.EmbeddingDimension, qp.EmbeddingDimension, "Qdrant", "EmbeddingDimension", changes, restartRequired: true)
+            };
+        }
+
+        if (patch.Signal is { } sp)
+        {
+            signal = new SignalConfig
+            {
+                CliPath = ApplyString(signal.CliPath, sp.CliPath, "Signal", "CliPath", changes),
+                Account = signal.Account, // secret — not patchable
+                Enabled = ApplyBool(signal.Enabled, sp.Enabled, "Signal", "Enabled", changes),
+                AllowedSenders = sp.AllowedSenders ?? signal.AllowedSenders,
+                DaemonBaseUrl = ApplyString(signal.DaemonBaseUrl, sp.DaemonBaseUrl, "Signal", "DaemonBaseUrl", changes)
+            };
+            if (sp.AllowedSenders != null && !sp.AllowedSenders.SequenceEqual(current.Signal.AllowedSenders))
+            {
+                changes.Add(new ConfigChange
+                {
+                    Section = "Signal",
+                    Field = "AllowedSenders",
+                    OldValue = string.Join(", ", current.Signal.AllowedSenders),
+                    NewValue = string.Join(", ", sp.AllowedSenders)
+                });
+            }
+        }
+
+        if (patch.Unstructured is { } up)
+        {
+            unstructured = new UnstructuredConfig
+            {
+                Enabled = ApplyBool(unstructured.Enabled, up.Enabled, "Unstructured", "Enabled", changes),
+                BaseUrl = ApplyString(unstructured.BaseUrl, up.BaseUrl, "Unstructured", "BaseUrl", changes),
+                TimeoutSeconds = ApplyInt(unstructured.TimeoutSeconds, up.TimeoutSeconds, "Unstructured", "TimeoutSeconds", changes)
+            };
+        }
+
+        if (patch.Wiki is { } wp)
+        {
+            wiki = new WikiConfig
+            {
+                BasePath = ApplyString(wiki.BasePath, wp.BasePath, "Wiki", "BasePath", changes),
+                MaxFactsPerEntry = ApplyInt(wiki.MaxFactsPerEntry, wp.MaxFactsPerEntry, "Wiki", "MaxFactsPerEntry", changes),
+                StaleFactDays = ApplyInt(wiki.StaleFactDays, wp.StaleFactDays, "Wiki", "StaleFactDays", changes),
+                MinConfidenceThreshold = ApplyDouble(wiki.MinConfidenceThreshold, wp.MinConfidenceThreshold, "Wiki", "MinConfidenceThreshold", changes)
+            };
+        }
+
+        if (patch.Agents is { } agp)
+        {
+            agents = new AgentsConfig
+            {
+                BasePath = ApplyString(agents.BasePath, agp.BasePath, "Agents", "BasePath", changes)
+            };
+        }
+
+        if (patch.Knowledge is { } knp)
+        {
+            knowledge = new KnowledgeConfig
+            {
+                Enabled = ApplyBool(knowledge.Enabled, knp.Enabled, "Knowledge", "Enabled", changes),
+                CollectionName = ApplyString(knowledge.CollectionName, knp.CollectionName, "Knowledge", "CollectionName", changes),
+                EmbeddingDimension = knowledge.EmbeddingDimension,
+                DocumentsPath = ApplyString(knowledge.DocumentsPath, knp.DocumentsPath, "Knowledge", "DocumentsPath", changes),
+                DefaultDocumentTags = knp.DefaultDocumentTags ?? knowledge.DefaultDocumentTags,
+                AgentScopes = knowledge.AgentScopes,
+                TagRules = knowledge.TagRules
+            };
+            if (knp.DefaultDocumentTags != null && !knp.DefaultDocumentTags.SequenceEqual(current.Knowledge.DefaultDocumentTags))
+            {
+                changes.Add(new ConfigChange
+                {
+                    Section = "Knowledge",
+                    Field = "DefaultDocumentTags",
+                    OldValue = string.Join(", ", current.Knowledge.DefaultDocumentTags),
+                    NewValue = string.Join(", ", knp.DefaultDocumentTags)
+                });
+            }
+        }
+
+        if (patch.Context is { } cp)
+        {
+            context = new ContextConfig
+            {
+                SemanticSimilarityWeight = ApplyDouble(context.SemanticSimilarityWeight, cp.SemanticSimilarityWeight, "Context", "SemanticSimilarityWeight", changes),
+                RecencyDecayWeight = ApplyDouble(context.RecencyDecayWeight, cp.RecencyDecayWeight, "Context", "RecencyDecayWeight", changes),
+                DimensionMatchWeight = ApplyDouble(context.DimensionMatchWeight, cp.DimensionMatchWeight, "Context", "DimensionMatchWeight", changes),
+                InteractionFrequencyWeight = ApplyDouble(context.InteractionFrequencyWeight, cp.InteractionFrequencyWeight, "Context", "InteractionFrequencyWeight", changes),
+                MinRelevanceThreshold = ApplyDouble(context.MinRelevanceThreshold, cp.MinRelevanceThreshold, "Context", "MinRelevanceThreshold", changes),
+                MaxConversationTurns = ApplyInt(context.MaxConversationTurns, cp.MaxConversationTurns, "Context", "MaxConversationTurns", changes)
+            };
+        }
+
+        if (patch.Scheduler is { } scp)
+        {
+            scheduler = new SchedulerConfig
+            {
+                Enabled = ApplyBool(scheduler.Enabled, scp.Enabled, "Scheduler", "Enabled", changes),
+                WikiMaintenanceCron = ApplyString(scheduler.WikiMaintenanceCron, scp.WikiMaintenanceCron, "Scheduler", "WikiMaintenanceCron", changes)
+            };
+        }
+
+        if (patch.Routing is { } rp)
+        {
+            routing = new RoutingConfig
+            {
+                Enabled = ApplyBool(routing.Enabled, rp.Enabled, "Routing", "Enabled", changes),
+                ShadowMode = ApplyBool(routing.ShadowMode, rp.ShadowMode, "Routing", "ShadowMode", changes),
+                EnableQualityEscalation = ApplyBool(routing.EnableQualityEscalation, rp.EnableQualityEscalation, "Routing", "EnableQualityEscalation", changes),
+                SmallMaxTokens = ApplyInt(routing.SmallMaxTokens, rp.SmallMaxTokens, "Routing", "SmallMaxTokens", changes),
+                MediumMaxTokens = ApplyInt(routing.MediumMaxTokens, rp.MediumMaxTokens, "Routing", "MediumMaxTokens", changes),
+                SmallAlias = ApplyString(routing.SmallAlias, rp.SmallAlias, "Routing", "SmallAlias", changes),
+                MediumAlias = ApplyString(routing.MediumAlias, rp.MediumAlias, "Routing", "MediumAlias", changes),
+                LargeAlias = ApplyString(routing.LargeAlias, rp.LargeAlias, "Routing", "LargeAlias", changes),
+                CooldownSeconds = ApplyInt(routing.CooldownSeconds, rp.CooldownSeconds, "Routing", "CooldownSeconds", changes),
+                MaxProviderAttempts = ApplyInt(routing.MaxProviderAttempts, rp.MaxProviderAttempts, "Routing", "MaxProviderAttempts", changes),
+                SmallMaxConstraints = routing.SmallMaxConstraints,
+                MediumMaxConstraints = routing.MediumMaxConstraints,
+                MaxSelectionBudgetMs = routing.MaxSelectionBudgetMs,
+                QualityMinOutputLength = routing.QualityMinOutputLength,
+                QualityMinConstraintCoverage = routing.QualityMinConstraintCoverage,
+                ModelLimitSyncCron = routing.ModelLimitSyncCron,
+                SpendGuard = new SpendGuardConfig
+                {
+                    DailyPaidRequestSoftLimit = ApplyInt(routing.SpendGuard.DailyPaidRequestSoftLimit, rp.DailyPaidRequestSoftLimit, "Routing.SpendGuard", "DailyPaidRequestSoftLimit", changes),
+                    DailyPaidRequestHardLimit = ApplyInt(routing.SpendGuard.DailyPaidRequestHardLimit, rp.DailyPaidRequestHardLimit, "Routing.SpendGuard", "DailyPaidRequestHardLimit", changes)
+                }
+            };
+        }
+
+        var updated = new LeanKernelConfig
+        {
+            LiteLlm = liteLlm,
+            Qdrant = qdrant,
+            Signal = signal,
+            Unstructured = unstructured,
+            Wiki = wiki,
+            Agents = agents,
+            Knowledge = knowledge,
+            Context = context,
+            Scheduler = scheduler,
+            Auth = current.Auth,
+            Routing = routing,
+            Engagement = current.Engagement,
+            SignalPhoneNumber = current.SignalPhoneNumber,
+            SignalServerUrl = current.SignalServerUrl,
+            SignalApiToken = current.SignalApiToken,
+            DiscordBotToken = current.DiscordBotToken,
+            DiscordChannelId = current.DiscordChannelId
+        };
+
+        return (updated, changes);
+    }
+
+    private static string ApplyString(string current, string? patch, string section, string field, List<ConfigChange> changes, bool restartRequired = false)
+    {
+        if (patch == null || patch == current)
+            return current;
+        changes.Add(new ConfigChange { Section = section, Field = field, OldValue = current, NewValue = patch, RestartRequired = restartRequired });
+        return patch;
+    }
+
+    private static int ApplyInt(int current, int? patch, string section, string field, List<ConfigChange> changes, bool restartRequired = false)
+    {
+        if (patch == null || patch == current)
+            return current;
+        changes.Add(new ConfigChange { Section = section, Field = field, OldValue = current.ToString(), NewValue = patch.ToString(), RestartRequired = restartRequired });
+        return patch.Value;
+    }
+
+    private static double ApplyDouble(double current, double? patch, string section, string field, List<ConfigChange> changes)
+    {
+        if (patch == null || Math.Abs(patch.Value - current) < 1e-10)
+            return current;
+        changes.Add(new ConfigChange { Section = section, Field = field, OldValue = current.ToString("G"), NewValue = patch.Value.ToString("G") });
+        return patch.Value;
+    }
+
+    private static bool ApplyBool(bool current, bool? patch, string section, string field, List<ConfigChange> changes)
+    {
+        if (patch == null || patch == current)
+            return current;
+        changes.Add(new ConfigChange { Section = section, Field = field, OldValue = current.ToString(), NewValue = patch.ToString() });
+        return patch.Value;
+    }
 
     private static string MaskSecret(string? value)
     {

@@ -3,17 +3,37 @@ using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Host.Controllers;
 using LeanKernel.Host.Models.Admin;
+using LeanKernel.Host.Services;
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Host;
 
 public class ConfigControllerTests
 {
+    private static ConfigController MakeController(LeanKernelConfig? cfg = null, IRuntimeLeanKernelConfigStore? store = null)
+    {
+        var config = Options.Create(cfg ?? new LeanKernelConfig());
+        return new ConfigController(config, store ?? new StubStore(cfg ?? new LeanKernelConfig()));
+    }
+
+    private sealed class StubStore : IRuntimeLeanKernelConfigStore
+    {
+        private LeanKernelConfig _current;
+        public LeanKernelConfig? LastSaved { get; private set; }
+        public StubStore(LeanKernelConfig initial) => _current = initial;
+        public LeanKernelConfig GetCurrent() => _current;
+        public Task SaveAsync(LeanKernelConfig config, CancellationToken ct)
+        {
+            LastSaved = config;
+            _current = config;
+            return Task.CompletedTask;
+        }
+    }
+
     [Fact]
     public void GetConfig_ReturnsOk()
     {
-        var config = Options.Create(new LeanKernelConfig());
-        var controller = new ConfigController(config);
+        var controller = MakeController();
 
         var result = controller.GetConfig();
 
@@ -23,8 +43,7 @@ public class ConfigControllerTests
     [Fact]
     public void GetConfig_ReturnsAdminConfigResponse()
     {
-        var config = Options.Create(new LeanKernelConfig());
-        var controller = new ConfigController(config);
+        var controller = MakeController();
 
         var result = controller.GetConfig();
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -35,11 +54,10 @@ public class ConfigControllerTests
     [Fact]
     public void GetConfig_MasksLiteLlmApiKey()
     {
-        var config = Options.Create(new LeanKernelConfig
+        var controller = MakeController(new LeanKernelConfig
         {
             LiteLlm = new LiteLlmConfig { ApiKey = "sk-test1234567890" }
         });
-        var controller = new ConfigController(config);
 
         var result = controller.GetConfig();
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -53,11 +71,10 @@ public class ConfigControllerTests
     [Fact]
     public void GetConfig_ShortApiKey_FullyMasked()
     {
-        var config = Options.Create(new LeanKernelConfig
+        var controller = MakeController(new LeanKernelConfig
         {
             LiteLlm = new LiteLlmConfig { ApiKey = "short" }
         });
-        var controller = new ConfigController(config);
 
         var result = controller.GetConfig();
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -69,11 +86,10 @@ public class ConfigControllerTests
     [Fact]
     public void GetConfig_EmptyApiKey_FullyMasked()
     {
-        var config = Options.Create(new LeanKernelConfig
+        var controller = MakeController(new LeanKernelConfig
         {
             LiteLlm = new LiteLlmConfig { ApiKey = "" }
         });
-        var controller = new ConfigController(config);
 
         var result = controller.GetConfig();
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -336,6 +352,208 @@ public class ConfigControllerTests
 
         Assert.True(field.Masked);
         Assert.Equal("***", field.Value?.ToString());
+    }
+
+    // ── PATCH / ApplyPatch ─────────────────────────────────────────────────
+
+    [Fact]
+    public void ApplyPatch_NullSections_ReturnsNoChanges()
+    {
+        var current = new LeanKernelConfig();
+        var (updated, changes) = ConfigController.ApplyPatch(current, new AdminConfigPatchRequest());
+
+        Assert.Empty(changes);
+        Assert.Equal(current.LiteLlm.BaseUrl, updated.LiteLlm.BaseUrl);
+    }
+
+    [Fact]
+    public void ApplyPatch_LiteLlmBaseUrl_RecordsChange()
+    {
+        var current = new LeanKernelConfig { LiteLlm = new LiteLlmConfig { BaseUrl = "http://old:4000" } };
+        var patch = new AdminConfigPatchRequest
+        {
+            LiteLlm = new LiteLlmPatch { BaseUrl = "http://new:4000" }
+        };
+
+        var (updated, changes) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.Single(changes);
+        Assert.Equal("LiteLlm", changes[0].Section);
+        Assert.Equal("BaseUrl", changes[0].Field);
+        Assert.Equal("http://old:4000", changes[0].OldValue);
+        Assert.Equal("http://new:4000", changes[0].NewValue);
+        Assert.Equal("http://new:4000", updated.LiteLlm.BaseUrl);
+    }
+
+    [Fact]
+    public void ApplyPatch_LiteLlmApiKey_NotOverwritten()
+    {
+        var current = new LeanKernelConfig { LiteLlm = new LiteLlmConfig { ApiKey = "secret-key" } };
+        var patch = new AdminConfigPatchRequest { LiteLlm = new LiteLlmPatch { BaseUrl = "http://x:4000" } };
+
+        var (updated, _) = ConfigController.ApplyPatch(current, patch);
+
+        // ApiKey must never be overwritten via PATCH
+        Assert.Equal("secret-key", updated.LiteLlm.ApiKey);
+    }
+
+    [Fact]
+    public void ApplyPatch_QdrantSection_MarksRestartRequired()
+    {
+        var current = new LeanKernelConfig { Qdrant = new QdrantConfig { Host = "qdrant", Port = 6334 } };
+        var patch = new AdminConfigPatchRequest { Qdrant = new QdrantPatch { Host = "qdrant2" } };
+
+        var (updated, changes) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.Single(changes);
+        Assert.True(changes[0].RestartRequired);
+        Assert.Equal("qdrant2", updated.Qdrant.Host);
+    }
+
+    [Fact]
+    public void ApplyPatch_SignalSection_AllowedSendersUpdated()
+    {
+        var current = new LeanKernelConfig { Signal = new SignalConfig { AllowedSenders = ["+1"] } };
+        var patch = new AdminConfigPatchRequest
+        {
+            Signal = new SignalPatch { AllowedSenders = ["+1", "+2"] }
+        };
+
+        var (updated, changes) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.Equal(["+1", "+2"], updated.Signal.AllowedSenders);
+        Assert.Contains(changes, c => c.Field == "AllowedSenders");
+    }
+
+    [Fact]
+    public void ApplyPatch_SignalAccount_NotOverwritten()
+    {
+        var current = new LeanKernelConfig { Signal = new SignalConfig { Account = "+15559999999" } };
+        var patch = new AdminConfigPatchRequest { Signal = new SignalPatch { Enabled = false } };
+
+        var (updated, _) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.Equal("+15559999999", updated.Signal.Account);
+    }
+
+    [Fact]
+    public void ApplyPatch_UnstructuredSection_AppliesChanges()
+    {
+        var current = new LeanKernelConfig { Unstructured = new UnstructuredConfig { Enabled = true, TimeoutSeconds = 120 } };
+        var patch = new AdminConfigPatchRequest { Unstructured = new UnstructuredPatch { Enabled = false, TimeoutSeconds = 60 } };
+
+        var (updated, changes) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.False(updated.Unstructured.Enabled);
+        Assert.Equal(60, updated.Unstructured.TimeoutSeconds);
+        Assert.Equal(2, changes.Count);
+    }
+
+    [Fact]
+    public void ApplyPatch_ContextWeights_AppliesChanges()
+    {
+        var current = new LeanKernelConfig { Context = new ContextConfig { SemanticSimilarityWeight = 0.4 } };
+        var patch = new AdminConfigPatchRequest { Context = new ContextPatch { SemanticSimilarityWeight = 0.6 } };
+
+        var (updated, changes) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.Equal(0.6, updated.Context.SemanticSimilarityWeight);
+        Assert.Single(changes);
+        Assert.Equal("Context", changes[0].Section);
+    }
+
+    [Fact]
+    public void ApplyPatch_SameValue_NoChangeRecorded()
+    {
+        var current = new LeanKernelConfig { Scheduler = new SchedulerConfig { Enabled = true } };
+        var patch = new AdminConfigPatchRequest { Scheduler = new SchedulerPatch { Enabled = true } };
+
+        var (_, changes) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.Empty(changes);
+    }
+
+    [Fact]
+    public void ApplyPatch_RoutingSpendGuard_AppliesLimits()
+    {
+        var current = new LeanKernelConfig
+        {
+            Routing = new RoutingConfig { SpendGuard = new SpendGuardConfig { DailyPaidRequestSoftLimit = 0 } }
+        };
+        var patch = new AdminConfigPatchRequest
+        {
+            Routing = new RoutingPatch { DailyPaidRequestSoftLimit = 100, DailyPaidRequestHardLimit = 200 }
+        };
+
+        var (updated, changes) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.Equal(100, updated.Routing.SpendGuard.DailyPaidRequestSoftLimit);
+        Assert.Equal(200, updated.Routing.SpendGuard.DailyPaidRequestHardLimit);
+        Assert.Equal(2, changes.Count);
+    }
+
+    [Fact]
+    public void ApplyPatch_KnowledgeDefaultTags_AppliesChanges()
+    {
+        var current = new LeanKernelConfig { Knowledge = new KnowledgeConfig { DefaultDocumentTags = ["general"] } };
+        var patch = new AdminConfigPatchRequest { Knowledge = new KnowledgePatch { DefaultDocumentTags = ["research", "internal"] } };
+
+        var (updated, changes) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.Equal(["research", "internal"], updated.Knowledge.DefaultDocumentTags);
+        Assert.Contains(changes, c => c.Field == "DefaultDocumentTags");
+    }
+
+    [Fact]
+    public void ApplyPatch_PreservesChannelTokens()
+    {
+        var current = new LeanKernelConfig
+        {
+            DiscordBotToken = "bot-token-123456",
+            SignalApiToken = "sig-token-789"
+        };
+        var patch = new AdminConfigPatchRequest { Scheduler = new SchedulerPatch { Enabled = false } };
+
+        var (updated, _) = ConfigController.ApplyPatch(current, patch);
+
+        Assert.Equal("bot-token-123456", updated.DiscordBotToken);
+        Assert.Equal("sig-token-789", updated.SignalApiToken);
+    }
+
+    [Fact]
+    public async Task PatchConfig_NoChanges_ReturnsOkWithEmptyChanges()
+    {
+        var cfg = new LeanKernelConfig();
+        var store = new StubStore(cfg);
+        var controller = MakeController(cfg, store);
+
+        var result = await controller.PatchConfig(new AdminConfigPatchRequest(), CancellationToken.None);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AdminConfigPatchResponse>(ok.Value);
+
+        Assert.Empty(response.Changes);
+        Assert.Null(store.LastSaved); // no save when no changes
+    }
+
+    [Fact]
+    public async Task PatchConfig_WithChanges_SavesAndReturnsChanges()
+    {
+        var cfg = new LeanKernelConfig { LiteLlm = new LiteLlmConfig { BaseUrl = "http://old:4000" } };
+        var store = new StubStore(cfg);
+        var controller = MakeController(cfg, store);
+
+        var result = await controller.PatchConfig(new AdminConfigPatchRequest
+        {
+            LiteLlm = new LiteLlmPatch { BaseUrl = "http://new:4000" }
+        }, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AdminConfigPatchResponse>(ok.Value);
+
+        Assert.Single(response.Changes);
+        Assert.NotNull(store.LastSaved);
+        Assert.Equal("http://new:4000", store.LastSaved!.LiteLlm.BaseUrl);
+        Assert.NotNull(response.UpdatedConfig);
     }
 }
 
