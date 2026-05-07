@@ -115,8 +115,6 @@ public sealed class SkillParser
                 return null;
 
             var data = NormalizeDictionary(rawData);
-            if (data == null)
-                return null;
 
             var name = ExtractString(data, "name");
             var description = ExtractString(data, "description");
@@ -124,11 +122,13 @@ public sealed class SkillParser
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(description))
                 return null;
 
-            var metadata = ExtractDictionary(data, "metadata") ?? [];
-            var runtime = ParseRuntime(ExtractDictionary(data, "runtime"));
+            var metadata = ExtractDictionaryOrEmpty(data, "metadata");
+            var runtime = TryExtractDictionary(data, "runtime", out var runtimeData)
+                ? ParseRuntime(runtimeData)
+                : null;
             var operations = ParseOperations(data.TryGetValue("operations", out var opsData) ? opsData as IEnumerable : null);
 
-            var errors = ValidateDefinition(name, description, runtime, operations);
+            var errors = ValidateDefinition(runtime, operations);
 
             return new SkillDefinition(
                 Name: name,
@@ -158,9 +158,9 @@ public sealed class SkillParser
         var command = ExtractString(runtimeData, "command");
         var baseUrl = ExtractString(runtimeData, "baseUrl");
 
-        var auth = ParseAuth(ExtractDictionary(runtimeData, "auth"));
-        var requires = ParseRequires(ExtractDictionary(runtimeData, "requires"));
-        var egress = ParseEgress(ExtractDictionary(runtimeData, "egress"));
+        var auth = ParseAuth(ExtractDictionaryOrEmpty(runtimeData, "auth"));
+        var requires = ParseRequires(ExtractDictionaryOrEmpty(runtimeData, "requires"));
+        var egress = ParseEgress(ExtractDictionaryOrEmpty(runtimeData, "egress"));
 
         return new SkillRuntime(Type: type, Command: command, BaseUrl: baseUrl)
         {
@@ -174,11 +174,8 @@ public sealed class SkillParser
     /// <summary>
     /// Parse auth block from YAML data.
     /// </summary>
-    private SkillAuth? ParseAuth(Dictionary<string, object>? authData)
+    private SkillAuth ParseAuth(Dictionary<string, object> authData)
     {
-        if (authData == null)
-            return null;
-
         var type = ExtractString(authData, "type") ?? "none";
         var secretRef = ExtractString(authData, "secretRef");
 
@@ -188,12 +185,11 @@ public sealed class SkillParser
     /// <summary>
     /// Parse requires block from YAML data.
     /// </summary>
-    private SkillRequires? ParseRequires(Dictionary<string, object>? requiresData)
+    private SkillRequires ParseRequires(Dictionary<string, object> requiresData)
     {
-        if (requiresData == null)
-            return null;
-
-        var bins = ParseBinaries(requiresData["bins"] as IEnumerable);
+        var bins = requiresData.TryGetValue("bins", out var binsData)
+            ? ParseBinaries(binsData as IEnumerable)
+            : [];
         return new SkillRequires(Bins: bins);
     }
 
@@ -229,11 +225,8 @@ public sealed class SkillParser
     /// <summary>
     /// Parse egress block from YAML data.
     /// </summary>
-    private SkillEgress? ParseEgress(Dictionary<string, object>? egressData)
+    private SkillEgress ParseEgress(Dictionary<string, object> egressData)
     {
-        if (egressData == null)
-            return null;
-
         var allowHosts = new List<string>();
         if (egressData.TryGetValue("allowHosts", out var hostData) && hostData is IEnumerable hosts)
         {
@@ -267,7 +260,9 @@ public sealed class SkillParser
 
                 if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(summary))
                 {
-                    var invoke = ParseInvoke(ExtractDictionary(opDict, "invoke"));
+                    var invoke = TryExtractDictionary(opDict, "invoke", out var invokeData)
+                        ? ParseInvoke(invokeData)
+                        : null;
                     var parameters = opDict.ContainsKey("parameters") ? (opDict["parameters"] as Dictionary<string, object>) : null;
 
                     operations.Add(new SkillOperation(Id: id, Summary: summary)
@@ -341,8 +336,6 @@ public sealed class SkillParser
     /// Returns list of validation errors (empty if valid).
     /// </summary>
     private List<string> ValidateDefinition(
-        string name,
-        string description,
         SkillRuntime? runtime,
         List<SkillOperation> operations)
     {
@@ -461,11 +454,8 @@ public sealed class SkillParser
     /// <summary>
     /// Extract examples from bash code blocks.
     /// </summary>
-    private static Dictionary<string, object>? NormalizeDictionary(Dictionary<object, object>? dict)
+    private static Dictionary<string, object> NormalizeDictionary(Dictionary<object, object> dict)
     {
-        if (dict == null)
-            return null;
-
         var normalized = new Dictionary<string, object>();
         foreach (var kvp in dict)
         {
@@ -488,7 +478,7 @@ public sealed class SkillParser
                 {
                     if (item is Dictionary<object, object> itemDict)
                     {
-                        normalizedList.Add(NormalizeDictionary(itemDict) ?? item);
+                        normalizedList.Add(NormalizeDictionary(itemDict));
                     }
                     else
                     {
@@ -557,10 +547,21 @@ public sealed class SkillParser
     /// <summary>
     /// Safe extraction of nested dictionary.
     /// </summary>
-    private static Dictionary<string, object>? ExtractDictionary(Dictionary<string, object> dict, string key)
+    private static Dictionary<string, object> ExtractDictionaryOrEmpty(Dictionary<string, object> dict, string key) =>
+        TryExtractDictionary(dict, key, out var nested) ? nested : [];
+
+    private static bool TryExtractDictionary(
+        Dictionary<string, object> dict,
+        string key,
+        out Dictionary<string, object> nested)
     {
-        if (dict.TryGetValue(key, out var value) && value is Dictionary<string, object> nested)
-            return nested;
-        return null;
+        if (dict.TryGetValue(key, out var value) && value is Dictionary<string, object> valueDictionary)
+        {
+            nested = valueDictionary;
+            return true;
+        }
+
+        nested = [];
+        return false;
     }
 }

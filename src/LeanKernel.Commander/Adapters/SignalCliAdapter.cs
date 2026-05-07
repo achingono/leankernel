@@ -406,36 +406,45 @@ public sealed class SignalCliAdapter : ISignalAdapter
             if (TryCompletePendingRequest(root))
                 return;
 
-            if (root.TryGetProperty("method", out var method) &&
-                method.GetString() == "receive")
+            if (TryGetReceiveParameters(root, out var parameters))
             {
-                if (root.TryGetProperty("params", out var parameters))
-                {
-                    var parametersClone = parameters.Clone();
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var inbound = await ParseInboundMessageAsync(parametersClone, ct);
-                            if (inbound is not null)
-                                OnMessage?.Invoke(inbound);
-                        }
-                        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                        {
-                            _logger.LogDebug("Signal inbound processing cancelled");
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to process Signal inbound attachment payload");
-                        }
-                    }, ct);
-                }
+                QueueInboundProcessing(parameters, ct);
             }
         }
         catch (JsonException ex)
         {
             _logger.LogWarning(ex, "Failed to parse signal-cli output: {Line}", line);
         }
+    }
+
+    private static bool TryGetReceiveParameters(JsonElement root, out JsonElement parameters)
+    {
+        parameters = default;
+        return root.TryGetProperty("method", out var method)
+            && method.GetString() == "receive"
+            && root.TryGetProperty("params", out parameters);
+    }
+
+    private void QueueInboundProcessing(JsonElement parameters, CancellationToken ct)
+    {
+        var parametersClone = parameters.Clone();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var inbound = await ParseInboundMessageAsync(parametersClone, ct);
+                if (inbound is not null)
+                    OnMessage?.Invoke(inbound);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogDebug("Signal inbound processing cancelled");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to process Signal inbound attachment payload");
+            }
+        }, ct);
     }
 
     private bool TryCompletePendingRequest(JsonElement root)
@@ -501,12 +510,7 @@ public sealed class SignalCliAdapter : ISignalAdapter
             : null;
         var timestamp = GetSignalTimestamp(dataMessage, envelope.Value);
 
-        var groupId = dataMessage.TryGetProperty("groupInfo", out var groupInfo)
-            && groupInfo.TryGetProperty("groupId", out var groupIdProperty)
-                ? groupIdProperty.GetString()
-                : null;
-
-        var attachments = await ResolveAttachmentsAsync(source, groupId, dataMessage, ct);
+        var attachments = await ResolveAttachmentsAsync(source, dataMessage, ct);
         if (string.IsNullOrWhiteSpace(body) && attachments.Count == 0)
             return null;
 
@@ -521,7 +525,6 @@ public sealed class SignalCliAdapter : ISignalAdapter
 
     private async Task<IReadOnlyList<InboundAttachment>> ResolveAttachmentsAsync(
         string sender,
-        string? groupId,
         JsonElement dataMessage,
         CancellationToken ct)
     {
@@ -537,41 +540,18 @@ public sealed class SignalCliAdapter : ISignalAdapter
             var attachmentId = attachment.TryGetProperty("id", out var idProperty)
                 ? idProperty.GetString()
                 : null;
-            var fileName = attachment.TryGetProperty("filename", out var fileNameProperty)
-                ? fileNameProperty.GetString()
-                : null;
-            var contentType = attachment.TryGetProperty("contentType", out var contentTypeProperty)
-                ? contentTypeProperty.GetString()
-                : null;
-            var caption = attachment.TryGetProperty("caption", out var captionProperty)
-                ? captionProperty.GetString()
-                : null;
+            var fileName = GetOptionalString(attachment, "filename");
+            var contentType = GetOptionalString(attachment, "contentType");
+            var caption = GetOptionalString(attachment, "caption");
             var size = attachment.TryGetProperty("size", out var sizeProperty)
                 ? sizeProperty.GetInt64()
                 : (long?)null;
-
-            string? extractedText = null;
-            var shouldExtractText = !string.IsNullOrWhiteSpace(attachmentId)
-                && _attachmentTextExtractor.CanExtractText(contentType, fileName);
-            if (shouldExtractText)
-            {
-                try
-                {
-                    var bytes = await GetAttachmentBytesAsync(attachmentId!, ct);
-                    extractedText = await _attachmentTextExtractor.ExtractTextAsync(
-                        contentType,
-                        fileName,
-                        bytes,
-                        ct);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex,
-                        "Failed to fetch Signal attachment {AttachmentId} from {Sender}",
-                        attachmentId,
-                        sender);
-                }
-            }
+            var extractedText = await ExtractAttachmentTextAsync(
+                sender,
+                attachmentId,
+                fileName,
+                contentType,
+                ct);
 
             attachments.Add(new InboundAttachment
             {
@@ -585,6 +565,38 @@ public sealed class SignalCliAdapter : ISignalAdapter
         }
 
         return attachments;
+    }
+
+    private async Task<string?> ExtractAttachmentTextAsync(
+        string sender,
+        string? attachmentId,
+        string? fileName,
+        string? contentType,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(attachmentId)
+            || !_attachmentTextExtractor.CanExtractText(contentType, fileName))
+        {
+            return null;
+        }
+
+        try
+        {
+            var bytes = await GetAttachmentBytesAsync(attachmentId, ct);
+            return await _attachmentTextExtractor.ExtractTextAsync(
+                contentType,
+                fileName,
+                bytes,
+                ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to fetch Signal attachment {AttachmentId} from {Sender}",
+                attachmentId,
+                sender);
+            return null;
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -623,6 +635,9 @@ public sealed class SignalCliAdapter : ISignalAdapter
             ? envelopeTimestamp.GetInt64()
             : 0;
     }
+
+    private static string? GetOptionalString(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var property) ? property.GetString() : null;
 }
 
 [ExcludeFromCodeCoverage]

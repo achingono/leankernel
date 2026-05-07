@@ -77,7 +77,10 @@ public sealed class CronScheduler : IScheduler
                 }
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("Scheduled job {JobId} cancelled", job.Id);
+        }
     }
 
     private sealed record ScheduledJob(

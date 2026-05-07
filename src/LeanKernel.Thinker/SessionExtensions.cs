@@ -30,9 +30,9 @@ public static class SessionExtensions
     /// </summary>
     public static ConversationTurn ToConversationTurn(this ChatMessage message)
     {
-        var role = message.Role == ChatRole.Assistant ? "assistant"
-                 : message.Role == ChatRole.System ? "system"
-                 : "user";
+        var role = message.Role == ChatRole.Assistant
+            ? "assistant"
+            : ResolveNonAssistantRole(message.Role);
         return new ConversationTurn
         {
             Role = role,
@@ -57,4 +57,7 @@ public static class SessionExtensions
             .Where(m => m.Role != ChatRole.System)
             .Select(m => m.ToConversationTurn())
             .ToList();
+
+    private static string ResolveNonAssistantRole(ChatRole role) =>
+        role == ChatRole.System ? "system" : "user";
 }

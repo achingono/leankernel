@@ -125,8 +125,5 @@ public sealed class AttachmentTextExtractionService : IAttachmentTextExtractionS
         }
     }
 
-    private sealed class UnstructuredElement
-    {
-        public string? Text { get; init; }
-    }
+    private sealed record UnstructuredElement(string? Text);
 }

@@ -58,15 +58,15 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         _logger.LogDebug("Active dimensions for query: {Dimensions}", string.Join(", ", activeDimensions));
 
         // Phase 2: Retrieve candidate LeanKernels from wiki + vector store
-        var wikiCandidates = await RetrieveWikiLeanKernelsAsync(query, activeDimensions, budget, ct);
-        var vectorCandidates = await RetrieveVectorLeanKernelsAsync(query, agentKnowledgeTags, budget, ct);
+        var wikiCandidates = await RetrieveWikiLeanKernelsAsync(query, activeDimensions, ct);
+        var vectorCandidates = await RetrieveVectorLeanKernelsAsync(query, agentKnowledgeTags, ct);
 
         // Phase 3: Competitive ranking — all candidates compete for budget
-        var rankedWiki = RankLeanKernels(wikiCandidates, activeDimensions, budget.WikiFactsBudget, exclusionLog);
-        var rankedRetrieval = RankLeanKernels(vectorCandidates, activeDimensions, budget.RetrievalBudget, exclusionLog);
+        var rankedWiki = RankLeanKernels(wikiCandidates, budget.WikiFactsBudget, exclusionLog);
+        var rankedRetrieval = RankLeanKernels(vectorCandidates, budget.RetrievalBudget, exclusionLog);
 
         // Phase 4: Assemble conversation history (sliding window with compaction)
-        var history = await AssembleHistoryAsync(sessionId, budget.ConversationBudget, ct);
+        var history = await AssembleHistoryAsync(sessionId, ct);
 
         // Phase 5: Build final context
         var systemPrompt = await BuildSystemPromptAsync(ct);
@@ -127,7 +127,6 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private async Task<List<RelevanceScore>> RetrieveWikiLeanKernelsAsync(
         LeanKernelMessage query,
         HashSet<WikiDimension> dimensions,
-        ContextBudget budget,
         CancellationToken ct)
     {
         var wikiQuery = new WikiQuery
@@ -156,7 +155,6 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private async Task<List<RelevanceScore>> RetrieveVectorLeanKernelsAsync(
         LeanKernelMessage query,
         IReadOnlyList<string> agentTags,
-        ContextBudget budget,
         CancellationToken ct)
     {
         try
@@ -173,7 +171,6 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 
     private List<RelevanceScore> RankLeanKernels(
         List<RelevanceScore> candidates,
-        HashSet<WikiDimension> activeDimensions,
         int tokenBudget,
         List<string> exclusionLog)
     {
@@ -214,7 +211,6 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 
     private async Task<List<ConversationTurn>> AssembleHistoryAsync(
         string sessionId,
-        int tokenBudget,
         CancellationToken ct)
     {
         var allTurns = await _sessions.GetHistoryAsync(sessionId, ct);

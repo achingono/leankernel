@@ -56,8 +56,13 @@ public sealed class FunctionLoggingMiddleware
             .Build();
     }
 
-    private static string Truncate(string? value, int maxLength) =>
-        value is null ? "(null)"
-        : value.Length <= maxLength ? value
-        : value[..maxLength] + "...";
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (value is null)
+            return "(null)";
+
+        return value.Length <= maxLength
+            ? value
+            : value[..maxLength] + "...";
+    }
 }

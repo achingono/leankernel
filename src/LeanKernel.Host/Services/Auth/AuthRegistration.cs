@@ -17,11 +17,7 @@ public static class AuthRegistration
         IConfiguration configuration,
         string? dataDirectory = null)
     {
-        var dataDir = string.IsNullOrWhiteSpace(dataDirectory)
-            ? configuration["LeanKernel:Wiki:BasePath"] is string wikiPath
-                ? Path.GetDirectoryName(wikiPath) ?? "/app/data"
-                : "/app/data"
-            : dataDirectory;
+        var dataDir = ResolveDataDirectory(configuration, dataDirectory);
 
         var authStatePath = Path.Combine(dataDir, "auth-state.json");
 
@@ -118,6 +114,16 @@ public static class AuthRegistration
                       .RequireRole(AuthConstants.RoleApiClient, AuthConstants.RoleAdmin));
 
         return services;
+    }
+
+    private static string ResolveDataDirectory(IConfiguration configuration, string? dataDirectory)
+    {
+        if (!string.IsNullOrWhiteSpace(dataDirectory))
+            return dataDirectory;
+
+        return configuration["LeanKernel:Wiki:BasePath"] is string wikiPath
+            ? Path.GetDirectoryName(wikiPath) ?? "/app/data"
+            : "/app/data";
     }
 
     public static WebApplication UseLeanKernelAuth(this WebApplication app)

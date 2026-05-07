@@ -51,9 +51,7 @@ public sealed class WebSearchTool : ITool
             var abstractText = doc.RootElement.TryGetProperty("AbstractText", out var at) ? at.GetString() : null;
             var answer = doc.RootElement.TryGetProperty("Answer", out var ans) ? ans.GetString() : null;
 
-            var result = !string.IsNullOrEmpty(abstractText) ? abstractText
-                       : !string.IsNullOrEmpty(answer) ? answer
-                       : $"No instant answer found for: {query}";
+            var result = GetBestAnswer(query, abstractText, answer);
 
             return new ToolResult
             {
@@ -86,5 +84,15 @@ public sealed class WebSearchTool : ITool
         {
             return json;
         }
+    }
+
+    private static string GetBestAnswer(string query, string? abstractText, string? answer)
+    {
+        if (!string.IsNullOrEmpty(abstractText))
+            return abstractText;
+
+        return !string.IsNullOrEmpty(answer)
+            ? answer
+            : $"No instant answer found for: {query}";
     }
 }
