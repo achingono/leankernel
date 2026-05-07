@@ -8,6 +8,7 @@ LeanKernel is a personal AI agent platform built on .NET 10. It integrates a rea
 |---------|-------------|
 | [architecture/](architecture/index.md) | System components, runtime topology, data flows, and the evolutionary roadmap. |
 | [features/](features/index.md) | Product requirements for authentication, intelligent model routing, and other platform features. |
+| [plans/](plans/index.md) | Roadmap execution PRDs for autonomy controls, replay/provenance, budget guardrails, memory hygiene, and benchmark scoring. |
 | [skills/](skills/index.md) | Runtime skill system: how skills are defined, discovered, loaded, and executed. |
 | [development/](development/index.md) | Quality gates, test coverage, SonarQube scan, and the LiteLLM single-file spec plan. |
 
@@ -86,6 +87,7 @@ LeanKernel/
 │   ├── architecture/     # System design and component reference
 │   ├── development/      # Developer guides and quality gates
 │   ├── features/         # PRDs and feature specifications
+│   ├── plans/            # Roadmap execution PRDs
 │   └── skills/           # Runtime skill system docs
 ├── scripts/              # Quality scripts and utilities
 └── src/                  # .NET 10 solution

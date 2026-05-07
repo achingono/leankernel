@@ -1,6 +1,48 @@
-# 🔷 LeanKernel — Lean Personal AI Agent
+# LeanKernel — Lean Personal AI Agent
 
-A high-performance, cost-optimized personal AI agent built on **.NET 10 / C# 14**. LeanKernel prioritizes **token efficiency** through tight context management and a modular backend.
+![LeanKernel logo](docs/assets/brand/logo.svg)
+
+LeanKernel is the personal AI agent for builders who want **reliable output, lower token spend, and full control of context**. Instead of bloated chat history and unpredictable behavior, LeanKernel gives you a lean, observable agent runtime that helps you ship more with less friction.
+
+## Ideal Audience (LeanKernel/Hermes-Style Users)
+
+LeanKernel is built for power users who already rely on AI daily and want more control than typical hosted assistants:
+
+- **Indie hackers and solo builders** running multiple projects who need dependable execution, not chat novelty.
+- **Technical operators and developers** who care about auditability, composability, and predictable costs.
+- **Privacy-conscious professionals** who want local data ownership and explicit control over what enters model context.
+- **Small teams replacing assistant sprawl** (many disconnected tools) with one orchestrated, observable agent runtime.
+
+## Value Proposition: From Agent Chaos to Reliable Throughput
+
+LeanKernel helps you turn AI from "interesting demos" into repeatable output with lower spend, better context quality, and less operational friction.
+
+### Before vs After
+
+| Before (typical agent stack) | After (LeanKernel) |
+|-----------------------------|----------------|
+| Context bloat drives rising token costs and weaker answers | Context gatekeeper injects only high-value memory to improve relevance and reduce waste |
+| Hard to debug agent failures across tools and model hops | Structured middleware logs and diagnostics make runs observable and fixable |
+| Knowledge is fragmented across chat history, docs, and ad hoc notes | Unified 5W1H wiki + vector index keeps memory queryable and reusable |
+| Switching models/providers requires code churn and config drift | LiteLLM routing centralizes model strategy and allows provider changes with minimal disruption |
+
+### Benefit Stack (Feature -> Tangible Outcome -> Emotional Win)
+
+- **Deny-by-default context gating** -> fewer irrelevant tokens and tighter prompts -> more confidence that answers stay on target.
+- **5W1H structured memory + vector retrieval** -> faster recall of past facts and decisions -> less repeated explaining and lower frustration.
+- **MAF multi-agent orchestration** -> specialized workers handle complex requests predictably -> more done per day with less manual juggling.
+- **Dockerized sidecars (LiteLLM, Qdrant, indexer)** -> reproducible runtime on constrained hardware -> lower ops anxiety and easier recovery.
+- **Built-in web UI + API compatibility** -> one place for chat, logs, files, and configuration -> faster troubleshooting and smoother handoffs.
+
+## Main Pain Points with Existing AI Agents (Online Signals)
+
+Recurring issues in production agent deployments map directly to the problems LeanKernel is designed to solve:
+
+- **Complexity creep**: teams overbuild multi-agent flows where simpler patterns would work, increasing latency and cost ([Microsoft guidance](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)).
+- **Compounding errors and loop risk**: autonomous systems can stall, bounce, or loop without strong iteration limits and checkpoints ([Anthropic](https://www.anthropic.com/engineering/building-effective-agents), [Microsoft guidance](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)).
+- **Weak observability**: abstraction-heavy stacks make failures hard to trace and fix, reducing trust ([Anthropic](https://www.anthropic.com/engineering/building-effective-agents), [IBM](https://www.ibm.com/think/topics/ai-agents)).
+- **Cost unpredictability**: orchestration multiplies model calls and token usage without tight budgeting and compaction ([Microsoft guidance](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)).
+- **Governance and privacy concerns**: agents need stronger guardrails, least-privilege access, and auditable action trails ([IBM](https://www.ibm.com/think/topics/ai-agents), [PwC](https://www.pwc.com/us/en/tech-effect/ai-analytics/ai-predictions.html)).
 
 ## Architecture
 
@@ -132,27 +174,31 @@ To add documents, drop files into `./data/documents/`. The indexer automatically
 | Logging | Serilog | 9.0.0 |
 | Containers | Docker Compose | v2 |
 
-## Quick Start
+## Quick Start (First Value in Minutes)
+
+Spin up LeanKernel, complete guided onboarding, and run your first production-style agent flow from a single local stack.
 
 ```bash
-# 1. Clone and configure
+# 1) Configure environment
 cp .env.example .env
-# Edit .env with provider keys (Signal optional)
+# Add provider keys in .env (Signal is optional)
 
-# 2. Start all services
+# 2) Start the full stack
 docker compose up -d
 
-# 3. Open Web UI and run onboarding wizard
+# 3) Open the web app
 open http://localhost:5080
 
-# 4. Complete one-shot onboarding
-# - Configure LiteLLM/Qdrant/wiki/scheduler/signal
+# 4) Complete one-shot onboarding in the UI
+# - Configure LiteLLM, Qdrant, wiki, scheduler, and Signal (optional)
 # - Run built-in validation probes
-# - Click "Complete Onboarding"
+# - Click Complete Onboarding
 
-# 5. Check health
+# 5) Verify health
 curl http://localhost:5080/api/health
 ```
+
+If health returns successfully, proceed to `/chat` to run your first task and verify tool execution traces in the diagnostics panel.
 
 ### Local Development
 
@@ -508,6 +554,27 @@ LeanKernel uses Serilog with structured logging:
 | Tiered conversation aging | Turns 0-3 full, 4-8 summarized, 9-15 one-line, 16+ archived to wiki |
 | LiteLLM as proxy | Model-agnostic with hot-reload, no code changes for new providers |
 | Docker Compose isolation | Security boundaries, reproducible deployment |
+
+## Feature Enhancements to Make LeanKernel the Top Choice
+
+The following enhancements are prioritized to overcome common buyer objections and strengthen LeanKernel's differentiation.
+
+| Objection | Enhancement | Customer Benefit |
+|-----------|-------------|------------------|
+| "I don't trust autonomous agents in production." | **Policy-based autonomy levels** (suggest-only, approve-before-action, auto-execute by tool/category) | Safer rollout path from pilot to production with explicit control at each step |
+| "Agent behavior is hard to understand." | **Run replay + decision timeline UI** (prompt slices, tool calls, context sources, token/cost per step) | Faster debugging and stronger team trust through transparent reasoning traces |
+| "Costs can spike without warning." | **Hard budget guardrails** (per-session, per-agent, per-day limits + auto model downgrades) | Predictable spend and fewer billing surprises |
+| "Memory quality degrades over time." | **Memory hygiene jobs** (staleness scoring, contradiction detection, merge/summarize candidates) | Higher retrieval accuracy and less context pollution |
+| "Setup still feels technical." | **Guided deployment profiles** (local dev, homelab, small-team cloud) with one-click validation | Faster time-to-first-value for non-expert operators |
+| "I need proof this improves outcomes." | **Outcome analytics dashboard** (resolution rate, human takeover rate, latency, cost per successful task) | Clear ROI narrative for adoption decisions |
+
+### Proposed Near-Term Roadmap
+
+1. Add autonomy policy engine and per-tool approval gates.
+2. Ship run replay, cost timeline, and context provenance views in the web UI.
+3. Implement budget enforcement with graceful fallback routing in LiteLLM profiles.
+4. Add memory hygiene and quality scoring pipelines for wiki and session history.
+5. Publish benchmark scenarios (support triage, research synthesis, coding tasks) with reproducible metrics.
 
 ## License
 
