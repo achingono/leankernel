@@ -256,7 +256,7 @@ public sealed class MessageQueueService : IMessageQueue
         var totalMessages = _messages.Values.ToList();
         var pendingMessages = totalMessages.Where(m => !m.IsDelivered).ToList();
         var deliveredMessages = totalMessages.Where(m => m.IsDelivered).ToList();
-        var urgentMessages = pendingMessages.Where(m => m.IsUrgent).Count();
+        var urgentMessages = pendingMessages.Count(m => m.IsUrgent);
 
         var oldestPending = pendingMessages.OrderBy(m => m.EnqueuedAt).FirstOrDefault();
         var nextWindow = _timeBoundary.GetNextActiveWindow();

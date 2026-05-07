@@ -63,7 +63,7 @@ public sealed class DiscordChannelAdapter : IMessageChannel
 
         try
         {
-            var deliveryResult = await SendMessageWithRetryAsync(recipient, content, ct);
+            var deliveryResult = await SendMessageWithRetryAsync(content, ct);
             return deliveryResult;
         }
         catch (OperationCanceledException)
@@ -101,7 +101,6 @@ public sealed class DiscordChannelAdapter : IMessageChannel
     }
 
     private async Task<ChannelDeliveryResult> SendMessageWithRetryAsync(
-        string recipient,
         string content,
         CancellationToken ct)
     {
@@ -230,18 +229,15 @@ public sealed class DiscordChannelAdapter : IMessageChannel
 
         return Guid.NewGuid().ToString();
     }
-}
 
-/// <summary>
-/// Exception thrown when Discord rate limit is hit.
-/// </summary>
-public sealed class RateLimitedException : Exception
-{
-    public int RetryAfterSeconds { get; }
-
-    public RateLimitedException(int retryAfterSeconds)
-        : base($"Rate limited, retry after {retryAfterSeconds}s")
+    private sealed class RateLimitedException : Exception
     {
-        RetryAfterSeconds = retryAfterSeconds;
+        public int RetryAfterSeconds { get; }
+
+        public RateLimitedException(int retryAfterSeconds)
+            : base($"Rate limited, retry after {retryAfterSeconds}s")
+        {
+            RetryAfterSeconds = retryAfterSeconds;
+        }
     }
 }

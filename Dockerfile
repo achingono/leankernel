@@ -71,38 +71,7 @@ RUN curl -fsSL -o /tmp/simplefin-cli.tar.gz \
 #     rm -rf ~/.cache/pip
 
 # Create tools manifest
-RUN cat > /opt/LeanKernel/tools/tools-manifest.json << 'EOF'
-{
-  "version": 1,
-  "tools": [
-    {
-      "name": "signal-cli-native",
-      "version": "0.13.x",
-      "path": "/usr/bin/signal-cli",
-      "type": "system"
-    },
-    {
-      "name": "ms-todo-cli",
-      "version": "0.0.2",
-      "path": "/usr/local/bin/ms-todo-cli",
-      "type": "npm"
-    },
-    {
-      "name": "simplefin-cli",
-      "version": "0.0.2",
-      "path": "/usr/local/bin/simplefin-cli",
-      "type": "npm"
-    },
-    {
-      "name": "paddleocr",
-      "version": "2.7.0",
-      "path": "/usr/local/bin/paddleocr",
-      "type": "python",
-      "note": "Available as python module; invoke via: python3 -m paddleocr"
-    }
-  ]
-}
-EOF
+COPY config/tools-manifest.json /opt/LeanKernel/tools/tools-manifest.json
 
 # Create non-root user
 RUN useradd -m -s /bin/bash LeanKernel

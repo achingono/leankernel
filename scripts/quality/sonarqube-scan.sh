@@ -54,7 +54,7 @@ docker run --rm \
   bash -lc '
     set -euo pipefail
     apt-get update
-    apt-get install -y --no-install-recommends openjdk-17-jre-headless
+    apt-get install -y --no-install-recommends nodejs openjdk-17-jre-headless
     rm -rf /var/lib/apt/lists/*
     dotnet tool install --global dotnet-sonarscanner
     export PATH="$PATH:/root/.dotnet/tools"
@@ -63,6 +63,7 @@ docker run --rm \
       /d:sonar.host.url="$SONAR_HOST_URL" \
       /d:sonar.token="$SONAR_TOKEN" \
       /d:sonar.qualitygate.wait=true \
+      /d:sonar.python.version=3.12 \
       /d:sonar.cs.opencover.reportsPaths="coverage-results/sonar/**/coverage.opencover.xml" \
       /d:sonar.coverage.exclusions="**/LeanKernel.Tests.*/*,**/*.g.cs,**/*.Designer.cs,**/*.razor,**/Program.cs,**/Data/Migrations/*.cs,**/Services/Auth/AuthRegistration.cs,**/Services/Auth/OidcRegistration.cs,**/Services/Auth/BearerTokenAuthHandler.cs,**/Services/EngagementAuthorizationFilter.cs,**/Services/ChannelInitializationService.cs,**/Services/Skills/SkillHostedService.cs,**/Services/AttachmentTextExtractionService.cs,**/Services/EngagementRulesProvider.cs,**/Commander/Adapters/SignalRestApiAdapter.cs,**/Plugins/BuiltIn/Skills/DynamicSkillTool.cs,**/Plugins/BuiltIn/Skills/BinaryResolver.cs,**/Plugins/BuiltIn/Skills/DynamicSkillToolFactory.cs,**/Plugins/BuiltIn/Skills/EgressPolicy.cs,**/Plugins/BuiltIn/Skills/RuntimeSkillRegistry.cs"
     dotnet restore src/LeanKernel.sln
