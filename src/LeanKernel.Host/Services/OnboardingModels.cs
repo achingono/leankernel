@@ -8,6 +8,7 @@ public sealed class LeanKernelHostPaths
     public required string AgentsDirectory { get; init; }
     public required string RuntimeConfigPath { get; init; }
     public required string OnboardingStatePath { get; init; }
+    public string LiteLlmConfigPath { get; init; } = "";
 }
 
 public sealed class OnboardingStatus

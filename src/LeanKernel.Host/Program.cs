@@ -44,6 +44,8 @@ try
 
     var runtimeConfigPath = Path.Combine(configuredDataDir, "runtime-settings.json");
     var onboardingStatePath = Path.Combine(configuredDataDir, "onboarding-state.json");
+    var liteLlmConfigPath = builder.Configuration["LeanKernel:LiteLlm:ConfigPath"]
+        ?? Path.Combine(AppContext.BaseDirectory, "config", "litellm", "config.yaml");
     builder.Configuration.AddJsonFile(runtimeConfigPath, optional: true, reloadOnChange: true);
     // Re-apply environment variables so deployment-time values can override runtime overlay.
     builder.Configuration.AddEnvironmentVariables();
@@ -53,7 +55,8 @@ try
         DataDirectory = configuredDataDir,
         AgentsDirectory = configuredAgentsPath,
         RuntimeConfigPath = runtimeConfigPath,
-        OnboardingStatePath = onboardingStatePath
+        OnboardingStatePath = onboardingStatePath,
+        LiteLlmConfigPath = liteLlmConfigPath
     });
 
     // Serilog — structured logging to console + rolling file
@@ -211,6 +214,11 @@ try
     builder.Services.AddSingleton<IOnboardingStateStore, OnboardingStateStore>();
     builder.Services.AddSingleton<IRuntimeLeanKernelConfigStore, RuntimeLeanKernelConfigStore>();
     builder.Services.AddSingleton<IOnboardingOrchestrator, OnboardingOrchestrator>();
+    builder.Services.AddSingleton<ILiteLlmRoutingConfigService>(sp =>
+    {
+        var paths = sp.GetRequiredService<LeanKernelHostPaths>();
+        return new LiteLlmRoutingConfigService(paths.LiteLlmConfigPath);
+    });
 
     // Authentication & Authorization
     builder.Services.AddLeanKernelAuth(builder.Configuration, configuredDataDir);
