@@ -40,10 +40,10 @@ providers:
     keys:
       - source: env
         name: AZURE_AI_API_KEY
-        resourceName: fs-LeanKernel
+        resourceName: <first-azure-resource-name>
       - source: env
         name: AZURE_AI_API_KEY_2
-        resourceName: alfer-mkokmbre
+        resourceName: <second-azure-resource-name>
     models:
       - name: gpt-5.4-1
         context_window: 8192

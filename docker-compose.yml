@@ -12,26 +12,28 @@ services:
     environment:
       - DOTNET_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5080
-      - LEANKERNEL__LiteLlm__BaseUrl=http://litellm:4000
-      - LEANKERNEL__Unstructured__BaseUrl=http://unstructured:8000
-      - LEANKERNEL__LiteLlm__ApiKey=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
-      - LEANKERNEL__Qdrant__Host=qdrant
-      - LEANKERNEL__Qdrant__Port=6334
-      - LEANKERNEL__Qdrant__EmbeddingDimension=${EMBEDDING_DIMENSION:-3072}
-      - LEANKERNEL__Signal__Enabled=${LEANKERNEL_SIGNAL_ENABLED:-true}
-      - LEANKERNEL__Signal__CliPath=${LEANKERNEL_SIGNAL_CLI_PATH:-/usr/bin/signal-cli}
-      - LEANKERNEL__Signal__Account=${SIGNAL_PHONE_NUMBER:-}
-      - LEANKERNEL__Signal__AllowedSenders__0=${SIGNAL_ALLOWED_SENDER_0:-}
-      - LEANKERNEL__Signal__DaemonBaseUrl=http://signal:8080
-      - LEANKERNEL__Wiki__BasePath=/app/data/wiki
-      - LEANKERNEL__Agents__BasePath=/app/data/agents
-      - LEANKERNEL__Knowledge__Enabled=true
-      - LEANKERNEL__Knowledge__CollectionName=LEANKERNEL_knowledge
-      - LEANKERNEL__Knowledge__EmbeddingDimension=${EMBEDDING_DIMENSION:-3072}
+      - LEANKERNEL__LITELLM__BASEURL=http://litellm:4000
+      - LEANKERNEL__UNSTRUCTURED__BASEURL=http://unstructured:8000
+      - LEANKERNEL__LITELLM__APIKEY=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
+      - LEANKERNEL__QDRANT__HOST=qdrant
+      - LEANKERNEL__QDRANT__PORT=6334
+      - LEANKERNEL__QDRANT__EMBEDDINGDIMENSION=${EMBEDDING_DIMENSION:-3072}
+      - LEANKERNEL__SIGNAL__ENABLED=${LEANKERNEL_SIGNAL_ENABLED:-true}
+      - LEANKERNEL__SIGNAL__CLIPATH=${LEANKERNEL_SIGNAL_CLI_PATH:-/usr/bin/signal-cli}
+      - LEANKERNEL__SIGNAL__ACCOUNT=${SIGNAL_PHONE_NUMBER:-}
+      - LEANKERNEL__SIGNAL__ALLOWEDSENDERS__0=${SIGNAL_ALLOWED_SENDER_0:-}
+      - LEANKERNEL__SIGNAL__DAEMONBASEURL=http://signal:8080
+      - LEANKERNEL__WIKI__BASEPATH=/app/data/wiki
+      - LEANKERNEL__AGENTS__BASEPATH=/app/data/agents
+      - LEANKERNEL__KNOWLEDGE__ENABLED=true
+      - LEANKERNEL__KNOWLEDGE__COLLECTIONNAME=LEANKERNEL_knowledge
+      - LEANKERNEL__KNOWLEDGE__EMBEDDINGDIMENSION=${EMBEDDING_DIMENSION:-3072}
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data:/app/data
-      - signal-config:/home/LeanKernel/.local/share/signal-cli
+      - ./data/.signal-cli:/home/LeanKernel/.local/share/signal-cli
+      - ./data/.ms-todo-cli:/home/LeanKernel/.ms-todo-cli
+      - ./data/.simplefin-cli:/home/LeanKernel/.simplefin-cli
     depends_on:
       signal:
         condition: service_healthy
@@ -100,7 +102,7 @@ services:
     image: qdrant/qdrant:v1.17.1
     container_name: LeanKernel-qdrant
     volumes:
-      - ./data/qdrant:/qdrant/storage
+      - qdrant-data:/qdrant/storage
     ports:
       - "${QDRANT_PORT:-6333}:6333"
       - "${QDRANT_GRPC_PORT:-6334}:6334"
@@ -112,7 +114,7 @@ services:
         reservations:
           memory: 128M
     healthcheck:
-      test: ["CMD", "perl", "-e", "use IO::Socket::INET; exit(IO::Socket::INET->new(PeerAddr=>\"127.0.0.1:6333\") ? 0 : 1)"]
+      test: ["CMD", "perl", "-e", "use IO::Socket::INET; exit(IO::Socket::INET->new(PEERADDR=>\"127.0.0.1:6333\") ? 0 : 1)"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -140,7 +142,7 @@ services:
   # ── LeanKernel Indexer (Knowledge Pipeline Sidecar) ────────────────
   indexer:
     build:
-      context: ./scripts/indexer
+      context: ./config/indexer
       dockerfile: Dockerfile
     container_name: LeanKernel-indexer
     environment:
@@ -181,7 +183,7 @@ services:
   # ── Signal Daemon (signal-cli HTTP sidecar) ──────────────────
   signal:
     build:
-      context: ./scripts/signal-daemon
+      context: ./config/signal
       dockerfile: Dockerfile
     container_name: LeanKernel-signal
     environment:
@@ -191,7 +193,7 @@ services:
       - PORT=8080
       - TZ=${TZ:-America/Toronto}
     volumes:
-      - signal-config:/home/LeanKernel/.local/share/signal-cli
+      - ./data/.signal-cli:/home/LeanKernel/.local/share/signal-cli
     restart: unless-stopped
     deploy:
       resources:
@@ -207,7 +209,7 @@ services:
       start_period: 20s
 
 volumes:
-  signal-config:
+  qdrant-data:
     driver: local
   indexer-state:
     driver: local

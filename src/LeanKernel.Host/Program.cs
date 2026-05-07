@@ -158,8 +158,7 @@ try
 
     // Get skill directories for DynamicPluginHost initialization
     var skillDirs = builder.Configuration["LeanKernel:Skills:BasePaths"]?.Split(',')
-        ?? [Path.Combine(configuredDataDir, "skills"),
-            Path.Combine(configuredDataDir, "../.github/skills-remote")];
+        ?? [Path.Combine(configuredDataDir, "skills")];
 
     // Register DynamicPluginHost that wraps IToolRegistry for runtime skill loading
     builder.Services.AddSingleton(sp =>
