@@ -267,6 +267,65 @@ else if (_response != null)
             }
         </div>
 
+        <!-- Model Limit Drift -->
+        <div class="glass-card" style="grid-column: 1 / -1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 class="text-cyan">Model Limit Drift</h3>
+                <button class="btn-secondary btn-sm" @onclick="PreviewDrift" disabled="@_driftLoading">
+                    @if (_driftLoading) { <span>Checking…</span> } else { <span>Preview Drift</span> }
+                </button>
+            </div>
+            <p class="text-muted" style="font-size: 0.85rem; margin: 0 0 1rem;">
+                Checks live provider APIs (Groq, Gemini, Azure) and compares max_tokens and context_window against your config.
+                Requires provider API keys to be available in the environment.
+            </p>
+
+            @if (_driftError != null)
+            {
+                <p class="text-warning">⚠ @_driftError</p>
+            }
+            else if (_driftReport != null)
+            {
+                @if (_driftReport.TotalChanges == 0)
+                {
+                    <p class="text-cyan">✓ No drift detected — all model limits are up-to-date.</p>
+                }
+                else
+                {
+                    <p style="font-size: 0.85rem; margin: 0 0 0.75rem; color: var(--text-muted);">
+                        @_driftReport.TotalChanges field(s) differ from live provider metadata.
+                        Save the routing config after reviewing to apply.
+                    </p>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                            <thead>
+                                <tr style="color: var(--text-muted);">
+                                    <th style="text-align: left; padding: 0.25rem 0.5rem;">Provider</th>
+                                    <th style="text-align: left; padding: 0.25rem 0.5rem;">Model</th>
+                                    <th style="text-align: left; padding: 0.25rem 0.5rem;">Field</th>
+                                    <th style="text-align: right; padding: 0.25rem 0.5rem;">Current</th>
+                                    <th style="text-align: right; padding: 0.25rem 0.5rem;">Live</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in _driftReport.Changes)
+                                {
+                                    <tr style="border-top: 1px solid rgba(255,255,255,0.05);">
+                                        <td style="padding: 0.25rem 0.5rem;">@entry.Provider</td>
+                                        <td style="padding: 0.25rem 0.5rem; font-family: monospace; color: #00d4ff;">@entry.ModelId</td>
+                                        <td style="padding: 0.25rem 0.5rem; color: var(--text-muted);">@entry.Field</td>
+                                        <td style="padding: 0.25rem 0.5rem; text-align: right; color: var(--text-muted);">@FormatLimit(entry.OldValue)</td>
+                                        <td style="padding: 0.25rem 0.5rem; text-align: right; color: #a78bfa;">@FormatLimit(entry.NewValue)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Checked at @_driftReport.GeneratedAt</p>
+            }
+        </div>
+
         <!-- Router Policy -->
         <div class="glass-card">
             <h3 class="text-cyan" style="margin-bottom: 1rem;">Router Policy</h3>
@@ -303,6 +362,9 @@ else if (_response != null)
     private bool _saving;
     private RoutingConfigResponse? _response;
     private SaveDisplayResult? _saveResult;
+    private bool _driftLoading;
+    private string? _driftError;
+    private DriftReport? _driftReport;
 
     protected override async Task OnInitializedAsync()
     {
@@ -379,6 +441,33 @@ else if (_response != null)
 
     private IEnumerable<ProviderKeyStatus> GetKeyStatuses(string providerName)
         => _response?.KeyStatuses.Where(k => k.Provider == providerName) ?? [];
+
+    private async Task PreviewDrift()
+    {
+        _driftLoading = true;
+        _driftError = null;
+        _driftReport = null;
+        try
+        {
+            _driftReport = await Http.GetFromJsonAsync<DriftReport>("/api/model-limit-drift");
+            if (_driftReport?.Error is not null)
+            {
+                _driftError = _driftReport.Error;
+                _driftReport = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _driftError = ex.Message;
+        }
+        finally
+        {
+            _driftLoading = false;
+        }
+    }
+
+    private static string FormatLimit(double? value) =>
+        value.HasValue ? ((long)value.Value).ToString("N0") : "—";
 
     private sealed class SaveDisplayResult
     {

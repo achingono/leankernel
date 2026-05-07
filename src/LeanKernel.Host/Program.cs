@@ -219,6 +219,13 @@ try
         var paths = sp.GetRequiredService<LeanKernelHostPaths>();
         return new LiteLlmRoutingConfigService(paths.LiteLlmConfigPath);
     });
+    builder.Services.AddSingleton<IModelLimitDriftService>(sp =>
+    {
+        var paths = sp.GetRequiredService<LeanKernelHostPaths>();
+        var scriptPath = builder.Configuration["LeanKernel:LiteLlm:DriftScriptPath"]
+            ?? Path.Combine(AppContext.BaseDirectory, "scripts", "sync_litellm_model_limits.py");
+        return new ModelLimitDriftService(scriptPath, paths.LiteLlmConfigPath);
+    });
 
     // Authentication & Authorization
     builder.Services.AddLeanKernelAuth(builder.Configuration, configuredDataDir);
