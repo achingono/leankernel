@@ -230,7 +230,8 @@ public class SkillLoadingTests
             Assert.NotNull(skill);
             Assert.NotNull(skill.Runtime);
             Assert.Equal("cli", skill.Runtime.Type);
-            Assert.NotEmpty(skill.Runtime.Command);
+            var command = skill.Runtime.Command;
+            Assert.False(string.IsNullOrWhiteSpace(command));
         }
     }
 

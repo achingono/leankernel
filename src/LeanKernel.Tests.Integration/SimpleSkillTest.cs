@@ -9,7 +9,7 @@ public class SimpleSkillTest
     public async Task TestSimplefinSkillLoads()
     {
         var parser = new SkillParser();
-        var path = "/Users/achingono/source/repos/LeanKernel/.github/skills-remote/simplefin/SKILL.md";
+        var path = Path.Combine(FindRepositoryRoot(), ".github", "skills-remote", "simplefin", "SKILL.md");
         
         Assert.True(File.Exists(path), $"File not found: {path}");
         
@@ -38,5 +38,21 @@ public class SimpleSkillTest
         {
             throw new InvalidOperationException($"Parser exception: {ex.Message}\n{ex.StackTrace}", ex);
         }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, ".git", "config")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Could not find repository root.");
     }
 }

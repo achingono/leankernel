@@ -30,7 +30,7 @@ public sealed class AgentsConfigurationStep
         var agentsPath = Path.Combine(_paths.AgentsDirectory, "main", "AGENTS.md");
         var agentsDir = Path.GetDirectoryName(agentsPath);
 
-        if (!Directory.Exists(agentsDir))
+        if (agentsDir is not null && !Directory.Exists(agentsDir))
         {
             Directory.CreateDirectory(agentsDir);
         }

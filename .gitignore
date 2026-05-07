@@ -67,6 +67,7 @@ coverage-results/
 coverage-report/
 *.coverage
 *.coveragexml
+.sonarqube/
 
 # Python
 __pycache__/

@@ -171,6 +171,18 @@ cd src
 dotnet test LeanKernel.sln -v minimal
 ```
 
+### Quality Gates
+
+```bash
+# Coverage gate, default threshold: 80% line coverage
+scripts/quality/test-coverage.sh
+
+# Local Docker-backed SonarQube scan
+scripts/quality/sonarqube-scan.sh
+```
+
+See [docs/QUALITY.md](docs/QUALITY.md) for details and environment variables.
+
 ## Project Structure
 
 ```
