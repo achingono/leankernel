@@ -455,4 +455,113 @@ public class OnboardingOrchestratorTests : IDisposable
             return Task.CompletedTask;
         }
     }
+
+    // ADM-01: round-trip preservation of fields not in OnboardingConfigInput
+    public class OnboardingMergedConfigPreservationTests
+    {
+        [Fact]
+        public async Task SaveDraftAsync_PreservesSignalDaemonBaseUrlAndAllowedSenders()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), $"LEANKERNEL_merge_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var current = new LeanKernelConfig
+                {
+                    LiteLlm = new LiteLlmConfig
+                    {
+                        BaseUrl = "http://litellm:4000",
+                        ApiKey = "sk-test",
+                        DefaultModel = "small",
+                        EmbeddingModel = "embedding-small",
+                        ContextWindowTokens = 128000
+                    },
+                    Qdrant = new QdrantConfig { Host = "qdrant", Port = 6334, CollectionName = "col", EmbeddingDimension = 1536 },
+                    Signal = new SignalConfig
+                    {
+                        Enabled = false,
+                        Account = "",
+                        CliPath = "/usr/bin/signal-cli",
+                        AllowedSenders = ["+10001112222", "+10003334444"],
+                        DaemonBaseUrl = "http://signal-daemon:8080"
+                    },
+                    Unstructured = new UnstructuredConfig { Enabled = true, BaseUrl = "http://unstructured:8000", TimeoutSeconds = 60 },
+                    Agents = new AgentsConfig { BasePath = "/agents" },
+                    Wiki = new WikiConfig { BasePath = tempDir },
+                    Scheduler = new SchedulerConfig { Enabled = true, WikiMaintenanceCron = "0 3 * * *" },
+                    Routing = new RoutingConfig { Enabled = true, ShadowMode = false },
+                    SignalPhoneNumber = "+15550001111",
+                    DiscordBotToken = "discord-tok"
+                };
+
+                var runtime = new MergeStubConfigStore(current);
+                var state = new MergeStubState();
+                var orchestrator = new OnboardingOrchestrator(
+                    state,
+                    runtime,
+                    new MergeStubFactory(),
+                    NullLogger<OnboardingOrchestrator>.Instance,
+                    (_, _) => Task.FromResult(new OnboardingStepResult { Step = "qdrant", Success = true, Message = "ok" }));
+
+                var draft = new OnboardingConfigInput
+                {
+                    LiteLlm = current.LiteLlm,
+                    Qdrant = current.Qdrant,
+                    Signal = new SignalConfig { Enabled = true, Account = "+19998887777", CliPath = "/usr/bin/signal-cli" },
+                    Wiki = current.Wiki,
+                    Scheduler = current.Scheduler
+                };
+
+                await orchestrator.SaveDraftAsync(draft, CancellationToken.None);
+                var saved = runtime.GetCurrent();
+
+                Assert.True(saved.Signal.Enabled);
+                Assert.Equal("+19998887777", saved.Signal.Account);
+                Assert.Equal(["+10001112222", "+10003334444"], saved.Signal.AllowedSenders);
+                Assert.Equal("http://signal-daemon:8080", saved.Signal.DaemonBaseUrl);
+                Assert.Equal("http://unstructured:8000", saved.Unstructured.BaseUrl);
+                Assert.Equal("/agents", saved.Agents.BasePath);
+                Assert.True(saved.Routing.Enabled);
+                Assert.False(saved.Routing.ShadowMode);
+                Assert.Equal("+15550001111", saved.SignalPhoneNumber);
+                Assert.Equal("discord-tok", saved.DiscordBotToken);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+
+        private sealed class MergeStubConfigStore : IRuntimeLeanKernelConfigStore
+        {
+            private LeanKernelConfig _current;
+            public MergeStubConfigStore(LeanKernelConfig initial) => _current = initial;
+            public LeanKernelConfig GetCurrent() => _current;
+            public Task SaveAsync(LeanKernelConfig config, CancellationToken ct) { _current = config; return Task.CompletedTask; }
+        }
+
+        private sealed class MergeStubState : IOnboardingStateStore
+        {
+            private OnboardingStateDocument _doc = new() { UpdatedAt = DateTimeOffset.UtcNow };
+            public Task<OnboardingStateDocument> GetAsync(CancellationToken ct) => Task.FromResult(_doc);
+            public Task<bool> IsCompletedAsync(CancellationToken ct) => Task.FromResult(_doc.Completed);
+            public Task MarkInProgressAsync(CancellationToken ct) { _doc = new OnboardingStateDocument { UpdatedAt = DateTimeOffset.UtcNow }; return Task.CompletedTask; }
+            public Task MarkCompletedAsync(CancellationToken ct) { _doc = new OnboardingStateDocument { Completed = true, CompletedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow }; return Task.CompletedTask; }
+        }
+
+        private sealed class MergeStubFactory : IHttpClientFactory
+        {
+            public HttpClient CreateClient(string name) => new(new OkHandler());
+            private sealed class OkHandler : HttpMessageHandler
+            {
+                protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
+                    => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                    {
+                        Content = new System.Net.Http.StringContent(
+                            System.Text.Json.JsonSerializer.Serialize(new { data = new[] { new { id = "small" } } }),
+                            System.Text.Encoding.UTF8, "application/json")
+                    });
+            }
+        }
+    }
 }

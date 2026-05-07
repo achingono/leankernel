@@ -136,8 +136,12 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
             {
                 CliPath = NormalizeRequired(draft.Signal.CliPath, current.Signal.CliPath),
                 Account = (draft.Signal.Account ?? string.Empty).Trim(),
-                Enabled = draft.Signal.Enabled
+                Enabled = draft.Signal.Enabled,
+                AllowedSenders = current.Signal.AllowedSenders?.ToArray() ?? [],
+                DaemonBaseUrl = current.Signal.DaemonBaseUrl
             },
+            Unstructured = current.Unstructured,
+            Agents = current.Agents,
             Wiki = new WikiConfig
             {
                 BasePath = NormalizeRequired(draft.Wiki.BasePath, current.Wiki.BasePath),
@@ -160,7 +164,14 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
                     current.Scheduler.WikiMaintenanceCron)
             },
             Auth = current.Auth,
-            Knowledge = current.Knowledge
+            Knowledge = current.Knowledge,
+            Routing = current.Routing,
+            Engagement = current.Engagement,
+            SignalPhoneNumber = current.SignalPhoneNumber,
+            SignalServerUrl = current.SignalServerUrl,
+            SignalApiToken = current.SignalApiToken,
+            DiscordBotToken = current.DiscordBotToken,
+            DiscordChannelId = current.DiscordChannelId
         };
 
         return merged;

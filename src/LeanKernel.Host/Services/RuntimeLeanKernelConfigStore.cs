@@ -70,7 +70,18 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
             CliPath = source.Signal.CliPath,
             Account = source.Signal.Account,
             Enabled = source.Signal.Enabled,
-            AllowedSenders = source.Signal.AllowedSenders?.ToArray() ?? []
+            AllowedSenders = source.Signal.AllowedSenders?.ToArray() ?? [],
+            DaemonBaseUrl = source.Signal.DaemonBaseUrl
+        },
+        Unstructured = new UnstructuredConfig
+        {
+            Enabled = source.Unstructured.Enabled,
+            BaseUrl = source.Unstructured.BaseUrl,
+            TimeoutSeconds = source.Unstructured.TimeoutSeconds
+        },
+        Agents = new AgentsConfig
+        {
+            BasePath = source.Agents.BasePath
         },
         Wiki = new WikiConfig
         {
@@ -132,7 +143,37 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
             DefaultDocumentTags = source.Knowledge.DefaultDocumentTags.ToArray(),
             AgentScopes = new Dictionary<string, AgentScopeConfig>(source.Knowledge.AgentScopes),
             TagRules = source.Knowledge.TagRules.ToList()
-        }
+        },
+        Routing = new RoutingConfig
+        {
+            Enabled = source.Routing.Enabled,
+            ShadowMode = source.Routing.ShadowMode,
+            EnableQualityEscalation = source.Routing.EnableQualityEscalation,
+            SmallMaxTokens = source.Routing.SmallMaxTokens,
+            SmallMaxConstraints = source.Routing.SmallMaxConstraints,
+            MediumMaxTokens = source.Routing.MediumMaxTokens,
+            MediumMaxConstraints = source.Routing.MediumMaxConstraints,
+            SmallAlias = source.Routing.SmallAlias,
+            MediumAlias = source.Routing.MediumAlias,
+            LargeAlias = source.Routing.LargeAlias,
+            CooldownSeconds = source.Routing.CooldownSeconds,
+            MaxProviderAttempts = source.Routing.MaxProviderAttempts,
+            MaxSelectionBudgetMs = source.Routing.MaxSelectionBudgetMs,
+            QualityMinOutputLength = source.Routing.QualityMinOutputLength,
+            QualityMinConstraintCoverage = source.Routing.QualityMinConstraintCoverage,
+            ModelLimitSyncCron = source.Routing.ModelLimitSyncCron,
+            SpendGuard = new SpendGuardConfig
+            {
+                DailyPaidRequestSoftLimit = source.Routing.SpendGuard.DailyPaidRequestSoftLimit,
+                DailyPaidRequestHardLimit = source.Routing.SpendGuard.DailyPaidRequestHardLimit
+            }
+        },
+        Engagement = source.Engagement,
+        SignalPhoneNumber = source.SignalPhoneNumber,
+        SignalServerUrl = source.SignalServerUrl,
+        SignalApiToken = source.SignalApiToken,
+        DiscordBotToken = source.DiscordBotToken,
+        DiscordChannelId = source.DiscordChannelId
     };
 
     private sealed class RuntimeConfigDocument
