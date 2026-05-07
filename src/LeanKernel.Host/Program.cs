@@ -149,7 +149,9 @@ try
     builder.Services.AddSingleton<ITool, KnowledgeSearchTool>();
 
     // Skill System — Runtime skill loading from filesystem
+    builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<SkillParser>();
+    builder.Services.AddSingleton<IBinaryResolver, BinaryResolver>();
     builder.Services.AddSingleton<ISkillRegistry, RuntimeSkillRegistry>();
     builder.Services.AddSingleton<DynamicSkillToolFactory>();
 
