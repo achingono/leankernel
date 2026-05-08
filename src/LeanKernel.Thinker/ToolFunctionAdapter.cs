@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Interfaces;
@@ -62,20 +61,7 @@ public sealed class ToolFunctionAdapter
         {
             foreach (var op in multiOp.Operations)
             {
-                var capturedTool = multiOp;
-                var capturedOp = op;
-                yield return AIFunctionFactory.Create(
-                    async (string parameters, CancellationToken ct) =>
-                    {
-                        _logger.LogInformation("Tool invoked: {Tool}.{Op} with parameters: {Params}",
-                            capturedTool.Name, capturedOp.Id, parameters);
-
-                        var parametersJson = BuildOperationJson(capturedOp.Id, parameters);
-                        var result = await capturedTool.ExecuteAsync(parametersJson, ct);
-                        return result.Success ? result.Output ?? "" : $"Error: {result.Error}";
-                    },
-                    name: $"{tool.Name}__{capturedOp.Id}",
-                    description: $"{capturedOp.Summary} (skill: {tool.Name})");
+                yield return new SkillOperationFunction(multiOp, op, _logger);
             }
         }
         else
@@ -91,30 +77,6 @@ public sealed class ToolFunctionAdapter
                 },
                 name: capturedTool.Name,
                 description: capturedTool.Description);
-        }
-    }
-
-    /// <summary>
-    /// Merge the operation ID with any additional caller-supplied parameters into a single
-    /// JSON object expected by DynamicSkillTool.ExecuteAsync.
-    /// </summary>
-    private static string BuildOperationJson(string operationId, string? parameters)
-    {
-        if (string.IsNullOrWhiteSpace(parameters) || parameters.Trim() == "{}")
-            return JsonSerializer.Serialize(new Dictionary<string, object> { ["operation"] = operationId });
-
-        try
-        {
-            using var doc = JsonDocument.Parse(parameters);
-            var dict = new Dictionary<string, object> { ["operation"] = operationId };
-            foreach (var prop in doc.RootElement.EnumerateObject())
-                dict[prop.Name] = prop.Value.Clone();
-            return JsonSerializer.Serialize(dict);
-        }
-        catch
-        {
-            // If parameters aren't valid JSON, ignore them and just route the operation
-            return JsonSerializer.Serialize(new Dictionary<string, object> { ["operation"] = operationId });
         }
     }
 

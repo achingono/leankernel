@@ -105,6 +105,24 @@ public class ToolFunctionAdapterTests
         Assert.Contains("doughray__summary", names);
     }
 
+    [Fact]
+    public void BuildTools_OperationsTool_FunctionSchemaContainsOperationFields()
+    {
+        const string schema = """{"type":"object","properties":{"listId":{"type":"string"}}}""";
+        var tool = new FakeOperationsTool("ms-todo", "To-do skill", [
+            new ToolOperationDescriptor("task_list", "List tasks.", schema)
+        ]);
+        var registry = new FakeToolRegistry([tool]);
+        var adapter = new ToolFunctionAdapter(registry, NullLogger<ToolFunctionAdapter>.Instance);
+
+        var tools = adapter.BuildTools();
+
+        Assert.Single(tools);
+        var aiFunc = Assert.IsAssignableFrom<Microsoft.Extensions.AI.AIFunction>(tools[0]);
+        var jsonSchema = aiFunc.JsonSchema.ToString();
+        Assert.Contains("listId", jsonSchema);
+    }
+
     private sealed class FakeOperationsTool(
         string name, string description, IReadOnlyList<ToolOperationDescriptor> operations) : IOperationsTool
     {

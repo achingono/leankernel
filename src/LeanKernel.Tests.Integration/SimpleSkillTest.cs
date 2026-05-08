@@ -9,7 +9,7 @@ public class SimpleSkillTest
     public async Task TestSimplefinSkillLoads()
     {
         var parser = new SkillParser();
-        var path = Path.Combine(FindRepositoryRoot(), ".github", "skills-remote", "simplefin", "SKILL.md");
+        var path = Path.Combine(FindRepositoryRoot(), "data", "skills", "simplefin", "SKILL.md");
         
         Assert.True(File.Exists(path), $"File not found: {path}");
         
