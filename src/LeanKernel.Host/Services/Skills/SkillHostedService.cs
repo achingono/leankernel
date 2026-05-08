@@ -85,6 +85,9 @@ public sealed class SkillHostedService : IHostedService
         try
         {
             _logger.LogInformation("Initializing skills from {Count} directories", _skillDirectories.Length);
+
+            // Seed runtime registry with configured directories before loading dynamic tools.
+            await _skillRegistry.InitializeAsync(_skillDirectories);
             
             // Initialize the plugin host (synchronously load all skills)
             await _pluginHost.InitializeAsync();

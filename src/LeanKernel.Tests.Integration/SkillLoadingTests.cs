@@ -16,7 +16,7 @@ public class SkillLoadingTests
     private string GetSkillPath(string skillName)
     {
         var repoRoot = FindRepositoryRoot();
-        return Path.Combine(repoRoot, ".github", "skills-remote", skillName, "SKILL.md");
+        return Path.Combine(repoRoot, "data", "skills", skillName, "SKILL.md");
     }
 
     private string FindRepositoryRoot()
