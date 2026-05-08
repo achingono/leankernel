@@ -156,7 +156,7 @@ services:
       - QDRANT_PORT=6334
       - COLLECTION_NAME=LEANKERNEL_knowledge
       - WIKI_PATH=/app/data/wiki
-      - DOCUMENTS_PATH=/app/data/agents/main/documents
+      - DOCUMENTS_PATHS=/app/data/documents,/app/data/attachments,/app/data/agents/main/documents
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-embedding-small}
       - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-3072}
       - RESCAN_INTERVAL_SECONDS=${INDEXER_RESCAN_INTERVAL:-300}
@@ -166,7 +166,9 @@ services:
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data/wiki:/app/data/wiki
+      - ./data/documents:/app/data/documents
       - ./data/agents:/app/data/agents
+      - ./data/.signal-cli/attachments:/app/data/attachments
       - indexer-state:/app/data/indexer-state
     depends_on:
       qdrant:

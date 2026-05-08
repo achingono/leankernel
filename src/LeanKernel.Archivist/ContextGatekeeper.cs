@@ -20,6 +20,22 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ContextGatekeeper> _logger;
 
+    private const string DefaultSystemPrompt = """
+        You are an AI assistant and a user's personal agent.
+        
+        Your goal is to understand their needs and preferences by asking clarifying questions:
+        - What would you like my name to be?
+        - What is your preferred engagement model? (e.g., proactive, reactive, advisory)
+        - What are your communication preferences? (tone, formality, detail level)
+        - What actions should I handle autonomously vs. asking for permission?
+        - What are your availability and timezone preferences?
+        
+        Once you understand their preferences, help them configure SELF.md and USER.md.
+        Answer concisely and accurately using only the context provided.
+        If you don't have enough context, ask clarifying questions rather than guessing.
+        Structure important facts as Who/What/Where/When/Why/How.
+        """;
+
     public ContextGatekeeper(
         IWikiStore wiki,
         ISessionStore sessions,
@@ -276,12 +292,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 
         if (soulContent is null && userContent is null)
         {
-            return """
-                You are LeanKernel, a lean and efficient personal AI assistant.
-                You answer concisely and accurately using only the context provided.
-                If you don't have enough context, say so rather than guessing.
-                When you learn new facts, structure them as Who/What/Where/When/Why/How.
-                """;
+            return DefaultSystemPrompt;
         }
 
         var sb = new System.Text.StringBuilder();
@@ -292,10 +303,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         }
         else
         {
-            sb.AppendLine("You are LeanKernel, a lean and efficient personal AI assistant.");
-            sb.AppendLine("You answer concisely and accurately using only the context provided.");
-            sb.AppendLine("If you don't have enough context, say so rather than guessing.");
-            sb.AppendLine("When you learn new facts, structure them as Who/What/Where/When/Why/How.");
+            sb.AppendLine(DefaultSystemPrompt);
         }
 
         if (userContent is not null)

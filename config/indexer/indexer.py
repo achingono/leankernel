@@ -48,6 +48,12 @@ QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6334"))
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "LEANKERNEL_knowledge")
 WIKI_PATH = os.getenv("WIKI_PATH", "/app/data/wiki")
 DOCUMENTS_PATH = os.getenv("DOCUMENTS_PATH", "/app/data/documents")
+DOCUMENTS_PATHS = [
+    path.strip()
+    for path in os.getenv("DOCUMENTS_PATHS", DOCUMENTS_PATH).split(",")
+    if path.strip()
+]
+DATA_ROOT_PATH = os.getenv("DATA_ROOT_PATH", "/app/data")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "embedding-small")
 EMBEDDING_DIMENSION = int(os.getenv("EMBEDDING_DIMENSION", "3072"))
 EMBEDDING_REQUEST_DIMENSION = int(os.getenv("EMBEDDING_REQUEST_DIMENSION", str(EMBEDDING_DIMENSION)))
@@ -379,11 +385,32 @@ def chunk_text(text: str, max_tokens: int = 500) -> list[str]:
 
 def source_metadata(file_path: str) -> tuple[str, str]:
     """Return source_file payload path and source_type for a file."""
-    if file_path.startswith(WIKI_PATH):
-        return "wiki/" + os.path.relpath(file_path, WIKI_PATH), "wiki"
-    if file_path.startswith(DOCUMENTS_PATH):
-        return "documents/" + os.path.relpath(file_path, DOCUMENTS_PATH), "document"
+    if _is_subpath(file_path, WIKI_PATH):
+        return _relative_source_path(file_path, WIKI_PATH, "wiki", "wiki"), "wiki"
+    for documents_path in DOCUMENTS_PATHS:
+        if _is_subpath(file_path, documents_path):
+            return _relative_source_path(file_path, documents_path, "documents", "document"), "document"
     return os.path.basename(file_path), "document"
+
+
+def _is_subpath(file_path: str, base_path: str) -> bool:
+    """Return True when file_path is inside base_path."""
+    try:
+        file_abs = os.path.abspath(file_path)
+        base_abs = os.path.abspath(base_path)
+        return os.path.commonpath([file_abs, base_abs]) == base_abs
+    except ValueError:
+        return False
+
+
+def _relative_source_path(file_path: str, base_path: str, fallback_prefix: str, source_type: str) -> str:
+    """Build a stable source_file path, preferring relative paths under DATA_ROOT_PATH."""
+    if _is_subpath(file_path, DATA_ROOT_PATH):
+        relative_to_data = os.path.relpath(file_path, DATA_ROOT_PATH)
+        if source_type == "wiki" and not relative_to_data.startswith("wiki/"):
+            return "wiki/" + os.path.relpath(file_path, base_path)
+        return relative_to_data
+    return f"{fallback_prefix}/" + os.path.relpath(file_path, base_path)
 
 
 def chunk_payload(
@@ -614,12 +641,7 @@ class Indexer:
 
     def _delete_file_vectors(self, file_path: str):
         """Delete all vectors associated with a file path. Raises on failure."""
-        if file_path.startswith(WIKI_PATH):
-            relative_path = "wiki/" + os.path.relpath(file_path, WIKI_PATH)
-        elif file_path.startswith(DOCUMENTS_PATH):
-            relative_path = "documents/" + os.path.relpath(file_path, DOCUMENTS_PATH)
-        else:
-            relative_path = os.path.basename(file_path)
+        relative_path, _ = source_metadata(file_path)
 
         try:
             self.qdrant.delete(
@@ -650,7 +672,8 @@ class Indexer:
         indexed_paths = self.state.get_all_paths()
         current_paths = set()
 
-        for base_path in [WIKI_PATH, DOCUMENTS_PATH]:
+        scan_paths = [WIKI_PATH, *DOCUMENTS_PATHS]
+        for base_path in scan_paths:
             if not os.path.isdir(base_path):
                 continue
             for root, _, files in os.walk(base_path):
@@ -727,7 +750,7 @@ async def main():
     """Main entry point for the indexer service."""
     logger.info("LeanKernel Knowledge Indexer starting...")
     logger.info(f"  Wiki path: {WIKI_PATH}")
-    logger.info(f"  Documents path: {DOCUMENTS_PATH}")
+    logger.info(f"  Documents paths: {DOCUMENTS_PATHS}")
     logger.info(f"  Qdrant: {QDRANT_HOST}:{QDRANT_PORT}/{COLLECTION_NAME}")
     logger.info(f"  Embedding model: {EMBEDDING_MODEL}")
     logger.info(f"  Rescan interval: {RESCAN_INTERVAL}s")
@@ -744,7 +767,8 @@ async def main():
     loop = asyncio.get_event_loop()
     observer = Observer()
 
-    for watch_path, debounce in [(WIKI_PATH, WIKI_DEBOUNCE), (DOCUMENTS_PATH, 30)]:
+    watch_targets = [(WIKI_PATH, WIKI_DEBOUNCE)] + [(path, 30) for path in DOCUMENTS_PATHS]
+    for watch_path, debounce in watch_targets:
         if os.path.isdir(watch_path):
             handler = IndexerEventHandler(indexer, loop, debounce)
             observer.schedule(handler, watch_path, recursive=True)
