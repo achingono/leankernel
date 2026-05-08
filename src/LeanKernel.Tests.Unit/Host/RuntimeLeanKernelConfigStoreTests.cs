@@ -52,8 +52,8 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
         Assert.True(File.Exists(_paths.RuntimeConfigPath));
         var json = await File.ReadAllTextAsync(_paths.RuntimeConfigPath);
         using var doc = JsonDocument.Parse(json);
-        Assert.True(doc.RootElement.TryGetProperty("LeanKernel", out var LeanKernel));
-        var sender = LeanKernel.GetProperty("signal")
+        Assert.True(doc.RootElement.TryGetProperty("leanKernel", out var leanKernel));
+        var sender = leanKernel.GetProperty("signal")
             .GetProperty("allowedSenders")[0]
             .GetString();
         Assert.Equal("+15551234567", sender);
@@ -134,27 +134,27 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
 
         var json = await File.ReadAllTextAsync(_paths.RuntimeConfigPath);
         using var doc = JsonDocument.Parse(json);
-        var LeanKernel = doc.RootElement.GetProperty("LeanKernel");
+        var leanKernel = doc.RootElement.GetProperty("leanKernel");
 
         Assert.Equal("http://signal-daemon:8080",
-            LeanKernel.GetProperty("signal").GetProperty("daemonBaseUrl").GetString());
+            leanKernel.GetProperty("signal").GetProperty("daemonBaseUrl").GetString());
         Assert.Equal("+15559990000",
-            LeanKernel.GetProperty("signal").GetProperty("account").GetString());
+            leanKernel.GetProperty("signal").GetProperty("account").GetString());
         Assert.Equal("http://unstructured:8000",
-            LeanKernel.GetProperty("unstructured").GetProperty("baseUrl").GetString());
+            leanKernel.GetProperty("unstructured").GetProperty("baseUrl").GetString());
         Assert.Equal(90,
-            LeanKernel.GetProperty("unstructured").GetProperty("timeoutSeconds").GetInt32());
+            leanKernel.GetProperty("unstructured").GetProperty("timeoutSeconds").GetInt32());
         Assert.Equal("/app/data/agents",
-            LeanKernel.GetProperty("agents").GetProperty("basePath").GetString());
-        Assert.True(LeanKernel.GetProperty("routing").GetProperty("enabled").GetBoolean());
-        Assert.False(LeanKernel.GetProperty("routing").GetProperty("shadowMode").GetBoolean());
+            leanKernel.GetProperty("agents").GetProperty("basePath").GetString());
+        Assert.True(leanKernel.GetProperty("routing").GetProperty("enabled").GetBoolean());
+        Assert.False(leanKernel.GetProperty("routing").GetProperty("shadowMode").GetBoolean());
         Assert.Equal(100,
-            LeanKernel.GetProperty("routing").GetProperty("spendGuard")
+            leanKernel.GetProperty("routing").GetProperty("spendGuard")
                 .GetProperty("dailyPaidRequestSoftLimit").GetInt32());
         Assert.Equal("+15550001111",
-            LeanKernel.GetProperty("signalPhoneNumber").GetString());
+            leanKernel.GetProperty("signalPhoneNumber").GetString());
         Assert.Equal("discord-tok",
-            LeanKernel.GetProperty("discordBotToken").GetString());
+            leanKernel.GetProperty("discordBotToken").GetString());
     }
 
     [Fact]

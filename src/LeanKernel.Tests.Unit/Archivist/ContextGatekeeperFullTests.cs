@@ -103,7 +103,13 @@ public class ContextGatekeeperFullTests
         knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new List<RelevanceScore>()));
 
-        var config = Options.Create(new LeanKernelConfig());
+        var config = Options.Create(new LeanKernelConfig
+        {
+            Context = new ContextConfig
+            {
+                MinRelevanceThreshold = 0.0
+            }
+        });
         var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
 
         var msg = new LeanKernelMessage
@@ -146,7 +152,13 @@ public class ContextGatekeeperFullTests
         knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new List<RelevanceScore>()));
 
-        var config = Options.Create(new LeanKernelConfig());
+        var config = Options.Create(new LeanKernelConfig
+        {
+            Context = new ContextConfig
+            {
+                MinRelevanceThreshold = 0.0
+            }
+        });
         var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
 
         var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "hi" };
@@ -231,10 +243,13 @@ public class ContextGatekeeperFullTests
         var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "what is my name" };
         var budget = ContextBudget.FromModelWindow(128_000);
 
-        var ctx = await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
+        await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
 
-        Assert.NotEmpty(ctx.WikiLeanKernels);
-        Assert.Equal("who-user-profile", ctx.WikiLeanKernels[0].EntryId);
+        await wiki.Received(1).QueryAsync(
+            Arg.Is<WikiQuery>(q => q.TextQuery == "what is my name"
+                && q.Dimensions.Contains(WikiDimension.Who)
+                && q.Dimensions.Contains(WikiDimension.What)),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -3,7 +3,9 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Core.Interfaces;
 using LeanKernel.Host.Services;
+using NSubstitute;
 
 namespace LeanKernel.Tests.Unit.Host;
 
@@ -261,6 +263,8 @@ public class OnboardingOrchestratorTests : IDisposable
             new StubOnboardingStateStore(),
             new StubRuntimeConfigStore(cfg),
             CreateFactory(HttpStatusCode.OK, HttpStatusCode.OK),
+            CreateSelfStep(_tempDir),
+            CreateUserStep(_tempDir),
             NullLogger<OnboardingOrchestrator>.Instance);
 
         var result = await orchestrator.ValidateAsync(CancellationToken.None);
@@ -279,8 +283,37 @@ public class OnboardingOrchestratorTests : IDisposable
             state,
             runtime,
             httpClientFactory,
+            CreateSelfStep(_tempDir),
+            CreateUserStep(_tempDir),
             NullLogger<OnboardingOrchestrator>.Instance,
             qdrantValidator);
+    }
+
+    private static SelfConfigurationStep CreateSelfStep(string tempDir)
+    {
+        return new SelfConfigurationStep(
+            new LeanKernelHostPaths
+            {
+                DataDirectory = Path.Combine(tempDir, "data"),
+                AgentsDirectory = Path.Combine(tempDir, "agents"),
+                RuntimeConfigPath = Path.Combine(tempDir, "runtime-settings.json"),
+                OnboardingStatePath = Path.Combine(tempDir, "onboarding-state.json")
+            },
+            NullLogger<SelfConfigurationStep>.Instance);
+    }
+
+    private static UserConfigurationStep CreateUserStep(string tempDir)
+    {
+        return new UserConfigurationStep(
+            new LeanKernelHostPaths
+            {
+                DataDirectory = Path.Combine(tempDir, "data"),
+                AgentsDirectory = Path.Combine(tempDir, "agents"),
+                RuntimeConfigPath = Path.Combine(tempDir, "runtime-settings.json"),
+                OnboardingStatePath = Path.Combine(tempDir, "onboarding-state.json")
+            },
+            Substitute.For<IWikiStore>(),
+            NullLogger<UserConfigurationStep>.Instance);
     }
 
     private IHttpClientFactory CreateFactory(HttpStatusCode modelStatus, HttpStatusCode embeddingStatus)
@@ -500,6 +533,25 @@ public class OnboardingOrchestratorTests : IDisposable
                     state,
                     runtime,
                     new MergeStubFactory(),
+                    new SelfConfigurationStep(
+                        new LeanKernelHostPaths
+                        {
+                            DataDirectory = Path.Combine(tempDir, "data"),
+                            AgentsDirectory = Path.Combine(tempDir, "agents"),
+                            RuntimeConfigPath = Path.Combine(tempDir, "runtime-settings.json"),
+                            OnboardingStatePath = Path.Combine(tempDir, "onboarding-state.json")
+                        },
+                        NullLogger<SelfConfigurationStep>.Instance),
+                    new UserConfigurationStep(
+                        new LeanKernelHostPaths
+                        {
+                            DataDirectory = Path.Combine(tempDir, "data"),
+                            AgentsDirectory = Path.Combine(tempDir, "agents"),
+                            RuntimeConfigPath = Path.Combine(tempDir, "runtime-settings.json"),
+                            OnboardingStatePath = Path.Combine(tempDir, "onboarding-state.json")
+                        },
+                        Substitute.For<IWikiStore>(),
+                        NullLogger<UserConfigurationStep>.Instance),
                     NullLogger<OnboardingOrchestrator>.Instance,
                     (_, _) => Task.FromResult(new OnboardingStepResult { Step = "qdrant", Success = true, Message = "ok" }));
 

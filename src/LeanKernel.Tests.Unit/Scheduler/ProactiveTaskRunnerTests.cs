@@ -27,7 +27,8 @@ public class ProactiveTaskRunnerTests
             Substitute.For<IWikiStore>(),
             NullLogger<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>.Instance);
         var syncJob = new LeanKernel.Scheduler.Jobs.ModelLimitSyncJob(config, NullLogger<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>.Instance);
-        var runner = new ProactiveTaskRunner(scheduler, job, scrubJob, syncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
+        var profileSyncJob = Substitute.For<IAsyncJob>();
+        var runner = new ProactiveTaskRunner(scheduler, job, scrubJob, syncJob, profileSyncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
 
         await runner.StartAsync(CancellationToken.None);
 
@@ -55,7 +56,8 @@ public class ProactiveTaskRunnerTests
             {
                 Enabled = true,
                 WikiMaintenanceCron = "0 3 * * *",
-                ChatFactScrubCron = "30 2 * * *"
+                ChatFactScrubCron = "30 2 * * *",
+                UserProfileSyncCron = "0 4 * * *"
             }
         });
         var scrubJob = new LeanKernel.Scheduler.Jobs.ChatFactScrubJob(
@@ -63,7 +65,8 @@ public class ProactiveTaskRunnerTests
             Substitute.For<IWikiStore>(),
             NullLogger<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>.Instance);
         var syncJob = new LeanKernel.Scheduler.Jobs.ModelLimitSyncJob(config, NullLogger<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>.Instance);
-        var runner = new ProactiveTaskRunner(scheduler, job, scrubJob, syncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
+        var profileSyncJob = Substitute.For<IAsyncJob>();
+        var runner = new ProactiveTaskRunner(scheduler, job, scrubJob, syncJob, profileSyncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
 
         await runner.StartAsync(CancellationToken.None);
 
@@ -73,6 +76,10 @@ public class ProactiveTaskRunnerTests
 
         await scheduler.Received(1).ScheduleAsync(
             "chat-fact-scrub", "30 2 * * *",
+            Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>());
+
+        await scheduler.Received(1).ScheduleAsync(
+            "user-profile-sync", "0 4 * * *",
             Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>());
     }
 }

@@ -197,6 +197,8 @@ public class OnboardingControllerTests
         var agentsStep = CreateStubAgentsStep();
 
         var controller = new OnboardingController(orchestrator, CreateIncompleteStore(), agentsStep);
+        await controller.InitializeAgents(new AgentsInitializeRequest { PresetName = "basic" }, CancellationToken.None);
+
         var request = new AgentsSectionUpdateRequest 
         { 
             SectionName = "Agent Personality", 

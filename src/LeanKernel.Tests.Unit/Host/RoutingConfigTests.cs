@@ -408,5 +408,13 @@ public class RoutingConfigTests
             SaveCalled = true;
             return Task.CompletedTask;
         }
+
+        public string GetRawYaml() => string.Empty;
+
+        public Task SaveRawYamlAsync(string yaml, CancellationToken ct)
+        {
+            SaveCalled = true;
+            return Task.CompletedTask;
+        }
     }
 }
