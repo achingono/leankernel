@@ -19,6 +19,10 @@ public static class WikiExtractor
         var entries = new List<WikiEntry>();
         var combined = $"{userMessage}\n{assistantResponse}";
 
+        // Extract first-person profile and preference facts from user statements.
+        var profileFacts = ExtractUserProfileFacts(userMessage, sourceId);
+        entries.AddRange(profileFacts);
+
         // Extract entity mentions (Who)
         var whoFacts = ExtractWhoFacts(combined, sourceId);
         entries.AddRange(whoFacts);
@@ -30,6 +34,79 @@ public static class WikiExtractor
         // Extract temporal references (When)
         var whenFacts = ExtractWhenFacts(combined, sourceId);
         entries.AddRange(whenFacts);
+
+        return entries;
+    }
+
+    private static List<WikiEntry> ExtractUserProfileFacts(string userText, string sourceId)
+    {
+        var entries = new List<WikiEntry>();
+
+        var rules = new (string Pattern, WikiDimension Dimension, string EntryId, string Subject, Func<System.Text.RegularExpressions.Match, string> ClaimFormatter)[]
+        {
+            (
+                @"\bmy\s+name\s+is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b",
+                WikiDimension.Who,
+                "who-user-profile",
+                "User",
+                match => $"User name is {match.Groups[1].Value.Trim()}"
+            ),
+            (
+                @"\bcall\s+me\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b",
+                WikiDimension.Who,
+                "who-user-profile",
+                "User",
+                match => $"User prefers to be called {match.Groups[1].Value.Trim()}"
+            ),
+            (
+                @"\bi\s+live\s+in\s+([A-Za-z][A-Za-z\s\-']+)\b",
+                WikiDimension.Where,
+                "where-user-location",
+                "User location",
+                match => $"User lives in {match.Groups[1].Value.Trim()}"
+            ),
+            (
+                @"\bi\s+prefer\s+(.+?)(?:[\.!\?]|$)",
+                WikiDimension.What,
+                "what-user-preferences",
+                "User preferences",
+                match => $"User prefers {match.Groups[1].Value.Trim()}"
+            ),
+            (
+                @"\bi\s+like\s+(.+?)(?:[\.!\?]|$)",
+                WikiDimension.What,
+                "what-user-preferences",
+                "User preferences",
+                match => $"User likes {match.Groups[1].Value.Trim()}"
+            )
+        };
+
+        foreach (var rule in rules)
+        {
+            foreach (System.Text.RegularExpressions.Match match in
+                System.Text.RegularExpressions.Regex.Matches(userText, rule.Pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                var claim = match.Success ? rule.ClaimFormatter(match).Trim() : string.Empty;
+                if (claim.Length < 6)
+                    continue;
+
+                var existing = entries.Find(e => e.Id == rule.EntryId);
+                if (existing is not null)
+                {
+                    existing.Facts.Add(CreateFact(claim, sourceId));
+                }
+                else
+                {
+                    entries.Add(new WikiEntry
+                    {
+                        Id = rule.EntryId,
+                        Dimension = rule.Dimension,
+                        Subject = rule.Subject,
+                        Facts = [CreateFact(claim, sourceId)]
+                    });
+                }
+            }
+        }
 
         return entries;
     }

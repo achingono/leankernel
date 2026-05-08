@@ -201,6 +201,43 @@ public class ContextGatekeeperFullTests
     }
 
     [Fact]
+    public async Task GateContextAsync_WikiEntryWithLexicalOverlap_PassesDefaultThreshold()
+    {
+        var wikiEntry = new WikiEntry
+        {
+            Id = "who-user-profile",
+            Dimension = WikiDimension.Who,
+            Subject = "User",
+            Facts = [new WikiFact { Claim = "User name is Ada Lovelace", Confidence = 0.9, EstimatedTokens = 6 }],
+            LastAccessed = DateTimeOffset.UtcNow,
+            AccessCount = 0
+        };
+
+        var wiki = Substitute.For<IWikiStore>();
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([wikiEntry]));
+
+        var sessions = Substitute.For<ISessionStore>();
+        sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<ConversationTurn>()));
+
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
+        var config = Options.Create(new LeanKernelConfig());
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
+
+        var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "what is my name" };
+        var budget = ContextBudget.FromModelWindow(128_000);
+
+        var ctx = await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
+
+        Assert.NotEmpty(ctx.WikiLeanKernels);
+        Assert.Equal("who-user-profile", ctx.WikiLeanKernels[0].EntryId);
+    }
+
+    [Fact]
     public async Task GateContextAsync_WithAgentTags_PassesTagsToKnowledgeSearch()
     {
         var wiki = Substitute.For<IWikiStore>();

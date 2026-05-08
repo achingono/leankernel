@@ -443,9 +443,33 @@ public sealed class WikiStore : IWikiStore
 
     private static bool MatchesText(WikiEntry entry, string query)
     {
-        var lower = query.ToLowerInvariant();
-        return entry.Subject.Contains(lower, StringComparison.OrdinalIgnoreCase) ||
-               entry.Facts.Any(f => f.Claim.Contains(lower, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(query))
+            return true;
+
+        if (entry.Subject.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            entry.Facts.Any(f => f.Claim.Contains(query, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var queryTokens = Tokenize(query);
+        if (queryTokens.Count == 0)
+            return false;
+
+        var entryTokens = Tokenize($"{entry.Subject} {string.Join(' ', entry.Facts.Select(f => f.Claim))}");
+        if (entryTokens.Count == 0)
+            return false;
+
+        return queryTokens.Any(entryTokens.Contains);
+    }
+
+    private static HashSet<string> Tokenize(string text)
+    {
+        return text
+            .ToLowerInvariant()
+            .Split([' ', '\t', '\r', '\n', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '"', '\'', '/', '\\', '-', '_'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(token => token.Length >= 2)
+            .ToHashSet();
     }
 
     private void EnsureDirectories()

@@ -134,7 +134,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
             TextQuery = query.Content,
             Dimensions = dimensions,
             MaxResults = 20,
-            MinConfidence = _config.Context.MinRelevanceThreshold
+            MinConfidence = _config.Wiki.MinConfidenceThreshold
         };
 
         var entries = await _wiki.QueryAsync(wikiQuery, ct);
@@ -144,7 +144,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
             EntryId = e.Id,
             Content = FormatWikiEntryCompact(e),
             EstimatedTokens = e.Facts.Sum(f => f.EstimatedTokens),
-            SemanticSimilarity = 0.0, // Will be enriched by vector search
+            SemanticSimilarity = ComputeLexicalSimilarity(query.Content, e),
             RecencyDecay = ComputeRecencyDecay(e.LastAccessed),
             DimensionMatch = dimensions.Contains(e.Dimension) ? 1.0 : 0.2,
             InteractionFrequency = Math.Min(e.AccessCount / 100.0, 1.0),
@@ -304,6 +304,33 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private static string FormatWikiEntryCompact(WikiEntry entry) =>
         $"[{entry.Dimension}:{entry.Subject}] " +
         string.Join("; ", entry.Facts.Select(f => f.Claim));
+
+    private static double ComputeLexicalSimilarity(string queryText, WikiEntry entry)
+    {
+        var queryTokens = Tokenize(queryText);
+        if (queryTokens.Count == 0)
+            return 0.0;
+
+        var entryText = $"{entry.Subject} {string.Join(' ', entry.Facts.Select(f => f.Claim))}";
+        var entryTokens = Tokenize(entryText);
+        if (entryTokens.Count == 0)
+            return 0.0;
+
+        var overlap = queryTokens.Count(token => entryTokens.Contains(token));
+        return overlap / (double)queryTokens.Count;
+    }
+
+    private static HashSet<string> Tokenize(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return [];
+
+        return text
+            .ToLowerInvariant()
+            .Split([' ', '\t', '\r', '\n', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '"', '\'', '/', '\\', '-', '_'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(token => token.Length >= 2)
+            .ToHashSet();
+    }
 
     private static double ComputeRecencyDecay(DateTimeOffset lastAccessed)
     {

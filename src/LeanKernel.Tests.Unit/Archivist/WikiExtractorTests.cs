@@ -111,4 +111,30 @@ public class WikiExtractorTests
         // Should not create entries for generic conversation
         Assert.DoesNotContain(entries, e => e.Dimension == WikiDimension.Who);
     }
+
+    [Fact]
+    public void ExtractFacts_ExtractsUserNameFromFirstPersonStatement()
+    {
+        var entries = WikiExtractor.ExtractFacts(
+            "my name is Ada Lovelace",
+            "Thanks for sharing.",
+            "test-source");
+
+        var profile = entries.FirstOrDefault(e => e.Id == "who-user-profile");
+        Assert.NotNull(profile);
+        Assert.Contains(profile.Facts, f => f.Claim.Contains("User name is Ada Lovelace", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ExtractFacts_ExtractsUserPreference()
+    {
+        var entries = WikiExtractor.ExtractFacts(
+            "I prefer concise responses.",
+            "Understood.",
+            "test-source");
+
+        var prefs = entries.FirstOrDefault(e => e.Id == "what-user-preferences");
+        Assert.NotNull(prefs);
+        Assert.Contains(prefs.Facts, f => f.Claim.Contains("User prefers concise responses", StringComparison.OrdinalIgnoreCase));
+    }
 }

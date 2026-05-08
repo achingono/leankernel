@@ -91,6 +91,20 @@ public class WikiStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task QueryAsync_NaturalLanguageQuery_MatchesByTokens()
+    {
+        await _store.UpsertAsync(
+            MakeEntry("who-user-profile", WikiDimension.Who, "User", "User name is Ada Lovelace"),
+            CancellationToken.None);
+
+        var query = new WikiQuery { TextQuery = "what is my name", MaxResults = 10 };
+        var results = await _store.QueryAsync(query, CancellationToken.None);
+
+        Assert.Single(results);
+        Assert.Equal("who-user-profile", results[0].Id);
+    }
+
+    [Fact]
     public async Task QueryAsync_DimensionFilter_LimitsScope()
     {
         await _store.UpsertAsync(MakeEntry("who-alice", WikiDimension.Who, "Alice", "Fact"), CancellationToken.None);
