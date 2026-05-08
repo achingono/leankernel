@@ -62,4 +62,27 @@ public sealed class RoutingConfigController : ControllerBase
             ValidationErrors = errors
         });
     }
+
+    [HttpGet("raw")]
+    public IActionResult GetRawYaml()
+    {
+        var yaml = _service.GetRawYaml();
+        return Ok(new { yaml });
+    }
+
+    [HttpPut("raw")]
+    public async Task<IActionResult> SaveRawYaml(
+        [FromBody] RawYamlSaveRequest request,
+        CancellationToken ct)
+    {
+        try
+        {
+            await _service.SaveRawYamlAsync(request.Yaml, ct);
+            return Ok(new { saved = true });
+        }
+        catch (Exception ex)
+        {
+            return UnprocessableEntity(new { saved = false, error = ex.Message });
+        }
+    }
 }

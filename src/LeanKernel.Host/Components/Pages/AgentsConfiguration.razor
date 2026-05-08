@@ -14,7 +14,7 @@
 
 @if (IsLoading)
 {
-    <div class="glass-card" style="text-align: center; padding: 2.5rem;">
+    <div class="glass-card card-center">
         <p class="text-muted">Loading agent presets...</p>
     </div>
 }
@@ -24,10 +24,10 @@ else if (ShowAgentsMdEditor)
         <!-- Preset Selection -->
         <div class="glass-card">
             <h3 class="text-cyan">1) Choose a Preset</h3>
-            <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.85rem;">
+            <p class="text-muted text-sm">
                 Select a preset to initialize your AGENTS.md file with recommended defaults.
             </p>
-            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <div class="flex-row" style="flex-wrap: wrap;">
                 @foreach (var preset in Presets)
                 {
                     <button 
@@ -40,7 +40,7 @@ else if (ShowAgentsMdEditor)
             </div>
             @if (SelectedPreset != null)
             {
-                <div style="margin-top: 1rem; text-align: center;">
+                <div class="card-center">
                     <button class="btn-primary" @onclick="InitializeAgents" disabled="@IsBusy">
                         Initialize with @SelectedPreset
                     </button>
@@ -53,7 +53,7 @@ else if (ShowAgentsMdEditor)
         {
             <div class="glass-card">
                 <h3 class="text-cyan">2) Edit Sections</h3>
-                <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.85rem;">
+                <p class="text-muted text-sm">
                     Update specific sections of your AGENTS.md file. Each change is saved immediately.
                 </p>
                 
@@ -75,13 +75,14 @@ else if (ShowAgentsMdEditor)
                 {
                     <div>
                         <label class="setting-label">Content for @SelectedSection:</label>
-                        <textarea 
-                            class="setting-textarea" 
-                            style="font-family: monospace; min-height: 200px; width: 100%;"
-                            @bind="SectionContent"
-                            placeholder="Enter section content..."
-                        ></textarea>
-                        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+                        <div class="monaco-container" style="margin-top: 0.5rem;">
+                            <MonacoEditor @ref="_sectionEditor"
+                                          Language="markdown"
+                                          Value="@SectionContent"
+                                          ValueChanged="v => SectionContent = v"
+                                          Height="350px" />
+                        </div>
+                        <div class="flex-row">
                             <button class="btn-primary" @onclick="UpdateSection" disabled="@IsBusy">
                                 Save Section
                             </button>
@@ -94,7 +95,7 @@ else if (ShowAgentsMdEditor)
             <!-- Validation -->
             <div class="glass-card">
                 <h3 class="text-cyan">3) Validate Configuration</h3>
-                <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.85rem;">
+                <p class="text-muted text-sm">
                     Check that your AGENTS.md file is valid and properly formatted.
                 </p>
                 <button class="btn-primary" @onclick="ValidateAgents" disabled="@IsBusy">
@@ -107,26 +108,26 @@ else if (ShowAgentsMdEditor)
                         @if (ValidationResult.IsValid)
                         {
                             <div class="validation-success">
-                                <p style="margin: 0;"><strong>[PASS] AGENTS.md is valid</strong></p>
+                            <p class="m-0"><strong>[PASS] AGENTS.md is valid</strong></p>
                             </div>
                         }
                         else
                         {
                             <div class="validation-error">
-                                <p style="margin: 0; margin-bottom: 0.5rem;"><strong>[FAIL] Validation failed</strong></p>
+                            <p class="m-0"><strong>[FAIL] Validation failed</strong></p>
                                 @foreach (var error in ValidationResult.Errors)
                                 {
-                                    <p style="margin: 0.25rem 0; font-size: 0.85rem;">- @error</p>
+                                    <p class="text-sm">- @error</p>
                                 }
                             </div>
                         }
                         @if (ValidationResult.Warnings.Any())
                         {
-                            <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(255, 193, 7, 0.1); border-left: 3px solid var(--neon-warning); border-radius: 4px;">
-                                <p style="margin: 0; margin-bottom: 0.5rem;"><strong>[WARN] Warnings</strong></p>
+                            <div class="alert-warning">
+                                <p class="m-0"><strong>[WARN] Warnings</strong></p>
                                 @foreach (var warning in ValidationResult.Warnings)
                                 {
-                                    <p style="margin: 0.25rem 0; font-size: 0.85rem;">- @warning</p>
+                                    <p class="text-sm">- @warning</p>
                                 }
                             </div>
                         }
@@ -138,22 +139,22 @@ else if (ShowAgentsMdEditor)
         <!-- Status Messages -->
         @if (!string.IsNullOrWhiteSpace(StatusMessage))
         {
-            <div class="glass-card" style="background: rgba(0, 255, 136, 0.05); border-left: 3px solid var(--neon-success);">
-                <p style="margin: 0; color: var(--neon-success);">[OK] @StatusMessage</p>
+            <div class="alert-success">
+                <p class="m-0">[OK] @StatusMessage</p>
             </div>
         }
 
         @if (!string.IsNullOrWhiteSpace(ErrorMessage))
         {
-            <div class="glass-card" style="background: rgba(255, 0, 127, 0.05); border-left: 3px solid var(--neon-danger);">
-                <p style="margin: 0; color: var(--neon-danger);">[ERROR] @ErrorMessage</p>
+            <div class="alert-danger">
+                <p class="m-0">[ERROR] @ErrorMessage</p>
             </div>
         }
     </div>
 
     <!-- Navigation -->
-    <div class="glass-card" style="margin-top: 1.5rem;">
-        <div style="display: flex; gap: 0.75rem; justify-content: space-between;">
+    <div class="glass-card">
+        <div class="section-header">
             <button class="btn-ghost" @onclick="BackToOnboarding">
                 Back to Onboarding
             </button>
@@ -178,6 +179,7 @@ else if (ShowAgentsMdEditor)
     private string? SelectedSection = null;
     private string SectionContent = "";
     private string OriginalSectionContent = "";
+    private MonacoEditor? _sectionEditor;
 
     private string? StatusMessage = null;
     private string? ErrorMessage = null;
@@ -296,6 +298,9 @@ else if (ShowAgentsMdEditor)
 
     private async Task UpdateSection()
     {
+        if (_sectionEditor is not null)
+            SectionContent = await _sectionEditor.GetValueAsync();
+
         if (string.IsNullOrEmpty(SelectedSection) || string.IsNullOrEmpty(SectionContent))
             return;
 
@@ -328,9 +333,11 @@ else if (ShowAgentsMdEditor)
         }
     }
 
-    private void ResetSection()
+    private async Task ResetSection()
     {
         SectionContent = OriginalSectionContent;
+        if (_sectionEditor is not null)
+            await _sectionEditor.SetValueAsync(SectionContent);
     }
 
     private async Task ValidateAgents()
@@ -397,66 +404,18 @@ else if (ShowAgentsMdEditor)
 }
 
 <style>
-.btn-preset {
-    padding: 1rem;
-    background: rgba(0, 200, 255, 0.05);
-    border: 2px solid rgba(0, 200, 255, 0.3);
-    border-radius: 8px;
-    color: var(--text-color);
-    cursor: pointer;
-    flex: 1;
-    min-width: 200px;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.btn-preset:hover {
-    background: rgba(0, 200, 255, 0.1);
-    border-color: rgba(0, 200, 255, 0.6);
-}
-
-.btn-preset.active {
-    background: rgba(0, 200, 255, 0.2);
-    border-color: var(--neon-primary);
-    box-shadow: 0 0 12px rgba(0, 200, 255, 0.3);
-}
-
-.preset-desc {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: 0.5rem;
-    font-weight: normal;
-}
-
 .setting-textarea {
     background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(0, 200, 255, 0.2);
-    border-radius: 4px;
-    color: var(--text-color);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
     padding: 0.75rem;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
 }
 
 .setting-textarea:focus {
     outline: none;
     border-color: var(--neon-primary);
-    box-shadow: 0 0 8px rgba(0, 200, 255, 0.2);
-}
-
-.validation-success {
-    padding: 0.75rem;
-    background: rgba(0, 255, 136, 0.1);
-    border-left: 3px solid var(--neon-success);
-    border-radius: 4px;
-    color: var(--neon-success);
-}
-
-.validation-error {
-    padding: 0.75rem;
-    background: rgba(255, 0, 127, 0.1);
-    border-left: 3px solid var(--neon-danger);
-    border-radius: 4px;
-    color: var(--neon-danger);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.2);
 }
 </style>

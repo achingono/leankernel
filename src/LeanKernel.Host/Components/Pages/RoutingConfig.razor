@@ -11,32 +11,80 @@
     <p class="subtitle">Manage providers, models, route lanes, and aliases</p>
 </div>
 
+<!-- View toggle -->
+<div class="dimension-tabs" style="margin-bottom: 1.25rem;">
+    <button class="dimension-tab @(_viewMode == "structured" ? "active" : "")" @onclick='() => SwitchView("structured")'>
+        Structured View
+    </button>
+    <button class="dimension-tab @(_viewMode == "yaml" ? "active" : "")" @onclick='() => SwitchView("yaml")'>
+        Raw YAML
+    </button>
+</div>
+
 @if (_loadError != null)
 {
     <div class="glass-card border-warning" style="margin-bottom: 1rem;">
-        <p class="text-warning" style="margin: 0;">⚠ Failed to load routing config: @_loadError</p>
+        <p class="text-warning m-0">⚠ Failed to load routing config: @_loadError</p>
     </div>
 }
 
-@if (_saveResult != null)
+@if (_viewMode == "yaml")
+{
+    <!-- Raw YAML editor -->
+    <div class="glass-card" style="margin-bottom: 1rem;">
+        <div class="section-header">
+            <div>
+                <h3 class="text-cyan m-0">LiteLLM config.yaml</h3>
+                <p class="text-muted text-xs">
+                    Edit the raw YAML configuration. Changes are validated and applied immediately.
+                </p>
+            </div>
+            <div class="flex-row">
+                <button class="btn-ghost btn-sm" @onclick="ReloadRawYaml" disabled="@_yamlBusy">Reload</button>
+                <button class="btn-primary btn-sm" @onclick="SaveRawYaml" disabled="@(_yamlBusy || string.IsNullOrEmpty(_rawYaml))">
+                    @(_yamlBusy ? "Saving…" : "Save YAML")
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_yamlSaveError))
+        {
+            <p class="text-danger text-sm">⚠ @_yamlSaveError</p>
+        }
+        @if (_yamlSaveSuccess)
+        {
+            <p class="text-neon text-sm">✓ YAML saved successfully.</p>
+        }
+
+        <div class="monaco-container">
+            <MonacoEditor @ref="_yamlEditor"
+                          Language="yaml"
+                          Value="@_rawYaml"
+                          ValueChanged="v => _rawYaml = v"
+                          Height="600px" />
+        </div>
+    </div>
+}
+
+@if (_viewMode == "structured" && _saveResult != null)
 {
     <div class="glass-card @(_saveResult.HasErrors ? "border-warning" : "border-success")" style="margin-bottom: 1rem;">
         @if (_saveResult.Saved)
         {
-            <p class="text-cyan" style="margin: 0 0 0.25rem;">✓ Configuration saved successfully.</p>
+        <p class="text-cyan m-0">✓ Configuration saved successfully.</p>
         }
         else if (_saveResult.IsDryRun && !_saveResult.HasErrors)
         {
-            <p class="text-cyan" style="margin: 0 0 0.25rem;">✓ Dry-run complete — no validation errors.</p>
+        <p class="text-cyan m-0">✓ Dry-run complete — no validation errors.</p>
         }
         else if (_saveResult.HasErrors)
         {
-            <p class="text-warning" style="margin: 0 0 0.25rem;">⚠ Validation errors prevented save.</p>
+        <p class="text-warning m-0">⚠ Validation errors prevented save.</p>
         }
 
         @if (_saveResult.ValidationErrors.Count > 0)
         {
-            <ul style="margin: 0.25rem 0 0; padding-left: 1.5rem; font-size: 0.85rem;">
+            <ul class="text-sm" style="margin: 0.25rem 0 0; padding-left: 1.5rem;">
                 @foreach (var e in _saveResult.ValidationErrors)
                 {
                     <li class="@(e.Severity == "error" ? "text-warning" : "text-muted")">[@e.Severity] @e.Message</li>
@@ -47,20 +95,20 @@
         @if (!string.IsNullOrEmpty(_saveResult.Diff))
         {
             <details style="margin-top: 0.75rem;">
-                <summary style="cursor: pointer; color: var(--text-muted); font-size: 0.85rem;">Show YAML diff</summary>
+                <summary class="text-muted text-sm" style="cursor: pointer;">Show YAML diff</summary>
                 <pre style="margin-top: 0.5rem; font-size: 0.75rem; overflow-x: auto; background: rgba(0,0,0,0.3); padding: 0.75rem; border-radius: 4px;">@_saveResult.Diff</pre>
             </details>
         }
     </div>
 }
 
-@if (_loading)
+@if (_viewMode == "structured" && _loading)
 {
-    <div class="glass-card" style="text-align: center; padding: 3rem;">
+    <div class="glass-card card-center">
         <p class="text-muted">Loading routing configuration...</p>
     </div>
 }
-else if (_response != null)
+else if (_viewMode == "structured" && _response != null)
 {
     var config = _response.Config;
 
@@ -68,8 +116,8 @@ else if (_response != null)
     @if (_response.ValidationErrors.Count > 0)
     {
         <div class="glass-card border-warning" style="margin-bottom: 1rem;">
-            <p class="text-warning" style="margin: 0 0 0.5rem;"><strong>Validation Issues</strong></p>
-            <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.85rem;">
+        <p class="text-warning m-0"><strong>Validation Issues</strong></p>
+            <ul class="text-sm" style="margin: 0; padding-left: 1.5rem;">
                 @foreach (var e in _response.ValidationErrors)
                 {
                     <li class="@(e.Severity == "error" ? "text-warning" : "text-muted")">[@e.Severity] @e.Message</li>
@@ -82,13 +130,26 @@ else if (_response != null)
 
         <!-- Provider Inventory -->
         <div class="glass-card" style="grid-column: 1 / -1;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="section-header">
                 <h3 class="text-cyan">Provider Inventory</h3>
+                @if (config.Providers.Count == 0)
+                {
+                    <button class="btn-ghost btn-sm" @onclick='() => SwitchView("yaml")'>Edit YAML &#x2192;</button>
+                }
             </div>
+            @if (config.Providers.Count == 0)
+            {
+                <div class="empty-hint">
+                    <p class="text-muted m-0" style="margin-bottom: 0.5rem;">No providers configured.</p>
+                    <p class="text-muted text-sm">
+                        Switch to <button class="btn-link" @onclick='() => SwitchView("yaml")'>Raw YAML</button> to add provider configuration.
+                    </p>
+                </div>
+            }
             @foreach (var (providerName, provider) in config.Providers)
             {
-                <div class="glass-card" style="margin-bottom: 0.75rem;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div class="glass-card">
+                    <div class="flex-row" style="margin-bottom: 0.5rem;">
                         <strong>@providerName</strong>
                         @if (!string.IsNullOrEmpty(provider.LitellmProvider))
                         {
@@ -98,8 +159,8 @@ else if (_response != null)
 
                     <!-- Key Slots -->
                     <div style="margin-bottom: 0.5rem;">
-                        <span class="setting-label" style="font-size: 0.8rem;">Key Slots</span>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;">
+                        <span class="setting-label text-xs">Key Slots</span>
+                        <div class="flex-row" style="margin-top: 0.25rem;">
                             @foreach (var ks in GetKeyStatuses(providerName))
                             {
                                 <span class="badge @(ks.Configured ? "badge-success" : "badge-warning")" title="@ks.EnvVar">
@@ -109,43 +170,43 @@ else if (_response != null)
                             }
                             @if (!GetKeyStatuses(providerName).Any())
                             {
-                                <span class="text-muted" style="font-size: 0.8rem;">No key slots</span>
+                <span class="text-muted text-xs">No key slots</span>
                             }
                         </div>
                     </div>
 
                     <!-- Model Catalog -->
                     <div>
-                        <span class="setting-label" style="font-size: 0.8rem;">Models</span>
+                        <span class="setting-label text-xs">Models</span>
                         <div style="overflow-x: auto; margin-top: 0.25rem;">
-                            <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                            <table class="data-table">
                                 <thead>
-                                    <tr style="color: var(--text-muted);">
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">ID</th>
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Name</th>
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Mode</th>
-                                        <th style="text-align: right; padding: 0.25rem 0.5rem;">Max Tokens</th>
-                                        <th style="text-align: right; padding: 0.25rem 0.5rem;">Dimensions</th>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Mode</th>
+                                        <th class="text-right">Max Tokens</th>
+                                        <th class="text-right">Dimensions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach (var model in provider.Models)
                                     {
-                                        <tr style="border-top: 1px solid rgba(255,255,255,0.05);">
-                                            <td style="padding: 0.25rem 0.5rem; font-family: monospace; color: #00d4ff;">@model.Id</td>
-                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted);">@model.Name</td>
-                                            <td style="padding: 0.25rem 0.5rem;">
+                                        <tr>
+                                            <td class="col-id">@model.Id</td>
+                                            <td class="col-muted">@model.Name</td>
+                                            <td>
                                                 @if (!string.IsNullOrEmpty(model.Mode))
                                                 {
                                                     <span class="badge">@model.Mode</span>
                                                 }
                                                 else
                                                 {
-                                                    <span style="color: var(--text-muted);">chat</span>
+                                                    <span class="text-muted">chat</span>
                                                 }
                                             </td>
-                                            <td style="padding: 0.25rem 0.5rem; text-align: right;">@(model.MaxTokens > 0 ? model.MaxTokens.ToString("N0") : "—")</td>
-                                            <td style="padding: 0.25rem 0.5rem; text-align: right;">@(model.Dimensions.HasValue ? model.Dimensions.Value.ToString() : "—")</td>
+                                            <td class="text-right">@(model.MaxTokens > 0 ? model.MaxTokens.ToString("N0") : "—")</td>
+                                            <td class="text-right">@(model.Dimensions.HasValue ? model.Dimensions.Value.ToString() : "—")</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -158,9 +219,9 @@ else if (_response != null)
 
         <!-- Route Lanes -->
         <div class="glass-card" style="grid-column: 1 / -1;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="section-header">
                 <h3 class="text-cyan">Route Lanes</h3>
-                <div style="display: flex; gap: 0.5rem;">
+                <div class="flex-row">
                     <button class="btn-secondary btn-sm" @onclick="() => DryRun()" disabled="@_saving">Validate</button>
                     <button class="btn-primary btn-sm" @onclick="() => Save()" disabled="@_saving">Save Config</button>
                 </div>
@@ -173,32 +234,25 @@ else if (_response != null)
 
             @if (chatLanes.Any())
             {
-                <h4 style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 0.75rem;">Chat Lanes</h4>
+                <h4 class="text-muted text-sm">Chat Lanes</h4>
                 @foreach (var (lane, entries) in chatLanes)
                 {
                     <div style="margin-bottom: 1.25rem;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            <strong style="color: #00d4ff;">@lane</strong>
+                        <div class="flex-row" style="margin-bottom: 0.5rem;">
+                            <strong class="text-cyan">@lane</strong>
                             <span class="badge">@entries.Count route(s)</span>
                         </div>
                         <div style="overflow-x: auto;">
-                            <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="color: var(--text-muted);">
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Order</th>
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Provider</th>
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Model</th>
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Key Slots</th>
-                                    </tr>
-                                </thead>
+                            <table class="data-table">
+                                <thead><tr><th>Order</th><th>Provider</th><th>Model</th><th>Key Slots</th></tr></thead>
                                 <tbody>
                                     @foreach (var entry in entries.OrderBy(e => e.Order))
                                     {
-                                        <tr style="border-top: 1px solid rgba(255,255,255,0.05);">
-                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted);">@entry.Order</td>
-                                            <td style="padding: 0.25rem 0.5rem; font-weight: 500;">@entry.Provider</td>
-                                            <td style="padding: 0.25rem 0.5rem; font-family: monospace; color: #00d4ff;">@entry.Model</td>
-                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted); font-size: 0.75rem;">@string.Join(", ", entry.Keys)</td>
+                                        <tr>
+                                            <td class="col-muted">@entry.Order</td>
+                                            <td>@entry.Provider</td>
+                                            <td class="col-id">@entry.Model</td>
+                                            <td class="col-keys">@string.Join(", ", entry.Keys)</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -210,32 +264,25 @@ else if (_response != null)
 
             @if (embeddingLanes.Any())
             {
-                <h4 style="color: var(--text-muted); font-size: 0.85rem; margin: 1rem 0 0.75rem;">Embedding Lanes</h4>
+                <h4 class="text-muted text-sm">Embedding Lanes</h4>
                 @foreach (var (lane, entries) in embeddingLanes)
                 {
                     <div style="margin-bottom: 1.25rem;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            <strong style="color: #a78bfa;">@lane</strong>
+                        <div class="flex-row" style="margin-bottom: 0.5rem;">
+                            <strong class="text-violet">@lane</strong>
                             <span class="badge">embedding</span>
                         </div>
                         <div style="overflow-x: auto;">
-                            <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="color: var(--text-muted);">
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Order</th>
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Provider</th>
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Model</th>
-                                        <th style="text-align: left; padding: 0.25rem 0.5rem;">Key Slots</th>
-                                    </tr>
-                                </thead>
+                            <table class="data-table">
+                                <thead><tr><th>Order</th><th>Provider</th><th>Model</th><th>Key Slots</th></tr></thead>
                                 <tbody>
                                     @foreach (var entry in entries.OrderBy(e => e.Order))
                                     {
-                                        <tr style="border-top: 1px solid rgba(255,255,255,0.05);">
-                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted);">@entry.Order</td>
-                                            <td style="padding: 0.25rem 0.5rem; font-weight: 500;">@entry.Provider</td>
-                                            <td style="padding: 0.25rem 0.5rem; font-family: monospace; color: #a78bfa;">@entry.Model</td>
-                                            <td style="padding: 0.25rem 0.5rem; color: var(--text-muted); font-size: 0.75rem;">@string.Join(", ", entry.Keys)</td>
+                                        <tr>
+                                            <td class="col-muted">@entry.Order</td>
+                                            <td>@entry.Provider</td>
+                                            <td class="col-violet">@entry.Model</td>
+                                            <td class="col-keys">@string.Join(", ", entry.Keys)</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -269,13 +316,13 @@ else if (_response != null)
 
         <!-- Model Limit Drift -->
         <div class="glass-card" style="grid-column: 1 / -1;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="section-header">
                 <h3 class="text-cyan">Model Limit Drift</h3>
                 <button class="btn-secondary btn-sm" @onclick="PreviewDrift" disabled="@_driftLoading">
                     @if (_driftLoading) { <span>Checking…</span> } else { <span>Preview Drift</span> }
                 </button>
             </div>
-            <p class="text-muted" style="font-size: 0.85rem; margin: 0 0 1rem;">
+            <p class="text-muted text-sm">
                 Checks live provider APIs (Groq, Gemini, Azure) and compares max_tokens and context_window against your config.
                 Requires provider API keys to be available in the environment.
             </p>
@@ -292,43 +339,43 @@ else if (_response != null)
                 }
                 else
                 {
-                    <p style="font-size: 0.85rem; margin: 0 0 0.75rem; color: var(--text-muted);">
+                    <p class="text-muted text-sm">
                         @_driftReport.TotalChanges field(s) differ from live provider metadata.
                         Save the routing config after reviewing to apply.
                     </p>
                     <div style="overflow-x: auto;">
-                        <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                        <table class="data-table">
                             <thead>
-                                <tr style="color: var(--text-muted);">
-                                    <th style="text-align: left; padding: 0.25rem 0.5rem;">Provider</th>
-                                    <th style="text-align: left; padding: 0.25rem 0.5rem;">Model</th>
-                                    <th style="text-align: left; padding: 0.25rem 0.5rem;">Field</th>
-                                    <th style="text-align: right; padding: 0.25rem 0.5rem;">Current</th>
-                                    <th style="text-align: right; padding: 0.25rem 0.5rem;">Live</th>
+                                <tr>
+                                    <th>Provider</th>
+                                    <th>Model</th>
+                                    <th>Field</th>
+                                    <th class="text-right">Current</th>
+                                    <th class="text-right">Live</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var entry in _driftReport.Changes)
                                 {
-                                    <tr style="border-top: 1px solid rgba(255,255,255,0.05);">
-                                        <td style="padding: 0.25rem 0.5rem;">@entry.Provider</td>
-                                        <td style="padding: 0.25rem 0.5rem; font-family: monospace; color: #00d4ff;">@entry.ModelId</td>
-                                        <td style="padding: 0.25rem 0.5rem; color: var(--text-muted);">@entry.Field</td>
-                                        <td style="padding: 0.25rem 0.5rem; text-align: right; color: var(--text-muted);">@FormatLimit(entry.OldValue)</td>
-                                        <td style="padding: 0.25rem 0.5rem; text-align: right; color: #a78bfa;">@FormatLimit(entry.NewValue)</td>
+                                    <tr>
+                                        <td>@entry.Provider</td>
+                                        <td class="col-id">@entry.ModelId</td>
+                                        <td class="col-muted">@entry.Field</td>
+                                        <td class="text-right col-muted">@FormatLimit(entry.OldValue)</td>
+                                        <td class="text-right col-violet">@FormatLimit(entry.NewValue)</td>
                                     </tr>
                                 }
                             </tbody>
                         </table>
                     </div>
                 }
-                <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Checked at @_driftReport.GeneratedAt</p>
+                <p class="text-muted text-xs" style="margin-top: 0.5rem;">Checked at @_driftReport.GeneratedAt</p>
             }
         </div>
 
         <!-- Router Policy -->
         <div class="glass-card">
-            <h3 class="text-cyan" style="margin-bottom: 1rem;">Router Policy</h3>
+            <h3 class="text-cyan">Router Policy</h3>
             <div class="diagnostic-panel">
                 <div class="diagnostic-row">
                     <span class="diagnostic-label">Strategy</span>
@@ -354,7 +401,7 @@ else if (_response != null)
         </div>
 
     </div>
-}
+}  @* end structured view *@
 
 @code {
     private bool _loading = true;
@@ -365,10 +412,77 @@ else if (_response != null)
     private bool _driftLoading;
     private string? _driftError;
     private DriftReport? _driftReport;
+    private string _viewMode = "structured";
+    private string _rawYaml = "";
+    private bool _yamlBusy;
+    private string? _yamlSaveError;
+    private bool _yamlSaveSuccess;
+    private MonacoEditor? _yamlEditor;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadConfig();
+    }
+
+    private async Task SwitchView(string mode)
+    {
+        _viewMode = mode;
+        if (mode == "yaml" && string.IsNullOrEmpty(_rawYaml))
+            await ReloadRawYaml();
+    }
+
+    private async Task ReloadRawYaml()
+    {
+        _yamlBusy = true;
+        _yamlSaveError = null;
+        _yamlSaveSuccess = false;
+        try
+        {
+            var result = await Http.GetFromJsonAsync<RawYamlResponse>("/api/routing-config/raw");
+            _rawYaml = result?.Yaml ?? "";
+            if (_yamlEditor is not null)
+                await _yamlEditor.SetValueAsync(_rawYaml);
+        }
+        catch (Exception ex)
+        {
+            _yamlSaveError = $"Failed to load YAML: {ex.Message}";
+        }
+        finally
+        {
+            _yamlBusy = false;
+        }
+    }
+
+    private async Task SaveRawYaml()
+    {
+        _yamlBusy = true;
+        _yamlSaveError = null;
+        _yamlSaveSuccess = false;
+        try
+        {
+            if (_yamlEditor is not null)
+                _rawYaml = await _yamlEditor.GetValueAsync();
+
+            var response = await Http.PutAsJsonAsync("/api/routing-config/raw", new { yaml = _rawYaml });
+            if (response.IsSuccessStatusCode)
+            {
+                _yamlSaveSuccess = true;
+                await LoadConfig();
+            }
+            else
+            {
+                var error = await response.Content.ReadFromJsonAsync<RawYamlErrorResponse>();
+                _yamlSaveError = error?.Error ?? $"Save failed ({(int)response.StatusCode})";
+            }
+        }
+        catch (Exception ex)
+        {
+            _yamlSaveError = ex.Message;
+        }
+        finally
+        {
+            _yamlBusy = false;
+        }
     }
 
     private async Task LoadConfig()
@@ -476,5 +590,15 @@ else if (_response != null)
         public string Diff { get; init; } = "";
         public List<RoutingValidationError> ValidationErrors { get; init; } = [];
         public bool HasErrors { get; init; }
+    }
+
+    private sealed class RawYamlResponse
+    {
+        public string Yaml { get; init; } = "";
+    }
+
+    private sealed class RawYamlErrorResponse
+    {
+        public string? Error { get; init; }
     }
 }

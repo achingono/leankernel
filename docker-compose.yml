@@ -29,9 +29,11 @@ services:
       - LEANKERNEL__KNOWLEDGE__ENABLED=true
       - LEANKERNEL__KNOWLEDGE__COLLECTIONNAME=LEANKERNEL_knowledge
       - LEANKERNEL__KNOWLEDGE__EMBEDDINGDIMENSION=${EMBEDDING_DIMENSION:-3072}
+      - LEANKERNEL__ROUTING__ENABLED=true
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data:/app/data
+      - ./config/litellm:/app/config/litellm
       - ./data/.signal-cli:/home/LeanKernel/.local/share/signal-cli
       - ./data/.ms-todo-cli:/home/LeanKernel/.ms-todo-cli
       - ./data/.simplefin-cli:/home/LeanKernel/.simplefin-cli

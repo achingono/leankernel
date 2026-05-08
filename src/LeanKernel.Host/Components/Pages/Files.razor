@@ -15,7 +15,7 @@
     <div class="glass-card files-tree-panel">
         <!-- Breadcrumb -->
         <div class="files-breadcrumb">
-            <button class="btn-ghost" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"
+            <button class="btn-ghost btn-sm"
                     @onclick="NavigateUp" disabled="@(CurrentPath == "")">
                 <LeanKernelIcon Name="up" Class="button-icon" /> Up
             </button>
@@ -56,17 +56,22 @@
     <div class="glass-card files-preview-panel">
         @if (FileContent is not null)
         {
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="section-header">
                 <div>
                     <h3>@FileContent.Path</h3>
-                    <span class="text-muted" style="font-size: 0.8rem;">@FormatSize(FileContent.Size)</span>
+                    <span class="text-muted text-xs">@FormatSize(FileContent.Size)</span>
                 </div>
                 <button class="btn-ghost" @onclick="() => FileContent = null" aria-label="Close file preview">
                     <LeanKernelIcon Name="close" Class="button-icon" />
                 </button>
             </div>
-            <div class="log-viewer" style="max-height: none;">
-                <pre class="file-preview-content">@FileContent.Content</pre>
+            <div class="log-viewer">
+                <div class="monaco-container">
+                    <MonacoEditor Language="@GetMonacoLanguage(FileContent.Path)"
+                                  Value="@FileContent.Content"
+                                  ReadOnly="true"
+                                  Height="calc(100vh - 320px)" />
+                </div>
             </div>
         }
         else if (FileError is not null)
@@ -75,7 +80,7 @@
         }
         else
         {
-            <div class="empty-state" style="height: 100%; display: grid; place-items: center;">
+            <div class="empty-state card-fill-center">
                 Select a file to preview
             </div>
         }
@@ -158,6 +163,24 @@
             ".cs" => "file-code",
             ".sh" => "file-script",
             _ => "file-json"
+        };
+
+    private static string GetMonacoLanguage(string? path) =>
+        Path.GetExtension(path ?? "").ToLower() switch
+        {
+            ".cs" => "csharp",
+            ".yaml" or ".yml" => "yaml",
+            ".json" => "json",
+            ".md" => "markdown",
+            ".py" => "python",
+            ".sh" or ".bash" => "shell",
+            ".ts" or ".tsx" => "typescript",
+            ".js" or ".jsx" => "javascript",
+            ".html" => "html",
+            ".css" => "css",
+            ".xml" => "xml",
+            ".sql" => "sql",
+            _ => "plaintext"
         };
 
 }

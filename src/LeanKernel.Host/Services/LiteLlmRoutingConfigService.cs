@@ -13,6 +13,8 @@ public interface ILiteLlmRoutingConfigService
     string GenerateYaml(LiteLlmRoutingConfig config);
     string ComputeDiff(string oldYaml, string newYaml);
     Task SaveAsync(LiteLlmRoutingConfig config, CancellationToken ct);
+    string GetRawYaml();
+    Task SaveRawYamlAsync(string yaml, CancellationToken ct);
 }
 
 public sealed class LiteLlmRoutingConfigService : ILiteLlmRoutingConfigService
@@ -173,6 +175,36 @@ public sealed class LiteLlmRoutingConfigService : ILiteLlmRoutingConfigService
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
+        await File.WriteAllTextAsync(_configPath, yaml, ct);
+    }
+
+    public string GetRawYaml()
+    {
+        if (File.Exists(_configPath))
+            return File.ReadAllText(_configPath);
+
+        // Fall back to the example config as a starter template
+        var examplePath = Path.Combine(
+            Path.GetDirectoryName(_configPath) ?? "",
+            "config.example.yaml");
+
+        if (File.Exists(examplePath))
+            return "# Starter template — edit and click Save YAML to apply.\n"
+                   + "# This will be written to: " + _configPath + "\n\n"
+                   + File.ReadAllText(examplePath);
+
+        return "# LiteLLM config.yaml\n"
+               + "# File not found: " + _configPath + "\n"
+               + "# Add a 'providers' block to get started.\n";
+    }
+
+    public async Task SaveRawYamlAsync(string yaml, CancellationToken ct)
+    {
+        // Validate by parsing first
+        ParseYaml(yaml); // throws if invalid
+        var dir = Path.GetDirectoryName(_configPath);
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
         await File.WriteAllTextAsync(_configPath, yaml, ct);
     }
 

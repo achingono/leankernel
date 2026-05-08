@@ -90,3 +90,8 @@ public sealed class RoutingConfigSaveResponse
     public string YamlDiff { get; init; } = "";
     public List<RoutingValidationError> ValidationErrors { get; init; } = [];
 }
+
+public sealed class RawYamlSaveRequest
+{
+    public string Yaml { get; init; } = "";
+}
