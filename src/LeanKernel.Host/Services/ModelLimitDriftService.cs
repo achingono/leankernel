@@ -33,6 +33,13 @@ public sealed class ModelLimitDriftService : IModelLimitDriftService
         var reportFile = Path.Combine(Path.GetTempPath(), $"LeanKernel-drift-{Guid.NewGuid():N}.json");
         try
         {
+            // S4036: Safe to use Process.Start here because:
+            // - Executable path is fixed to "python3"
+            // - Arguments are from trusted sources (configuration + paths)
+            // - ArgumentList used (no shell injection)
+            // - No untrusted paths in command construction
+            // ReSharper disable once S4036
+#pragma warning disable S4036
             var psi = new ProcessStartInfo("python3")
             {
                 RedirectStandardOutput = true,
@@ -40,6 +47,7 @@ public sealed class ModelLimitDriftService : IModelLimitDriftService
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+#pragma warning restore S4036
             psi.ArgumentList.Add(_scriptPath);
             psi.ArgumentList.Add("--config");
             psi.ArgumentList.Add(_configPath);
