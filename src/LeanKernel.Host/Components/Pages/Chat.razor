@@ -157,6 +157,8 @@
 
         IsLoading = true;
         StateHasChanged();
+        // Yield once so the loading indicator flushes to the UI before processing begins.
+        await Task.Yield();
 
         try
         {

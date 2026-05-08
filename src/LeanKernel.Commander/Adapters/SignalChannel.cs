@@ -175,7 +175,8 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
 
     private sealed class SignalTypingScope : IAsyncDisposable
     {
-        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(10);
+        // Signal clients often clear typing quickly; keep a short heartbeat to avoid flicker/gaps.
+        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(3);
 
         private readonly ISignalAdapter _adapter;
         private readonly string _recipientId;

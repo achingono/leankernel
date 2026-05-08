@@ -89,7 +89,14 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
         try
         {
             using var response = await _http.SendAsync(request, timeoutCts.Token);
-            // Typing is best-effort — ignore response status.
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogDebug(
+                    "Typing indicator request returned {StatusCode} for {Recipient} (stop={Stop})",
+                    (int)response.StatusCode,
+                    recipient,
+                    stop);
+            }
         }
         catch (Exception ex)
         {
