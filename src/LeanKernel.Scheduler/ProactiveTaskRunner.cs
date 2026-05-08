@@ -13,6 +13,7 @@ public sealed class ProactiveTaskRunner
 {
     private readonly IScheduler _scheduler;
     private readonly Jobs.WikiMaintenanceJob _wikiJob;
+    private readonly Jobs.ChatFactScrubJob _chatFactScrubJob;
     private readonly Jobs.ModelLimitSyncJob _syncJob;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ProactiveTaskRunner> _logger;
@@ -20,12 +21,14 @@ public sealed class ProactiveTaskRunner
     public ProactiveTaskRunner(
         IScheduler scheduler,
         Jobs.WikiMaintenanceJob wikiJob,
+        Jobs.ChatFactScrubJob chatFactScrubJob,
         Jobs.ModelLimitSyncJob syncJob,
         IOptions<LeanKernelConfig> config,
         ILogger<ProactiveTaskRunner> logger)
     {
         _scheduler = scheduler;
         _wikiJob = wikiJob;
+        _chatFactScrubJob = chatFactScrubJob;
         _syncJob = syncJob;
         _config = config.Value;
         _logger = logger;
@@ -44,6 +47,12 @@ public sealed class ProactiveTaskRunner
             "wiki-maintenance",
             _config.Scheduler.WikiMaintenanceCron,
             _wikiJob.ExecuteAsync,
+            ct);
+
+        await _scheduler.ScheduleAsync(
+            "chat-fact-scrub",
+            _config.Scheduler.ChatFactScrubCron,
+            _chatFactScrubJob.ExecuteAsync,
             ct);
 
         // Phase 4 — model limit sync (only when routing is enabled)

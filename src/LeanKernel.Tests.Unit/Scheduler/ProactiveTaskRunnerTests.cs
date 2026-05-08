@@ -22,8 +22,12 @@ public class ProactiveTaskRunnerTests
             NullLogger<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>.Instance);
 
         var config = Options.Create(new LeanKernelConfig { Scheduler = new SchedulerConfig { Enabled = false } });
+        var scrubJob = new LeanKernel.Scheduler.Jobs.ChatFactScrubJob(
+            Substitute.For<ISessionStore>(),
+            Substitute.For<IWikiStore>(),
+            NullLogger<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>.Instance);
         var syncJob = new LeanKernel.Scheduler.Jobs.ModelLimitSyncJob(config, NullLogger<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>.Instance);
-        var runner = new ProactiveTaskRunner(scheduler, job, syncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
+        var runner = new ProactiveTaskRunner(scheduler, job, scrubJob, syncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
 
         await runner.StartAsync(CancellationToken.None);
 
@@ -45,14 +49,30 @@ public class ProactiveTaskRunnerTests
                 NullLogger<LeanKernel.Archivist.Wiki.WikiCompiler>.Instance),
             NullLogger<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>.Instance);
 
-        var config = Options.Create(new LeanKernelConfig { Scheduler = new SchedulerConfig { Enabled = true, WikiMaintenanceCron = "0 3 * * *" } });
+        var config = Options.Create(new LeanKernelConfig
+        {
+            Scheduler = new SchedulerConfig
+            {
+                Enabled = true,
+                WikiMaintenanceCron = "0 3 * * *",
+                ChatFactScrubCron = "30 2 * * *"
+            }
+        });
+        var scrubJob = new LeanKernel.Scheduler.Jobs.ChatFactScrubJob(
+            Substitute.For<ISessionStore>(),
+            Substitute.For<IWikiStore>(),
+            NullLogger<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>.Instance);
         var syncJob = new LeanKernel.Scheduler.Jobs.ModelLimitSyncJob(config, NullLogger<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>.Instance);
-        var runner = new ProactiveTaskRunner(scheduler, job, syncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
+        var runner = new ProactiveTaskRunner(scheduler, job, scrubJob, syncJob, config, NullLogger<ProactiveTaskRunner>.Instance);
 
         await runner.StartAsync(CancellationToken.None);
 
         await scheduler.Received(1).ScheduleAsync(
             "wiki-maintenance", "0 3 * * *",
+            Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>());
+
+        await scheduler.Received(1).ScheduleAsync(
+            "chat-fact-scrub", "30 2 * * *",
             Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>());
     }
 }

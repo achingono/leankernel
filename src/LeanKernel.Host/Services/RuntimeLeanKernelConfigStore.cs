@@ -102,7 +102,8 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
         Scheduler = new SchedulerConfig
         {
             Enabled = source.Scheduler.Enabled,
-            WikiMaintenanceCron = source.Scheduler.WikiMaintenanceCron
+            WikiMaintenanceCron = source.Scheduler.WikiMaintenanceCron,
+            ChatFactScrubCron = source.Scheduler.ChatFactScrubCron
         },
         Auth = new AuthConfig
         {

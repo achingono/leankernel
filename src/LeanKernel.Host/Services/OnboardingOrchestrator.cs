@@ -161,7 +161,10 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
                 Enabled = draft.Scheduler.Enabled,
                 WikiMaintenanceCron = NormalizeRequired(
                     draft.Scheduler.WikiMaintenanceCron,
-                    current.Scheduler.WikiMaintenanceCron)
+                    current.Scheduler.WikiMaintenanceCron),
+                ChatFactScrubCron = NormalizeRequired(
+                    draft.Scheduler.ChatFactScrubCron,
+                    current.Scheduler.ChatFactScrubCron)
             },
             Auth = current.Auth,
             Knowledge = current.Knowledge,

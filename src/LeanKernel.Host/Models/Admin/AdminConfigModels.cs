@@ -145,6 +145,7 @@ public sealed record SchedulerConfigSection
 
     public ConfigField Enabled { get; init; } = new();
     public ConfigField WikiMaintenanceCron { get; init; } = new();
+    public ConfigField ChatFactScrubCron { get; init; } = new();
 }
 
 public sealed record AuthConfigSection

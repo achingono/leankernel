@@ -198,6 +198,7 @@ try
     // Scheduler
     builder.Services.AddSingleton<IScheduler, CronScheduler>();
     builder.Services.AddSingleton<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>();
+    builder.Services.AddSingleton<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>();
     builder.Services.AddSingleton<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>();
     builder.Services.AddSingleton<LeanKernel.Scheduler.ProactiveTaskRunner>();
 

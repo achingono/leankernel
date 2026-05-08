@@ -85,6 +85,7 @@ public sealed class SchedulerPatch
 {
     public bool? Enabled { get; set; }
     public string? WikiMaintenanceCron { get; set; }
+    public string? ChatFactScrubCron { get; set; }
 }
 
 public sealed class RoutingPatch

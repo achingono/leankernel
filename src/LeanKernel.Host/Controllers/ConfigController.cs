@@ -98,7 +98,8 @@ public sealed class ConfigController : ControllerBase
             Scheduler = new SchedulerConfigSection
             {
                 Enabled = Field(cfg.Scheduler.Enabled, description: "Enable background scheduler"),
-                WikiMaintenanceCron = Field(cfg.Scheduler.WikiMaintenanceCron, description: "Cron expression for wiki maintenance job")
+                WikiMaintenanceCron = Field(cfg.Scheduler.WikiMaintenanceCron, description: "Cron expression for wiki maintenance job"),
+                ChatFactScrubCron = Field(cfg.Scheduler.ChatFactScrubCron, description: "Cron expression for nightly chat fact scrub job")
             },
             Auth = new AuthConfigSection
             {
@@ -349,7 +350,8 @@ public sealed class ConfigController : ControllerBase
             scheduler = new SchedulerConfig
             {
                 Enabled = ApplyBool(scheduler.Enabled, scp.Enabled, "Scheduler", "Enabled", changes),
-                WikiMaintenanceCron = ApplyString(scheduler.WikiMaintenanceCron, scp.WikiMaintenanceCron, "Scheduler", "WikiMaintenanceCron", changes)
+                WikiMaintenanceCron = ApplyString(scheduler.WikiMaintenanceCron, scp.WikiMaintenanceCron, "Scheduler", "WikiMaintenanceCron", changes),
+                ChatFactScrubCron = ApplyString(scheduler.ChatFactScrubCron, scp.ChatFactScrubCron, "Scheduler", "ChatFactScrubCron", changes)
             };
         }
 
