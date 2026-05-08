@@ -12,7 +12,7 @@ namespace LeanKernel.Plugins.BuiltIn.Skills;
 /// Invokes skills via HTTP, CLI, or composite methods at runtime.
 /// No compilation required — just add a SKILL.md file to the skill directory.
 /// </summary>
-public sealed class DynamicSkillTool : ITool
+public sealed class DynamicSkillTool : ITool, IOperationsTool
 {
     private readonly SkillDefinition _skillDef;
     private readonly HttpClient _httpClient;
@@ -23,6 +23,11 @@ public sealed class DynamicSkillTool : ITool
     public string Description => _skillDef.Description;
     public string Category => GetCategory();
     public string ParametersSchema => BuildParametersSchema();
+
+    public IReadOnlyList<ToolOperationDescriptor> Operations =>
+        _skillDef.Operations
+            .Select(op => new ToolOperationDescriptor(op.Id, op.Summary, BuildOperationParametersSchema(op)))
+            .ToList();
 
     public DynamicSkillTool(
         SkillDefinition skillDef,
@@ -316,6 +321,25 @@ public sealed class DynamicSkillTool : ITool
               "required": ["operation"]
             }
             """;
+    }
+
+    /// <summary>
+    /// Build a JSON Schema for a single operation's parameters (excludes the 'operation' routing field).
+    /// Falls back to an empty-properties object schema if the operation has no parameters.
+    /// </summary>
+    private static string BuildOperationParametersSchema(SkillOperation op)
+    {
+        if (op.Parameters == null || op.Parameters.Count == 0)
+            return """{"type":"object","properties":{},"additionalProperties":false}""";
+
+        try
+        {
+            return JsonSerializer.Serialize(op.Parameters);
+        }
+        catch
+        {
+            return """{"type":"object","properties":{},"additionalProperties":false}""";
+        }
     }
 
     private ToolResult FailResult(Stopwatch sw, string error)

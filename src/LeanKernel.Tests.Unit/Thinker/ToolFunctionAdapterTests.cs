@@ -51,6 +51,73 @@ public class ToolFunctionAdapterTests
         Assert.Equal(3, result.Count);
     }
 
+    [Fact]
+    public void BuildTools_OperationsTool_ExpandsToOneAIFunctionPerOperation()
+    {
+        var tool = new FakeOperationsTool("doughray", "Finance skill", [
+            new ToolOperationDescriptor("health", "Check health", "{}"),
+            new ToolOperationDescriptor("list_accounts", "List accounts", "{}")
+        ]);
+        var registry = new FakeToolRegistry([tool]);
+        var adapter = new ToolFunctionAdapter(registry, NullLogger<ToolFunctionAdapter>.Instance);
+
+        var tools = adapter.BuildTools();
+
+        Assert.Equal(2, tools.Count);
+        var names = tools.Select(t => t.Name).ToList();
+        Assert.Contains("doughray__health", names);
+        Assert.Contains("doughray__list_accounts", names);
+    }
+
+    [Fact]
+    public void BuildTools_OperationsTool_FunctionDescriptionsIncludeSkillName()
+    {
+        var tool = new FakeOperationsTool("doughray", "Finance skill", [
+            new ToolOperationDescriptor("health", "Check API health.", "{}")
+        ]);
+        var registry = new FakeToolRegistry([tool]);
+        var adapter = new ToolFunctionAdapter(registry, NullLogger<ToolFunctionAdapter>.Instance);
+
+        var tools = adapter.BuildTools();
+
+        Assert.Single(tools);
+        Assert.Equal("Check API health. (skill: doughray)", tools[0].Description);
+    }
+
+    [Fact]
+    public void BuildTools_MixedTools_ExpandsOperationsToolAndKeepsSimpleTool()
+    {
+        var simpleTool = new FakeTool("wiki", "Wiki search", success: true, output: "result");
+        var opsTool = new FakeOperationsTool("doughray", "Finance", [
+            new ToolOperationDescriptor("health", "Health check.", "{}"),
+            new ToolOperationDescriptor("summary", "Dashboard summary.", "{}")
+        ]);
+        var registry = new FakeToolRegistry([simpleTool, opsTool]);
+        var adapter = new ToolFunctionAdapter(registry, NullLogger<ToolFunctionAdapter>.Instance);
+
+        var tools = adapter.BuildTools();
+
+        // wiki stays as 1 function; doughray expands to 2
+        Assert.Equal(3, tools.Count);
+        var names = tools.Select(t => t.Name).ToList();
+        Assert.Contains("wiki", names);
+        Assert.Contains("doughray__health", names);
+        Assert.Contains("doughray__summary", names);
+    }
+
+    private sealed class FakeOperationsTool(
+        string name, string description, IReadOnlyList<ToolOperationDescriptor> operations) : IOperationsTool
+    {
+        public string Name => name;
+        public string Description => description;
+        public string Category => "general";
+        public string ParametersSchema => "{}";
+        public IReadOnlyList<ToolOperationDescriptor> Operations => operations;
+
+        public Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct) =>
+            Task.FromResult(new ToolResult { ToolName = name, Success = true, Output = "ok" });
+    }
+
     private sealed class FakeTool(string name, string description, bool success, string? output) : ITool
     {
         public string Name => name;

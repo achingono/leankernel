@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Interfaces;
@@ -40,20 +41,7 @@ public sealed class ToolFunctionAdapter
     {
         var tools = _registry.Tools.Values
             .Where(tool => IsToolAllowedForAgent(tool, agent))
-            .Select(tool =>
-            {
-                var capturedTool = tool;
-                return AIFunctionFactory.Create(
-                    async (string input, CancellationToken ct) =>
-                    {
-                        _logger.LogInformation("Tool invoked: {Tool} with input: {Input}",
-                            capturedTool.Name, input);
-                        var result = await capturedTool.ExecuteAsync(input, ct);
-                        return result.Success ? result.Output ?? "" : $"Error: {result.Error}";
-                    },
-                    name: capturedTool.Name,
-                    description: capturedTool.Description);
-            })
+            .SelectMany(tool => BuildFunctionsForTool(tool))
             .Cast<AITool>()
             .ToList();
 
@@ -62,6 +50,72 @@ public sealed class ToolFunctionAdapter
             agent != null ? $" for agent '{agent.Name}'" : "");
         
         return tools;
+    }
+
+    /// <summary>
+    /// Expand a tool into one AIFunction per operation (for IOperationsTool) or a single
+    /// function with a JSON input string (for simple tools).
+    /// </summary>
+    private IEnumerable<AIFunction> BuildFunctionsForTool(ITool tool)
+    {
+        if (tool is IOperationsTool multiOp && multiOp.Operations.Count > 0)
+        {
+            foreach (var op in multiOp.Operations)
+            {
+                var capturedTool = multiOp;
+                var capturedOp = op;
+                yield return AIFunctionFactory.Create(
+                    async (string parameters, CancellationToken ct) =>
+                    {
+                        _logger.LogInformation("Tool invoked: {Tool}.{Op} with parameters: {Params}",
+                            capturedTool.Name, capturedOp.Id, parameters);
+
+                        var parametersJson = BuildOperationJson(capturedOp.Id, parameters);
+                        var result = await capturedTool.ExecuteAsync(parametersJson, ct);
+                        return result.Success ? result.Output ?? "" : $"Error: {result.Error}";
+                    },
+                    name: $"{tool.Name}__{capturedOp.Id}",
+                    description: $"{capturedOp.Summary} (skill: {tool.Name})");
+            }
+        }
+        else
+        {
+            var capturedTool = tool;
+            yield return AIFunctionFactory.Create(
+                async (string input, CancellationToken ct) =>
+                {
+                    _logger.LogInformation("Tool invoked: {Tool} with input: {Input}",
+                        capturedTool.Name, input);
+                    var result = await capturedTool.ExecuteAsync(input, ct);
+                    return result.Success ? result.Output ?? "" : $"Error: {result.Error}";
+                },
+                name: capturedTool.Name,
+                description: capturedTool.Description);
+        }
+    }
+
+    /// <summary>
+    /// Merge the operation ID with any additional caller-supplied parameters into a single
+    /// JSON object expected by DynamicSkillTool.ExecuteAsync.
+    /// </summary>
+    private static string BuildOperationJson(string operationId, string? parameters)
+    {
+        if (string.IsNullOrWhiteSpace(parameters) || parameters.Trim() == "{}")
+            return JsonSerializer.Serialize(new Dictionary<string, object> { ["operation"] = operationId });
+
+        try
+        {
+            using var doc = JsonDocument.Parse(parameters);
+            var dict = new Dictionary<string, object> { ["operation"] = operationId };
+            foreach (var prop in doc.RootElement.EnumerateObject())
+                dict[prop.Name] = prop.Value.Clone();
+            return JsonSerializer.Serialize(dict);
+        }
+        catch
+        {
+            // If parameters aren't valid JSON, ignore them and just route the operation
+            return JsonSerializer.Serialize(new Dictionary<string, object> { ["operation"] = operationId });
+        }
     }
 
     /// <summary>
