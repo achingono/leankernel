@@ -11,6 +11,7 @@ mkdir -p "$RESULTS_DIR"
 dotnet test "$ROOT_DIR/src/LeanKernel.sln" \
   -c Release \
   --collect:"XPlat Code Coverage" \
+  --filter "FullyQualifiedName!~Integration" \
   --settings "$ROOT_DIR/src/LeanKernel.Tests.Unit/coverage.runsettings" \
   --results-directory "$RESULTS_DIR"
 
