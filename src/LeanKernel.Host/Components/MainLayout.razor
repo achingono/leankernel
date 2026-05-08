@@ -12,11 +12,7 @@
     <!-- Sidebar Navigation -->
     <nav class="LeanKernel-sidebar @(SidebarCollapsed ? "collapsed" : "")" aria-label="Main navigation">
         <div class="sidebar-header">
-            <img src="brand/logo-mark.png" class="LeanKernel-logo" alt="LeanKernel logo" />
-            @if (!SidebarCollapsed)
-            {
-                <span class="LeanKernel-title">LeanKernel</span>
-            }
+            <img src="brand/@(SidebarCollapsed ? "logo-mark.png" : "logo-dark.png")" class="LeanKernel-logo" alt="LeanKernel logo" />
             <button class="sidebar-toggle"
                     @onclick="ToggleSidebar"
                     aria-label="@(SidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")"

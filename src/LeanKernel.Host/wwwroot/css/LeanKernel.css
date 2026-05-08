@@ -133,7 +133,7 @@ html {
 }
 
 .LeanKernel-logo {
-    width: 1.5rem;
+    /*width: 1.5rem;*/
     height: 1.5rem;
     filter: drop-shadow(0 0 8px rgba(212, 182, 138, 0.4));
     flex-shrink: 0;
@@ -230,6 +230,18 @@ html {
 
 .nav-item.active::before {
     transform: scaleY(1);
+}
+
+.nav-logout {
+    color: var(--text-primary);
+    background: rgba(10, 20, 40, 0.35);
+    border: 1px solid rgba(168, 181, 160, 0.35);
+}
+
+.nav-logout:hover {
+    color: var(--bg-base);
+    background: rgba(168, 181, 160, 0.3);
+    border-color: rgba(168, 181, 160, 0.5);
 }
 
 .nav-icon {
