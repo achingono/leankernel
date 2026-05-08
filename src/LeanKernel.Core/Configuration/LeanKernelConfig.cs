@@ -8,6 +8,7 @@ public sealed class LeanKernelConfig
     public const string SectionName = "LeanKernel";
 
     public LiteLlmConfig LiteLlm { get; set; } = new();
+    public OllamaConfig Ollama { get; set; } = new();
     public QdrantConfig Qdrant { get; set; } = new();
     public SignalConfig Signal { get; set; } = new();
     public UnstructuredConfig Unstructured { get; set; } = new();
@@ -74,6 +75,30 @@ public sealed class LiteLlmConfig
     public string DefaultModel { get; set; } = "small";
     public string EmbeddingModel { get; set; } = "embedding-small";
     public int ContextWindowTokens { get; set; } = 128_000;
+}
+
+public sealed class OllamaConfig
+{
+    /// <summary>
+    /// Base URL for local Ollama instance (e.g., "http://host.docker.internal:11434" or "http://ollama:11434").
+    /// </summary>
+    public string BaseUrl { get; set; } = "http://host.docker.internal:11434";
+
+    /// <summary>
+    /// Model name to use for semantic extraction (e.g., "mistral", "neural-chat", "llama2").
+    /// Must be available in the local Ollama instance.
+    /// </summary>
+    public string Model { get; set; } = "mistral";
+
+    /// <summary>
+    /// Temperature for extraction (0-1, lower = more deterministic).
+    /// </summary>
+    public double Temperature { get; set; } = 0.3;
+
+    /// <summary>
+    /// HTTP timeout in seconds for Ollama requests.
+    /// </summary>
+    public int TimeoutSeconds { get; set; } = 30;
 }
 
 public sealed class QdrantConfig

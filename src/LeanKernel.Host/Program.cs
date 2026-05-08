@@ -109,6 +109,15 @@ try
     builder.Services.AddSingleton<WikiCompiler>();
     builder.Services.AddSingleton<ConversationCompactor>();
     builder.Services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
+    
+    // LLM-based semantic wiki extraction (async, fire-and-forget)
+    builder.Services.AddHttpClient<LeanKernel.Archivist.Wiki.LlmWikiExtractor>(
+        (sp, client) =>
+        {
+            var cfg = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
+            client.BaseAddress = new Uri(cfg.Ollama.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(cfg.Ollama.TimeoutSeconds);
+        });
 
     // Thinker
     builder.Services.AddSingleton<LeanKernel.Thinker.Middleware.FunctionLoggingMiddleware>();
@@ -117,7 +126,19 @@ try
     builder.Services.AddSingleton<AgentFactory>();
     builder.Services.AddSingleton<ToolFunctionAdapter>();
     builder.Services.AddSingleton<PromptAssembler>();
-    builder.Services.AddSingleton<ThinkerServiceDependencies>();
+    builder.Services.AddSingleton<ThinkerServiceDependencies>(sp =>
+    {
+        var gatekeeper = sp.GetRequiredService<IContextGatekeeper>();
+        var sessions = sp.GetRequiredService<ISessionStore>();
+        var wiki = sp.GetRequiredService<IWikiStore>();
+        var agentFactory = sp.GetRequiredService<AgentFactory>();
+        var toolAdapter = sp.GetRequiredService<ToolFunctionAdapter>();
+        var promptAssembler = sp.GetRequiredService<PromptAssembler>();
+        var llmExtractor = sp.GetService<LeanKernel.Archivist.Wiki.LlmWikiExtractor>();
+        
+        return new ThinkerServiceDependencies(
+            gatekeeper, sessions, wiki, agentFactory, toolAdapter, promptAssembler, llmExtractor);
+    });
 
     // Intelligent routing (FR-1 through FR-8) — disabled by default until LeanKernel:Routing:Enabled = true
     builder.Services.AddSingleton<LeanKernel.Thinker.Routing.TaskComplexityScorer>();

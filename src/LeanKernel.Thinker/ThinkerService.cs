@@ -21,7 +21,8 @@ public sealed class ThinkerServiceDependencies
         IWikiStore wiki,
         AgentFactory agentFactory,
         ToolFunctionAdapter toolAdapter,
-        PromptAssembler promptAssembler)
+        PromptAssembler promptAssembler,
+        LlmWikiExtractor? llmExtractor = null)
     {
         Gatekeeper = gatekeeper;
         Sessions = sessions;
@@ -29,6 +30,7 @@ public sealed class ThinkerServiceDependencies
         AgentFactory = agentFactory;
         ToolAdapter = toolAdapter;
         PromptAssembler = promptAssembler;
+        LlmExtractor = llmExtractor;
     }
 
     public IContextGatekeeper Gatekeeper { get; }
@@ -37,6 +39,7 @@ public sealed class ThinkerServiceDependencies
     public AgentFactory AgentFactory { get; }
     public ToolFunctionAdapter ToolAdapter { get; }
     public PromptAssembler PromptAssembler { get; }
+    public LlmWikiExtractor? LlmExtractor { get; }
 }
 
 /// <summary>
@@ -54,6 +57,7 @@ public sealed class ThinkerService : IThinkerService
     private readonly PromptAssembler _promptAssembler;
     private readonly ModelRoutingService? _routing;
     private readonly SelectionLogStore? _selectionLog;
+    private readonly LlmWikiExtractor? _llmExtractor;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -70,6 +74,7 @@ public sealed class ThinkerService : IThinkerService
         _agentFactory = dependencies.AgentFactory;
         _toolAdapter = dependencies.ToolAdapter;
         _promptAssembler = dependencies.PromptAssembler;
+        _llmExtractor = dependencies.LlmExtractor;
         _routing = routing;
         _selectionLog = selectionLog;
         _config = config.Value;
@@ -143,19 +148,27 @@ public sealed class ThinkerService : IThinkerService
         }, ct);
 
         // 6. Extract and persist 5W1H facts from the exchange
+        var sourceId = $"conversation:{DateTimeOffset.UtcNow:yyyy-MM-ddTHH:mm:ss}";
+        
+        // 6a. Synchronous regex extraction (fast, non-blocking)
         try
         {
-            var sourceId = $"conversation:{DateTimeOffset.UtcNow:yyyy-MM-ddTHH:mm:ss}";
             var facts = WikiExtractor.ExtractFacts(message.Content, response, sourceId);
             if (facts.Count > 0)
             {
                 await _wiki.IngestFactsAsync(facts, ct);
-                _logger.LogDebug("Extracted {Count} wiki entries from conversation", facts.Count);
+                _logger.LogDebug("Regex extraction: ingested {Count} wiki entries", facts.Count);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Fact extraction failed — continuing without persistence");
+            _logger.LogWarning(ex, "Regex fact extraction failed — continuing without persistence");
+        }
+
+        // 6b. Async LLM extraction (semantic, fire-and-forget, doesn't block turn latency)
+        if (_llmExtractor is not null)
+        {
+            _llmExtractor.ExtractAsync(message.Content, response, sourceId);
         }
 
         return response;
