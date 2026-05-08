@@ -221,6 +221,9 @@ try
     builder.Services.AddSingleton<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>();
     builder.Services.AddSingleton<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>();
     builder.Services.AddSingleton<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>();
+    builder.Services.AddSingleton<LeanKernel.Host.Services.Jobs.UserProfileSyncJob>();
+    builder.Services.AddSingleton<LeanKernel.Scheduler.IAsyncJob>(sp => 
+        sp.GetRequiredService<LeanKernel.Host.Services.Jobs.UserProfileSyncJob>());
     builder.Services.AddSingleton<LeanKernel.Scheduler.ProactiveTaskRunner>();
 
     // Web API services
@@ -337,6 +340,8 @@ try
     builder.Services.AddHostedService<ChannelInitializationService>();
     
     builder.Services.AddScoped<AgentsConfigurationStep>();
+    builder.Services.AddScoped<SelfConfigurationStep>();
+    builder.Services.AddScoped<UserConfigurationStep>();
     builder.Services.AddHostedService<MessageProcessingBackgroundService>();
 
     // Forwarded headers (for reverse proxy HTTPS detection)

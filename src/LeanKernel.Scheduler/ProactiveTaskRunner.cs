@@ -6,6 +6,14 @@ using LeanKernel.Core.Interfaces;
 namespace LeanKernel.Scheduler;
 
 /// <summary>
+/// Interface for job wrappers that can be executed asynchronously.
+/// </summary>
+public interface IAsyncJob
+{
+    Task ExecuteAsync(CancellationToken ct);
+}
+
+/// <summary>
 /// Registers and manages proactive scheduled tasks.
 /// Connects job definitions (from config) to the CronScheduler.
 /// </summary>
@@ -15,6 +23,7 @@ public sealed class ProactiveTaskRunner
     private readonly Jobs.WikiMaintenanceJob _wikiJob;
     private readonly Jobs.ChatFactScrubJob _chatFactScrubJob;
     private readonly Jobs.ModelLimitSyncJob _syncJob;
+    private readonly IAsyncJob _userProfileSyncJob;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ProactiveTaskRunner> _logger;
 
@@ -23,6 +32,7 @@ public sealed class ProactiveTaskRunner
         Jobs.WikiMaintenanceJob wikiJob,
         Jobs.ChatFactScrubJob chatFactScrubJob,
         Jobs.ModelLimitSyncJob syncJob,
+        IAsyncJob userProfileSyncJob,
         IOptions<LeanKernelConfig> config,
         ILogger<ProactiveTaskRunner> logger)
     {
@@ -30,6 +40,7 @@ public sealed class ProactiveTaskRunner
         _wikiJob = wikiJob;
         _chatFactScrubJob = chatFactScrubJob;
         _syncJob = syncJob;
+        _userProfileSyncJob = userProfileSyncJob;
         _config = config.Value;
         _logger = logger;
     }
@@ -53,6 +64,13 @@ public sealed class ProactiveTaskRunner
             "chat-fact-scrub",
             _config.Scheduler.ChatFactScrubCron,
             _chatFactScrubJob.ExecuteAsync,
+            ct);
+
+        // User profile sync (learn from wiki facts)
+        await _scheduler.ScheduleAsync(
+            "user-profile-sync",
+            _config.Scheduler.UserProfileSyncCron,
+            _userProfileSyncJob.ExecuteAsync,
             ct);
 
         // Phase 4 — model limit sync (only when routing is enabled)

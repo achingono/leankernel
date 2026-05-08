@@ -16,18 +16,24 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
     private readonly IRuntimeLeanKernelConfigStore _runtimeConfigStore;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly Func<LeanKernelConfig, CancellationToken, Task<OnboardingStepResult>> _qdrantValidator;
+    private readonly SelfConfigurationStep _selfStep;
+    private readonly UserConfigurationStep _userStep;
     private readonly ILogger<OnboardingOrchestrator> _logger;
 
     public OnboardingOrchestrator(
         IOnboardingStateStore stateStore,
         IRuntimeLeanKernelConfigStore runtimeConfigStore,
         IHttpClientFactory httpClientFactory,
+        SelfConfigurationStep selfStep,
+        UserConfigurationStep userStep,
         ILogger<OnboardingOrchestrator> logger,
         Func<LeanKernelConfig, CancellationToken, Task<OnboardingStepResult>>? qdrantValidator = null)
     {
         _stateStore = stateStore;
         _runtimeConfigStore = runtimeConfigStore;
         _httpClientFactory = httpClientFactory;
+        _selfStep = selfStep;
+        _userStep = userStep;
         _qdrantValidator = qdrantValidator ?? ValidateQdrantAsync;
         _logger = logger;
     }
@@ -97,8 +103,21 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
             };
         }
 
+        // Initialize SELF.md and USER.md for the agent
+        var selfResult = await _selfStep.InitializeAsync(ct);
+        if (!selfResult.Success)
+        {
+            _logger.LogWarning("Failed to initialize SELF.md: {Message}", selfResult.Message);
+        }
+
+        var userResult = await _userStep.InitializeAsync(ct);
+        if (!userResult.Success)
+        {
+            _logger.LogWarning("Failed to initialize USER.md: {Message}", userResult.Message);
+        }
+
         await _stateStore.MarkCompletedAsync(ct);
-        _logger.LogInformation("Onboarding marked as completed");
+        _logger.LogInformation("Onboarding marked as completed. SELF.md and USER.md initialized.");
 
         return new OnboardingCompletionResult
         {

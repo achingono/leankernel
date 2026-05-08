@@ -186,6 +186,7 @@ public sealed class SchedulerConfig
     public bool Enabled { get; set; } = true;
     public string WikiMaintenanceCron { get; set; } = "0 3 * * *"; // 3 AM daily
     public string ChatFactScrubCron { get; set; } = "30 2 * * *"; // 2:30 AM daily
+    public string UserProfileSyncCron { get; set; } = "0 4 * * *"; // 4 AM daily
 }
 
 public sealed class RoutingConfig

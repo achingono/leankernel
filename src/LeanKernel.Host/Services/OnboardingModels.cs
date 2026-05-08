@@ -47,6 +47,20 @@ public sealed class OnboardingCompletionResult
     public required OnboardingValidationResult Validation { get; init; }
 }
 
+/// <summary>
+/// Result of SELF.md or USER.md configuration steps.
+/// </summary>
+public sealed class ConfigurationStepResult
+{
+    public required bool Success { get; init; }
+    public required string Message { get; init; }
+    public bool AlreadyExists { get; init; }
+    public bool? IsValid { get; init; }
+    public string? FilePath { get; init; }
+    public List<string> Errors { get; init; } = [];
+    public List<string> Warnings { get; init; } = [];
+}
+
 public sealed class OnboardingConfigInput
 {
     public LiteLlmConfig LiteLlm { get; init; } = new();
