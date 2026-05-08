@@ -203,7 +203,7 @@ async def handle_send(req: web.Request) -> web.Response:
     assert bridge
     body = await req.json()
     try:
-        await bridge.request(
+        rpc = await bridge.request(
             "send",
             {
                 "recipient": body.get("recipients", []),
@@ -211,7 +211,24 @@ async def handle_send(req: web.Request) -> web.Response:
             },
             timeout=30.0,
         )
-        return web.json_response({"timestamp": 0})
+
+        # Surface signal-cli JSON-RPC failures instead of returning a fake timestamp.
+        if isinstance(rpc, dict) and rpc.get("error") is not None:
+            err = rpc.get("error")
+            return web.json_response(
+                {
+                    "error": "signal-cli send failed",
+                    "rpcError": err,
+                },
+                status=502,
+            )
+
+        result = rpc.get("result") if isinstance(rpc, dict) else None
+        if isinstance(result, dict) and "timestamp" in result:
+            return web.json_response({"timestamp": result.get("timestamp", 0)})
+
+        # Fallback for unexpected but successful shapes.
+        return web.json_response({"timestamp": 0, "result": result})
     except asyncio.TimeoutError:
         return web.json_response({"error": "send timed out"}, status=504)
     except Exception as exc:
