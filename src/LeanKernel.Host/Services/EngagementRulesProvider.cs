@@ -193,8 +193,8 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
         if (whatToCapture.Any())
             rules.MemoryPolicy.WhatToCapture = whatToCapture.ToArray();
 
-        rules.MemoryPolicy.UpdateSoulMd = !Regex.IsMatch(section, "UpdateSoulMd.*false", RegexOptions.IgnoreCase);
-        rules.MemoryPolicy.UpdateUserMd = !Regex.IsMatch(section, "UpdateUserMd.*false", RegexOptions.IgnoreCase);
+        rules.MemoryPolicy.UpdateSelf = !Regex.IsMatch(section, "UpdateSelf.*false", RegexOptions.IgnoreCase);
+        rules.MemoryPolicy.UpdateUser = !Regex.IsMatch(section, "UpdateUser.*false", RegexOptions.IgnoreCase);
     }
 
     private static void ParseSafetyBoundariesSection(string content, EngagementRules rules)

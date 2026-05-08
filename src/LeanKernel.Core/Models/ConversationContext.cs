@@ -14,6 +14,12 @@ public sealed record ConversationContext
 
     public int EstimatedTotalTokens { get; init; }
     public List<string> ExclusionLog { get; init; } = [];
+
+    /// <summary>
+    /// Optional onboarding instruction injected on the first message of a session
+    /// when SELF.md or USER.md have gaps. Appended to the system prompt.
+    /// </summary>
+    public string? OnboardingInstruction { get; init; }
 }
 
 public sealed record ConversationTurn

@@ -81,6 +81,11 @@ public sealed class PromptAssembler
             parts.Add($"\n## Available Tools: {string.Join(", ", context.ActiveToolNames)}");
         }
 
+        if (!string.IsNullOrWhiteSpace(context.OnboardingInstruction))
+        {
+            parts.Add($"\n## Onboarding Directive\n{context.OnboardingInstruction}");
+        }
+
         return string.Join("\n", parts);
     }
 }

@@ -164,11 +164,11 @@ The agent should remember these about you:
 - RecentDecisions: Recent architectural decisions you've made
 - BlockersAndPain: Things that currently frustrate you
 
-**UpdateSoulMd:** true
-- Update SOUL.md with new understandings about your agent
+**UpdateSelf:** true
+- Update SELF.md with new understandings about your agent
 - Happens when agent learns about its own behavior patterns
 
-**UpdateUserMd:** true
+**UpdateUser:** true
 - Update USER.md with new understandings about you
 - Happens when agent learns about your preferences, schedule, or needs
 
@@ -200,4 +200,4 @@ Configure data handling and safety constraints.
 6. **Knowledge:** Select what the agent should learn and update
 7. **Safety:** Choose data-handling preferences
 
-See SOUL.md for agent self-understanding and USER.md for agent's understanding of you.
+See SELF.md for agent self-understanding and USER.md for agent's understanding of you.

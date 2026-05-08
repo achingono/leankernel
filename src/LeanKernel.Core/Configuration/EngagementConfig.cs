@@ -277,14 +277,14 @@ public sealed class MemoryPolicy
     ];
     
     /// <summary>
-    /// Whether to update SOUL.md with learnings.
+    /// Whether to update SELF.md with learnings.
     /// </summary>
-    public bool UpdateSoulMd { get; set; } = true;
+    public bool UpdateSelf { get; set; } = true;
     
     /// <summary>
     /// Whether to update USER.md with learnings.
     /// </summary>
-    public bool UpdateUserMd { get; set; } = true;
+    public bool UpdateUser { get; set; } = true;
 }
 
 /// <summary>

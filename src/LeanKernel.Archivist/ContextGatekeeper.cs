@@ -71,6 +71,11 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         // Phase 5: Build final context
         var systemPrompt = await BuildSystemPromptAsync(ct);
 
+        // Phase 5a: On the very first message of a session, check for identity gaps
+        var onboardingInstruction = history.Count == 1
+            ? await BuildOnboardingInstructionAsync(ct)
+            : null;
+
         var totalTokens = EstimateTokens(systemPrompt)
             + rankedWiki.Sum(s => s.EstimatedTokens)
             + rankedRetrieval.Sum(s => s.EstimatedTokens)
@@ -88,7 +93,8 @@ public sealed class ContextGatekeeper : IContextGatekeeper
             RetrievedLeanKernels = rankedRetrieval,
             ActiveToolNames = [], // Populated by Thinker based on intent
             EstimatedTotalTokens = totalTokens,
-            ExclusionLog = exclusionLog
+            ExclusionLog = exclusionLog,
+            OnboardingInstruction = onboardingInstruction
         };
     }
 
@@ -257,7 +263,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private async Task<string> BuildSystemPromptAsync(CancellationToken ct)
     {
         var agentDir = Path.Combine(_config.Agents.BasePath, "main");
-        var soulPath = Path.Combine(agentDir, "SOUL.md");
+        var soulPath = Path.Combine(agentDir, "SELF.md");
         var userPath = Path.Combine(agentDir, "USER.md");
 
         var soulContent = File.Exists(soulPath)
@@ -299,6 +305,56 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         }
 
         return sb.ToString().Trim();
+    }
+
+    private async Task<string?> BuildOnboardingInstructionAsync(CancellationToken ct)
+    {
+        var agentDir = Path.Combine(_config.Agents.BasePath, "main");
+        var soulPath = Path.Combine(agentDir, "SELF.md");
+        var userPath = Path.Combine(agentDir, "USER.md");
+
+        var soulContent = File.Exists(soulPath) ? await File.ReadAllTextAsync(soulPath, ct) : null;
+        var userContent = File.Exists(userPath) ? await File.ReadAllTextAsync(userPath, ct) : null;
+
+        var gaps = new List<string>();
+
+        // Check SELF.md for gaps
+        if (string.IsNullOrWhiteSpace(soulContent) || soulContent.Contains("TODO") || soulContent.Length < 100)
+        {
+            gaps.Add("agent identity (name, role, personality, capabilities, communication style)");
+        }
+
+        // Check USER.md for gaps
+        if (string.IsNullOrWhiteSpace(userContent) || userContent.Contains("TODO") || userContent.Length < 50)
+        {
+            gaps.Add("user preferences (name, timezone, communication preferences, goals)");
+        }
+        else
+        {
+            // Check for specific missing sections
+            if (!userContent.Contains("name", StringComparison.OrdinalIgnoreCase) &&
+                !userContent.Contains("who", StringComparison.OrdinalIgnoreCase))
+                gaps.Add("the user's name");
+
+            if (!userContent.Contains("timezone", StringComparison.OrdinalIgnoreCase) &&
+                !userContent.Contains("location", StringComparison.OrdinalIgnoreCase))
+                gaps.Add("the user's timezone or location");
+        }
+
+        if (gaps.Count == 0)
+            return null;
+
+        return $"""
+            IMPORTANT: This is the first message in a new conversation session.
+            Before answering the user's question, briefly introduce yourself and ask 1-2 focused questions
+            to fill in missing information about: {string.Join(", ", gaps)}.
+            Keep it conversational and natural — don't make it feel like a form.
+            After gathering this context, answer their question.
+            Once you have gathered the information, output it as a structured block at the end of your response:
+            [IDENTITY_UPDATE]
+            <the gathered facts as key: value pairs>
+            [/IDENTITY_UPDATE]
+            """;
     }
 
     private static string FormatWikiEntryCompact(WikiEntry entry) =>
