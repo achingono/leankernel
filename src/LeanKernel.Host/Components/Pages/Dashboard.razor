@@ -47,8 +47,8 @@
 <!-- System Info -->
 <div class="content-grid stagger-in">
     <div class="glass-card">
-        <h3 class="text-cyan" style="margin-bottom: 1rem;">System</h3>
-        <div class="diagnostic-panel" style="border: none; background: transparent; padding: 0;">
+        <h3 class="text-cyan">System</h3>
+        <div class="diagnostic-panel diagnostic-panel-bare">
             <div class="diagnostic-row">
                 <span class="diagnostic-label">Model</span>
                 <span class="diagnostic-value">@Stats?.Config?.Model</span>
@@ -73,10 +73,10 @@
     </div>
 
     <div class="glass-card">
-        <h3 class="text-cyan" style="margin-bottom: 1rem;">Wiki Dimensions</h3>
+        <h3 class="text-cyan">Wiki Dimensions</h3>
         @if (Dimensions is not null)
         {
-            <div class="diagnostic-panel" style="border: none; background: transparent; padding: 0;">
+            <div class="diagnostic-panel diagnostic-panel-bare">
                 @foreach (var dim in Dimensions)
                 {
                     <div class="diagnostic-row">

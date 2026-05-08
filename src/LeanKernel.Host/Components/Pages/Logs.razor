@@ -12,7 +12,7 @@
 
 <!-- Filters -->
 <div class="toolbar-row">
-    <div class="search-box" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+    <div class="search-box" style="flex: 1; min-width: 200px;">
         <LeanKernelIcon Name="search" Class="search-icon" />
         <input class="search-input"
                @bind="SearchQuery"
@@ -32,10 +32,10 @@
     <button class="btn-ghost" @onclick="async () => { SearchQuery = string.Empty; SelectedLevel = string.Empty; await LoadLogs(); }">Clear</button>
 </div>
 
-<!-- Log files info -->
-<div style="margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+<!-- Log file stats -->
+<p class="text-muted text-xs">
     @LogResult?.TotalFiles files · @LogResult?.Lines?.Count lines shown
-</div>
+</p>
 
 <!-- Log viewer -->
 <div class="glass-card log-viewer">

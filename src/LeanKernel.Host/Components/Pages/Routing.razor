@@ -18,8 +18,8 @@
 
 @if (!Config!.Routing.Enabled)
 {
-    <div class="glass-card" style="margin-bottom: 1.5rem;">
-        <p style="color: var(--text-muted); text-align: center;">
+    <div class="glass-card">
+        <p class="text-muted text-center">
             Routing is currently <strong style="color: var(--neon-green);">disabled</strong>.
             Set <code>LEANKERNEL__Routing__Enabled=true</code> to activate.
         </p>
@@ -27,9 +27,9 @@
 }
 else if (Config.Routing.ShadowMode)
 {
-    <div class="glass-card" style="margin-bottom: 1.5rem;">
-        <p style="color: var(--text-muted); text-align: center;">
-            <span class="status-badge" style="background: rgba(255, 200, 0, 0.15); color: #ffc800; border-color: rgba(255, 200, 0, 0.3);">● Shadow Mode</span>
+    <div class="glass-card">
+        <p class="text-muted text-center">
+            <span class="status-badge status-warning">● Shadow Mode</span>
             &nbsp; Routing is running in shadow mode — decisions are logged but the static model responds.
         </p>
     </div>
@@ -42,15 +42,15 @@ else if (Config.Routing.ShadowMode)
         <div class="stat-label">Requests (1h)</div>
     </div>
     <div class="glass-card stat-card">
-        <div class="stat-value">@FreePct<span style="font-size:1rem; color:var(--text-muted);">%</span></div>
+        <div class="stat-value">@FreePct<span class="stat-unit">%</span></div>
         <div class="stat-label">Free (1h)</div>
     </div>
     <div class="glass-card stat-card">
-        <div class="stat-value">@P50<span style="font-size:1rem; color:var(--text-muted);">ms</span></div>
+        <div class="stat-value">@P50<span class="stat-unit">ms</span></div>
         <div class="stat-label">Latency p50</div>
     </div>
     <div class="glass-card stat-card">
-        <div class="stat-value">@P95<span style="font-size:1rem; color:var(--text-muted);">ms</span></div>
+        <div class="stat-value">@P95<span class="stat-unit">ms</span></div>
         <div class="stat-label">Latency p95</div>
     </div>
     <div class="glass-card stat-card">
@@ -61,11 +61,11 @@ else if (Config.Routing.ShadowMode)
         <div class="stat-value">
             @if (HardLimitActive)
             {
-                <span class="status-badge" style="background: rgba(255,60,60,0.15); color: #ff3c3c; border-color: rgba(255,60,60,0.3);">● Hard Limit</span>
+                <span class="status-badge status-danger">● Hard Limit</span>
             }
             else if (SoftLimitActive)
             {
-                <span class="status-badge" style="background: rgba(255,200,0,0.15); color: #ffc800; border-color: rgba(255,200,0,0.3);">● Soft Limit</span>
+                <span class="status-badge status-warning">● Soft Limit</span>
             }
             else
             {
@@ -89,7 +89,7 @@ else if (Config.Routing.ShadowMode)
                     <span class="diagnostic-value">
                         @if (entry.Value)
                         {
-                            <span class="status-badge" style="background: rgba(255,60,60,0.15); color: #ff3c3c; border-color: rgba(255,60,60,0.3);">● Cooldown</span>
+                            <span class="status-badge status-danger">● Cooldown</span>
                         }
                         else
                         {
@@ -101,7 +101,7 @@ else if (Config.Routing.ShadowMode)
             @if (HealthSnapshot.Count == 0)
             {
                 <div class="diagnostic-row">
-                    <span class="diagnostic-label" style="color: var(--text-muted);">No health data yet</span>
+                    <span class="diagnostic-label">No health data yet</span>
                 </div>
             }
         </div>
@@ -109,7 +109,7 @@ else if (Config.Routing.ShadowMode)
 
     <!-- Spend Guard -->
     <div class="glass-card">
-        <h3 class="text-cyan" style="margin-bottom: 1rem;">Spend Guard</h3>
+        <h3 class="text-cyan">Spend Guard</h3>
         <div class="diagnostic-panel">
             <div class="diagnostic-row">
                 <span class="diagnostic-label">Paid requests today</span>
@@ -126,12 +126,12 @@ else if (Config.Routing.ShadowMode)
             @if (HardLimit > 0)
             {
                 var pct = Math.Min(100, SpendGuardCount * 100 / HardLimit);
-                <div class="diagnostic-row" style="flex-direction: column; gap: 0.4rem; padding-top: 0.5rem;">
-                    <div style="display:flex; justify-content: space-between;">
+                <div class="diagnostic-row diagnostic-row-col">
+                    <div class="section-header">
                         <span class="diagnostic-label">Usage</span>
                         <span class="diagnostic-label">@pct%</span>
                     </div>
-                    <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 8px; width: 100%;">
+                    <div class="progress-track">
                         <div style="width: @pct%; height: 100%; background: @(pct >= 100 ? "#ff3c3c" : pct >= 80 ? "#ffc800" : "#00ff88"); border-radius: 4px; transition: width 0.3s;"></div>
                     </div>
                 </div>
@@ -141,16 +141,16 @@ else if (Config.Routing.ShadowMode)
 
     <!-- Complexity Distribution -->
     <div class="glass-card">
-        <h3 class="text-cyan" style="margin-bottom: 1rem;">Complexity Distribution (1h)</h3>
+        <h3 class="text-cyan">Complexity Distribution (1h)</h3>
         <div class="diagnostic-panel">
             @foreach (var (tier, pct) in ComplexityDist)
             {
-                <div class="diagnostic-row" style="flex-direction: column; gap: 0.4rem;">
-                    <div style="display:flex; justify-content: space-between;">
+                <div class="diagnostic-row diagnostic-row-col">
+                    <div class="section-header">
                         <span class="diagnostic-label">@tier</span>
                         <span class="diagnostic-label">@pct.ToString("F1")%</span>
                     </div>
-                    <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 6px; width: 100%;">
+                    <div class="progress-track progress-sm">
                         <div style="width: @Math.Min(100d, pct).ToString("F1")%; height: 100%; background: #00d4ff; border-radius: 4px;"></div>
                     </div>
                 </div>
@@ -158,7 +158,7 @@ else if (Config.Routing.ShadowMode)
             @if (!ComplexityDist.Any())
             {
                 <div class="diagnostic-row">
-                    <span class="diagnostic-label" style="color: var(--text-muted);">No data yet</span>
+                    <span class="diagnostic-label">No data yet</span>
                 </div>
             }
         </div>
@@ -166,7 +166,7 @@ else if (Config.Routing.ShadowMode)
 
     <!-- Selection Reason Breakdown -->
     <div class="glass-card">
-        <h3 class="text-cyan" style="margin-bottom: 1rem;">Selection Reasons (1h)</h3>
+        <h3 class="text-cyan">Selection Reasons (1h)</h3>
         <div class="diagnostic-panel">
             @foreach (var kv in ReasonCounts.OrderByDescending(x => x.Value))
             {
@@ -178,7 +178,7 @@ else if (Config.Routing.ShadowMode)
             @if (!ReasonCounts.Any())
             {
                 <div class="diagnostic-row">
-                    <span class="diagnostic-label" style="color: var(--text-muted);">No data yet</span>
+                    <span class="diagnostic-label">No data yet</span>
                 </div>
             }
         </div>
@@ -186,7 +186,7 @@ else if (Config.Routing.ShadowMode)
 
     <!-- Escalation Rate by Tier -->
     <div class="glass-card">
-        <h3 class="text-cyan" style="margin-bottom: 1rem;">Escalation Rate by Tier (1h)</h3>
+        <h3 class="text-cyan">Escalation Rate by Tier (1h)</h3>
         <div class="diagnostic-panel">
             @foreach (var kv in EscalationRates.OrderBy(x => x.Key))
             {
@@ -198,7 +198,7 @@ else if (Config.Routing.ShadowMode)
             @if (!EscalationRates.Any())
             {
                 <div class="diagnostic-row">
-                    <span class="diagnostic-label" style="color: var(--text-muted);">No data yet</span>
+                    <span class="diagnostic-label">No data yet</span>
                 </div>
             }
         </div>
@@ -206,7 +206,7 @@ else if (Config.Routing.ShadowMode)
 
     <!-- Latency Percentiles -->
     <div class="glass-card">
-        <h3 class="text-cyan" style="margin-bottom: 1rem;">Latency Percentiles (1h)</h3>
+        <h3 class="text-cyan">Latency Percentiles (1h)</h3>
         <div class="diagnostic-panel">
             <div class="diagnostic-row">
                 <span class="diagnostic-label">p50</span>
@@ -264,49 +264,49 @@ else if (Config.Routing.ShadowMode)
 
     <!-- Recent Decisions -->
     <div class="glass-card" style="grid-column: 1 / -1;">
-        <h3 class="text-cyan" style="margin-bottom: 1rem;">Recent Routing Decisions</h3>
+        <h3 class="text-cyan">Recent Routing Decisions</h3>
         @{
             var recent = RecentDecisions;
         }
         @if (recent.Count == 0)
         {
-            <p style="color: var(--text-muted);">No decisions recorded yet.</p>
+            <p class="text-muted">No decisions recorded yet.</p>
         }
         else
         {
             <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <table class="data-table" style="font-size: 0.85rem;">
                     <thead>
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Time</th>
-                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Complexity</th>
-                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Alias</th>
-                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Cost</th>
-                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Reason</th>
-                            <th style="text-align: left; padding: 0.5rem; color: var(--text-muted);">Attempts</th>
-                            <th style="text-align: right; padding: 0.5rem; color: var(--text-muted);">Latency</th>
+                        <tr>
+                            <th>Time</th>
+                            <th>Complexity</th>
+                            <th>Alias</th>
+                            <th>Cost</th>
+                            <th>Reason</th>
+                            <th>Attempts</th>
+                            <th class="text-right">Latency</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var r in recent)
                         {
-                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                                <td style="padding: 0.4rem 0.5rem; color: var(--text-muted);">@r.Timestamp.ToString("HH:mm:ss")</td>
-                                <td style="padding: 0.4rem 0.5rem;">@r.Complexity</td>
-                                <td style="padding: 0.4rem 0.5rem; color: #00d4ff;">@r.SelectedAlias</td>
-                                <td style="padding: 0.4rem 0.5rem;">
+                            <tr>
+                                <td class="col-muted">@r.Timestamp.ToString("HH:mm:ss")</td>
+                                <td>@r.Complexity</td>
+                                <td class="col-id">@r.SelectedAlias</td>
+                                <td>
                                     @if (r.CostBucket == "paid")
                                     {
-                                        <span style="color: #ffc800;">paid</span>
+                                        <span class="text-warning">paid</span>
                                     }
                                     else
                                     {
                                         <span class="text-neon">free</span>
                                     }
                                 </td>
-                                <td style="padding: 0.4rem 0.5rem; font-size: 0.8rem; color: var(--text-muted);">@r.SelectionReason</td>
-                                <td style="padding: 0.4rem 0.5rem;">@r.AttemptCount</td>
-                                <td style="padding: 0.4rem 0.5rem; text-align: right;">@r.LatencyMs ms</td>
+                                <td class="col-muted text-xs">@r.SelectionReason</td>
+                                <td>@r.AttemptCount</td>
+                                <td class="text-right">@r.LatencyMs ms</td>
                             </tr>
                         }
                     </tbody>

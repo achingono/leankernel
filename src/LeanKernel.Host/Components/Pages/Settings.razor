@@ -19,8 +19,8 @@
     <div class="glass-card @(_saveResult.Success ? "border-success" : "border-warning")" style="margin-bottom: 1rem;">
         @if (_saveResult.Success && _saveResult.Changes?.Count > 0)
         {
-            <p class="text-cyan" style="margin: 0 0 0.5rem;">✓ @_saveResult.Changes.Count change(s) saved successfully.</p>
-            <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.85rem;">
+            <p class="text-cyan m-0" style="margin-bottom: 0.5rem;">✓ @_saveResult.Changes.Count change(s) saved successfully.</p>
+            <ul class="text-sm" style="margin: 0; padding-left: 1.5rem;">
                 @foreach (var c in _saveResult.Changes)
                 {
                     <li class="@(c.RestartRequired ? "text-warning" : "")">
@@ -32,11 +32,11 @@
         }
         else if (_saveResult.Success)
         {
-            <p class="text-muted" style="margin: 0;">No changes detected.</p>
+            <p class="text-muted m-0">No changes detected.</p>
         }
         else
         {
-            <p class="text-warning" style="margin: 0;">⚠ @_saveResult.ErrorMessage</p>
+            <p class="text-warning m-0">⚠ @_saveResult.ErrorMessage</p>
         }
     </div>
 }
@@ -288,7 +288,7 @@
 }
 else
 {
-    <div class="glass-card" style="text-align: center; padding: 3rem;">
+    <div class="glass-card card-center">
         <p class="text-muted">Loading configuration...</p>
     </div>
 }
@@ -738,7 +738,7 @@ else
 }
 else
 {
-    <div class="glass-card" style="text-align: center; padding: 3rem;">
+    <div class="glass-card card-center">
         <p class="text-muted">Loading configuration...</p>
     </div>
 }

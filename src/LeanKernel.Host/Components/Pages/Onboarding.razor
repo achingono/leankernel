@@ -12,24 +12,55 @@
 
 @if (IsLoading)
 {
-    <div class="glass-card" style="text-align: center; padding: 2.5rem;">
+    <div class="glass-card card-center">
         <p class="text-muted">Loading onboarding state...</p>
     </div>
 }
 else if (Completed)
 {
     <div class="glass-card stagger-in">
-        <h3 class="text-neon" style="margin-bottom: 0.75rem;">✓ Onboarding complete</h3>
-        <p class="text-muted" style="margin-bottom: 1rem;">@StatusMessage</p>
+        <h3 class="text-neon">&#x2713; Onboarding complete</h3>
+        <p class="text-muted">@StatusMessage</p>
         <button class="btn-primary" @onclick='() => Nav.NavigateTo("/")'>Enter Dashboard</button>
     </div>
 }
 else
 {
-    <div class="content-grid stagger-in">
-        <div class="glass-card">
+    <!-- Stepper header -->
+    <div class="onboarding-stepper stagger-in">
+        @for (var i = 0; i < Steps.Length; i++)
+        {
+            var idx = i;
+            var stepState = idx < CurrentStep ? "done" : idx == CurrentStep ? "active" : "pending";
+            <button class="stepper-item @stepState" @onclick="() => GoToStep(idx)"
+                 aria-label="Step @(idx + 1): @Steps[idx]" type="button">
+                <div class="stepper-circle">
+                    @if (idx < CurrentStep)
+                    {
+                        <span>&#x2713;</span>
+                    }
+                    else
+                    {
+                        <span>@(idx + 1)</span>
+                    }
+                </div>
+                <span class="stepper-label">@Steps[idx]</span>
+                @if (idx < Steps.Length - 1)
+                {
+                    <div class="stepper-line @(idx < CurrentStep ? "done" : "")"></div>
+                }
+            </button>
+        }
+    </div>
+
+    <!-- Step content -->
+    <div class="glass-card stagger-in step-card">
+
+        @if (CurrentStep == 0)
+        {
             <div class="setting-group">
-                <h3 class="text-cyan">1) LiteLLM</h3>
+                <h3 class="text-cyan">LiteLLM</h3>
+                <p class="text-muted text-sm">Configure the LiteLLM model proxy that routes requests to your AI providers.</p>
                 <div class="setting-row">
                     <span class="setting-label">Base URL</span>
                     <input class="setting-input" @bind="Draft.LiteLlm.BaseUrl" />
@@ -51,11 +82,13 @@ else
                     <input class="setting-input" type="number" min="1024" step="1024" @bind="Draft.LiteLlm.ContextWindowTokens" />
                 </div>
             </div>
-        </div>
+        }
 
-        <div class="glass-card">
+        @if (CurrentStep == 1)
+        {
             <div class="setting-group">
-                <h3 class="text-cyan">2) Vector + Wiki</h3>
+                <h3 class="text-cyan">Vector + Wiki</h3>
+                <p class="text-muted text-sm">Set up Qdrant vector storage for semantic memory and the wiki knowledge base path.</p>
                 <div class="setting-row">
                     <span class="setting-label">Qdrant Host</span>
                     <input class="setting-input" @bind="Draft.Qdrant.Host" />
@@ -77,11 +110,13 @@ else
                     <input class="setting-input text-mono" @bind="Draft.Wiki.BasePath" />
                 </div>
             </div>
-        </div>
+        }
 
-        <div class="glass-card">
+        @if (CurrentStep == 2)
+        {
             <div class="setting-group">
-                <h3 class="text-cyan">3) Signal (optional)</h3>
+                <h3 class="text-cyan">Signal <span class="badge">optional</span></h3>
+                <p class="text-muted text-sm">Enable the Signal messaging adapter to interact with the agent over Signal.</p>
                 <div class="setting-row">
                     <span class="setting-label">Enabled</span>
                     <input type="checkbox" @bind="Draft.Signal.Enabled" />
@@ -95,11 +130,13 @@ else
                     <input class="setting-input text-mono" @bind="Draft.Signal.CliPath" />
                 </div>
             </div>
-        </div>
+        }
 
-        <div class="glass-card">
+        @if (CurrentStep == 3)
+        {
             <div class="setting-group">
-                <h3 class="text-cyan">4) Scheduler</h3>
+                <h3 class="text-cyan">Scheduler</h3>
+                <p class="text-muted text-sm">Configure the background scheduler for automated wiki maintenance tasks.</p>
                 <div class="setting-row">
                     <span class="setting-label">Enabled</span>
                     <input type="checkbox" @bind="Draft.Scheduler.Enabled" />
@@ -109,26 +146,24 @@ else
                     <input class="setting-input text-mono" @bind="Draft.Scheduler.WikiMaintenanceCron" />
                 </div>
             </div>
-        </div>
+        }
 
-        <div class="glass-card">
+        @if (CurrentStep == 4)
+        {
             <div class="setting-group">
-                <h3 class="text-cyan">5) Agent Rules (optional)</h3>
-                <p class="text-muted" style="margin-bottom: 0.75rem; font-size: 0.85rem;">
-                    Define engagement rules, autonomy scope, and time boundaries for your agent.
-                </p>
-                <button class="btn-primary" @onclick='() => Nav.NavigateTo("/onboarding/agents")' style="width: 100%;">
-                    Configure Agent Rules →
+                <h3 class="text-cyan">Agent Rules <span class="badge">optional</span></h3>
+                <p class="text-muted text-sm">Define engagement rules, autonomy scope, and time boundaries for your agent.</p>
+                <button class="btn-primary btn-block" @onclick='() => Nav.NavigateTo("/onboarding/agents")'>
+                    Configure Agent Rules &#x2192;
                 </button>
             </div>
-        </div>
+        }
 
-        <div class="glass-card">
+        @if (CurrentStep == 5)
+        {
             <div class="setting-group">
-                <h3 class="text-cyan">6) Authentication</h3>
-                <p class="text-muted" style="margin-bottom: 0.75rem; font-size: 0.85rem;">
-                    Set your admin passcode. This will be required to access LeanKernel after onboarding.
-                </p>
+                <h3 class="text-cyan">Authentication</h3>
+                <p class="text-muted text-sm">Set your admin passcode. This will be required to access LeanKernel after onboarding.</p>
                 <div class="setting-row">
                     <span class="setting-label">Admin Passcode</span>
                     <input class="setting-input" type="password" @bind="Passcode" placeholder="Min 8 characters" />
@@ -139,52 +174,79 @@ else
                 </div>
                 @if (!string.IsNullOrWhiteSpace(PasscodeError))
                 {
-                    <p style="color: var(--neon-danger); font-size: 0.85rem; margin-top: 0.5rem;">@PasscodeError</p>
+                    <p class="text-danger text-sm">@PasscodeError</p>
+                }
+            </div>
+
+            @if (Validation is not null)
+            {
+                <div style="margin-top: 1.5rem;">
+                    <h4 class="text-cyan">Validation Results</h4>
+                    @foreach (var vstep in Validation.Steps)
+                    {
+                        <div class="diagnostic-row">
+                            <span class="diagnostic-label">@vstep.Step</span>
+                            <span class="diagnostic-value">
+                                <span class="status-badge @(vstep.Success ? "status-healthy" : "status-error")">
+                                    @(vstep.Success ? "&#x25CF; PASS" : "&#x25CF; FAIL")
+                                </span>
+                                <span class="text-sm">@vstep.Message</span>
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @if (!string.IsNullOrWhiteSpace(StatusMessage))
+        {
+            <p class="text-muted text-sm">@StatusMessage</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <p class="text-danger text-sm">@ErrorMessage</p>
+        }
+    </div>
+
+    <!-- Navigation controls -->
+    <div class="glass-card">
+        <div class="section-header" style="flex-wrap: wrap; gap: 0.75rem;">
+            <button class="btn-ghost" @onclick="PrevStep" disabled="@(CurrentStep == 0 || IsBusy)">
+                &#x2190; Back
+            </button>
+            <div class="flex-row">
+                <button class="btn-ghost" @onclick="SaveDraft" disabled="@IsBusy">Save Draft</button>
+                @if (CurrentStep < Steps.Length - 1)
+                {
+                    <button class="btn-primary" @onclick="NextStep" disabled="@IsBusy">Next &#x2192;</button>
+                }
+                else
+                {
+                    <button class="btn-ghost" @onclick="Validate" disabled="@IsBusy">Run Validation</button>
+                    <button class="btn-accent" @onclick="Complete" disabled="@IsBusy">
+                        Complete Onboarding &#x2713;
+                    </button>
                 }
             </div>
         </div>
     </div>
-
-    <div class="glass-card" style="margin-top: 1.5rem;">
-        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-            <button class="btn-ghost" @onclick="SaveDraft" disabled="@IsBusy">Save Draft</button>
-            <button class="btn-primary" @onclick="Validate" disabled="@IsBusy">Run Validation</button>
-            <button class="btn-primary" style="background: var(--neon-secondary);" @onclick="Complete" disabled="@IsBusy">Complete Onboarding</button>
-        </div>
-        @if (!string.IsNullOrWhiteSpace(StatusMessage))
-        {
-            <p class="text-muted" style="margin-top: 0.75rem;">@StatusMessage</p>
-        }
-        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
-        {
-            <p style="margin-top: 0.75rem; color: var(--neon-danger);">@ErrorMessage</p>
-        }
-    </div>
-
-    @if (Validation is not null)
-    {
-        <div class="glass-card" style="margin-top: 1.5rem;">
-            <h3 class="text-cyan" style="margin-bottom: 0.75rem;">Validation Results</h3>
-            @foreach (var step in Validation.Steps)
-            {
-                <div class="diagnostic-row">
-                    <span class="diagnostic-label">@step.Step</span>
-                    <span class="diagnostic-value">
-                        <span class="status-badge @(step.Success ? "status-healthy" : "status-error")">
-                            @(step.Success ? "● PASS" : "● FAIL")
-                        </span>
-                        <span style="margin-left: 0.5rem;">@step.Message</span>
-                    </span>
-                </div>
-            }
-        </div>
-    }
 }
 
 @code {
+    private static readonly string[] Steps =
+    [
+        "LiteLLM",
+        "Vector + Wiki",
+        "Signal",
+        "Scheduler",
+        "Agent Rules",
+        "Authentication"
+    ];
+
     private bool IsLoading = true;
     private bool IsBusy;
     private bool Completed;
+    private int CurrentStep;
     private string? StatusMessage;
     private string? ErrorMessage;
     private string Passcode = "";
@@ -225,6 +287,27 @@ else
         }
     }
 
+    private void GoToStep(int index)
+    {
+        // Allow navigation to completed steps or current step
+        if (index <= CurrentStep)
+            CurrentStep = index;
+    }
+
+    private void PrevStep()
+    {
+        if (CurrentStep > 0) CurrentStep--;
+    }
+
+    private async Task NextStep()
+    {
+        await RunBusyAsync(async () =>
+        {
+            if (!await SaveDraftInternal()) return;
+            if (CurrentStep < Steps.Length - 1) CurrentStep++;
+        });
+    }
+
     private async Task SaveDraft()
     {
         await RunBusyAsync(SaveDraftInternal);
@@ -256,7 +339,6 @@ else
     {
         await RunBusyAsync(async () =>
         {
-            // Validate passcode
             PasscodeError = null;
             if (string.IsNullOrWhiteSpace(Passcode) || Passcode.Length < 8)
             {
@@ -280,7 +362,6 @@ else
             Validation = completion?.Validation;
             if (response.IsSuccessStatusCode && completion?.Success == true)
             {
-                // Set the initial passcode via auth bootstrap
                 var authResponse = await Http.PostAsJsonAsync("api/auth/bootstrap", new { passcode = Passcode });
                 if (!authResponse.IsSuccessStatusCode)
                 {

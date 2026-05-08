@@ -14,7 +14,7 @@
 
 <div class="chat-container">
     <!-- Session selector -->
-    <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center;">
+    <div class="toolbar-row">
         <select class="setting-input" style="max-width: 300px;" @onchange="OnSessionChanged">
             <option value="">New Conversation</option>
             @foreach (var session in Sessions)
@@ -28,7 +28,7 @@
     </div>
 
     <!-- Messages -->
-    <div class="chat-messages glass-card" style="flex: 1; overflow-y: auto;" @ref="messagesContainer">
+    <div class="chat-messages glass-card" @ref="messagesContainer">
         @foreach (var msg in Messages)
         {
             <div>
@@ -70,7 +70,7 @@
 
         @if (IsLoading)
         {
-            <div class="chat-bubble assistant" style="opacity: 0.6;">
+            <div class="chat-bubble assistant chat-bubble--thinking">
                 <span class="text-neon">●</span> Thinking...
             </div>
         }
@@ -78,12 +78,13 @@
 
     <!-- Input -->
     <div class="chat-input-area">
-        <input class="chat-input"
-               @bind="InputText"
-               @bind:event="oninput"
-               @onkeydown="OnKeyDown"
-               placeholder="Type a message..."
-               disabled="@IsLoading" />
+         <textarea class="chat-input"
+                @bind="InputText"
+                @bind:event="oninput"
+                @onkeydown="OnKeyDown"
+                placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+                rows="1"
+                disabled="@IsLoading"></textarea>
         <button class="btn-primary" @onclick="SendMessage" disabled="@(IsLoading || string.IsNullOrWhiteSpace(InputText))">
             Send
         </button>
