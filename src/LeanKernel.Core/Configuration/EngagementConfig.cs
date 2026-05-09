@@ -66,7 +66,10 @@ public sealed class AutonomyScope
         "AnalyzeCode", 
         "SearchWiki",
         "CreateNote",
-        "UpdateWiki"
+        "UpdateWiki",
+        "WriteAgentsMd",
+        "WriteSelfMd",
+        "WriteUserMd"
     ];
     
     /// <summary>

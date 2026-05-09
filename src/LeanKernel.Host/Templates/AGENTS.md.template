@@ -41,6 +41,9 @@ These actions are pre-approved and need no permission:
 - ViewErrorLogs
 - CreateBranch
 - CreateTestCommits
+- WriteAgentsMd
+- WriteSelfMd
+- WriteUserMd
 
 ### Must Ask Before
 

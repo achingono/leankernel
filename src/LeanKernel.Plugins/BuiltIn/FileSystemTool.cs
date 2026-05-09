@@ -13,7 +13,7 @@ namespace LeanKernel.Plugins.BuiltIn;
     Name = "file_read",
     Description = "Read contents of a local file within the allowed data directory.",
     Category = ToolCategory.FileSystem)]
-public sealed class FileSystemTool : ITool
+public class FileSystemReadTool : ITool
 {
     private readonly string _allowedBasePath;
 
@@ -31,7 +31,7 @@ public sealed class FileSystemTool : ITool
         }
         """;
 
-    public FileSystemTool(string allowedBasePath = "/app/data")
+    public FileSystemReadTool(string allowedBasePath = "/app/data")
     {
         _allowedBasePath = Path.GetFullPath(allowedBasePath);
     }
@@ -94,5 +94,14 @@ public sealed class FileSystemTool : ITool
                 Duration = sw.Elapsed
             };
         }
+    }
+}
+
+[Obsolete("Use FileSystemReadTool instead.")]
+public sealed class FileSystemTool : FileSystemReadTool
+{
+    public FileSystemTool(string allowedBasePath = "/app/data")
+        : base(allowedBasePath)
+    {
     }
 }

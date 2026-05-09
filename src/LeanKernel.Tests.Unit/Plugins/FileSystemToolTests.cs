@@ -12,7 +12,7 @@ public class FileSystemToolTests
 
         try
         {
-            var tool = new FileSystemTool(tmpDir);
+            var tool = new FileSystemReadTool(tmpDir);
             var result = await tool.ExecuteAsync(
                 """{"path": "../../etc/passwd"}""",
                 CancellationToken.None);
@@ -36,7 +36,7 @@ public class FileSystemToolTests
 
         try
         {
-            var tool = new FileSystemTool(tmpDir);
+            var tool = new FileSystemReadTool(tmpDir);
             var result = await tool.ExecuteAsync(
                 """{"path": "test.txt"}""",
                 CancellationToken.None);
@@ -59,7 +59,7 @@ public class FileSystemToolTests
 
         try
         {
-            var tool = new FileSystemTool(tmpDir);
+            var tool = new FileSystemReadTool(tmpDir);
             var result = await tool.ExecuteAsync(
                 """{"path": "nonexistent.txt"}""",
                 CancellationToken.None);
@@ -83,7 +83,7 @@ public class FileSystemToolTests
 
         try
         {
-            var tool = new FileSystemTool(tmpDir);
+            var tool = new FileSystemReadTool(tmpDir);
             var result = await tool.ExecuteAsync(
                 """{"path": "big.txt", "maxLines": 10}""",
                 CancellationToken.None);
@@ -105,7 +105,7 @@ public class FileSystemToolTests
 
         try
         {
-            var tool = new FileSystemTool(tmpDir);
+            var tool = new FileSystemReadTool(tmpDir);
             var result = await tool.ExecuteAsync("not valid json", CancellationToken.None);
             Assert.False(result.Success);
         }
@@ -118,21 +118,21 @@ public class FileSystemToolTests
     [Fact]
     public void Name_IsFileRead()
     {
-        var tool = new FileSystemTool("/tmp");
+        var tool = new FileSystemReadTool("/tmp");
         Assert.Equal("file_read", tool.Name);
     }
 
     [Fact]
     public void Description_NotEmpty()
     {
-        var tool = new FileSystemTool("/tmp");
+        var tool = new FileSystemReadTool("/tmp");
         Assert.NotEmpty(tool.Description);
     }
 
     [Fact]
     public void ParametersSchema_ContainsPath()
     {
-        var tool = new FileSystemTool("/tmp");
+        var tool = new FileSystemReadTool("/tmp");
         Assert.Contains("path", tool.ParametersSchema);
     }
 }

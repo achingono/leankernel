@@ -83,6 +83,7 @@ public sealed class DynamicSkillToolFactory
 public sealed class DynamicPluginHost : IToolRegistry
 {
     private readonly DynamicSkillToolFactory _factory;
+    private readonly IReadOnlyList<ITool> _builtInTools;
     private readonly Dictionary<string, ITool> _tools;
     private readonly ILogger<DynamicPluginHost> _logger;
 
@@ -90,9 +91,11 @@ public sealed class DynamicPluginHost : IToolRegistry
 
     public DynamicPluginHost(
         DynamicSkillToolFactory factory,
+        IEnumerable<ITool> builtInTools,
         ILogger<DynamicPluginHost> logger)
     {
         _factory = factory;
+        _builtInTools = builtInTools.ToList();
         _logger = logger;
         _tools = new Dictionary<string, ITool>(StringComparer.OrdinalIgnoreCase);
     }
@@ -105,6 +108,12 @@ public sealed class DynamicPluginHost : IToolRegistry
     {
         try
         {
+            foreach (var tool in _builtInTools)
+            {
+                _tools[tool.Name] = tool;
+                _logger.LogInformation("Registered built-in tool: {ToolName}", tool.Name);
+            }
+
             var tools = await _factory.CreateAllToolsAsync();
             foreach (var tool in tools)
             {

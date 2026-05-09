@@ -170,6 +170,13 @@ try
     // Plugins — Built-in tools
     builder.Services.AddSingleton<ITool, WikiQueryTool>();
     builder.Services.AddSingleton<ITool, KnowledgeSearchTool>();
+    builder.Services.AddSingleton<ITool, FileSystemReadTool>();
+    builder.Services.AddSingleton<ITool, FileSystemWriteTool>();
+    builder.Services.AddSingleton<ITool, FileSystemEditTool>();
+    builder.Services.AddSingleton<ITool, FileSystemDeleteTool>();
+    builder.Services.AddSingleton<ITool, FileSystemMoveTool>();
+    builder.Services.AddSingleton<ITool, FileSystemCopyTool>();
+    builder.Services.AddSingleton<ITool, FileSystemChmodTool>();
 
     // Skill System — Runtime skill loading from filesystem
     builder.Services.AddMemoryCache();
@@ -189,9 +196,10 @@ try
     builder.Services.AddSingleton(sp =>
     {
         var factory = sp.GetRequiredService<DynamicSkillToolFactory>();
+        var builtInTools = sp.GetServices<ITool>();
         var logger = sp.GetRequiredService<ILogger<DynamicPluginHost>>();
 
-        var host = new DynamicPluginHost(factory, logger);
+        var host = new DynamicPluginHost(factory, builtInTools, logger);
         return host;
     });
 
