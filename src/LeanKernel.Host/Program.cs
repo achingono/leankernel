@@ -115,8 +115,7 @@ try
         (sp, client) =>
         {
             var cfg = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
-            client.BaseAddress = new Uri(cfg.Ollama.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(cfg.Ollama.TimeoutSeconds);
+            client.BaseAddress = new Uri(cfg.LiteLlm.BaseUrl);
         });
 
     // Thinker

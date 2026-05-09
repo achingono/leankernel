@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,40 +11,38 @@ using LeanKernel.Core.Models;
 namespace LeanKernel.Archivist.Wiki;
 
 /// <summary>
-/// Semantic extraction using local Ollama LLM.
+/// Semantic extraction using LiteLLM's OpenAI-compatible chat completions API.
 /// Runs asynchronously to avoid turn latency.
 /// </summary>
 public sealed class LlmWikiExtractor
 {
-    private readonly HttpClient _ollamaClient;
+    private const int MaxExchangeCharacters = 4_000;
+
+    private static readonly string[] ChatCompletionPaths = ["/v1/chat/completions", "/chat/completions"];
+
+    private readonly HttpClient _liteLlmClient;
     private readonly IWikiStore _wiki;
     private readonly ILogger<LlmWikiExtractor> _logger;
     private readonly string _model;
     private readonly double _temperature;
 
-    private const string ExtractionPrompt = """
+    private const string ExtractionInstructions = """
         Extract factual claims from this conversation exchange as structured 5W1H facts.
         Return ONLY a valid JSON array. Each item has: dimension (who/what/when/where/why/how), subject, claims (string array).
-        
-        Return empty array [] if no facts found.
-        
-        Exchange:
-        USER: {0}
-        ASSISTANT: {1}
-        
-        JSON:
+
+        Return empty array [] if no facts are present.
         """;
 
     public LlmWikiExtractor(
-        HttpClient ollamaClient,
+        HttpClient liteLlmClient,
         IWikiStore wiki,
         IOptions<LeanKernelConfig> config,
         ILogger<LlmWikiExtractor> logger)
     {
-        _ollamaClient = ollamaClient;
+        _liteLlmClient = liteLlmClient;
         _wiki = wiki;
         _logger = logger;
-        _model = config.Value.Ollama.Model;
+        _model = config.Value.LiteLlm.DefaultModel;
         _temperature = config.Value.Ollama.Temperature;
     }
 
@@ -65,21 +65,20 @@ public sealed class LlmWikiExtractor
         });
     }
 
-    private async Task ExtractAndIngestAsync(string userMessage, string assistantResponse, string sourceId, CancellationToken ct)
+    internal async Task ExtractAndIngestAsync(string userMessage, string assistantResponse, string sourceId, CancellationToken ct)
     {
-        var prompt = string.Format(ExtractionPrompt, userMessage, assistantResponse);
-        var response = await CallOllamaAsync(prompt, ct);
+        var response = await CallLiteLlmAsync(userMessage, assistantResponse, ct);
 
         if (string.IsNullOrWhiteSpace(response))
         {
-            _logger.LogDebug("Ollama returned empty response for extraction");
+            _logger.LogDebug("LiteLLM returned empty response for extraction");
             return;
         }
 
         var entries = ParseExtractedFacts(response, sourceId);
         if (entries.Count == 0)
         {
-            _logger.LogDebug("No facts parsed from Ollama response");
+            _logger.LogDebug("No facts parsed from LiteLLM response");
             return;
         }
 
@@ -87,27 +86,61 @@ public sealed class LlmWikiExtractor
         _logger.LogDebug("LLM extraction: ingested {Count} entries from {SourceId}", entries.Count, sourceId);
     }
 
-    private async Task<string> CallOllamaAsync(string prompt, CancellationToken ct)
+    private async Task<string> CallLiteLlmAsync(string userMessage, string assistantResponse, CancellationToken ct)
     {
-        var request = new
+        var exchange = BuildExchange(userMessage, assistantResponse);
+        var payload = JsonSerializer.Serialize(new
         {
             model = _model,
-            prompt = prompt,
-            stream = false,
-            temperature = _temperature
-        };
+            temperature = _temperature,
+            messages = new object[]
+            {
+                new { role = "system", content = ExtractionInstructions },
+                new { role = "user", content = exchange }
+            }
+        });
 
-        var content = new StringContent(
-            JsonSerializer.Serialize(request),
-            System.Text.Encoding.UTF8,
-            "application/json");
+        HttpResponseMessage? notFoundResponse = null;
 
-        var response = await _ollamaClient.PostAsync("/api/generate", content, ct);
-        response.EnsureSuccessStatusCode();
+        foreach (var path in ChatCompletionPaths)
+        {
+            using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+            var response = await _liteLlmClient.PostAsync(path, content, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                notFoundResponse = response;
+                continue;
+            }
 
-        var responseJson = await response.Content.ReadAsStringAsync(ct);
-        using var doc = JsonDocument.Parse(responseJson);
-        return doc.RootElement.GetProperty("response").GetString() ?? "";
+            response.EnsureSuccessStatusCode();
+            var responseJson = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(responseJson);
+            return doc.RootElement
+                .GetProperty("choices")[0]
+                .GetProperty("message")
+                .GetProperty("content")
+                .GetString() ?? string.Empty;
+        }
+
+        notFoundResponse?.EnsureSuccessStatusCode();
+        return string.Empty;
+    }
+
+    private static string BuildExchange(string userMessage, string assistantResponse)
+    {
+        var trimmedUserMessage = TrimForExtraction(userMessage);
+        var trimmedAssistantResponse = TrimForExtraction(assistantResponse);
+
+        return $"USER:\n{trimmedUserMessage}\n\nASSISTANT:\n{trimmedAssistantResponse}";
+    }
+
+    private static string TrimForExtraction(string text)
+    {
+        text = text.Trim();
+        if (text.Length <= MaxExchangeCharacters)
+            return text;
+
+        return text[..MaxExchangeCharacters] + "\n...[truncated for extraction]";
     }
 
     private static List<WikiEntry> ParseExtractedFacts(string jsonResponse, string sourceId)
@@ -116,7 +149,6 @@ public sealed class LlmWikiExtractor
 
         try
         {
-            // Try to extract JSON array from response (Ollama may include commentary)
             var jsonStart = jsonResponse.IndexOf('[');
             var jsonEnd = jsonResponse.LastIndexOf(']');
             if (jsonStart < 0 || jsonEnd < 0) return entries;
@@ -129,7 +161,7 @@ public sealed class LlmWikiExtractor
                 var dimensionStr = item.GetProperty("dimension").GetString() ?? "what";
                 var subject = item.GetProperty("subject").GetString() ?? "Unknown";
                 var claims = item.GetProperty("claims").EnumerateArray()
-                    .Select(c => c.GetString() ?? "")
+                    .Select(c => c.GetString() ?? string.Empty)
                     .Where(c => !string.IsNullOrWhiteSpace(c))
                     .ToList();
 
@@ -147,7 +179,7 @@ public sealed class LlmWikiExtractor
                     Facts = claims.Select(claim => new WikiFact
                     {
                         Claim = claim,
-                        Confidence = 0.85, // LLM extraction gets higher confidence than regex
+                        Confidence = 0.85,
                         Source = sourceId,
                         LastConfirmed = DateTimeOffset.UtcNow,
                         EstimatedTokens = (int)Math.Ceiling(claim.Length / 4.0)
@@ -155,9 +187,8 @@ public sealed class LlmWikiExtractor
                 });
             }
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            // Log but don't throw; graceful degradation
         }
 
         return entries;
