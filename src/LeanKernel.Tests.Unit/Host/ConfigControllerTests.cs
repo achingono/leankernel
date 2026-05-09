@@ -162,13 +162,22 @@ public class ConfigControllerTests
     {
         var cfg = new LeanKernelConfig
         {
-            Unstructured = new UnstructuredConfig { Enabled = false, BaseUrl = "http://custom:8000", TimeoutSeconds = 60 }
+            Unstructured = new UnstructuredConfig
+            {
+                Enabled = false,
+                BaseUrl = "http://custom:8000",
+                TimeoutSeconds = 60,
+                SupportedMimeTypes = ["application/pdf", "image/png"],
+                SupportedExtensions = [".pdf", ".png"]
+            }
         };
         var response = ConfigController.BuildResponse(cfg);
 
         Assert.Equal(false, response.Unstructured.Enabled.Value);
         Assert.Equal("http://custom:8000", response.Unstructured.BaseUrl.Value?.ToString());
         Assert.Equal(60, response.Unstructured.TimeoutSeconds.Value);
+        Assert.NotNull(response.Unstructured.SupportedMimeTypes.Value);
+        Assert.NotNull(response.Unstructured.SupportedExtensions.Value);
     }
 
     [Fact]
@@ -439,14 +448,34 @@ public class ConfigControllerTests
     [Fact]
     public void ApplyPatch_UnstructuredSection_AppliesChanges()
     {
-        var current = new LeanKernelConfig { Unstructured = new UnstructuredConfig { Enabled = true, TimeoutSeconds = 120 } };
-        var patch = new AdminConfigPatchRequest { Unstructured = new UnstructuredPatch { Enabled = false, TimeoutSeconds = 60 } };
+        var current = new LeanKernelConfig
+        {
+            Unstructured = new UnstructuredConfig
+            {
+                Enabled = true,
+                TimeoutSeconds = 120,
+                SupportedMimeTypes = ["application/pdf"],
+                SupportedExtensions = [".pdf"]
+            }
+        };
+        var patch = new AdminConfigPatchRequest
+        {
+            Unstructured = new UnstructuredPatch
+            {
+                Enabled = false,
+                TimeoutSeconds = 60,
+                SupportedMimeTypes = ["image/png", "image/jpeg"],
+                SupportedExtensions = [".png", ".jpg"]
+            }
+        };
 
         var (updated, changes) = ConfigController.ApplyPatch(current, patch);
 
         Assert.False(updated.Unstructured.Enabled);
         Assert.Equal(60, updated.Unstructured.TimeoutSeconds);
-        Assert.Equal(2, changes.Count);
+        Assert.Equal(["image/png", "image/jpeg"], updated.Unstructured.SupportedMimeTypes);
+        Assert.Equal([".png", ".jpg"], updated.Unstructured.SupportedExtensions);
+        Assert.Equal(4, changes.Count);
     }
 
     [Fact]

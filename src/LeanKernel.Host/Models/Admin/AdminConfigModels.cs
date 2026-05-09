@@ -92,6 +92,8 @@ public sealed record UnstructuredConfigSection
     public ConfigField Enabled { get; init; } = new();
     public ConfigField BaseUrl { get; init; } = new();
     public ConfigField TimeoutSeconds { get; init; } = new();
+    public ConfigField SupportedMimeTypes { get; init; } = new();
+    public ConfigField SupportedExtensions { get; init; } = new();
 }
 
 public sealed record WikiConfigSection

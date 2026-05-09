@@ -77,7 +77,9 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
         {
             Enabled = source.Unstructured.Enabled,
             BaseUrl = source.Unstructured.BaseUrl,
-            TimeoutSeconds = source.Unstructured.TimeoutSeconds
+            TimeoutSeconds = source.Unstructured.TimeoutSeconds,
+            SupportedMimeTypes = source.Unstructured.SupportedMimeTypes?.ToArray() ?? [],
+            SupportedExtensions = source.Unstructured.SupportedExtensions?.ToArray() ?? []
         },
         Agents = new AgentsConfig
         {

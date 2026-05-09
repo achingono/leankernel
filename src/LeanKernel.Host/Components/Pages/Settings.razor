@@ -157,6 +157,14 @@
                     <span class="setting-label">Timeout (s)</span>
                     <input class="setting-input" type="number" @bind="Config.Unstructured.TimeoutSeconds" />
                 </div>
+                <div class="setting-row">
+                    <span class="setting-label">Supported MIME Types</span>
+                    <input class="setting-input" @bind="Config.Unstructured.SupportedMimeTypesInput" />
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Supported Extensions</span>
+                    <input class="setting-input" @bind="Config.Unstructured.SupportedExtensionsInput" />
+                </div>
             </div>
         </div>
 
@@ -330,7 +338,9 @@ else
             {
                 Enabled = cfg.Unstructured.Enabled,
                 BaseUrl = cfg.Unstructured.BaseUrl,
-                TimeoutSeconds = cfg.Unstructured.TimeoutSeconds
+                TimeoutSeconds = cfg.Unstructured.TimeoutSeconds,
+                SupportedMimeTypesInput = string.Join(",", cfg.Unstructured.SupportedMimeTypes),
+                SupportedExtensionsInput = string.Join(",", cfg.Unstructured.SupportedExtensions)
             },
             Wiki = new WikiVm
             {
@@ -436,7 +446,11 @@ else
             {
                 Enabled = Config!.Unstructured.Enabled,
                 BaseUrl = Config.Unstructured.BaseUrl,
-                TimeoutSeconds = Config.Unstructured.TimeoutSeconds
+                TimeoutSeconds = Config.Unstructured.TimeoutSeconds,
+                SupportedMimeTypes = Config.Unstructured.SupportedMimeTypesInput?
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                SupportedExtensions = Config.Unstructured.SupportedExtensionsInput?
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             }
         },
         SectionKey.Wiki => new AdminConfigPatchRequest
@@ -546,6 +560,8 @@ else
         public bool Enabled { get; set; }
         public string BaseUrl { get; set; } = "";
         public int TimeoutSeconds { get; set; }
+        public string SupportedMimeTypesInput { get; set; } = "";
+        public string SupportedExtensionsInput { get; set; } = "";
     }
 
     private sealed class WikiVm

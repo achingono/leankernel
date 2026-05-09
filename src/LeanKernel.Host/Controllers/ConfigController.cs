@@ -65,7 +65,9 @@ public sealed class ConfigController : ControllerBase
             {
                 Enabled = Field(cfg.Unstructured.Enabled, description: "Enable Unstructured document processing"),
                 BaseUrl = Field(cfg.Unstructured.BaseUrl, description: "Unstructured service base URL"),
-                TimeoutSeconds = Field(cfg.Unstructured.TimeoutSeconds, description: "Request timeout for document processing")
+                TimeoutSeconds = Field(cfg.Unstructured.TimeoutSeconds, description: "Request timeout for document processing"),
+                SupportedMimeTypes = Field(cfg.Unstructured.SupportedMimeTypes, description: "Attachment MIME types routed through the extractor"),
+                SupportedExtensions = Field(cfg.Unstructured.SupportedExtensions, description: "Attachment file extensions routed through the extractor")
             },
             Wiki = new WikiConfigSection
             {
@@ -285,8 +287,32 @@ public sealed class ConfigController : ControllerBase
             {
                 Enabled = ApplyBool(unstructured.Enabled, up.Enabled, "Unstructured", "Enabled", changes),
                 BaseUrl = ApplyString(unstructured.BaseUrl, up.BaseUrl, "Unstructured", "BaseUrl", changes),
-                TimeoutSeconds = ApplyInt(unstructured.TimeoutSeconds, up.TimeoutSeconds, "Unstructured", "TimeoutSeconds", changes)
+                TimeoutSeconds = ApplyInt(unstructured.TimeoutSeconds, up.TimeoutSeconds, "Unstructured", "TimeoutSeconds", changes),
+                SupportedMimeTypes = up.SupportedMimeTypes ?? unstructured.SupportedMimeTypes,
+                SupportedExtensions = up.SupportedExtensions ?? unstructured.SupportedExtensions
             };
+
+            if (up.SupportedMimeTypes != null && !up.SupportedMimeTypes.SequenceEqual(current.Unstructured.SupportedMimeTypes))
+            {
+                changes.Add(new ConfigChange
+                {
+                    Section = "Unstructured",
+                    Field = "SupportedMimeTypes",
+                    OldValue = string.Join(", ", current.Unstructured.SupportedMimeTypes),
+                    NewValue = string.Join(", ", up.SupportedMimeTypes)
+                });
+            }
+
+            if (up.SupportedExtensions != null && !up.SupportedExtensions.SequenceEqual(current.Unstructured.SupportedExtensions))
+            {
+                changes.Add(new ConfigChange
+                {
+                    Section = "Unstructured",
+                    Field = "SupportedExtensions",
+                    OldValue = string.Join(", ", current.Unstructured.SupportedExtensions),
+                    NewValue = string.Join(", ", up.SupportedExtensions)
+                });
+            }
         }
 
         if (patch.Wiki is { } wp)

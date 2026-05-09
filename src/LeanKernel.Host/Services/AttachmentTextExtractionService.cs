@@ -11,39 +11,11 @@ public sealed class AttachmentTextExtractionService : IAttachmentTextExtractionS
 {
     private const int MaxExtractedCharacters = 12_000;
 
-    private static readonly HashSet<string> DocumentMimeTypes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "application/pdf",
-        "application/rtf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.ms-powerpoint",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/epub+zip",
-        "message/rfc822"
-    };
-
-    private static readonly HashSet<string> DocumentExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".pdf",
-        ".doc",
-        ".docx",
-        ".ppt",
-        ".pptx",
-        ".xls",
-        ".xlsx",
-        ".rtf",
-        ".odt",
-        ".epub",
-        ".eml",
-        ".msg"
-    };
-
     private readonly HttpClient _httpClient;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<AttachmentTextExtractionService> _logger;
+    private readonly HashSet<string> _supportedMimeTypes;
+    private readonly HashSet<string> _supportedExtensions;
 
     public AttachmentTextExtractionService(
         HttpClient httpClient,
@@ -53,6 +25,12 @@ public sealed class AttachmentTextExtractionService : IAttachmentTextExtractionS
         _httpClient = httpClient;
         _config = config.Value;
         _logger = logger;
+        _supportedMimeTypes = new HashSet<string>(
+            _config.Unstructured.SupportedMimeTypes ?? [],
+            StringComparer.OrdinalIgnoreCase);
+        _supportedExtensions = new HashSet<string>(
+            _config.Unstructured.SupportedExtensions ?? [],
+            StringComparer.OrdinalIgnoreCase);
     }
 
     public bool CanExtractText(string? contentType, string? fileName)
@@ -60,11 +38,14 @@ public sealed class AttachmentTextExtractionService : IAttachmentTextExtractionS
         if (InboundAttachmentTextExtractor.CanExtractText(contentType, fileName))
             return true;
 
-        if (!string.IsNullOrWhiteSpace(contentType) && DocumentMimeTypes.Contains(contentType))
+        if (!string.IsNullOrWhiteSpace(contentType)
+            && _supportedMimeTypes.Contains(contentType))
+        {
             return true;
+        }
 
         var extension = Path.GetExtension(fileName ?? string.Empty);
-        return !string.IsNullOrWhiteSpace(extension) && DocumentExtensions.Contains(extension);
+        return !string.IsNullOrWhiteSpace(extension) && _supportedExtensions.Contains(extension);
     }
 
     public async Task<string?> ExtractTextAsync(

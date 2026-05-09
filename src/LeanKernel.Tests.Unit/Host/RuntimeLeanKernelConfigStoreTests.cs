@@ -78,7 +78,9 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
             {
                 Enabled = true,
                 BaseUrl = "http://unstructured:8000",
-                TimeoutSeconds = 90
+                TimeoutSeconds = 90,
+                SupportedMimeTypes = ["application/pdf", "image/png"],
+                SupportedExtensions = [".pdf", ".png"]
             },
             Agents = new AgentsConfig { BasePath = "/app/data/agents" },
             Wiki = new WikiConfig { BasePath = "/app/data/wiki" },
@@ -144,6 +146,10 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
             leanKernel.GetProperty("unstructured").GetProperty("baseUrl").GetString());
         Assert.Equal(90,
             leanKernel.GetProperty("unstructured").GetProperty("timeoutSeconds").GetInt32());
+        Assert.Equal(2,
+            leanKernel.GetProperty("unstructured").GetProperty("supportedMimeTypes").GetArrayLength());
+        Assert.Equal(2,
+            leanKernel.GetProperty("unstructured").GetProperty("supportedExtensions").GetArrayLength());
         Assert.Equal("/app/data/agents",
             leanKernel.GetProperty("agents").GetProperty("basePath").GetString());
         Assert.True(leanKernel.GetProperty("routing").GetProperty("enabled").GetBoolean());
@@ -167,7 +173,13 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
                 DaemonBaseUrl = "http://daemon:8080",
                 AllowedSenders = ["+1111", "+2222"]
             },
-            Unstructured = new UnstructuredConfig { BaseUrl = "http://unstructured:8000", TimeoutSeconds = 60 },
+            Unstructured = new UnstructuredConfig
+            {
+                BaseUrl = "http://unstructured:8000",
+                TimeoutSeconds = 60,
+                SupportedMimeTypes = ["application/pdf", "image/png"],
+                SupportedExtensions = [".pdf", ".png"]
+            },
             Agents = new AgentsConfig { BasePath = "/agents" },
             Routing = new RoutingConfig
             {
@@ -190,6 +202,8 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
         Assert.Equal(["+1111", "+2222"], clone.Signal.AllowedSenders);
         Assert.Equal("http://unstructured:8000", clone.Unstructured.BaseUrl);
         Assert.Equal(60, clone.Unstructured.TimeoutSeconds);
+        Assert.Equal(["application/pdf", "image/png"], clone.Unstructured.SupportedMimeTypes);
+        Assert.Equal([".pdf", ".png"], clone.Unstructured.SupportedExtensions);
         Assert.Equal("/agents", clone.Agents.BasePath);
         Assert.True(clone.Routing.Enabled);
         Assert.Equal(50, clone.Routing.SpendGuard.DailyPaidRequestSoftLimit);

@@ -133,6 +133,49 @@ public sealed class UnstructuredConfig
     public bool Enabled { get; set; } = true;
     public string BaseUrl { get; set; } = "http://unstructured:8000";
     public int TimeoutSeconds { get; set; } = 120;
+    public string[] SupportedMimeTypes { get; set; } =
+    [
+        "application/pdf",
+        "application/rtf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/epub+zip",
+        "message/rfc822",
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif",
+        "image/bmp",
+        "image/tiff"
+    ];
+
+    public string[] SupportedExtensions { get; set; } =
+    [
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".ppt",
+        ".pptx",
+        ".xls",
+        ".xlsx",
+        ".rtf",
+        ".odt",
+        ".epub",
+        ".eml",
+        ".msg",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+        ".bmp",
+        ".gif",
+        ".tif",
+        ".tiff"
+    ];
 }
 
 public sealed class AgentsConfig

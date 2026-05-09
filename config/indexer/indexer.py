@@ -73,16 +73,41 @@ RETRYABLE_EMBEDDING_ERRORS = (
     httpx.PoolTimeout,
     httpx.NetworkError,
 )
+UNSTRUCTURED_MAX_RETRIES = int(os.getenv("UNSTRUCTURED_MAX_RETRIES", "5"))
+UNSTRUCTURED_RETRY_BASE_SECONDS = float(os.getenv("UNSTRUCTURED_RETRY_BASE_SECONDS", "1.0"))
+UNSTRUCTURED_RETRY_MAX_SECONDS = float(os.getenv("UNSTRUCTURED_RETRY_MAX_SECONDS", "15"))
+RETRYABLE_UNSTRUCTURED_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
+RETRYABLE_UNSTRUCTURED_ERRORS = (
+    httpx.ConnectError,
+    httpx.ReadTimeout,
+    httpx.WriteTimeout,
+    httpx.PoolTimeout,
+    httpx.NetworkError,
+)
 
 # Document extensions that should go through Unstructured
 UNSTRUCTURED_EXTENSIONS = {
     ".pdf", ".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls",
     ".html", ".htm", ".epub", ".rtf", ".odt", ".csv", ".tsv",
     ".eml", ".msg", ".rst", ".org",
+    ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif",
 }
 
 # Text-based extensions that can be read directly
 TEXT_EXTENSIONS = {".md", ".txt", ".json", ".yaml", ".yml", ".xml", ".log"}
+
+
+def _retry_delay(
+    attempt: int,
+    base_seconds: float,
+    max_seconds: float,
+    retry_after: str | None = None,
+) -> float:
+    if retry_after and retry_after.isdigit():
+        delay = min(float(retry_after), max_seconds)
+    else:
+        delay = min(base_seconds * (2 ** (attempt - 1)), max_seconds)
+    return delay + random.uniform(0.0, 0.2)
 
 
 def should_ignore_path(file_path: str) -> bool:
@@ -267,18 +292,66 @@ class UnstructuredClient:
 
     async def parse(self, file_path: str) -> list[dict]:
         """Parse a document file and return chunked elements."""
-        with open(file_path, "rb") as f:
-            response = await self.client.post(
-                f"{self.base_url}/general/v0/general",
-                files={"files": (os.path.basename(file_path), f)},
-                data={
-                    "strategy": "auto",
-                    "chunking_strategy": "by_title",
-                    "max_characters": CHUNK_SIZE_TOKENS * 4,
-                },
-            )
-        response.raise_for_status()
-        return response.json()
+        last_error: Exception | None = None
+
+        for attempt in range(1, UNSTRUCTURED_MAX_RETRIES + 1):
+            try:
+                with open(file_path, "rb") as f:
+                    response = await self.client.post(
+                        f"{self.base_url}/general/v0/general",
+                        files={"files": (os.path.basename(file_path), f)},
+                        data={
+                            "strategy": "auto",
+                            "chunking_strategy": "by_title",
+                            "max_characters": CHUNK_SIZE_TOKENS * 4,
+                        },
+                    )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                last_error = e
+                status = e.response.status_code
+                if status not in RETRYABLE_UNSTRUCTURED_STATUSES or attempt == UNSTRUCTURED_MAX_RETRIES:
+                    raise
+
+                delay = _retry_delay(
+                    attempt,
+                    base_seconds=UNSTRUCTURED_RETRY_BASE_SECONDS,
+                    max_seconds=UNSTRUCTURED_RETRY_MAX_SECONDS,
+                    retry_after=e.response.headers.get("retry-after"),
+                )
+                logger.warning(
+                    "Unstructured HTTP %s for %s (attempt %s/%s); retrying in %.2fs",
+                    status,
+                    file_path,
+                    attempt,
+                    UNSTRUCTURED_MAX_RETRIES,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            except RETRYABLE_UNSTRUCTURED_ERRORS as e:
+                last_error = e
+                if attempt == UNSTRUCTURED_MAX_RETRIES:
+                    raise
+
+                delay = _retry_delay(
+                    attempt,
+                    base_seconds=UNSTRUCTURED_RETRY_BASE_SECONDS,
+                    max_seconds=UNSTRUCTURED_RETRY_MAX_SECONDS,
+                )
+                logger.warning(
+                    "Unstructured connection error for %s (attempt %s/%s): %r; retrying in %.2fs",
+                    file_path,
+                    attempt,
+                    UNSTRUCTURED_MAX_RETRIES,
+                    e,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Unstructured parse failed without an explicit exception")
 
     async def close(self):
         await self.client.aclose()
@@ -791,15 +864,20 @@ async def main():
 
 
 async def wait_for_dependencies():
-    """Wait for Qdrant and LiteLLM to become available."""
+    """Wait for Qdrant, LiteLLM, and Unstructured to become available."""
     max_retries = 30
     for i in range(max_retries):
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 # Check Qdrant
                 resp = await client.get(f"http://{QDRANT_HOST}:{QDRANT_PORT - 1}")
+                resp.raise_for_status()
                 # Check LiteLLM
                 resp = await client.get(f"{LITELLM_URL}/health/liveliness")
+                resp.raise_for_status()
+                # Check Unstructured
+                resp = await client.get(f"{UNSTRUCTURED_API_URL}/healthcheck")
+                resp.raise_for_status()
             logger.info("Dependencies ready.")
             return
         except Exception:

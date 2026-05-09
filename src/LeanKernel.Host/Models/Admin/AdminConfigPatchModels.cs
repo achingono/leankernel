@@ -48,6 +48,8 @@ public sealed class UnstructuredPatch
     public bool? Enabled { get; set; }
     public string? BaseUrl { get; set; }
     public int? TimeoutSeconds { get; set; }
+    public string[]? SupportedMimeTypes { get; set; }
+    public string[]? SupportedExtensions { get; set; }
 }
 
 public sealed class WikiPatch
