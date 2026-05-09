@@ -282,10 +282,10 @@ public sealed class AgentsConfigurationStep
         {
             "autonomous" => ReplaceSection(template,
                 "CanDoWithoutAsking",
-                new[] { "ViewRepositoryStructure", "ReadPublicDocumentation", "SearchCodebase", "ViewConfiguration", "ViewErrorLogs", "CreateBranch", "CreateTestCommits", "ViewDeploymentStatus", "RunTests", "ViewBuildLogs", "ReadWiki", "ViewAnalytics", "CheckSystemHealth", "UpdateDocumentation", "CommentOnPRs", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
+                new[] { "ViewRepositoryStructure", "ReadPublicDocumentation", "SearchCodebase", "ReadFile", "ListFiles", "StatFile", "ViewConfiguration", "ViewErrorLogs", "CreateBranch", "CreateTestCommits", "ViewDeploymentStatus", "RunTests", "ViewBuildLogs", "ReadWiki", "ViewAnalytics", "CheckSystemHealth", "UpdateDocumentation", "CommentOnPRs", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
             "cautious" => ReplaceSection(template,
                 "CanDoWithoutAsking",
-                new[] { "ViewRepositoryStructure", "SearchCodebase", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
+                new[] { "ViewRepositoryStructure", "SearchCodebase", "ReadFile", "ListFiles", "StatFile", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
             _ => template // basic preset (default)
         };
     }
@@ -332,6 +332,9 @@ created: 2024-01-01
 
 - ViewRepositoryStructure
 - SearchCodebase
+- ReadFile
+- ListFiles
+- StatFile
 - WriteAgentsMd
 - WriteSelfMd
 - WriteUserMd
@@ -340,6 +343,11 @@ created: 2024-01-01
 
 - PushToMainBranch
 - DeleteBranch
+- WriteFile
+- CreateDirectory
+- MoveFile
+- CopyFile
+- ChangeFilePermissions
 
 ### Never Do
 

@@ -24,7 +24,11 @@ internal static class FileSystemPolicy
     {
         var normalizedBase = EnsureTrailingSeparator(Path.GetFullPath(basePath));
         var normalizedFull = Path.GetFullPath(fullPath);
-        return normalizedFull.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(
+                   normalizedFull,
+                   normalizedBase.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                   StringComparison.OrdinalIgnoreCase)
+               || normalizedFull.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool IsWriteAllowed(string basePath, string fullPath, IReadOnlyCollection<string> allowlist)

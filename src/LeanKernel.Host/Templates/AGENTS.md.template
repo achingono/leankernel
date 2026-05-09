@@ -37,6 +37,9 @@ These actions are pre-approved and need no permission:
 - ViewRepositoryStructure
 - ReadPublicDocumentation
 - SearchCodebase
+- ReadFile
+- ListFiles
+- StatFile
 - ViewConfiguration
 - ViewErrorLogs
 - CreateBranch
@@ -51,6 +54,11 @@ These actions require explicit user permission each time:
 
 - PushToMainBranch
 - DeleteBranch
+- WriteFile
+- CreateDirectory
+- MoveFile
+- CopyFile
+- ChangeFilePermissions
 - ModifyConfiguration
 - ChangeDeploymentSettings
 - SendExternalMessage

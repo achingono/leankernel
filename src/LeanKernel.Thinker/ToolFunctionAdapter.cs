@@ -14,11 +14,21 @@ public sealed class ToolFunctionAdapter
 {
     private readonly IToolRegistry _registry;
     private readonly ILogger<ToolFunctionAdapter> _logger;
+    private readonly IToolExecutionAuthorizer? _executionAuthorizer;
 
     public ToolFunctionAdapter(IToolRegistry registry, ILogger<ToolFunctionAdapter> logger)
+        : this(registry, logger, null)
+    {
+    }
+
+    public ToolFunctionAdapter(
+        IToolRegistry registry,
+        ILogger<ToolFunctionAdapter> logger,
+        IToolExecutionAuthorizer? executionAuthorizer)
     {
         _registry = registry;
         _logger = logger;
+        _executionAuthorizer = executionAuthorizer;
     }
 
     /// <summary>
@@ -61,15 +71,30 @@ public sealed class ToolFunctionAdapter
         {
             foreach (var op in multiOp.Operations)
             {
-                yield return new SkillOperationFunction(multiOp, op, _logger);
+                yield return new SkillOperationFunction(multiOp, op, _executionAuthorizer, _logger);
             }
         }
         else
         {
             var capturedTool = tool;
+            var authorizer = _executionAuthorizer;
             yield return AIFunctionFactory.Create(
                 async (string input, CancellationToken ct) =>
                 {
+                    if (authorizer is not null)
+                    {
+                        var authorization = await authorizer.AuthorizeAsync(capturedTool.Name, input, ct);
+                        if (!authorization.IsAuthorized)
+                        {
+                            _logger.LogWarning(
+                                "Tool execution denied for {Tool} (action: {Action}): {Reason}",
+                                capturedTool.Name,
+                                authorization.ActionType ?? "unknown",
+                                authorization.Reason ?? "unauthorized");
+                            return $"Error: {authorization.Reason ?? "Tool execution denied"}";
+                        }
+                    }
+
                     _logger.LogInformation("Tool invoked: {Tool} with input: {Input}",
                         capturedTool.Name, input);
                     var result = await capturedTool.ExecuteAsync(input, ct);

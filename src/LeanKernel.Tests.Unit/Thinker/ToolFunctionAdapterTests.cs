@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.AI;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 using LeanKernel.Thinker;
@@ -123,6 +124,38 @@ public class ToolFunctionAdapterTests
         Assert.Contains("listId", jsonSchema);
     }
 
+    [Fact]
+    public async Task BuildTools_SimpleTool_DeniedByExecutionAuthorizer_ReturnsError()
+    {
+        var tool = new FakeTool("file_write", "Write file", success: true, output: "ok");
+        var registry = new FakeToolRegistry([tool]);
+        var authorizer = new FakeToolExecutionAuthorizer("file_write", ToolExecutionAuthorizationResult.Deny("User permission required", "WriteFile"));
+        var adapter = new ToolFunctionAdapter(registry, NullLogger<ToolFunctionAdapter>.Instance, authorizer);
+
+        var tools = adapter.BuildTools();
+        var aiFunc = Assert.IsAssignableFrom<Microsoft.Extensions.AI.AIFunction>(Assert.Single(tools));
+        var result = await aiFunc.InvokeAsync(new AIFunctionArguments { ["input"] = "{}" }, CancellationToken.None);
+
+        Assert.Equal("Error: User permission required", result?.ToString());
+    }
+
+    [Fact]
+    public async Task BuildTools_OperationsTool_DeniedByExecutionAuthorizer_ReturnsError()
+    {
+        var tool = new FakeOperationsTool("doughray", "Finance skill", [
+            new ToolOperationDescriptor("health", "Check health", "{}")
+        ]);
+        var registry = new FakeToolRegistry([tool]);
+        var authorizer = new FakeToolExecutionAuthorizer("doughray__health", ToolExecutionAuthorizationResult.Deny("Blocked", "HealthCheck"));
+        var adapter = new ToolFunctionAdapter(registry, NullLogger<ToolFunctionAdapter>.Instance, authorizer);
+
+        var tools = adapter.BuildTools();
+        var aiFunc = Assert.IsAssignableFrom<Microsoft.Extensions.AI.AIFunction>(Assert.Single(tools));
+        var result = await aiFunc.InvokeAsync(new AIFunctionArguments(), CancellationToken.None);
+
+        Assert.Equal("Error: Blocked", result?.ToString());
+    }
+
     private sealed class FakeOperationsTool(
         string name, string description, IReadOnlyList<ToolOperationDescriptor> operations) : IOperationsTool
     {
@@ -160,5 +193,15 @@ public class ToolFunctionAdapterTests
 
         public ITool? GetTool(string name) => Tools.GetValueOrDefault(name);
         public IEnumerable<string> GetToolNames() => Tools.Keys;
+    }
+
+    private sealed class FakeToolExecutionAuthorizer(string blockedToolName, ToolExecutionAuthorizationResult result) : IToolExecutionAuthorizer
+    {
+        public Task<ToolExecutionAuthorizationResult> AuthorizeAsync(string toolName, string parametersJson, CancellationToken ct)
+        {
+            return Task.FromResult(string.Equals(toolName, blockedToolName, StringComparison.OrdinalIgnoreCase)
+                ? result
+                : ToolExecutionAuthorizationResult.Allow());
+        }
     }
 }

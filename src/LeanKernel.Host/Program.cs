@@ -177,6 +177,10 @@ try
     builder.Services.AddSingleton<ITool, FileSystemMoveTool>();
     builder.Services.AddSingleton<ITool, FileSystemCopyTool>();
     builder.Services.AddSingleton<ITool, FileSystemChmodTool>();
+    builder.Services.AddSingleton<ITool, DirectoryMkdirTool>();
+    builder.Services.AddSingleton<ITool, FileSystemTouchTool>();
+    builder.Services.AddSingleton<ITool, DirectoryListTool>();
+    builder.Services.AddSingleton<ITool, FileSystemStatTool>();
 
     // Skill System — Runtime skill loading from filesystem
     builder.Services.AddMemoryCache();
@@ -272,6 +276,7 @@ try
         var rules = rulesProvider.GetCurrent();
         return new ActionAuthorizer(rules, logger);
     });
+    builder.Services.AddSingleton<IToolExecutionAuthorizer, EngagementToolExecutionAuthorizer>();
     builder.Services.AddSingleton(sp =>
     {
         var rulesProvider = sp.GetRequiredService<IEngagementRulesProvider>();

@@ -14,6 +14,7 @@ internal sealed class SkillOperationFunction : AIFunction
 {
     private readonly IOperationsTool _tool;
     private readonly ToolOperationDescriptor _operation;
+    private readonly IToolExecutionAuthorizer? _executionAuthorizer;
     private readonly string _name;
     private readonly string _description;
     private readonly JsonElement _schema;
@@ -22,10 +23,12 @@ internal sealed class SkillOperationFunction : AIFunction
     public SkillOperationFunction(
         IOperationsTool tool,
         ToolOperationDescriptor operation,
+        IToolExecutionAuthorizer? executionAuthorizer,
         ILogger? logger = null)
     {
         _tool = tool;
         _operation = operation;
+        _executionAuthorizer = executionAuthorizer;
         _name = $"{tool.Name}__{operation.Id}";
         _description = $"{operation.Summary} (skill: {tool.Name})";
         _logger = logger;
@@ -53,6 +56,21 @@ internal sealed class SkillOperationFunction : AIFunction
         }
 
         var parametersJson = JsonSerializer.Serialize(dict);
+
+        if (_executionAuthorizer is not null)
+        {
+            var authorization = await _executionAuthorizer.AuthorizeAsync(_name, parametersJson, cancellationToken);
+            if (!authorization.IsAuthorized)
+            {
+                _logger?.LogWarning(
+                    "Tool execution denied for {Tool}.{Op} (action: {Action}): {Reason}",
+                    _tool.Name,
+                    _operation.Id,
+                    authorization.ActionType ?? "unknown",
+                    authorization.Reason ?? "unauthorized");
+                return $"Error: {authorization.Reason ?? "Tool execution denied"}";
+            }
+        }
 
         _logger?.LogInformation("Tool invoked: {Tool}.{Op} with parameters: {Params}",
             _tool.Name, _operation.Id, parametersJson);

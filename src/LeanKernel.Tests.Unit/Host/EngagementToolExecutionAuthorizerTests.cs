@@ -1,0 +1,60 @@
+using NSubstitute;
+using LeanKernel.Host.Services;
+
+namespace LeanKernel.Tests.Unit.Host;
+
+public class EngagementToolExecutionAuthorizerTests
+{
+    [Fact]
+    public async Task AuthorizeAsync_ProfileWrite_UsesSpecificWriteAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("WriteSelfMd", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "WriteSelfMd",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("file_write", """{"path":"SELF.md","content":"hi"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("WriteSelfMd", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("WriteSelfMd", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_DirectoryList_UsesListFilesAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("ListFiles", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "ListFiles",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("directory_list", "{}", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("ListFiles", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("ListFiles", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_UnknownTool_AllowsWithoutCallingActionAuthorizer()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+
+        var result = await authorizer.AuthorizeAsync("wiki_query", "{}", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Null(result.ActionType);
+        await actionAuthorizer.DidNotReceive().AuthorizeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+}

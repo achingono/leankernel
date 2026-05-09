@@ -97,4 +97,94 @@ public class FileSystemMutationToolTests
             Directory.Delete(tmpDir, true);
         }
     }
+
+    [Fact]
+    public async Task TouchTool_CreatesAllowlistedAgentsFile()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+
+        try
+        {
+            var tool = new FileSystemTouchTool(tmpDir);
+            var result = await tool.ExecuteAsync(
+                """{"path": "agents/main/AGENTS.md"}""",
+                CancellationToken.None);
+
+            Assert.True(result.Success);
+            Assert.True(File.Exists(Path.Combine(tmpDir, "agents", "main", "AGENTS.md")));
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task MkdirTool_AllowsParentDirectoryForAllowlistedAgentsFile()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+
+        try
+        {
+            var tool = new DirectoryMkdirTool(tmpDir);
+            var result = await tool.ExecuteAsync(
+                """{"path": "agents/main"}""",
+                CancellationToken.None);
+
+            Assert.True(result.Success);
+            Assert.True(Directory.Exists(Path.Combine(tmpDir, "agents", "main")));
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ListTool_ListsDirectoryEntries()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(tmpDir, "folder"));
+        await File.WriteAllTextAsync(Path.Combine(tmpDir, "file.txt"), "hello");
+
+        try
+        {
+            var tool = new DirectoryListTool(tmpDir);
+            var result = await tool.ExecuteAsync("""{}""", CancellationToken.None);
+
+            Assert.True(result.Success);
+            Assert.Contains("file.txt", result.Output!);
+            Assert.Contains("folder", result.Output!);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task StatTool_ReturnsMetadataForFile()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        await File.WriteAllTextAsync(Path.Combine(tmpDir, "SELF.md"), "hello");
+
+        try
+        {
+            var tool = new FileSystemStatTool(tmpDir);
+            var result = await tool.ExecuteAsync(
+                """{"path": "SELF.md"}""",
+                CancellationToken.None);
+
+            Assert.True(result.Success);
+            Assert.Contains("sizeBytes", result.Output!);
+            Assert.Contains("SELF.md", result.Output!);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
 }

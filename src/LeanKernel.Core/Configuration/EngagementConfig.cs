@@ -63,6 +63,8 @@ public sealed class AutonomyScope
     public string[] CanDoWithoutAsking { get; set; } = 
     [
         "ReadFile",
+        "ListFiles",
+        "StatFile",
         "AnalyzeCode", 
         "SearchWiki",
         "CreateNote",
@@ -81,6 +83,11 @@ public sealed class AutonomyScope
         "SendEmail",
         "SendMessage",
         "PushCode",
+        "WriteFile",
+        "CreateDirectory",
+        "MoveFile",
+        "CopyFile",
+        "ChangeFilePermissions",
         "ModifyConfig",
         "DeleteFile"
     ];
