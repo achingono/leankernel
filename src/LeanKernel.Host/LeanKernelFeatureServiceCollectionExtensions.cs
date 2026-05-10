@@ -129,6 +129,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<ModelRoutingService>();
 
         services.AddSingleton<IThinkerService, ThinkerService>();
+        services.AddSingleton<IAgentRuntime, AgentRuntime>();
         services.AddSingleton<WorkerAgent, ResearchWorker>();
         services.AddSingleton<WorkerAgent, CodeWorker>();
         services.AddSingleton<WorkerAgent, ScheduleWorker>();

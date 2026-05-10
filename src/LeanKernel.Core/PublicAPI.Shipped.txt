@@ -40,6 +40,7 @@ LeanKernel.Core.Enums.TaskComplexity
 LeanKernel.Core.Enums.WikiDimension
 LeanKernel.Core.Interfaces.IAgentOrchestrator
 LeanKernel.Core.Interfaces.IActionAuthorizer
+LeanKernel.Core.Interfaces.IAgentRuntime
 LeanKernel.Core.Interfaces.IAgentSelfProfileInitializer
 LeanKernel.Core.Interfaces.IAttachmentTextExtractionService
 LeanKernel.Core.Interfaces.ICapabilityGapStore
