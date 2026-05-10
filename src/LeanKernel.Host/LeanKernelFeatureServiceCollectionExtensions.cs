@@ -99,6 +99,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<IIdentityFileUpdateService, IdentityFileUpdateService>();
         services.AddSingleton<RequestFailureHandler>();
         services.AddSingleton<IToolExecutionAuthorizer, EngagementToolExecutionAuthorizer>();
+        services.AddSingleton<PostTurnPipeline>();
         services.AddSelfImprovement();
 
         services.AddSingleton<ThinkerServiceDependencies>(sp =>
@@ -110,11 +111,11 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             var toolAdapter = sp.GetRequiredService<ToolFunctionAdapter>();
             var promptAssembler = sp.GetRequiredService<PromptAssembler>();
             var responseEnhancer = sp.GetService<IResponseEnhancer>();
-            var turnEventSink = sp.GetService<ITurnEventSink>();
+            var postTurnPipeline = sp.GetService<PostTurnPipeline>();
 
             return new ThinkerServiceDependencies(
                 gatekeeper, sessions, wiki, agentFactory, toolAdapter, promptAssembler,
-                responseEnhancer, turnEventSink);
+                responseEnhancer, postTurnPipeline);
         });
 
         services.AddSingleton<TaskComplexityScorer>();

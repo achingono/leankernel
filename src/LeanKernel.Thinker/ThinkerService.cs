@@ -1,6 +1,7 @@
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
@@ -26,7 +27,7 @@ public sealed class ThinkerServiceDependencies
     /// <param name="toolAdapter">The adapter that exposes tools to the AI agent.</param>
     /// <param name="promptAssembler">The service that builds system instructions.</param>
     /// <param name="responseEnhancer">The optional synchronous response enhancer.</param>
-    /// <param name="turnEventSink">The optional sink for durable post-turn learning.</param>
+    /// <param name="postTurnPipeline">The pipeline that persists assistant output and publishes learning events.</param>
     public ThinkerServiceDependencies(
         IContextGatekeeper gatekeeper,
         ISessionStore sessions,
@@ -35,7 +36,7 @@ public sealed class ThinkerServiceDependencies
         ToolFunctionAdapter toolAdapter,
         PromptAssembler promptAssembler,
         IResponseEnhancer? responseEnhancer = null,
-        ITurnEventSink? turnEventSink = null)
+        PostTurnPipeline? postTurnPipeline = null)
     {
         Gatekeeper = gatekeeper;
         Sessions = sessions;
@@ -44,7 +45,7 @@ public sealed class ThinkerServiceDependencies
         ToolAdapter = toolAdapter;
         PromptAssembler = promptAssembler;
         ResponseEnhancer = responseEnhancer;
-        TurnEventSink = turnEventSink;
+        PostTurnPipeline = postTurnPipeline;
     }
 
     public IContextGatekeeper Gatekeeper { get; }
@@ -54,7 +55,7 @@ public sealed class ThinkerServiceDependencies
     public ToolFunctionAdapter ToolAdapter { get; }
     public PromptAssembler PromptAssembler { get; }
     public IResponseEnhancer? ResponseEnhancer { get; }
-    public ITurnEventSink? TurnEventSink { get; }
+    public PostTurnPipeline? PostTurnPipeline { get; }
 }
 
 /// <summary>
@@ -73,7 +74,7 @@ public sealed class ThinkerService : IThinkerService
     private readonly ModelRoutingService? _routing;
     private readonly SelectionLogStore? _selectionLog;
     private readonly IResponseEnhancer? _responseEnhancer;
-    private readonly ITurnEventSink? _turnEventSink;
+    private readonly PostTurnPipeline? _postTurnPipeline;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -91,7 +92,8 @@ public sealed class ThinkerService : IThinkerService
         _toolAdapter = dependencies.ToolAdapter;
         _promptAssembler = dependencies.PromptAssembler;
         _responseEnhancer = dependencies.ResponseEnhancer;
-        _turnEventSink = dependencies.TurnEventSink;
+        _postTurnPipeline = dependencies.PostTurnPipeline
+            ?? new PostTurnPipeline(_sessions, NullLogger<PostTurnPipeline>.Instance);
         _routing = routing;
         _selectionLog = selectionLog;
         _config = config.Value;
@@ -170,37 +172,16 @@ public sealed class ThinkerService : IThinkerService
                 message.Content, response, context, ct);
         }
 
-        // 5. Record outbound turn
-        await _sessions.AppendTurnAsync(sessionId, new ConversationTurn
+        if (_postTurnPipeline is not null)
         {
-            Role = "assistant",
-            Content = response,
-            Timestamp = DateTimeOffset.UtcNow
-        }, ct);
-
-        var sourceId = $"conversation:{DateTimeOffset.UtcNow:yyyy-MM-ddTHH:mm:ss}";
-
-        if (_turnEventSink is not null)
-        {
-            try
-            {
-                await _turnEventSink.EnqueueAsync(new TurnEvent
-                {
-                    Id = Guid.NewGuid().ToString("N"),
-                    SessionId = sessionId,
-                    UserMessage = message,
-                    AssistantResponse = response,
-                    Context = context,
-                    SourceId = sourceId,
-                    CompletedAt = DateTimeOffset.UtcNow,
-                    ErrorType = errorType,
-                    ErrorMessage = errorMessage
-                }, ct);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to enqueue turn event for self-improvement");
-            }
+            await _postTurnPipeline.CompleteAsync(
+                sessionId,
+                message,
+                response,
+                context,
+                errorType,
+                errorMessage,
+                ct);
         }
 
         return response;
