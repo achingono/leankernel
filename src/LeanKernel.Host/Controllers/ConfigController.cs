@@ -8,6 +8,9 @@ using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
+/// <summary>
+/// Represents the config controller.
+/// </summary>
 [ApiController]
 [Route("api/config")]
 [Authorize(Policy = AuthConstants.PolicyAdminOnly)]
@@ -16,6 +19,11 @@ public sealed class ConfigController : ControllerBase
     private readonly IOptions<LeanKernelConfig> _config;
     private readonly IRuntimeLeanKernelConfigStore _store;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ConfigController" /> class.
+    /// </summary>
+    /// <param name="config">The config.</param>
+    /// <param name="store">The store.</param>
     public ConfigController(IOptions<LeanKernelConfig> config, IRuntimeLeanKernelConfigStore store)
     {
         _config = config;
@@ -34,6 +42,11 @@ public sealed class ConfigController : ControllerBase
         return Ok(BuildResponse(cfg));
     }
 
+    /// <summary>
+    /// Executes the build response operation.
+    /// </summary>
+    /// <param name="cfg">The cfg.</param>
+    /// <returns>The operation result.</returns>
     public static AdminConfigResponse BuildResponse(LeanKernelConfig cfg)
     {
         return new AdminConfigResponse
@@ -168,6 +181,9 @@ public sealed class ConfigController : ControllerBase
         };
     }
 
+    /// <summary>
+    /// Represents the field.
+    /// </summary>
     public static ConfigField Field(
         object? value,
         bool restartRequired = false,
@@ -183,6 +199,9 @@ public sealed class ConfigController : ControllerBase
             Description = description
         };
 
+    /// <summary>
+    /// Represents the secret field.
+    /// </summary>
     public static ConfigField SecretField(
         string? value,
         bool envBacked = false,
@@ -218,6 +237,12 @@ public sealed class ConfigController : ControllerBase
         return Ok(new AdminConfigPatchResponse { Changes = changes, UpdatedConfig = BuildResponse(updated) });
     }
 
+    /// <summary>
+    /// Applies a patch request to a copy of the current configuration.
+    /// </summary>
+    /// <param name="current">The configuration values to patch.</param>
+    /// <param name="patch">The requested configuration updates.</param>
+    /// <returns>The operation result.</returns>
     public static (LeanKernelConfig updated, List<ConfigChange> changes) ApplyPatch(
         LeanKernelConfig current,
         AdminConfigPatchRequest patch)
@@ -472,4 +497,3 @@ public sealed class ConfigController : ControllerBase
         return value[..4] + new string('*', value.Length - 4);
     }
 }
-

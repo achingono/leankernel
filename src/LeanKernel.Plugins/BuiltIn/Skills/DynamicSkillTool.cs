@@ -19,16 +19,34 @@ public sealed class DynamicSkillTool : ITool, IOperationsTool
     private readonly IBinaryResolver _binaryResolver;
     private readonly ILogger<DynamicSkillTool> _logger;
 
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public string Name => NormalizeToolName(_skillDef.Name);
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description => _skillDef.Description;
+    /// <summary>
+    /// Gets or sets the category.
+    /// </summary>
     public string Category => GetCategory();
+    /// <summary>
+    /// Gets or sets the parameters schema.
+    /// </summary>
     public string ParametersSchema => BuildParametersSchema();
 
+    /// <summary>
+    /// Gets or sets the operations.
+    /// </summary>
     public IReadOnlyList<ToolOperationDescriptor> Operations =>
         _skillDef.Operations
             .Select(op => new ToolOperationDescriptor(op.Id, op.Summary, BuildOperationParametersSchema(op)))
             .ToList();
 
+    /// <summary>
+    /// Represents the dynamic skill tool.
+    /// </summary>
     public DynamicSkillTool(
         SkillDefinition skillDef,
         HttpClient httpClient,
@@ -62,6 +80,12 @@ public sealed class DynamicSkillTool : ITool, IOperationsTool
         return "general";
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="parametersJson">The parameters json.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();

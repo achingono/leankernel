@@ -25,9 +25,18 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
     private CancellationTokenSource? _cts;
     private Task? _receiveLoop;
 
+    /// <summary>
+    /// Represents the on message.
+    /// </summary>
     public event Action<SignalInboundMessage>? OnMessage;
+    /// <summary>
+    /// Represents the on error.
+    /// </summary>
     public event Action<string>? OnError;
 
+    /// <summary>
+    /// Represents the signal rest api adapter.
+    /// </summary>
     public SignalRestApiAdapter(
         string baseUrl,
         string account,
@@ -42,6 +51,11 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
         _attachmentTextExtractor = attachmentTextExtractor;
     }
 
+    /// <summary>
+    /// Executes the start async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public Task StartAsync(CancellationToken ct)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -50,6 +64,13 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Executes the send message async operation.
+    /// </summary>
+    /// <param name="recipient">The recipient.</param>
+    /// <param name="message">The message.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SendMessageAsync(string recipient, string message, CancellationToken ct)
     {
         using var timeoutCts = new CancellationTokenSource(SendTimeout);
@@ -76,6 +97,13 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
         }
     }
 
+    /// <summary>
+    /// Executes the send typing async operation.
+    /// </summary>
+    /// <param name="recipient">The recipient.</param>
+    /// <param name="stop">The stop.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SendTypingAsync(string recipient, bool stop, CancellationToken ct)
     {
         using var timeoutCts = new CancellationTokenSource(TypingTimeout);
@@ -266,6 +294,10 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
 
     // ── IAsyncDisposable ─────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Executes the dispose async operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public async ValueTask DisposeAsync()
     {
         _cts?.Cancel();

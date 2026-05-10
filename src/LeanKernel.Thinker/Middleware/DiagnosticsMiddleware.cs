@@ -13,6 +13,10 @@ public sealed class DiagnosticsMiddleware
 {
     private readonly ILogger<DiagnosticsMiddleware> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DiagnosticsMiddleware" /> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
     public DiagnosticsMiddleware(ILogger<DiagnosticsMiddleware> logger)
     {
         _logger = logger;

@@ -22,6 +22,9 @@ public sealed class AgentFactory
     private readonly DiagnosticsMiddleware? _diagnostics;
     private readonly ILogger<AgentFactory> _logger;
 
+    /// <summary>
+    /// Represents the agent factory.
+    /// </summary>
     public AgentFactory(
         IOptions<LeanKernelConfig> config,
         ILogger<AgentFactory> logger,

@@ -16,11 +16,19 @@ public sealed class ToolFunctionAdapter
     private readonly ILogger<ToolFunctionAdapter> _logger;
     private readonly IToolExecutionAuthorizer? _executionAuthorizer;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ToolFunctionAdapter" /> class.
+    /// </summary>
+    /// <param name="registry">The registry.</param>
+    /// <param name="logger">The logger.</param>
     public ToolFunctionAdapter(IToolRegistry registry, ILogger<ToolFunctionAdapter> logger)
         : this(registry, logger, null)
     {
     }
 
+    /// <summary>
+    /// Represents the tool function adapter.
+    /// </summary>
     public ToolFunctionAdapter(
         IToolRegistry registry,
         ILogger<ToolFunctionAdapter> logger,

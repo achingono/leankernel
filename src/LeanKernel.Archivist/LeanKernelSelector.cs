@@ -56,11 +56,17 @@ public static class LeanKernelSelector
     }
 }
 
+/// <summary>
+/// Represents the relevance score weights.
+/// </summary>
 public sealed record RelevanceScoreWeights(
     double Semantic = 0.40,
     double Recency = 0.20,
     double Dimension = 0.25,
     double Frequency = 0.15)
 {
+    /// <summary>
+    /// Gets or sets the default.
+    /// </summary>
     public static RelevanceScoreWeights Default { get; } = new();
 }

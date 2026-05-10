@@ -5,6 +5,9 @@ namespace LeanKernel.Core.Interfaces;
 /// </summary>
 public interface ITypingIndicatorChannel
 {
+    /// <summary>
+    /// Starts a typing or processing indicator for the target recipient.
+    /// </summary>
     ValueTask<IAsyncDisposable> BeginTypingAsync(string recipientId, CancellationToken ct);
 }
 
@@ -13,11 +16,18 @@ public interface ITypingIndicatorChannel
 /// </summary>
 public sealed class NoopAsyncDisposable : IAsyncDisposable
 {
+    /// <summary>
+    /// Gets the shared no-op async disposable instance.
+    /// </summary>
     public static NoopAsyncDisposable Instance { get; } = new();
 
     private NoopAsyncDisposable()
     {
     }
 
+    /// <summary>
+    /// Completes without releasing resources.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

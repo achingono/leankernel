@@ -8,6 +8,9 @@ namespace LeanKernel.Core.Interfaces;
 /// </summary>
 public interface IOperationsTool : ITool
 {
+    /// <summary>
+    /// Gets the operation descriptors exposed by this multi-operation tool.
+    /// </summary>
     IReadOnlyList<ToolOperationDescriptor> Operations { get; }
 }
 

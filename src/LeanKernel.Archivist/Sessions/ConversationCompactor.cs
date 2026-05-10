@@ -15,6 +15,9 @@ public sealed class ConversationCompactor
     private readonly IWikiStore _wiki;
     private readonly ILogger<ConversationCompactor> _logger;
 
+    /// <summary>
+    /// Represents the conversation compactor.
+    /// </summary>
     public ConversationCompactor(
         ISessionStore sessions,
         IWikiStore wiki,

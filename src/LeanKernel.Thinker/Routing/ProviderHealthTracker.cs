@@ -13,6 +13,10 @@ public sealed class ProviderHealthTracker
     private readonly ConcurrentDictionary<string, DateTimeOffset> _cooldowns = new();
     private readonly TimeSpan _defaultCooldown;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProviderHealthTracker" /> class.
+    /// </summary>
+    /// <param name="defaultCooldown">The default cooldown.</param>
     public ProviderHealthTracker(TimeSpan? defaultCooldown = null)
     {
         _defaultCooldown = defaultCooldown ?? TimeSpan.FromSeconds(60);

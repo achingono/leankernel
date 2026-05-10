@@ -31,6 +31,10 @@ public sealed class TaskComplexityScorer
 
     private readonly RoutingConfig _config;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TaskComplexityScorer" /> class.
+    /// </summary>
+    /// <param name="config">The config.</param>
     public TaskComplexityScorer(IOptions<LeanKernelConfig> config)
     {
         _config = config.Value.Routing;

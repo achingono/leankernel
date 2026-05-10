@@ -10,6 +10,9 @@ namespace LeanKernel.Scheduler;
 /// </summary>
 public interface IAsyncJob
 {
+    /// <summary>
+    /// Executes the operation.
+    /// </summary>
     Task ExecuteAsync(CancellationToken ct);
 }
 
@@ -27,6 +30,9 @@ public sealed class ProactiveTaskRunner
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ProactiveTaskRunner> _logger;
 
+    /// <summary>
+    /// Represents the proactive task runner.
+    /// </summary>
     public ProactiveTaskRunner(
         IScheduler scheduler,
         Jobs.WikiMaintenanceJob wikiJob,
@@ -45,6 +51,11 @@ public sealed class ProactiveTaskRunner
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the start async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task StartAsync(CancellationToken ct)
     {
         if (!_config.Scheduler.Enabled)

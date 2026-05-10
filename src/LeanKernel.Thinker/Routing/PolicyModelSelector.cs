@@ -14,6 +14,9 @@ public sealed class PolicyModelSelector
     private readonly ProviderHealthTracker _health;
     private readonly SpendGuard _spendGuard;
 
+    /// <summary>
+    /// Represents the policy model selector.
+    /// </summary>
     public PolicyModelSelector(
         IOptions<LeanKernelConfig> config,
         ProviderHealthTracker health,

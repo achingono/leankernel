@@ -23,11 +23,17 @@ public sealed class EgressPolicyHandler : HttpClientHandler
 {
     private readonly IEgressPolicy _policy;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EgressPolicyHandler" /> class.
+    /// </summary>
+    /// <param name="policy">The policy.</param>
+    /// <returns>The operation result.</returns>
     public EgressPolicyHandler(IEgressPolicy policy)
     {
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
     }
 
+    /// <inheritdoc />
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
@@ -46,11 +52,21 @@ public sealed class SkillEgressPolicy : IEgressPolicy
 {
     private readonly List<string> _allowHosts;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SkillEgressPolicy" /> class.
+    /// </summary>
+    /// <param name="allowHosts">The allow hosts.</param>
+    /// <returns>The operation result.</returns>
     public SkillEgressPolicy(List<string> allowHosts)
     {
         _allowHosts = allowHosts ?? [];
     }
 
+    /// <summary>
+    /// Executes the is url allowed operation.
+    /// </summary>
+    /// <param name="url">The url.</param>
+    /// <returns>The operation result.</returns>
     public bool IsUrlAllowed(string url)
     {
         if (string.IsNullOrWhiteSpace(url))
@@ -67,6 +83,11 @@ public sealed class SkillEgressPolicy : IEgressPolicy
         return IsHostAllowed(hostWithPort) || IsHostAllowed(host);
     }
 
+    /// <summary>
+    /// Executes the is host allowed operation.
+    /// </summary>
+    /// <param name="host">The host.</param>
+    /// <returns>The operation result.</returns>
     public bool IsHostAllowed(string host)
     {
         if (string.IsNullOrWhiteSpace(host))

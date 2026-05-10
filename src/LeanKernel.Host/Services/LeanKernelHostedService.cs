@@ -12,6 +12,9 @@ public sealed class LeanKernelHostedService : BackgroundService
     private readonly IOnboardingStateStore _onboardingState;
     private readonly ILogger<LeanKernelHostedService> _logger;
 
+    /// <summary>
+    /// Represents the lean kernel hosted service.
+    /// </summary>
     public LeanKernelHostedService(
         IServiceProvider services,
         IOnboardingStateStore onboardingState,
@@ -22,6 +25,7 @@ public sealed class LeanKernelHostedService : BackgroundService
         _logger = logger;
     }
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("LeanKernel engine starting...");

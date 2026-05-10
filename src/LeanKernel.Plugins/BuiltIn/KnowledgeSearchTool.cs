@@ -6,6 +6,9 @@ using LeanKernel.Plugins.Sdk;
 
 namespace LeanKernel.Plugins.BuiltIn;
 
+/// <summary>
+/// Represents the knowledge search tool.
+/// </summary>
 [ToolMetadata(
     Name = "search_knowledge",
     Description = "Search the knowledge base for relevant documents, wiki facts, and indexed content. Results are scoped to the agent's configured access.",
@@ -15,9 +18,21 @@ public sealed class KnowledgeSearchTool : ITool
     private readonly IKnowledgeSearchService _knowledge;
     private readonly KnowledgeConfig _config;
 
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public string Name => "search_knowledge";
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description => "Search the unified knowledge base (wiki + documents) for relevant content.";
+    /// <summary>
+    /// Gets or sets the category.
+    /// </summary>
     public string Category => ToolCategory.Wiki.ToString().ToLower();
+    /// <summary>
+    /// Gets or sets the parameters schema.
+    /// </summary>
     public string ParametersSchema => """
         {
           "type": "object",
@@ -30,12 +45,23 @@ public sealed class KnowledgeSearchTool : ITool
         }
         """;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="KnowledgeSearchTool" /> class.
+    /// </summary>
+    /// <param name="knowledge">The knowledge.</param>
+    /// <param name="config">The config.</param>
     public KnowledgeSearchTool(IKnowledgeSearchService knowledge, IOptions<LeanKernelConfig> config)
     {
         _knowledge = knowledge;
         _config = config.Value.Knowledge;
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="parametersJson">The parameters json.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

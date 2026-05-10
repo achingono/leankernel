@@ -15,6 +15,12 @@ public sealed class TokenService : ITokenService
     private readonly ILogger<TokenService> _logger;
     private readonly int _defaultExpirationDays;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TokenService" /> class.
+    /// </summary>
+    /// <param name="store">The store.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="defaultExpirationDays">The default expiration days.</param>
     public TokenService(IAuthStateStore store, ILogger<TokenService> logger, int defaultExpirationDays = 90)
     {
         _store = store;
@@ -22,6 +28,9 @@ public sealed class TokenService : ITokenService
         _defaultExpirationDays = defaultExpirationDays;
     }
 
+    /// <summary>
+    /// Represents the create async.
+    /// </summary>
     public async Task<ApiTokenCreationResult> CreateAsync(
         string name, int? expirationDays = null, CancellationToken ct = default)
     {
@@ -53,6 +62,12 @@ public sealed class TokenService : ITokenService
         return new ApiTokenCreationResult { Token = token, RawToken = rawToken };
     }
 
+    /// <summary>
+    /// Executes the verify async operation.
+    /// </summary>
+    /// <param name="rawToken">The raw token.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<ApiToken?> VerifyAsync(string rawToken, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(rawToken))
@@ -76,12 +91,23 @@ public sealed class TokenService : ITokenService
         return match;
     }
 
+    /// <summary>
+    /// Executes the list async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<IReadOnlyList<ApiToken>> ListAsync(CancellationToken ct = default)
     {
         var state = await _store.LoadAsync(ct);
         return state.Tokens.AsReadOnly();
     }
 
+    /// <summary>
+    /// Executes the revoke async operation.
+    /// </summary>
+    /// <param name="tokenId">The token id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<bool> RevokeAsync(string tokenId, CancellationToken ct = default)
     {
         var state = await _store.LoadAsync(ct);
@@ -96,6 +122,11 @@ public sealed class TokenService : ITokenService
         return true;
     }
 
+    /// <summary>
+    /// Executes the hash token operation.
+    /// </summary>
+    /// <param name="rawToken">The raw token.</param>
+    /// <returns>The operation result.</returns>
     public static string HashToken(string rawToken)
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(rawToken);

@@ -16,6 +16,9 @@ public sealed class AgentsConfigurationStep : IOnboardingStep
     /// <inheritdoc />
     public string Name => "agents";
 
+    /// <summary>
+    /// Represents the agents configuration step.
+    /// </summary>
     public AgentsConfigurationStep(
         LeanKernelHostPaths paths,
         IEngagementRulesProvider rulesProvider,
@@ -423,14 +426,41 @@ Data handling and safety constraints.
 /// </summary>
 public sealed class AgentsStepResult
 {
+    /// <summary>
+    /// Gets or sets the success.
+    /// </summary>
     public required bool Success { get; init; }
+    /// <summary>
+    /// Gets or sets the message.
+    /// </summary>
     public required string Message { get; init; }
+    /// <summary>
+    /// Gets or sets the already exists.
+    /// </summary>
     public bool AlreadyExists { get; init; }
+    /// <summary>
+    /// Gets or sets the is valid.
+    /// </summary>
     public bool? IsValid { get; init; }
+    /// <summary>
+    /// Gets or sets the agents path.
+    /// </summary>
     public string? AgentsPath { get; init; }
+    /// <summary>
+    /// Gets or sets the preset used.
+    /// </summary>
     public string? PresetUsed { get; init; }
+    /// <summary>
+    /// Gets or sets the rules.
+    /// </summary>
     public EngagementRules? Rules { get; init; }
+    /// <summary>
+    /// Gets or sets the errors.
+    /// </summary>
     public List<string> Errors { get; init; } = [];
+    /// <summary>
+    /// Gets or sets the warnings.
+    /// </summary>
     public List<string> Warnings { get; init; } = [];
 }
 
@@ -439,9 +469,24 @@ public sealed class AgentsStepResult
 /// </summary>
 public sealed class AgentsPreset
 {
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public required string Name { get; init; }
+    /// <summary>
+    /// Gets or sets the display name.
+    /// </summary>
     public required string DisplayName { get; init; }
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public required string Description { get; init; }
+    /// <summary>
+    /// Gets or sets the can do count.
+    /// </summary>
     public int CanDoCount { get; init; }
+    /// <summary>
+    /// Gets or sets the must ask count.
+    /// </summary>
     public int MustAskCount { get; init; }
 }

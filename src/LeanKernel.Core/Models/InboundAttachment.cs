@@ -7,11 +7,29 @@ namespace LeanKernel.Core.Models;
 /// </summary>
 public sealed record InboundAttachment
 {
+    /// <summary>
+    /// Gets or sets the id.
+    /// </summary>
     public required string Id { get; init; }
+    /// <summary>
+    /// Gets or sets the file name.
+    /// </summary>
     public string? FileName { get; init; }
+    /// <summary>
+    /// Gets or sets the content type.
+    /// </summary>
     public string? ContentType { get; init; }
+    /// <summary>
+    /// Gets or sets the size.
+    /// </summary>
     public long? Size { get; init; }
+    /// <summary>
+    /// Gets or sets the caption.
+    /// </summary>
     public string? Caption { get; init; }
+    /// <summary>
+    /// Gets or sets the extracted text.
+    /// </summary>
     public string? ExtractedText { get; init; }
 }
 
@@ -60,6 +78,13 @@ public static class InboundAttachmentTextExtractor
         ".sh"
     };
 
+    /// <summary>
+    /// Executes the try extract text operation.
+    /// </summary>
+    /// <param name="contentType">The content type.</param>
+    /// <param name="fileName">The file name.</param>
+    /// <param name="bytes">The bytes.</param>
+    /// <returns>The operation result.</returns>
     public static string? TryExtractText(string? contentType, string? fileName, byte[] bytes)
     {
         if (bytes.Length == 0 || !CanExtractText(contentType, fileName))
@@ -84,9 +109,20 @@ public static class InboundAttachmentTextExtractor
             : text[..MaxExtractedCharacters] + "\n...[truncated]";
     }
 
+    /// <summary>
+    /// Executes the normalize text operation.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <returns>The operation result.</returns>
     public static string NormalizeText(string text) =>
         text.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
 
+    /// <summary>
+    /// Executes the can extract text operation.
+    /// </summary>
+    /// <param name="contentType">The content type.</param>
+    /// <param name="fileName">The file name.</param>
+    /// <returns>The operation result.</returns>
     public static bool CanExtractText(string? contentType, string? fileName)
     {
         if (!string.IsNullOrWhiteSpace(contentType))
@@ -134,6 +170,12 @@ public static class InboundAttachmentTextExtractor
 /// </summary>
 public static class InboundMessageContentFormatter
 {
+    /// <summary>
+    /// Executes the format content operation.
+    /// </summary>
+    /// <param name="body">The body.</param>
+    /// <param name="attachments">The attachments.</param>
+    /// <returns>The operation result.</returns>
     public static string FormatContent(string? body, IReadOnlyList<InboundAttachment> attachments)
     {
         var trimmedBody = body?.Trim();
@@ -186,6 +228,9 @@ public static class InboundMessageContentFormatter
         return sb.ToString().Trim();
     }
 
+    /// <summary>
+    /// Represents the build metadata.
+    /// </summary>
     public static Dictionary<string, string> BuildMetadata(
         string metadataPrefix,
         IReadOnlyList<InboundAttachment> attachments)

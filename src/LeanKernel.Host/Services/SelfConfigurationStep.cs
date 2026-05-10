@@ -16,6 +16,9 @@ public sealed class SelfConfigurationStep : IAgentSelfProfileInitializer, IOnboa
     /// <inheritdoc />
     public string Name => "self";
 
+    /// <summary>
+    /// Represents the self configuration step.
+    /// </summary>
     public SelfConfigurationStep(
         LeanKernelHostPaths paths,
         ILogger<SelfConfigurationStep> logger)

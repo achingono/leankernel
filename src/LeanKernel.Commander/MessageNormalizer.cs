@@ -7,6 +7,9 @@ namespace LeanKernel.Commander;
 /// </summary>
 public static class MessageNormalizer
 {
+    /// <summary>
+    /// Represents the normalize.
+    /// </summary>
     public static LeanKernelMessage Normalize(
         string channelId,
         string senderId,

@@ -17,9 +17,21 @@ public sealed class ReminderTool : ITool
 {
     private readonly IScheduler _scheduler;
 
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public string Name => "reminder";
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description => "Create a scheduled reminder.";
+    /// <summary>
+    /// Gets or sets the category.
+    /// </summary>
     public string Category => ToolCategory.Scheduling.ToString().ToLower();
+    /// <summary>
+    /// Gets or sets the parameters schema.
+    /// </summary>
     public string ParametersSchema => """
         {
           "type": "object",
@@ -32,11 +44,21 @@ public sealed class ReminderTool : ITool
         }
         """;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ReminderTool" /> class.
+    /// </summary>
+    /// <param name="scheduler">The scheduler.</param>
     public ReminderTool(IScheduler scheduler)
     {
         _scheduler = scheduler;
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="parametersJson">The parameters json.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

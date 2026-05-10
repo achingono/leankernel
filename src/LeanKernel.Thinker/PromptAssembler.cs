@@ -12,6 +12,10 @@ public sealed class PromptAssembler
 {
     private readonly ILogger<PromptAssembler> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PromptAssembler" /> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
     public PromptAssembler(ILogger<PromptAssembler> logger)
     {
         _logger = logger;

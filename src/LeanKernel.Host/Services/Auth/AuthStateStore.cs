@@ -15,6 +15,10 @@ public sealed class AuthStateStore : IAuthStateStore
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AuthStateStore" /> class.
+    /// </summary>
+    /// <param name="filePath">The file path.</param>
     public AuthStateStore(string filePath)
     {
         _filePath = filePath;
@@ -23,6 +27,11 @@ public sealed class AuthStateStore : IAuthStateStore
             Directory.CreateDirectory(dir);
     }
 
+    /// <summary>
+    /// Executes the load async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<AuthStateDocument> LoadAsync(CancellationToken ct = default)
     {
         await _lock.WaitAsync(ct);
@@ -41,6 +50,12 @@ public sealed class AuthStateStore : IAuthStateStore
         }
     }
 
+    /// <summary>
+    /// Executes the save async operation.
+    /// </summary>
+    /// <param name="state">The state.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SaveAsync(AuthStateDocument state, CancellationToken ct = default)
     {
         await _lock.WaitAsync(ct);

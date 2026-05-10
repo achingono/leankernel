@@ -17,9 +17,21 @@ public sealed class WebSearchTool : ITool
 {
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public string Name => "web_search";
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description => "Search the web for current information.";
+    /// <summary>
+    /// Gets or sets the category.
+    /// </summary>
     public string Category => ToolCategory.Information.ToString().ToLower();
+    /// <summary>
+    /// Gets or sets the parameters schema.
+    /// </summary>
     public string ParametersSchema => """
         {
           "type": "object",
@@ -30,11 +42,21 @@ public sealed class WebSearchTool : ITool
         }
         """;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WebSearchTool" /> class.
+    /// </summary>
+    /// <param name="httpClient">The http client.</param>
     public WebSearchTool(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="parametersJson">The parameters json.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

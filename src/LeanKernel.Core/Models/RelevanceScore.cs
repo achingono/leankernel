@@ -18,17 +18,41 @@ public enum RelevanceSourceType
 /// </summary>
 public sealed record RelevanceScore
 {
+    /// <summary>
+    /// Gets or sets the entry id.
+    /// </summary>
     public required string EntryId { get; init; }
+    /// <summary>
+    /// Gets or sets the content.
+    /// </summary>
     public required string Content { get; init; }
+    /// <summary>
+    /// Gets or sets the estimated tokens.
+    /// </summary>
     public int EstimatedTokens { get; init; }
 
     /// <summary>Composite score (0.0–1.0). Higher = more relevant to current query.</summary>
     public double Score { get; init; }
 
+    /// <summary>
+    /// Gets or sets the semantic similarity.
+    /// </summary>
     public double SemanticSimilarity { get; init; }
+    /// <summary>
+    /// Gets or sets the recency decay.
+    /// </summary>
     public double RecencyDecay { get; init; }
+    /// <summary>
+    /// Gets or sets the dimension match.
+    /// </summary>
     public double DimensionMatch { get; init; }
+    /// <summary>
+    /// Gets or sets the interaction frequency.
+    /// </summary>
     public double InteractionFrequency { get; init; }
+    /// <summary>
+    /// Gets or sets the priority.
+    /// </summary>
     public ContextPriority Priority { get; init; } = ContextPriority.Medium;
 
     /// <summary>Source type — determines which scoring formula to apply.</summary>

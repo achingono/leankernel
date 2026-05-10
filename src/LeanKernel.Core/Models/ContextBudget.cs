@@ -7,6 +7,9 @@ namespace LeanKernel.Core.Models;
 /// </summary>
 public sealed class ContextBudget
 {
+    /// <summary>
+    /// Gets or sets the total tokens.
+    /// </summary>
     public required int TotalTokens { get; init; }
 
     /// <summary>System prompt + persona. ~15% of budget.</summary>

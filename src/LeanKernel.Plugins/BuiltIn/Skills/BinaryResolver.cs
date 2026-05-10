@@ -42,12 +42,22 @@ public sealed class BinaryResolver : IBinaryResolver
         public string? Note { get; set; }
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BinaryResolver" /> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
     public BinaryResolver(ILogger<BinaryResolver> logger)
     {
         _logger = logger;
         LoadManifest();
     }
 
+    /// <summary>
+    /// Executes the resolve binary operation.
+    /// </summary>
+    /// <param name="binaryName">The binary name.</param>
+    /// <param name="minVersion">The min version.</param>
+    /// <returns>The operation result.</returns>
     public string? ResolveBinary(string binaryName, string? minVersion = null)
     {
         if (_manifest.TryGetValue(binaryName, out var info))
@@ -61,11 +71,22 @@ public sealed class BinaryResolver : IBinaryResolver
         return null;
     }
 
+    /// <summary>
+    /// Executes the is binary available operation.
+    /// </summary>
+    /// <param name="binaryName">The binary name.</param>
+    /// <param name="minVersion">The min version.</param>
+    /// <returns>The operation result.</returns>
     public bool IsBinaryAvailable(string binaryName, string? minVersion = null)
     {
         return ResolveBinary(binaryName, minVersion) != null;
     }
 
+    /// <summary>
+    /// Executes the get binary version operation.
+    /// </summary>
+    /// <param name="binaryName">The binary name.</param>
+    /// <returns>The operation result.</returns>
     public string? GetBinaryVersion(string binaryName)
     {
         if (_manifest.TryGetValue(binaryName, out var info))

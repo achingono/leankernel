@@ -16,6 +16,10 @@ namespace LeanKernel.Generators;
 [Generator]
 public class ToolRegistryGenerator : IIncrementalGenerator
 {
+    /// <summary>
+    /// Executes the initialize operation.
+    /// </summary>
+    /// <param name="context">The context.</param>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Find all class declarations with any attribute named "ToolMetadata"

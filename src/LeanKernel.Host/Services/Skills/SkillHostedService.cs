@@ -22,6 +22,9 @@ public sealed class SkillHostedService : IHostedService
     private readonly Dictionary<string, System.Timers.Timer> _debounceTimers = [];
     private const int DEBOUNCE_DELAY_MS = 250;
 
+    /// <summary>
+    /// Represents the skill hosted service.
+    /// </summary>
     public SkillHostedService(
         ISkillRegistry skillRegistry,
         DynamicPluginHost pluginHost,
@@ -36,6 +39,11 @@ public sealed class SkillHostedService : IHostedService
         _skillDirectories = skillDirectories;
     }
 
+    /// <summary>
+    /// Executes the start async operation.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting Skill Hosted Service");
@@ -53,6 +61,11 @@ public sealed class SkillHostedService : IHostedService
         _logger.LogInformation("Skill Hosted Service started successfully");
     }
 
+    /// <summary>
+    /// Executes the stop async operation.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Stopping Skill Hosted Service");

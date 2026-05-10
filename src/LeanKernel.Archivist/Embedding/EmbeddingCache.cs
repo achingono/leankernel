@@ -14,12 +14,23 @@ public sealed class EmbeddingCache
     private readonly int _maxEntries;
     private readonly ILogger<EmbeddingCache> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EmbeddingCache" /> class.
+    /// </summary>
+    /// <param name="maxEntries">The max entries.</param>
+    /// <param name="logger">The logger.</param>
     public EmbeddingCache(int maxEntries, ILogger<EmbeddingCache> logger)
     {
         _maxEntries = maxEntries;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the try get operation.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <param name="embedding">The embedding.</param>
+    /// <returns>The operation result.</returns>
     public bool TryGet(string text, out float[] embedding)
     {
         var key = ComputeKey(text);
@@ -34,6 +45,11 @@ public sealed class EmbeddingCache
         return false;
     }
 
+    /// <summary>
+    /// Executes the set operation.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <param name="embedding">The embedding.</param>
     public void Set(string text, float[] embedding)
     {
         var key = ComputeKey(text);
@@ -49,6 +65,9 @@ public sealed class EmbeddingCache
         }
     }
 
+    /// <summary>
+    /// Gets or sets the count.
+    /// </summary>
     public int Count => _cache.Count;
 
     private void Evict()

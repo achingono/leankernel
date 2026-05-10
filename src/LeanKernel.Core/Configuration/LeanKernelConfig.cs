@@ -5,20 +5,62 @@ namespace LeanKernel.Core.Configuration;
 /// </summary>
 public sealed class LeanKernelConfig
 {
+    /// <summary>
+    /// Represents the section name.
+    /// </summary>
     public const string SectionName = "LeanKernel";
 
+    /// <summary>
+    /// Gets or sets the lite llm.
+    /// </summary>
     public LiteLlmConfig LiteLlm { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the ollama.
+    /// </summary>
     public OllamaConfig Ollama { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the qdrant.
+    /// </summary>
     public QdrantConfig Qdrant { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the signal.
+    /// </summary>
     public SignalConfig Signal { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the unstructured.
+    /// </summary>
     public UnstructuredConfig Unstructured { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the wiki.
+    /// </summary>
     public WikiConfig Wiki { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the agents.
+    /// </summary>
     public AgentsConfig Agents { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the knowledge.
+    /// </summary>
     public KnowledgeConfig Knowledge { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the context.
+    /// </summary>
     public ContextConfig Context { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the scheduler.
+    /// </summary>
     public SchedulerConfig Scheduler { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the auth.
+    /// </summary>
     public AuthConfig Auth { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the routing.
+    /// </summary>
     public RoutingConfig Routing { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the engagement.
+    /// </summary>
     public EngagementRules Engagement { get; set; } = new();
     /// <summary>
     /// Gets or sets options for the post-turn self-improvement pipeline.
@@ -87,54 +129,169 @@ public sealed class SelfImprovementConfig
     public bool FailureRecoveryEnabled { get; set; } = true;
 }
 
-public enum AuthMode { LocalPasscode, Oidc, Disabled }
+/// <summary>
+/// Represents the available authentication modes.
+/// </summary>
+public enum AuthMode
+{
+    /// <summary>
+    /// Uses local administrator passcode authentication.
+    /// </summary>
+    LocalPasscode,
 
+    /// <summary>
+    /// Uses OpenID Connect authentication.
+    /// </summary>
+    Oidc,
+
+    /// <summary>
+    /// Disables authentication for development scenarios.
+    /// </summary>
+    Disabled
+}
+
+/// <summary>
+/// Represents the auth config.
+/// </summary>
 public sealed class AuthConfig
 {
+    /// <summary>
+    /// Gets or sets the mode.
+    /// </summary>
     public AuthMode Mode { get; set; } = AuthMode.LocalPasscode;
+    /// <summary>
+    /// Gets or sets the session duration minutes.
+    /// </summary>
     public int SessionDurationMinutes { get; set; } = 480;
+    /// <summary>
+    /// Gets or sets the token default expiration days.
+    /// </summary>
     public int TokenDefaultExpirationDays { get; set; } = 90;
+    /// <summary>
+    /// Gets or sets the allowed origins.
+    /// </summary>
     public string[] AllowedOrigins { get; set; } = [];
+    /// <summary>
+    /// Gets or sets the local.
+    /// </summary>
     public LocalPasscodeConfig Local { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the oidc.
+    /// </summary>
     public OidcConfig Oidc { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the rate limit.
+    /// </summary>
     public RateLimitConfig RateLimit { get; set; } = new();
 }
 
+/// <summary>
+/// Represents the local passcode config.
+/// </summary>
 public sealed class LocalPasscodeConfig
 {
+    /// <summary>
+    /// Gets or sets the min length.
+    /// </summary>
     public int MinLength { get; set; } = 8;
+    /// <summary>
+    /// Gets or sets the max failed attempts.
+    /// </summary>
     public int MaxFailedAttempts { get; set; } = 5;
+    /// <summary>
+    /// Gets or sets the lockout minutes.
+    /// </summary>
     public int LockoutMinutes { get; set; } = 15;
 }
 
+/// <summary>
+/// Represents the oidc config.
+/// </summary>
 public sealed class OidcConfig
 {
+    /// <summary>
+    /// Gets or sets the authority.
+    /// </summary>
     public string Authority { get; set; } = "";
+    /// <summary>
+    /// Gets or sets the client id.
+    /// </summary>
     public string ClientId { get; set; } = "";
+    /// <summary>
+    /// Gets or sets the client secret.
+    /// </summary>
     public string ClientSecret { get; set; } = "";
+    /// <summary>
+    /// Gets or sets the callback path.
+    /// </summary>
     public string CallbackPath { get; set; } = "/auth/oidc/callback";
+    /// <summary>
+    /// Gets or sets the scopes.
+    /// </summary>
     public string[] Scopes { get; set; } = ["openid", "profile", "email"];
+    /// <summary>
+    /// Gets or sets the admin subject claim.
+    /// </summary>
     public string AdminSubjectClaim { get; set; } = "";
+    /// <summary>
+    /// Gets or sets the admin claim type.
+    /// </summary>
     public string AdminClaimType { get; set; } = "sub";
 }
 
+/// <summary>
+/// Represents the rate limit config.
+/// </summary>
 public sealed class RateLimitConfig
 {
+    /// <summary>
+    /// Gets or sets the login per minute per ip.
+    /// </summary>
     public int LoginPerMinutePerIp { get; set; } = 5;
+    /// <summary>
+    /// Gets or sets the login per hour per ip.
+    /// </summary>
     public int LoginPerHourPerIp { get; set; } = 20;
+    /// <summary>
+    /// Gets or sets the login per minute global.
+    /// </summary>
     public int LoginPerMinuteGlobal { get; set; } = 50;
+    /// <summary>
+    /// Gets or sets the token creation per hour.
+    /// </summary>
     public int TokenCreationPerHour { get; set; } = 10;
 }
 
+/// <summary>
+/// Represents the lite llm config.
+/// </summary>
 public sealed class LiteLlmConfig
 {
+    /// <summary>
+    /// Gets or sets the base url.
+    /// </summary>
     public string BaseUrl { get; set; } = "http://litellm:4000";
+    /// <summary>
+    /// Gets or sets the api key.
+    /// </summary>
     public string ApiKey { get; set; } = "sk-LeanKernel-local";
+    /// <summary>
+    /// Gets or sets the default model.
+    /// </summary>
     public string DefaultModel { get; set; } = "small";
+    /// <summary>
+    /// Gets or sets the embedding model.
+    /// </summary>
     public string EmbeddingModel { get; set; } = "embedding-small";
+    /// <summary>
+    /// Gets or sets the context window tokens.
+    /// </summary>
     public int ContextWindowTokens { get; set; } = 128_000;
 }
 
+/// <summary>
+/// Represents the ollama config.
+/// </summary>
 public sealed class OllamaConfig
 {
     /// <summary>
@@ -159,23 +316,50 @@ public sealed class OllamaConfig
     public int TimeoutSeconds { get; set; } = 30;
 }
 
+/// <summary>
+/// Represents the qdrant config.
+/// </summary>
 public sealed class QdrantConfig
 {
+    /// <summary>
+    /// Gets or sets the host.
+    /// </summary>
     public string Host { get; set; } = "qdrant";
+    /// <summary>
+    /// Gets or sets the port.
+    /// </summary>
     public int Port { get; set; } = 6334;
     /// <summary>
     /// Legacy collection name. Use Knowledge.CollectionName for the unified knowledge collection.
     /// Retained for backward compatibility with existing Qdrant data.
     /// </summary>
     public string CollectionName { get; set; } = "LEANKERNEL_knowledge";
+    /// <summary>
+    /// Gets or sets the embedding dimension.
+    /// </summary>
     public int EmbeddingDimension { get; set; } = 1536;
 }
 
+/// <summary>
+/// Represents the signal config.
+/// </summary>
 public sealed class SignalConfig
 {
+    /// <summary>
+    /// Gets or sets the cli path.
+    /// </summary>
     public string CliPath { get; set; } = "/usr/bin/signal-cli";
+    /// <summary>
+    /// Gets or sets the account.
+    /// </summary>
     public string Account { get; set; } = "";
+    /// <summary>
+    /// Gets or sets the enabled.
+    /// </summary>
     public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Gets or sets the allowed senders.
+    /// </summary>
     public string[] AllowedSenders { get; set; } = [];
 
     /// <summary>
@@ -186,11 +370,26 @@ public sealed class SignalConfig
     public string DaemonBaseUrl { get; set; } = "";
 }
 
+/// <summary>
+/// Represents the unstructured config.
+/// </summary>
 public sealed class UnstructuredConfig
 {
+    /// <summary>
+    /// Gets or sets the enabled.
+    /// </summary>
     public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Gets or sets the base url.
+    /// </summary>
     public string BaseUrl { get; set; } = "http://unstructured:8000";
+    /// <summary>
+    /// Gets or sets the timeout seconds.
+    /// </summary>
     public int TimeoutSeconds { get; set; } = 120;
+    /// <summary>
+    /// Gets or sets the supported mime types.
+    /// </summary>
     public string[] SupportedMimeTypes { get; set; } =
     [
         "application/pdf",
@@ -211,6 +410,9 @@ public sealed class UnstructuredConfig
         "image/tiff"
     ];
 
+    /// <summary>
+    /// Gets or sets the supported extensions.
+    /// </summary>
     public string[] SupportedExtensions { get; set; } =
     [
         ".pdf",
@@ -236,60 +438,162 @@ public sealed class UnstructuredConfig
     ];
 }
 
+/// <summary>
+/// Represents the agents config.
+/// </summary>
 public sealed class AgentsConfig
 {
+    /// <summary>
+    /// Gets or sets the base path.
+    /// </summary>
     public string BasePath { get; set; } = "/app/data/agents";
 }
 
+/// <summary>
+/// Represents the wiki config.
+/// </summary>
 public sealed class WikiConfig
 {
+    /// <summary>
+    /// Gets or sets the base path.
+    /// </summary>
     public string BasePath { get; set; } = "/app/data/wiki";
+    /// <summary>
+    /// Gets or sets the max facts per entry.
+    /// </summary>
     public int MaxFactsPerEntry { get; set; } = 20;
+    /// <summary>
+    /// Gets or sets the stale fact days.
+    /// </summary>
     public int StaleFactDays { get; set; } = 30;
+    /// <summary>
+    /// Gets or sets the min confidence threshold.
+    /// </summary>
     public double MinConfidenceThreshold { get; set; } = 0.5;
 }
 
+/// <summary>
+/// Represents the context config.
+/// </summary>
 public sealed class ContextConfig
 {
+    /// <summary>
+    /// Gets or sets the semantic similarity weight.
+    /// </summary>
     public double SemanticSimilarityWeight { get; set; } = 0.40;
+    /// <summary>
+    /// Gets or sets the recency decay weight.
+    /// </summary>
     public double RecencyDecayWeight { get; set; } = 0.20;
+    /// <summary>
+    /// Gets or sets the dimension match weight.
+    /// </summary>
     public double DimensionMatchWeight { get; set; } = 0.25;
+    /// <summary>
+    /// Gets or sets the interaction frequency weight.
+    /// </summary>
     public double InteractionFrequencyWeight { get; set; } = 0.15;
+    /// <summary>
+    /// Gets or sets the min relevance threshold.
+    /// </summary>
     public double MinRelevanceThreshold { get; set; } = 0.65;
+    /// <summary>
+    /// Gets or sets the max conversation turns.
+    /// </summary>
     public int MaxConversationTurns { get; set; } = 15;
 }
 
+/// <summary>
+/// Represents the knowledge config.
+/// </summary>
 public sealed class KnowledgeConfig
 {
+    /// <summary>
+    /// Gets or sets the enabled.
+    /// </summary>
     public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Gets or sets the collection name.
+    /// </summary>
     public string CollectionName { get; set; } = "LEANKERNEL_knowledge";
+    /// <summary>
+    /// Gets or sets the embedding dimension.
+    /// </summary>
     public int EmbeddingDimension { get; set; } = 1536;
+    /// <summary>
+    /// Gets or sets the documents path.
+    /// </summary>
     public string DocumentsPath { get; set; } = "/app/data/agents/main/documents";
+    /// <summary>
+    /// Gets or sets the default document tags.
+    /// </summary>
     public string[] DefaultDocumentTags { get; set; } = ["general"];
+    /// <summary>
+    /// Gets or sets the agent scopes.
+    /// </summary>
     public Dictionary<string, AgentScopeConfig> AgentScopes { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the tag rules.
+    /// </summary>
     public List<TagRule> TagRules { get; set; } = [];
 }
 
+/// <summary>
+/// Represents the agent scope config.
+/// </summary>
 public sealed class AgentScopeConfig
 {
+    /// <summary>
+    /// Gets or sets the tags.
+    /// </summary>
     public string[] Tags { get; set; } = [];
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description { get; set; } = "";
 }
 
+/// <summary>
+/// Represents the tag rule.
+/// </summary>
 public sealed class TagRule
 {
+    /// <summary>
+    /// Gets or sets the path pattern.
+    /// </summary>
     public string PathPattern { get; set; } = "";
+    /// <summary>
+    /// Gets or sets the tags.
+    /// </summary>
     public string[] Tags { get; set; } = [];
 }
 
+/// <summary>
+/// Represents the scheduler config.
+/// </summary>
 public sealed class SchedulerConfig
 {
+    /// <summary>
+    /// Gets or sets the enabled.
+    /// </summary>
     public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Gets or sets the wiki maintenance cron.
+    /// </summary>
     public string WikiMaintenanceCron { get; set; } = "0 3 * * *"; // 3 AM daily
+    /// <summary>
+    /// Gets or sets the chat fact scrub cron.
+    /// </summary>
     public string ChatFactScrubCron { get; set; } = "30 2 * * *"; // 2:30 AM daily
+    /// <summary>
+    /// Gets or sets the user profile sync cron.
+    /// </summary>
     public string UserProfileSyncCron { get; set; } = "0 4 * * *"; // 4 AM daily
 }
 
+/// <summary>
+/// Represents the routing config.
+/// </summary>
 public sealed class RoutingConfig
 {
     /// <summary>
@@ -381,6 +685,9 @@ public sealed class RoutingConfig
     public string ModelLimitSyncCron { get; set; } = "0 4 * * *"; // 4 AM daily
 }
 
+/// <summary>
+/// Represents the spend guard config.
+/// </summary>
 public sealed class SpendGuardConfig
 {
     /// <summary>Daily paid-request soft threshold (warning alert). 0 = disabled.</summary>

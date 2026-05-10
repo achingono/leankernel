@@ -5,6 +5,9 @@ using LeanKernel.Plugins.Sdk;
 
 namespace LeanKernel.Plugins.BuiltIn;
 
+/// <summary>
+/// Represents the directory mkdir tool.
+/// </summary>
 [ToolMetadata(
     Name = "directory_mkdir",
     Description = "Create a directory within the allowed data directory.",
@@ -14,9 +17,21 @@ public sealed class DirectoryMkdirTool : ITool
     private readonly string _allowedBasePath;
     private readonly HashSet<string> _writeAllowlist;
 
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public string Name => "directory_mkdir";
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description => "Create a directory in approved paths.";
+    /// <summary>
+    /// Gets or sets the category.
+    /// </summary>
     public string Category => ToolCategory.FileSystem.ToString().ToLower();
+    /// <summary>
+    /// Gets or sets the parameters schema.
+    /// </summary>
     public string ParametersSchema =>
         """
         {
@@ -28,6 +43,11 @@ public sealed class DirectoryMkdirTool : ITool
         }
         """;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DirectoryMkdirTool" /> class.
+    /// </summary>
+    /// <param name="allowedBasePath">The allowed base path.</param>
+    /// <param name="writeAllowlist">The write allowlist.</param>
     public DirectoryMkdirTool(string allowedBasePath = "/app/data", IEnumerable<string>? writeAllowlist = null)
     {
         _allowedBasePath = Path.GetFullPath(allowedBasePath);
@@ -36,6 +56,12 @@ public sealed class DirectoryMkdirTool : ITool
             StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="parametersJson">The parameters json.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

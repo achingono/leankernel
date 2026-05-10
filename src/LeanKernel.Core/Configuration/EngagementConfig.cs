@@ -2,16 +2,37 @@ namespace LeanKernel.Core.Configuration;
 
 /// <summary>
 /// Represents the rules of engagement between user and agent(s).
-/// Loaded from data/agents/<agent>/AGENTS.md at startup.
+/// Loaded from data/agents/&lt;agent&gt;/AGENTS.md at startup.
 /// </summary>
 public sealed class EngagementRules
 {
+    /// <summary>
+    /// Gets or sets the personality.
+    /// </summary>
     public AgentPersonality Personality { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the autonomy.
+    /// </summary>
     public AutonomyScope Autonomy { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the time boundaries.
+    /// </summary>
     public TimeBoundaries TimeBoundaries { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the channel rules.
+    /// </summary>
     public ChannelRules ChannelRules { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the action follow up.
+    /// </summary>
     public ActionFollowUpRules ActionFollowUp { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the memory policy.
+    /// </summary>
     public MemoryPolicy MemoryPolicy { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the safety boundaries.
+    /// </summary>
     public SafetyBoundaries SafetyBoundaries { get; set; } = new();
     
     /// <summary>
@@ -205,6 +226,11 @@ public sealed class ChannelRules
     /// </summary>
     public Dictionary<string, ChannelRuleSet> PerChannel { get; set; } = new();
     
+    /// <summary>
+    /// Executes the get rules for operation.
+    /// </summary>
+    /// <param name="channel">The channel.</param>
+    /// <returns>The operation result.</returns>
     public ChannelRuleSet GetRulesFor(string channel)
     {
         return PerChannel.TryGetValue(channel, out var rules) ? rules : new();
@@ -253,6 +279,11 @@ public sealed class ActionFollowUpRules
         { "DecisionAwaitingResponse", 3 }
     };
     
+    /// <summary>
+    /// Executes the get follow up days operation.
+    /// </summary>
+    /// <param name="actionType">The action type.</param>
+    /// <returns>The operation result.</returns>
     public int GetFollowUpDays(string actionType)
     {
         return DefaultFollowUpDays.TryGetValue(actionType, out var days) ? days : 7;

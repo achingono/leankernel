@@ -17,6 +17,9 @@ public sealed class KnowledgeEnhancementService : IResponseEnhancer
     private readonly IKnowledgeSearchService _knowledge;
     private readonly ILogger<KnowledgeEnhancementService> _logger;
 
+    /// <summary>
+    /// Represents the knowledge enhancement service.
+    /// </summary>
     public KnowledgeEnhancementService(
         IKnowledgeSearchService knowledge,
         ILogger<KnowledgeEnhancementService> logger)

@@ -11,6 +11,12 @@ namespace LeanKernel.Host.Services.Auth;
 /// </summary>
 public static class OidcRegistration
 {
+    /// <summary>
+    /// Executes the add lean kernel oidc operation.
+    /// </summary>
+    /// <param name="services">The services.</param>
+    /// <param name="configuration">The configuration.</param>
+    /// <returns>The operation result.</returns>
     public static IServiceCollection AddLeanKernelOidc(this IServiceCollection services, IConfiguration configuration)
     {
         var authConfig = configuration.GetSection("LeanKernel:Auth").Get<AuthConfig>();

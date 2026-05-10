@@ -10,6 +10,10 @@ public sealed class FileBrowserService
 {
     private readonly string _rootPath;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileBrowserService" /> class.
+    /// </summary>
+    /// <param name="config">The config.</param>
     public FileBrowserService(IOptions<LeanKernelConfig> config)
     {
         var wikiPath = config.Value.Wiki.BasePath;
@@ -18,6 +22,11 @@ public sealed class FileBrowserService
             Path.GetDirectoryName(wikiPath) ?? "/app/data");
     }
 
+    /// <summary>
+    /// Executes the browse operation.
+    /// </summary>
+    /// <param name="relativePath">The relative path.</param>
+    /// <returns>The operation result.</returns>
     public FileBrowseResult Browse(string? relativePath = null)
     {
         var targetPath = ResolveSafePath(relativePath);
@@ -57,6 +66,12 @@ public sealed class FileBrowserService
         };
     }
 
+    /// <summary>
+    /// Executes the read async operation.
+    /// </summary>
+    /// <param name="relativePath">The relative path.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<FileReadResult> ReadAsync(string relativePath, CancellationToken ct)
     {
         var fullPath = ResolveSafePath(relativePath);
@@ -92,27 +107,75 @@ public sealed class FileBrowserService
     }
 }
 
+/// <summary>
+/// Represents the file browse result.
+/// </summary>
 public sealed class FileBrowseResult
 {
+    /// <summary>
+    /// Gets or sets the current path.
+    /// </summary>
     public string CurrentPath { get; init; } = "";
+    /// <summary>
+    /// Gets or sets the entries.
+    /// </summary>
     public List<FileSystemItem> Entries { get; init; } = [];
+    /// <summary>
+    /// Gets or sets the error.
+    /// </summary>
     public string? Error { get; init; }
 }
 
+/// <summary>
+/// Represents the file system item.
+/// </summary>
 public sealed class FileSystemItem
 {
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public required string Name { get; init; }
+    /// <summary>
+    /// Gets or sets the path.
+    /// </summary>
     public required string Path { get; init; }
+    /// <summary>
+    /// Gets or sets the is directory.
+    /// </summary>
     public required bool IsDirectory { get; init; }
+    /// <summary>
+    /// Gets or sets the size.
+    /// </summary>
     public long Size { get; init; }
+    /// <summary>
+    /// Gets or sets the modified at.
+    /// </summary>
     public DateTime? ModifiedAt { get; init; }
 }
 
+/// <summary>
+/// Represents the file read result.
+/// </summary>
 public sealed class FileReadResult
 {
+    /// <summary>
+    /// Gets or sets the path.
+    /// </summary>
     public string? Path { get; init; }
+    /// <summary>
+    /// Gets or sets the content.
+    /// </summary>
     public string? Content { get; init; }
+    /// <summary>
+    /// Gets or sets the size.
+    /// </summary>
     public long Size { get; init; }
+    /// <summary>
+    /// Gets or sets the extension.
+    /// </summary>
     public string? Extension { get; init; }
+    /// <summary>
+    /// Gets or sets the error.
+    /// </summary>
     public string? Error { get; init; }
 }

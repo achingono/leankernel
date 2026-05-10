@@ -5,6 +5,9 @@ using LeanKernel.Host.Models.Routing;
 
 namespace LeanKernel.Host.Services;
 
+/// <summary>
+/// Represents the model limit drift service.
+/// </summary>
 public sealed class ModelLimitDriftService : IModelLimitDriftService
 {
     private readonly string _scriptPath;
@@ -16,12 +19,22 @@ public sealed class ModelLimitDriftService : IModelLimitDriftService
         NumberHandling = JsonNumberHandling.AllowReadingFromString
     };
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ModelLimitDriftService" /> class.
+    /// </summary>
+    /// <param name="scriptPath">The script path.</param>
+    /// <param name="configPath">The config path.</param>
     public ModelLimitDriftService(string scriptPath, string configPath)
     {
         _scriptPath = scriptPath;
         _configPath = configPath;
     }
 
+    /// <summary>
+    /// Executes the preview drift async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<DriftReport> PreviewDriftAsync(CancellationToken ct = default)
     {
         if (!File.Exists(_scriptPath))

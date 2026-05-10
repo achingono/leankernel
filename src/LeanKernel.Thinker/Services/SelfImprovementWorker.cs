@@ -30,6 +30,7 @@ public sealed class SelfImprovementWorker : BackgroundService
         _logger = logger;
     }
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await _queue.RestorePendingAsync(stoppingToken);

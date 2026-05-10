@@ -12,17 +12,30 @@ public sealed class LeanKernelHealthCheck : IHealthCheck
 {
     private readonly Func<LeanKernelConfig> _getConfig;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LeanKernelHealthCheck" /> class.
+    /// </summary>
+    /// <param name="config">The config.</param>
+    /// <returns>The operation result.</returns>
     [ActivatorUtilitiesConstructor]
     public LeanKernelHealthCheck(IOptionsMonitor<LeanKernelConfig> config)
     {
         _getConfig = () => config.CurrentValue;
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LeanKernelHealthCheck" /> class.
+    /// </summary>
+    /// <param name="config">The config.</param>
+    /// <returns>The operation result.</returns>
     public LeanKernelHealthCheck(IOptions<LeanKernelConfig> config)
     {
         _getConfig = () => config.Value;
     }
 
+    /// <summary>
+    /// Represents the check health async.
+    /// </summary>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)

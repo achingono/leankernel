@@ -12,6 +12,9 @@ public sealed class SkillParser
 {
     private readonly IDeserializer _yamlDeserializer;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SkillParser" /> class.
+    /// </summary>
     public SkillParser()
     {
         _yamlDeserializer = new DeserializerBuilder()

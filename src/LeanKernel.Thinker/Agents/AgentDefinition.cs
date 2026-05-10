@@ -6,8 +6,17 @@ namespace LeanKernel.Thinker.Agents;
 /// </summary>
 public sealed record AgentDefinition
 {
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public required string Name { get; init; }
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public required string Description { get; init; }
+    /// <summary>
+    /// Gets or sets the system prompt.
+    /// </summary>
     public required string SystemPrompt { get; init; }
 
     /// <summary>Maximum token budget this agent can use for context.</summary>

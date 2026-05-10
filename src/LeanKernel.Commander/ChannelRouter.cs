@@ -14,6 +14,9 @@ public sealed class ChannelRouter
     private readonly IReadOnlyList<IChannel> _channels;
     private readonly ILogger<ChannelRouter> _logger;
 
+    /// <summary>
+    /// Represents the channel router.
+    /// </summary>
     public ChannelRouter(
         IThinkerService thinker,
         IEnumerable<IChannel> channels,
@@ -24,6 +27,11 @@ public sealed class ChannelRouter
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the start async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task StartAsync(CancellationToken ct)
     {
         foreach (var channel in _channels)
@@ -34,6 +42,11 @@ public sealed class ChannelRouter
         }
     }
 
+    /// <summary>
+    /// Executes the stop async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task StopAsync(CancellationToken ct)
     {
         foreach (var channel in _channels)

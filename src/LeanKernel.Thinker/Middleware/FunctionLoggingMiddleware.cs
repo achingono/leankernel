@@ -11,6 +11,10 @@ public sealed class FunctionLoggingMiddleware
 {
     private readonly ILogger<FunctionLoggingMiddleware> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FunctionLoggingMiddleware" /> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
     public FunctionLoggingMiddleware(ILogger<FunctionLoggingMiddleware> logger)
     {
         _logger = logger;

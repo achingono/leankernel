@@ -14,6 +14,9 @@ namespace LeanKernel.Thinker.Routing;
 /// </summary>
 public sealed class ModelRoutingDependencies
 {
+    /// <summary>
+    /// Represents the model routing dependencies.
+    /// </summary>
     public ModelRoutingDependencies(
         TaskComplexityScorer scorer,
         PolicyModelSelector selector,
@@ -30,11 +33,29 @@ public sealed class ModelRoutingDependencies
         AgentFactory = agentFactory;
     }
 
+    /// <summary>
+    /// Gets or sets the scorer.
+    /// </summary>
     public TaskComplexityScorer Scorer { get; }
+    /// <summary>
+    /// Gets or sets the selector.
+    /// </summary>
     public PolicyModelSelector Selector { get; }
+    /// <summary>
+    /// Gets or sets the quality gate.
+    /// </summary>
     public ResponseQualityGate QualityGate { get; }
+    /// <summary>
+    /// Gets or sets the health tracker.
+    /// </summary>
     public ProviderHealthTracker HealthTracker { get; }
+    /// <summary>
+    /// Gets or sets the spend guard.
+    /// </summary>
     public SpendGuard SpendGuard { get; }
+    /// <summary>
+    /// Gets or sets the agent factory.
+    /// </summary>
     public AgentFactory AgentFactory { get; }
 }
 
@@ -53,6 +74,9 @@ public sealed class ModelRoutingService
     private readonly RoutingConfig _config;
     private readonly ILogger<ModelRoutingService> _logger;
 
+    /// <summary>
+    /// Represents the model routing service.
+    /// </summary>
     public ModelRoutingService(
         ModelRoutingDependencies dependencies,
         IOptions<LeanKernelConfig> config,

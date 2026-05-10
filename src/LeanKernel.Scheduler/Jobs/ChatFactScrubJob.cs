@@ -18,6 +18,9 @@ public sealed class ChatFactScrubJob
     private readonly IWikiStore _wiki;
     private readonly ILogger<ChatFactScrubJob> _logger;
 
+    /// <summary>
+    /// Represents the chat fact scrub job.
+    /// </summary>
     public ChatFactScrubJob(
         ISessionStore sessions,
         IWikiStore wiki,
@@ -28,6 +31,11 @@ public sealed class ChatFactScrubJob
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task ExecuteAsync(CancellationToken ct)
     {
         var runStartedAt = DateTimeOffset.UtcNow;

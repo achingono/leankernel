@@ -18,6 +18,9 @@ public sealed class UserConfigurationStep : IUserProfileSynchronizer, IOnboardin
     /// <inheritdoc />
     public string Name => "user";
 
+    /// <summary>
+    /// Represents the user configuration step.
+    /// </summary>
     public UserConfigurationStep(
         LeanKernelHostPaths paths,
         IWikiStore wikiStore,

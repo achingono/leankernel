@@ -12,12 +12,23 @@ public sealed class EngagementAuthorizationFilter : IAsyncActionFilter
     private readonly IActionAuthorizer _authorizer;
     private readonly ILogger<EngagementAuthorizationFilter> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EngagementAuthorizationFilter" /> class.
+    /// </summary>
+    /// <param name="authorizer">The authorizer.</param>
+    /// <param name="logger">The logger.</param>
     public EngagementAuthorizationFilter(IActionAuthorizer authorizer, ILogger<EngagementAuthorizationFilter> logger)
     {
         _authorizer = authorizer;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the on action execution async operation.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <param name="next">The next.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         // Check if method has RequiresEngagementPermission attribute

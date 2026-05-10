@@ -4,17 +4,28 @@ using LeanKernel.Host.Services;
 
 namespace LeanKernel.Host.Controllers;
 
+/// <summary>
+/// Represents the routing config controller.
+/// </summary>
 [ApiController]
 [Route("api/routing-config")]
 public sealed class RoutingConfigController : ControllerBase
 {
     private readonly ILiteLlmRoutingConfigService _service;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RoutingConfigController" /> class.
+    /// </summary>
+    /// <param name="service">The service.</param>
     public RoutingConfigController(ILiteLlmRoutingConfigService service)
     {
         _service = service;
     }
 
+    /// <summary>
+    /// Executes the get config operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     [HttpGet]
     public IActionResult GetConfig()
     {
@@ -30,6 +41,9 @@ public sealed class RoutingConfigController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Represents the save config.
+    /// </summary>
     [HttpPut]
     public async Task<IActionResult> SaveConfig(
         [FromBody] RoutingConfigSaveRequest request,
@@ -63,6 +77,10 @@ public sealed class RoutingConfigController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Executes the get raw yaml operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     [HttpGet("raw")]
     public IActionResult GetRawYaml()
     {
@@ -70,6 +88,9 @@ public sealed class RoutingConfigController : ControllerBase
         return Ok(new { yaml });
     }
 
+    /// <summary>
+    /// Represents the save raw yaml.
+    /// </summary>
     [HttpPut("raw")]
     public async Task<IActionResult> SaveRawYaml(
         [FromBody] RawYamlSaveRequest request,

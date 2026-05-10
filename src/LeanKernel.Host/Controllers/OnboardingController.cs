@@ -5,6 +5,9 @@ using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
+/// <summary>
+/// Represents the onboarding controller.
+/// </summary>
 [ApiController]
 [Route("api/onboarding")]
 public sealed class OnboardingController : ControllerBase
@@ -13,6 +16,9 @@ public sealed class OnboardingController : ControllerBase
     private readonly IOnboardingStateStore _stateStore;
     private readonly AgentsConfigurationStep _agentsStep;
 
+    /// <summary>
+    /// Represents the onboarding controller.
+    /// </summary>
     public OnboardingController(
         IOnboardingOrchestrator orchestrator,
         IOnboardingStateStore stateStore,
@@ -23,6 +29,11 @@ public sealed class OnboardingController : ControllerBase
         _agentsStep = agentsStep;
     }
 
+    /// <summary>
+    /// Executes the get status operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpGet("status")]
     [AllowAnonymous]
     public async Task<IActionResult> GetStatus(CancellationToken ct)
@@ -30,6 +41,11 @@ public sealed class OnboardingController : ControllerBase
         return Ok(await _orchestrator.GetStatusAsync(ct));
     }
 
+    /// <summary>
+    /// Executes the get draft operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpGet("draft")]
     public async Task<IActionResult> GetDraft(CancellationToken ct)
     {
@@ -38,6 +54,9 @@ public sealed class OnboardingController : ControllerBase
         return Ok(await _orchestrator.GetDraftAsync(ct));
     }
 
+    /// <summary>
+    /// Represents the save draft.
+    /// </summary>
     [HttpPut("draft")]
     public async Task<IActionResult> SaveDraft(
         [FromBody] OnboardingConfigInput draft,
@@ -49,6 +68,11 @@ public sealed class OnboardingController : ControllerBase
         return Ok(status);
     }
 
+    /// <summary>
+    /// Executes the validate operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpPost("validate")]
     public async Task<IActionResult> Validate(CancellationToken ct)
     {
@@ -58,6 +82,11 @@ public sealed class OnboardingController : ControllerBase
         return Ok(validation);
     }
 
+    /// <summary>
+    /// Executes the complete operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpPost("complete")]
     public async Task<IActionResult> Complete(CancellationToken ct)
     {
@@ -70,6 +99,10 @@ public sealed class OnboardingController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Executes the get agent presets operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     [HttpGet("agents/presets")]
     [AllowAnonymous]
     public IActionResult GetAgentPresets()
@@ -78,6 +111,9 @@ public sealed class OnboardingController : ControllerBase
         return Ok(presets);
     }
 
+    /// <summary>
+    /// Represents the initialize agents.
+    /// </summary>
     [HttpPost("agents/initialize")]
     public async Task<IActionResult> InitializeAgents(
         [FromBody] AgentsInitializeRequest request,
@@ -113,6 +149,11 @@ public sealed class OnboardingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Executes the validate agents operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpGet("agents/validate")]
     public async Task<IActionResult> ValidateAgents(CancellationToken ct)
     {
@@ -129,6 +170,9 @@ public sealed class OnboardingController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Represents the update agent section.
+    /// </summary>
     [HttpPost("agents/sections/{sectionName}")]
     public async Task<IActionResult> UpdateAgentSection(
         string sectionName,

@@ -10,6 +10,9 @@ using LeanKernel.Core.Enums;
 
 namespace LeanKernel.Host.Services;
 
+/// <summary>
+/// Represents the onboarding orchestrator.
+/// </summary>
 public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
 {
     private readonly IOnboardingStateStore _stateStore;
@@ -20,6 +23,9 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
     private readonly UserConfigurationStep _userStep;
     private readonly ILogger<OnboardingOrchestrator> _logger;
 
+    /// <summary>
+    /// Represents the onboarding orchestrator.
+    /// </summary>
     public OnboardingOrchestrator(
         IOnboardingStateStore stateStore,
         IRuntimeLeanKernelConfigStore runtimeConfigStore,
@@ -38,6 +44,11 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the get status async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<OnboardingStatus> GetStatusAsync(CancellationToken ct)
     {
         var state = await _stateStore.GetAsync(ct);
@@ -49,6 +60,11 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
         };
     }
 
+    /// <summary>
+    /// Executes the get draft async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public Task<OnboardingConfigInput> GetDraftAsync(CancellationToken ct)
     {
         var current = _runtimeConfigStore.GetCurrent();
@@ -63,6 +79,12 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
         return Task.FromResult(draft);
     }
 
+    /// <summary>
+    /// Executes the save draft async operation.
+    /// </summary>
+    /// <param name="draft">The draft.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<OnboardingStatus> SaveDraftAsync(OnboardingConfigInput draft, CancellationToken ct)
     {
         var normalized = BuildMergedConfig(_runtimeConfigStore.GetCurrent(), draft);
@@ -71,6 +93,11 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
         return await GetStatusAsync(ct);
     }
 
+    /// <summary>
+    /// Executes the validate async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<OnboardingValidationResult> ValidateAsync(CancellationToken ct)
     {
         var cfg = _runtimeConfigStore.GetCurrent();
@@ -89,6 +116,11 @@ public sealed class OnboardingOrchestrator : IOnboardingOrchestrator
         return result;
     }
 
+    /// <summary>
+    /// Executes the complete async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<OnboardingCompletionResult> CompleteAsync(CancellationToken ct)
     {
         var validation = await ValidateAsync(ct);

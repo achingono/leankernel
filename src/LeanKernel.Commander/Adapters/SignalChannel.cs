@@ -14,6 +14,9 @@ namespace LeanKernel.Commander.Adapters;
 /// </summary>
 public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
 {
+    /// <summary>
+    /// Gets or sets the channel id.
+    /// </summary>
     public string ChannelId => "signal";
 
     /// <inheritdoc />
@@ -34,8 +37,14 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
     private readonly HashSet<string> _allowedSenders;
     private ISignalAdapter? _adapter;
 
+    /// <summary>
+    /// Represents the on message received.
+    /// </summary>
     public event Func<LeanKernelMessage, CancellationToken, Task>? OnMessageReceived;
 
+    /// <summary>
+    /// Represents the signal channel.
+    /// </summary>
     public SignalChannel(
         IOptions<LeanKernelConfig> config,
         ILogger<SignalChannel> logger,
@@ -53,6 +62,11 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
             .ToHashSet(StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// Executes the is authorized sender operation.
+    /// </summary>
+    /// <param name="senderId">The sender id.</param>
+    /// <returns>The operation result.</returns>
     public bool IsAuthorizedSender(string senderId)
     {
         if (_allowedSenders.Count == 0)
@@ -61,6 +75,11 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         return _allowedSenders.Contains(senderId);
     }
 
+    /// <summary>
+    /// Executes the start async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task StartAsync(CancellationToken ct)
     {
         if (!_config.Signal.Enabled)
@@ -114,12 +133,24 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         }
     }
 
+    /// <summary>
+    /// Executes the stop async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public Task StopAsync(CancellationToken ct)
     {
         _logger.LogInformation("Signal channel stopping");
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Executes the send async operation.
+    /// </summary>
+    /// <param name="recipientId">The recipient id.</param>
+    /// <param name="content">The content.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SendAsync(string recipientId, string content, CancellationToken ct)
     {
         InitializeAdapter();
@@ -134,6 +165,9 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         _logger.LogDebug("Signal message sent to {Recipient}", recipientId);
     }
 
+    /// <summary>
+    /// Represents the deliver async.
+    /// </summary>
     public async Task<ChannelDeliveryResult> DeliverAsync(
         string recipientId,
         string content,
@@ -194,6 +228,12 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         }
     }
 
+    /// <summary>
+    /// Executes the begin typing async operation.
+    /// </summary>
+    /// <param name="recipientId">The recipient id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async ValueTask<IAsyncDisposable> BeginTypingAsync(string recipientId, CancellationToken ct)
     {
         if (_adapter is null || string.IsNullOrWhiteSpace(recipientId))
@@ -210,6 +250,10 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         }
     }
 
+    /// <summary>
+    /// Executes the dispose async operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public async ValueTask DisposeAsync()
     {
         if (_adapter is not null)

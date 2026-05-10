@@ -16,6 +16,9 @@ public sealed class WikiCompiler
     private readonly LeanKernelConfig _config;
     private readonly ILogger<WikiCompiler> _logger;
 
+    /// <summary>
+    /// Represents the wiki compiler.
+    /// </summary>
     public WikiCompiler(
         IWikiStore wiki,
         IOptions<LeanKernelConfig> config,

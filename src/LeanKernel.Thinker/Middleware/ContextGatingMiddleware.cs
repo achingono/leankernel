@@ -15,6 +15,11 @@ public sealed class ContextGatingMiddleware
     private readonly ILogger<ContextGatingMiddleware> _logger;
     private readonly ITokenEstimator _tokenEstimator;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ContextGatingMiddleware" /> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="tokenEstimator">The token estimator.</param>
     public ContextGatingMiddleware(ILogger<ContextGatingMiddleware> logger, ITokenEstimator? tokenEstimator = null)
     {
         _logger = logger;

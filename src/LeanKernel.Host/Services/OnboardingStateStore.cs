@@ -3,6 +3,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Host.Services;
 
+/// <summary>
+/// Represents the onboarding state store.
+/// </summary>
 public sealed class OnboardingStateStore : IOnboardingStateStore
 {
     private readonly LeanKernelHostPaths _paths;
@@ -13,6 +16,11 @@ public sealed class OnboardingStateStore : IOnboardingStateStore
         WriteIndented = true
     };
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OnboardingStateStore" /> class.
+    /// </summary>
+    /// <param name="paths">The paths.</param>
+    /// <param name="logger">The logger.</param>
     public OnboardingStateStore(LeanKernelHostPaths paths, ILogger<OnboardingStateStore> logger)
     {
         _paths = paths;
@@ -20,6 +28,11 @@ public sealed class OnboardingStateStore : IOnboardingStateStore
         Directory.CreateDirectory(_paths.DataDirectory);
     }
 
+    /// <summary>
+    /// Executes the get async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<OnboardingStateDocument> GetAsync(CancellationToken ct)
     {
         if (!File.Exists(_paths.OnboardingStatePath))
@@ -48,12 +61,22 @@ public sealed class OnboardingStateStore : IOnboardingStateStore
         }
     }
 
+    /// <summary>
+    /// Executes the is completed async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<bool> IsCompletedAsync(CancellationToken ct)
     {
         var state = await GetAsync(ct);
         return state.Completed;
     }
 
+    /// <summary>
+    /// Executes the mark in progress async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task MarkInProgressAsync(CancellationToken ct)
     {
         var existing = await GetAsync(ct);
@@ -69,6 +92,11 @@ public sealed class OnboardingStateStore : IOnboardingStateStore
         }, ct);
     }
 
+    /// <summary>
+    /// Executes the mark completed async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task MarkCompletedAsync(CancellationToken ct)
     {
         await SaveAsync(new OnboardingStateDocument

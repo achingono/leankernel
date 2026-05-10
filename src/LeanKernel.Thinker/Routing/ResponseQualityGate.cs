@@ -11,6 +11,10 @@ public sealed class ResponseQualityGate
 {
     private readonly RoutingConfig _config;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ResponseQualityGate" /> class.
+    /// </summary>
+    /// <param name="config">The config.</param>
     public ResponseQualityGate(IOptions<LeanKernelConfig> config)
     {
         _config = config.Value.Routing;

@@ -16,6 +16,9 @@ public sealed class PasscodeService : IPasscodeService
     private readonly ISecurityStampService _stampService;
     private readonly ILogger<PasscodeService> _logger;
 
+    /// <summary>
+    /// Represents the passcode service.
+    /// </summary>
     public PasscodeService(
         IAuthStateStore store,
         ISecurityStampService stampService,
@@ -26,6 +29,9 @@ public sealed class PasscodeService : IPasscodeService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Represents the is configured.
+    /// </summary>
     public bool IsConfigured
     {
         get
@@ -35,6 +41,12 @@ public sealed class PasscodeService : IPasscodeService
         }
     }
 
+    /// <summary>
+    /// Executes the verify async operation.
+    /// </summary>
+    /// <param name="passcode">The passcode.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<bool> VerifyAsync(string passcode, CancellationToken ct = default)
     {
         var state = await _store.LoadAsync(ct);
@@ -44,6 +56,12 @@ public sealed class PasscodeService : IPasscodeService
         return VerifyHash(passcode, state.PasscodeHash);
     }
 
+    /// <summary>
+    /// Executes the set async operation.
+    /// </summary>
+    /// <param name="newPasscode">The new passcode.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SetAsync(string newPasscode, CancellationToken ct = default)
     {
         var state = await _store.LoadAsync(ct);
@@ -53,6 +71,13 @@ public sealed class PasscodeService : IPasscodeService
         _logger.LogWarning("Passcode set/changed");
     }
 
+    /// <summary>
+    /// Executes the change async operation.
+    /// </summary>
+    /// <param name="currentPasscode">The current passcode.</param>
+    /// <param name="newPasscode">The new passcode.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task ChangeAsync(string currentPasscode, string newPasscode, CancellationToken ct = default)
     {
         var state = await _store.LoadAsync(ct);
@@ -65,6 +90,11 @@ public sealed class PasscodeService : IPasscodeService
         _logger.LogWarning("Passcode changed");
     }
 
+    /// <summary>
+    /// Executes the hash passcode operation.
+    /// </summary>
+    /// <param name="passcode">The passcode.</param>
+    /// <returns>The operation result.</returns>
     public static string HashPasscode(string passcode)
     {
         var salt = RandomNumberGenerator.GetBytes(SaltSize);
@@ -72,6 +102,12 @@ public sealed class PasscodeService : IPasscodeService
         return $"{Iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
     }
 
+    /// <summary>
+    /// Executes the verify hash operation.
+    /// </summary>
+    /// <param name="passcode">The passcode.</param>
+    /// <param name="storedHash">The stored hash.</param>
+    /// <returns>The operation result.</returns>
     public static bool VerifyHash(string passcode, string storedHash)
     {
         var parts = storedHash.Split('.');

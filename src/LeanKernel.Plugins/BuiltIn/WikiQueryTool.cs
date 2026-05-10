@@ -4,6 +4,9 @@ using LeanKernel.Plugins.Sdk;
 
 namespace LeanKernel.Plugins.BuiltIn;
 
+/// <summary>
+/// Represents the wiki query tool.
+/// </summary>
 [ToolMetadata(
     Name = "wiki_query",
     Description = "Search the 5W1H knowledge wiki for stored facts about people, events, places, times, reasons, or processes.",
@@ -12,9 +15,21 @@ public sealed class WikiQueryTool : ITool
 {
     private readonly IWikiStore _wiki;
 
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public string Name => "wiki_query";
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description => "Search the 5W1H knowledge wiki for stored facts.";
+    /// <summary>
+    /// Gets or sets the category.
+    /// </summary>
     public string Category => ToolCategory.Wiki.ToString().ToLower();
+    /// <summary>
+    /// Gets or sets the parameters schema.
+    /// </summary>
     public string ParametersSchema => """
         {
           "type": "object",
@@ -27,11 +42,21 @@ public sealed class WikiQueryTool : ITool
         }
         """;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WikiQueryTool" /> class.
+    /// </summary>
+    /// <param name="wiki">The wiki.</param>
     public WikiQueryTool(IWikiStore wiki)
     {
         _wiki = wiki;
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="parametersJson">The parameters json.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

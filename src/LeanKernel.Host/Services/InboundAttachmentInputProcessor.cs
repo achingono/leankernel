@@ -10,11 +10,18 @@ public sealed class InboundAttachmentInputProcessor
 {
     private readonly IAttachmentTextExtractionService _textExtractor;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InboundAttachmentInputProcessor" /> class.
+    /// </summary>
+    /// <param name="textExtractor">The text extractor.</param>
     public InboundAttachmentInputProcessor(IAttachmentTextExtractionService textExtractor)
     {
         _textExtractor = textExtractor;
     }
 
+    /// <summary>
+    /// Represents the process async.
+    /// </summary>
     public async Task<IReadOnlyList<InboundAttachment>> ProcessAsync(
         IReadOnlyList<InboundAttachmentInput>? attachments,
         CancellationToken ct)
@@ -77,13 +84,37 @@ public sealed class InboundAttachmentInputProcessor
     }
 }
 
+/// <summary>
+/// Represents the inbound attachment input.
+/// </summary>
 public sealed class InboundAttachmentInput
 {
+    /// <summary>
+    /// Gets or sets the id.
+    /// </summary>
     public string? Id { get; init; }
+    /// <summary>
+    /// Gets or sets the file name.
+    /// </summary>
     public string? FileName { get; init; }
+    /// <summary>
+    /// Gets or sets the content type.
+    /// </summary>
     public string? ContentType { get; init; }
+    /// <summary>
+    /// Gets or sets the size.
+    /// </summary>
     public long? Size { get; init; }
+    /// <summary>
+    /// Gets or sets the caption.
+    /// </summary>
     public string? Caption { get; init; }
+    /// <summary>
+    /// Gets or sets the text.
+    /// </summary>
     public string? Text { get; init; }
+    /// <summary>
+    /// Gets or sets the base64 content.
+    /// </summary>
     public string? Base64Content { get; init; }
 }

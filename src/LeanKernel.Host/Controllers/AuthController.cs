@@ -7,6 +7,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Host.Controllers;
 
+/// <summary>
+/// Represents the auth controller.
+/// </summary>
 [ApiController]
 [Route("api/auth")]
 public sealed class AuthController : ControllerBase
@@ -17,6 +20,9 @@ public sealed class AuthController : ControllerBase
     private readonly IOptions<LeanKernelConfig> _config;
     private readonly ILogger<AuthController> _logger;
 
+    /// <summary>
+    /// Represents the auth controller.
+    /// </summary>
     public AuthController(
         IPasscodeService passcode,
         ITokenService tokens,
@@ -31,6 +37,12 @@ public sealed class AuthController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the login operation.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpPost("login")]
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
@@ -55,6 +67,12 @@ public sealed class AuthController : ControllerBase
         return Ok(new { message = "Authenticated" });
     }
 
+    /// <summary>
+    /// Executes the login form operation.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpPost("login-form")]
     [AllowAnonymous]
     public async Task<IActionResult> LoginForm([FromForm] LoginFormRequest request, CancellationToken ct)
@@ -79,6 +97,10 @@ public sealed class AuthController : ControllerBase
         return LocalRedirect(NormalizeReturnUrl(request.ReturnUrl));
     }
 
+    /// <summary>
+    /// Executes the logout operation.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpPost("logout")]
     [Authorize(Policy = AuthConstants.PolicyUiAuthenticated)]
     public async Task<IActionResult> Logout()
@@ -88,6 +110,10 @@ public sealed class AuthController : ControllerBase
         return Ok(new { message = "Logged out" });
     }
 
+    /// <summary>
+    /// Executes the me operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     [HttpGet("me")]
     [Authorize(Policy = AuthConstants.PolicyAdminOnly)]
     public IActionResult Me()
@@ -103,6 +129,12 @@ public sealed class AuthController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Executes the change passcode operation.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpPost("passcode")]
     [Authorize(Policy = AuthConstants.PolicyAdminOnly)]
     public async Task<IActionResult> ChangePasscode([FromBody] ChangePasscodeRequest request, CancellationToken ct)
@@ -124,6 +156,11 @@ public sealed class AuthController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Executes the list tokens operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpGet("tokens")]
     [Authorize(Policy = AuthConstants.PolicyAdminOnly)]
     public async Task<IActionResult> ListTokens(CancellationToken ct)
@@ -141,6 +178,12 @@ public sealed class AuthController : ControllerBase
         }));
     }
 
+    /// <summary>
+    /// Executes the create token operation.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpPost("tokens")]
     [Authorize(Policy = AuthConstants.PolicyAdminOnly)]
     public async Task<IActionResult> CreateToken([FromBody] CreateTokenRequest request, CancellationToken ct)
@@ -160,6 +203,12 @@ public sealed class AuthController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Executes the revoke token operation.
+    /// </summary>
+    /// <param name="id">The id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpDelete("tokens/{id}")]
     [Authorize(Policy = AuthConstants.PolicyAdminOnly)]
     public async Task<IActionResult> RevokeToken(string id, CancellationToken ct)
@@ -171,6 +220,11 @@ public sealed class AuthController : ControllerBase
         return Ok(new { message = "Token revoked" });
     }
 
+    /// <summary>
+    /// Executes the revoke sessions operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpPost("revoke-sessions")]
     [Authorize(Policy = AuthConstants.PolicyAdminOnly)]
     public async Task<IActionResult> RevokeSessions(CancellationToken ct)
@@ -180,6 +234,10 @@ public sealed class AuthController : ControllerBase
         return Ok(new { message = "All sessions invalidated" });
     }
 
+    /// <summary>
+    /// Executes the get auth status operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     [HttpGet("status")]
     [AllowAnonymous]
     public IActionResult GetAuthStatus()
@@ -222,8 +280,23 @@ public sealed class AuthController : ControllerBase
     }
 }
 
+/// <summary>
+/// Represents the login request.
+/// </summary>
 public sealed record LoginRequest(string Passcode);
+/// <summary>
+/// Represents the login form request.
+/// </summary>
 public sealed record LoginFormRequest(string Passcode, string? ReturnUrl);
+/// <summary>
+/// Represents the change passcode request.
+/// </summary>
 public sealed record ChangePasscodeRequest(string CurrentPasscode, string NewPasscode);
+/// <summary>
+/// Represents the create token request.
+/// </summary>
 public sealed record CreateTokenRequest(string Name, int? ExpirationDays = null);
+/// <summary>
+/// Represents the bootstrap request.
+/// </summary>
 public sealed record BootstrapRequest(string Passcode);

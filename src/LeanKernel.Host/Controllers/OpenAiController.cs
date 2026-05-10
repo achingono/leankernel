@@ -21,6 +21,9 @@ public sealed class OpenAiController : ControllerBase
     private readonly ILogger<OpenAiController> _logger;
     private readonly InboundAttachmentInputProcessor _attachmentProcessor;
 
+    /// <summary>
+    /// Represents the open ai controller.
+    /// </summary>
     public OpenAiController(
         IThinkerService thinker,
         ILogger<OpenAiController> logger,
@@ -123,80 +126,158 @@ public sealed class OpenAiController : ControllerBase
 
 // ── OpenAI Protocol Types ────────────────────────────────────────
 
+/// <summary>
+/// Represents the open ai chat request.
+/// </summary>
 public sealed class OpenAiChatRequest
 {
+    /// <summary>
+    /// Gets or sets the model.
+    /// </summary>
     [JsonPropertyName("model")]
     public string? Model { get; init; }
 
+    /// <summary>
+    /// Gets or sets the messages.
+    /// </summary>
     [JsonPropertyName("messages")]
     public List<OpenAiMessage>? Messages { get; init; }
 
+    /// <summary>
+    /// Gets or sets the temperature.
+    /// </summary>
     [JsonPropertyName("temperature")]
     public double? Temperature { get; init; }
 
+    /// <summary>
+    /// Gets or sets the max tokens.
+    /// </summary>
     [JsonPropertyName("max_tokens")]
     public int? MaxTokens { get; init; }
 
+    /// <summary>
+    /// Gets or sets the stream.
+    /// </summary>
     [JsonPropertyName("stream")]
     public bool Stream { get; init; }
 
+    /// <summary>
+    /// Gets or sets the user.
+    /// </summary>
     [JsonPropertyName("user")]
     public string? User { get; init; }
 }
 
+/// <summary>
+/// Represents the open ai message.
+/// </summary>
 public sealed class OpenAiMessage
 {
+    /// <summary>
+    /// Gets or sets the role.
+    /// </summary>
     [JsonPropertyName("role")]
     public required string Role { get; init; }
 
+    /// <summary>
+    /// Gets or sets the content.
+    /// </summary>
     [JsonPropertyName("content")]
     public required string Content { get; init; }
 
+    /// <summary>
+    /// Gets or sets the attachments.
+    /// </summary>
     [JsonPropertyName("attachments")]
     public List<InboundAttachmentInput>? Attachments { get; init; }
 }
 
+/// <summary>
+/// Represents the open ai chat response.
+/// </summary>
 public sealed class OpenAiChatResponse
 {
+    /// <summary>
+    /// Gets or sets the id.
+    /// </summary>
     [JsonPropertyName("id")]
     public required string Id { get; init; }
 
+    /// <summary>
+    /// Gets or sets the object.
+    /// </summary>
     [JsonPropertyName("object")]
     public required string Object { get; init; }
 
+    /// <summary>
+    /// Gets or sets the created.
+    /// </summary>
     [JsonPropertyName("created")]
     public long Created { get; init; }
 
+    /// <summary>
+    /// Gets or sets the model.
+    /// </summary>
     [JsonPropertyName("model")]
     public required string Model { get; init; }
 
+    /// <summary>
+    /// Gets or sets the choices.
+    /// </summary>
     [JsonPropertyName("choices")]
     public required List<OpenAiChoice> Choices { get; init; }
 
+    /// <summary>
+    /// Gets or sets the usage.
+    /// </summary>
     [JsonPropertyName("usage")]
     public OpenAiUsage? Usage { get; init; }
 }
 
+/// <summary>
+/// Represents the open ai choice.
+/// </summary>
 public sealed class OpenAiChoice
 {
+    /// <summary>
+    /// Gets or sets the index.
+    /// </summary>
     [JsonPropertyName("index")]
     public int Index { get; init; }
 
+    /// <summary>
+    /// Gets or sets the message.
+    /// </summary>
     [JsonPropertyName("message")]
     public required OpenAiMessage Message { get; init; }
 
+    /// <summary>
+    /// Gets or sets the finish reason.
+    /// </summary>
     [JsonPropertyName("finish_reason")]
     public required string FinishReason { get; init; }
 }
 
+/// <summary>
+/// Represents the open ai usage.
+/// </summary>
 public sealed class OpenAiUsage
 {
+    /// <summary>
+    /// Gets or sets the prompt tokens.
+    /// </summary>
     [JsonPropertyName("prompt_tokens")]
     public int PromptTokens { get; init; }
 
+    /// <summary>
+    /// Gets or sets the completion tokens.
+    /// </summary>
     [JsonPropertyName("completion_tokens")]
     public int CompletionTokens { get; init; }
 
+    /// <summary>
+    /// Gets or sets the total tokens.
+    /// </summary>
     [JsonPropertyName("total_tokens")]
     public int TotalTokens { get; init; }
 }

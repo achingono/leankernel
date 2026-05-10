@@ -6,6 +6,9 @@ using LeanKernel.Host.Services.Auth;
 
 namespace LeanKernel.Host.Controllers;
 
+/// <summary>
+/// Represents the wiki controller.
+/// </summary>
 [ApiController]
 [Route("api/wiki")]
 [Authorize(Policy = AuthConstants.PolicyAdminOnly)]
@@ -13,11 +16,20 @@ public sealed class WikiController : ControllerBase
 {
     private readonly IWikiStore _wiki;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WikiController" /> class.
+    /// </summary>
+    /// <param name="wiki">The wiki.</param>
     public WikiController(IWikiStore wiki)
     {
         _wiki = wiki;
     }
 
+    /// <summary>
+    /// Executes the get dimensions operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpGet("dimensions")]
     public async Task<IActionResult> GetDimensions(CancellationToken ct)
     {
@@ -35,6 +47,9 @@ public sealed class WikiController : ControllerBase
         return Ok(summary);
     }
 
+    /// <summary>
+    /// Represents the list entries.
+    /// </summary>
     [HttpGet("entries")]
     public async Task<IActionResult> ListEntries(
         [FromQuery] string? dimension = null,
@@ -73,6 +88,12 @@ public sealed class WikiController : ControllerBase
         return Ok(all);
     }
 
+    /// <summary>
+    /// Executes the get entry operation.
+    /// </summary>
+    /// <param name="entryId">The entry id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     [HttpGet("entries/{entryId}")]
     public async Task<IActionResult> GetEntry(string entryId, CancellationToken ct)
     {

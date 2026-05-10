@@ -12,6 +12,9 @@ namespace LeanKernel.Host.Services.Auth;
 /// </summary>
 public static class AuthRegistration
 {
+    /// <summary>
+    /// Represents the add lean kernel auth.
+    /// </summary>
     public static IServiceCollection AddLeanKernelAuth(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -126,6 +129,11 @@ public static class AuthRegistration
             : "/app/data";
     }
 
+    /// <summary>
+    /// Executes the use lean kernel auth operation.
+    /// </summary>
+    /// <param name="app">The app.</param>
+    /// <returns>The operation result.</returns>
     public static WebApplication UseLeanKernelAuth(this WebApplication app)
     {
         var config = app.Services.GetRequiredService<IOptions<LeanKernelConfig>>().Value;

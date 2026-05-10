@@ -18,6 +18,9 @@ public sealed class EmbeddingService : IEmbeddingService
     private readonly LeanKernelConfig _config;
     private readonly ILogger<EmbeddingService> _logger;
 
+    /// <summary>
+    /// Represents the embedding service.
+    /// </summary>
     public EmbeddingService(
         HttpClient httpClient,
         IOptions<LeanKernelConfig> config,
@@ -28,12 +31,24 @@ public sealed class EmbeddingService : IEmbeddingService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the embed async operation.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<float[]> EmbedAsync(string text, CancellationToken ct)
     {
         var batch = await EmbedBatchAsync([text], ct);
         return batch[0];
     }
 
+    /// <summary>
+    /// Executes the embed batch async operation.
+    /// </summary>
+    /// <param name="texts">The texts.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<IReadOnlyList<float[]>> EmbedBatchAsync(IEnumerable<string> texts, CancellationToken ct)
     {
         var textList = texts.ToList();

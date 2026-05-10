@@ -29,9 +29,18 @@ public sealed class SignalCliAdapter : ISignalAdapter
     private Process? _process;
     private CancellationTokenSource? _cts;
 
+    /// <summary>
+    /// Represents the on message.
+    /// </summary>
     public event Action<SignalInboundMessage>? OnMessage;
+    /// <summary>
+    /// Represents the on error.
+    /// </summary>
     public event Action<string>? OnError;
 
+    /// <summary>
+    /// Represents the signal cli adapter.
+    /// </summary>
     public SignalCliAdapter(
         string cliPath,
         string account,
@@ -44,6 +53,11 @@ public sealed class SignalCliAdapter : ISignalAdapter
         _attachmentTextExtractor = attachmentTextExtractor;
     }
 
+    /// <summary>
+    /// Executes the start async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task StartAsync(CancellationToken ct)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -91,6 +105,13 @@ public sealed class SignalCliAdapter : ISignalAdapter
         await Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Executes the send message async operation.
+    /// </summary>
+    /// <param name="recipient">The recipient.</param>
+    /// <param name="message">The message.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SendMessageAsync(string recipient, string message, CancellationToken ct)
     {
         var requestParams = new Dictionary<string, object?>
@@ -186,6 +207,13 @@ public sealed class SignalCliAdapter : ISignalAdapter
         }
     }
 
+    /// <summary>
+    /// Executes the send typing async operation.
+    /// </summary>
+    /// <param name="recipient">The recipient.</param>
+    /// <param name="stop">The stop.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SendTypingAsync(string recipient, bool stop, CancellationToken ct)
     {
         var @params = new Dictionary<string, object?>
@@ -599,6 +627,10 @@ public sealed class SignalCliAdapter : ISignalAdapter
         }
     }
 
+    /// <summary>
+    /// Executes the dispose async operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public async ValueTask DisposeAsync()
     {
         _cts?.Cancel();
@@ -640,12 +672,27 @@ public sealed class SignalCliAdapter : ISignalAdapter
         element.TryGetProperty(propertyName, out var property) ? property.GetString() : null;
 }
 
+/// <summary>
+/// Represents the signal inbound message.
+/// </summary>
 [ExcludeFromCodeCoverage]
 public sealed record SignalInboundMessage
 {
+    /// <summary>
+    /// Gets or sets the sender.
+    /// </summary>
     public required string Sender { get; init; }
+    /// <summary>
+    /// Gets or sets the body.
+    /// </summary>
     public required string Body { get; init; }
+    /// <summary>
+    /// Gets or sets the timestamp ms.
+    /// </summary>
     public long TimestampMs { get; init; }
+    /// <summary>
+    /// Gets or sets the attachments.
+    /// </summary>
     public IReadOnlyList<InboundAttachment> Attachments { get; init; } = [];
 }
 

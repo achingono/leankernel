@@ -19,6 +19,9 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
     private readonly Dictionary<string, WorkerAgent> _workers = [];
     private readonly ILogger<AgentOrchestrator> _logger;
 
+    /// <summary>
+    /// Represents the agent orchestrator.
+    /// </summary>
     public AgentOrchestrator(
         AgentFactory agentFactory,
         PromptAssembler promptAssembler,
@@ -32,6 +35,9 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         _logger = logger;
     }
 
+    /// <summary>
+    /// Represents the process async.
+    /// </summary>
     public async Task<string> ProcessAsync(
         LeanKernelMessage message,
         ConversationContext context,
@@ -50,6 +56,9 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         return await InvokeWithWorkersAsync(context, message.Content, ct);
     }
 
+    /// <summary>
+    /// Represents the delegate to worker async.
+    /// </summary>
     public async Task<string> DelegateToWorkerAsync(
         string workerName,
         string task,
@@ -183,8 +192,18 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
     }
 }
 
+/// <summary>
+/// Represents the available task complexity values.
+/// </summary>
 public enum TaskComplexity
 {
+    /// <summary>
+    /// Request can be handled directly without worker delegation.
+    /// </summary>
     Simple,
+
+    /// <summary>
+    /// Request benefits from worker-agent delegation.
+    /// </summary>
     Complex
 }

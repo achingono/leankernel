@@ -19,6 +19,9 @@ public sealed class RequestFailureHandler
     private readonly IKnowledgeSearchService _knowledge;
     private readonly ILogger<RequestFailureHandler> _logger;
 
+    /// <summary>
+    /// Represents the request failure handler.
+    /// </summary>
     public RequestFailureHandler(
         IKnowledgeSearchService knowledge,
         ILogger<RequestFailureHandler> logger)

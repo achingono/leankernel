@@ -27,6 +27,11 @@ public sealed class WikiStore : IWikiStore
         @"^-\s+\[(?<text>[^\]]+)\]\((?<path>[^)]+)\)$",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WikiStore" /> class.
+    /// </summary>
+    /// <param name="config">The config.</param>
+    /// <param name="logger">The logger.</param>
     public WikiStore(IOptions<LeanKernelConfig> config, ILogger<WikiStore> logger)
     {
         _basePath = config.Value.Wiki.BasePath;
@@ -34,6 +39,12 @@ public sealed class WikiStore : IWikiStore
         EnsureDirectories();
     }
 
+    /// <summary>
+    /// Executes the get async operation.
+    /// </summary>
+    /// <param name="entryId">The entry id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<WikiEntry?> GetAsync(string entryId, CancellationToken ct)
     {
         var path = ResolvePath(entryId);
@@ -43,6 +54,12 @@ public sealed class WikiStore : IWikiStore
         return ParseMarkdown(content, entryId);
     }
 
+    /// <summary>
+    /// Executes the query async operation.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<IReadOnlyList<WikiEntry>> QueryAsync(WikiQuery query, CancellationToken ct)
     {
         var results = new List<WikiEntry>();
@@ -78,6 +95,12 @@ public sealed class WikiStore : IWikiStore
         return string.IsNullOrEmpty(query.TextQuery) || MatchesText(entry, query.TextQuery);
     }
 
+    /// <summary>
+    /// Executes the upsert async operation.
+    /// </summary>
+    /// <param name="entry">The entry.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task UpsertAsync(WikiEntry entry, CancellationToken ct)
     {
         var path = ResolvePath(entry.Id);
@@ -89,6 +112,12 @@ public sealed class WikiStore : IWikiStore
         _logger.LogDebug("Wiki entry upserted: {EntryId}", entry.Id);
     }
 
+    /// <summary>
+    /// Executes the delete async operation.
+    /// </summary>
+    /// <param name="entryId">The entry id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public Task DeleteAsync(string entryId, CancellationToken ct)
     {
         var path = ResolvePath(entryId);
@@ -100,6 +129,12 @@ public sealed class WikiStore : IWikiStore
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Executes the list by dimension async operation.
+    /// </summary>
+    /// <param name="dimension">The dimension.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<IReadOnlyList<WikiEntry>> ListByDimensionAsync(WikiDimension dimension, CancellationToken ct)
     {
         var dimDir = Path.Combine(_basePath, dimension.ToString().ToLowerInvariant());
@@ -125,6 +160,12 @@ public sealed class WikiStore : IWikiStore
         return entries;
     }
 
+    /// <summary>
+    /// Executes the ingest facts async operation.
+    /// </summary>
+    /// <param name="entries">The entries.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task IngestFactsAsync(IEnumerable<WikiEntry> entries, CancellationToken ct)
     {
         foreach (var entry in entries)

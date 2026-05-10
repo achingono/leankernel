@@ -5,6 +5,9 @@ using LeanKernel.Plugins.Sdk;
 
 namespace LeanKernel.Plugins.BuiltIn;
 
+/// <summary>
+/// Represents the file system chmod tool.
+/// </summary>
 [ToolMetadata(
     Name = "file_chmod",
     Description = "Change Unix permissions for approved files/directories.",
@@ -14,9 +17,21 @@ public sealed class FileSystemChmodTool : ITool
     private readonly string _allowedBasePath;
     private readonly HashSet<string> _writeAllowlist;
 
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public string Name => "file_chmod";
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description => "Set Unix file mode (octal, e.g. 644 or 755) for approved paths.";
+    /// <summary>
+    /// Gets or sets the category.
+    /// </summary>
     public string Category => ToolCategory.FileSystem.ToString().ToLower();
+    /// <summary>
+    /// Gets or sets the parameters schema.
+    /// </summary>
     public string ParametersSchema =>
         """
         {
@@ -29,6 +44,11 @@ public sealed class FileSystemChmodTool : ITool
         }
         """;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileSystemChmodTool" /> class.
+    /// </summary>
+    /// <param name="allowedBasePath">The allowed base path.</param>
+    /// <param name="writeAllowlist">The write allowlist.</param>
     public FileSystemChmodTool(string allowedBasePath = "/app/data", IEnumerable<string>? writeAllowlist = null)
     {
         _allowedBasePath = Path.GetFullPath(allowedBasePath);
@@ -37,6 +57,12 @@ public sealed class FileSystemChmodTool : ITool
             StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="parametersJson">The parameters json.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

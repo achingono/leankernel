@@ -10,14 +10,41 @@ public sealed record SkillDefinition(
     string Name,
     string Description)
 {
+    /// <summary>
+    /// Gets or sets the metadata.
+    /// </summary>
     public Dictionary<string, object> Metadata { get; init; } = [];
+    /// <summary>
+    /// Gets or sets the runtime.
+    /// </summary>
     public SkillRuntime? Runtime { get; init; }
+    /// <summary>
+    /// Gets or sets the operations.
+    /// </summary>
     public List<SkillOperation> Operations { get; init; } = [];
+    /// <summary>
+    /// Gets or sets the examples.
+    /// </summary>
     public List<SkillExample> Examples { get; init; } = [];
+    /// <summary>
+    /// Gets or sets the source path.
+    /// </summary>
     public string? SourcePath { get; init; }
+    /// <summary>
+    /// Gets or sets the loaded at.
+    /// </summary>
     public DateTime LoadedAt { get; init; } = DateTime.UtcNow;
+    /// <summary>
+    /// Gets or sets the validation errors.
+    /// </summary>
     public List<string> ValidationErrors { get; init; } = [];
+    /// <summary>
+    /// Gets or sets the is available.
+    /// </summary>
     public bool IsAvailable { get; init; } = true;
+    /// <summary>
+    /// Gets or sets the unavailable reason.
+    /// </summary>
     public string? UnavailableReason { get; init; }
 }
 
@@ -30,10 +57,25 @@ public sealed record SkillRuntime(
     string? Command = null,
     string? BaseUrl = null)
 {
+    /// <summary>
+    /// Gets or sets the auth.
+    /// </summary>
     public SkillAuth Auth { get; init; } = new(Type: "none");
+    /// <summary>
+    /// Gets or sets the requires.
+    /// </summary>
     public SkillRequires Requires { get; init; } = new();
+    /// <summary>
+    /// Gets or sets the egress.
+    /// </summary>
     public SkillEgress Egress { get; init; } = new();
+    /// <summary>
+    /// Gets or sets the env.
+    /// </summary>
     public Dictionary<string, string>? Env { get; init; }
+    /// <summary>
+    /// Gets or sets the timeout seconds.
+    /// </summary>
     public int? TimeoutSeconds { get; init; }
 }
 
@@ -50,6 +92,9 @@ public sealed record SkillAuth(
 public sealed record SkillRequires(
     List<BinaryRequirement>? Bins = null)
 {
+    /// <summary>
+    /// Gets or sets the bins.
+    /// </summary>
     public List<BinaryRequirement> Bins { get; } = Bins ?? [];
 }
 
@@ -67,6 +112,9 @@ public sealed record BinaryRequirement(
 public sealed record SkillEgress(
     List<string>? AllowHosts = null)
 {
+    /// <summary>
+    /// Gets or sets the allow hosts.
+    /// </summary>
     public List<string> AllowHosts { get; } = AllowHosts ?? [];
 }
 
@@ -78,7 +126,13 @@ public sealed record SkillOperation(
     string Id,
     string Summary)
 {
+    /// <summary>
+    /// Gets or sets the invoke.
+    /// </summary>
     public SkillInvoke? Invoke { get; init; }
+    /// <summary>
+    /// Gets or sets the parameters.
+    /// </summary>
     public Dictionary<string, object>? Parameters { get; init; }
 }
 
@@ -91,7 +145,13 @@ public sealed record SkillInvoke(
     string? HttpMethod = null,
     string? HttpPath = null)
 {
+    /// <summary>
+    /// Gets or sets the argv.
+    /// </summary>
     public List<string> Argv { get; } = Argv ?? [];
+    /// <summary>
+    /// Gets or sets the flags.
+    /// </summary>
     public Dictionary<string, string> Flags { get; } = Flags ?? [];
 }
 
@@ -100,8 +160,20 @@ public sealed record SkillInvoke(
 /// </summary>
 public sealed class SkillExample
 {
+    /// <summary>
+    /// Gets or sets the title.
+    /// </summary>
     public required string Title { get; init; }
+    /// <summary>
+    /// Gets or sets the code.
+    /// </summary>
     public required string Code { get; init; }
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string? Description { get; init; }
+    /// <summary>
+    /// Gets or sets the language.
+    /// </summary>
     public string? Language { get; init; } = "bash";
 }

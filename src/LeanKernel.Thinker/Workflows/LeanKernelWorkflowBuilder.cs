@@ -23,6 +23,9 @@ public sealed class LeanKernelWorkflowBuilder
     private readonly IEnumerable<WorkerAgent> _workers;
     private readonly ILogger<LeanKernelWorkflowBuilder> _logger;
 
+    /// <summary>
+    /// Represents the lean kernel workflow builder.
+    /// </summary>
     public LeanKernelWorkflowBuilder(
         AgentFactory agentFactory,
         IEnumerable<WorkerAgent> workers,

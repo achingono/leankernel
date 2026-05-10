@@ -5,6 +5,9 @@ using LeanKernel.Plugins.Sdk;
 
 namespace LeanKernel.Plugins.BuiltIn;
 
+/// <summary>
+/// Represents the file system write tool.
+/// </summary>
 [ToolMetadata(
     Name = "file_write",
     Description = "Write or append file content in approved paths within the data directory.",
@@ -14,9 +17,21 @@ public sealed class FileSystemWriteTool : ITool
     private readonly string _allowedBasePath;
     private readonly HashSet<string> _writeAllowlist;
 
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public string Name => "file_write";
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description => "Write or append to a local file in approved paths.";
+    /// <summary>
+    /// Gets or sets the category.
+    /// </summary>
     public string Category => ToolCategory.FileSystem.ToString().ToLower();
+    /// <summary>
+    /// Gets or sets the parameters schema.
+    /// </summary>
     public string ParametersSchema =>
         """
         {
@@ -31,6 +46,11 @@ public sealed class FileSystemWriteTool : ITool
         }
         """;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileSystemWriteTool" /> class.
+    /// </summary>
+    /// <param name="allowedBasePath">The allowed base path.</param>
+    /// <param name="writeAllowlist">The write allowlist.</param>
     public FileSystemWriteTool(string allowedBasePath = "/app/data", IEnumerable<string>? writeAllowlist = null)
     {
         _allowedBasePath = Path.GetFullPath(allowedBasePath);
@@ -39,6 +59,12 @@ public sealed class FileSystemWriteTool : ITool
             StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="parametersJson">The parameters json.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

@@ -17,6 +17,11 @@ public sealed class SpendGuard
     private DateOnly _currentDay;
     private readonly object _lock = new();
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SpendGuard" /> class.
+    /// </summary>
+    /// <param name="config">The config.</param>
+    /// <param name="logger">The logger.</param>
     public SpendGuard(IOptions<LeanKernelConfig> config, ILogger<SpendGuard> logger)
     {
         _config = config.Value.Routing;

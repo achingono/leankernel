@@ -21,6 +21,9 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
     private readonly KnowledgeConfig _config;
     private readonly ILogger<KnowledgeSearchService> _logger;
 
+    /// <summary>
+    /// Represents the knowledge search service.
+    /// </summary>
     public KnowledgeSearchService(
         IEmbeddingService embeddings,
         IOptions<LeanKernelConfig> config,
@@ -32,6 +35,9 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Represents the search async.
+    /// </summary>
     public async Task<List<RelevanceScore>> SearchAsync(
         string query,
         IReadOnlyList<string> agentTags,
@@ -74,6 +80,11 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
         }
     }
 
+    /// <summary>
+    /// Executes the is available async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<bool> IsAvailableAsync(CancellationToken ct)
     {
         if (!_config.Enabled) return false;

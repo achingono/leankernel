@@ -14,6 +14,9 @@ public sealed class DynamicSkillToolFactory
     private readonly IBinaryResolver _binaryResolver;
     private readonly ILoggerFactory _loggerFactory;
 
+    /// <summary>
+    /// Represents the dynamic skill tool factory.
+    /// </summary>
     public DynamicSkillToolFactory(
         ISkillRegistry skillRegistry,
         IBinaryResolver binaryResolver,
@@ -87,8 +90,14 @@ public sealed class DynamicPluginHost : IToolRegistry
     private readonly Dictionary<string, ITool> _tools;
     private readonly ILogger<DynamicPluginHost> _logger;
 
+    /// <summary>
+    /// Gets or sets the tools.
+    /// </summary>
     public IReadOnlyDictionary<string, ITool> Tools => _tools;
 
+    /// <summary>
+    /// Represents the dynamic plugin host.
+    /// </summary>
     public DynamicPluginHost(
         DynamicSkillToolFactory factory,
         IEnumerable<ITool> builtInTools,
@@ -147,9 +156,18 @@ public sealed class DynamicPluginHost : IToolRegistry
         }
     }
 
+    /// <summary>
+    /// Executes the get tool operation.
+    /// </summary>
+    /// <param name="name">The name.</param>
+    /// <returns>The operation result.</returns>
     public ITool? GetTool(string name) =>
         _tools.TryGetValue(name, out var tool) ? tool : null;
 
+    /// <summary>
+    /// Executes the get tool names operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public IEnumerable<string> GetToolNames() =>
         _tools.Keys;
 }

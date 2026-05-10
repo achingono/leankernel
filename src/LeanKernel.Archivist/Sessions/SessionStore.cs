@@ -18,6 +18,11 @@ public sealed class SessionStore : ISessionStore
         WriteIndented = true
     };
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SessionStore" /> class.
+    /// </summary>
+    /// <param name="sessionsPath">The sessions path.</param>
+    /// <param name="logger">The logger.</param>
     public SessionStore(string sessionsPath, ILogger<SessionStore> logger)
     {
         _basePath = sessionsPath;
@@ -25,6 +30,12 @@ public sealed class SessionStore : ISessionStore
         Directory.CreateDirectory(_basePath);
     }
 
+    /// <summary>
+    /// Executes the get history async operation.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<List<ConversationTurn>> GetHistoryAsync(string sessionId, CancellationToken ct)
     {
         var path = GetSessionPath(sessionId);
@@ -34,6 +45,13 @@ public sealed class SessionStore : ISessionStore
         return await JsonSerializer.DeserializeAsync<List<ConversationTurn>>(stream, JsonOptions, ct) ?? [];
     }
 
+    /// <summary>
+    /// Executes the append turn async operation.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="turn">The turn.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task AppendTurnAsync(string sessionId, ConversationTurn turn, CancellationToken ct)
     {
         var history = await GetHistoryAsync(sessionId, ct);
@@ -44,6 +62,13 @@ public sealed class SessionStore : ISessionStore
         await JsonSerializer.SerializeAsync(stream, history, JsonOptions, ct);
     }
 
+    /// <summary>
+    /// Executes the get or create session id async operation.
+    /// </summary>
+    /// <param name="channelId">The channel id.</param>
+    /// <param name="senderId">The sender id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public Task<string> GetOrCreateSessionIdAsync(string channelId, string senderId, CancellationToken ct)
     {
         // Deterministic session ID from channel + sender
@@ -51,6 +76,12 @@ public sealed class SessionStore : ISessionStore
         return Task.FromResult(sessionId);
     }
 
+    /// <summary>
+    /// Executes the compact async operation.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task CompactAsync(string sessionId, CancellationToken ct)
     {
         var history = await GetHistoryAsync(sessionId, ct);
@@ -69,6 +100,11 @@ public sealed class SessionStore : ISessionStore
         await JsonSerializer.SerializeAsync(stream, compacted, JsonOptions, ct);
     }
 
+    /// <summary>
+    /// Executes the list sessions async operation.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public Task<IReadOnlyList<string>> ListSessionsAsync(CancellationToken ct)
     {
         if (!Directory.Exists(_basePath))
@@ -85,6 +121,14 @@ public sealed class SessionStore : ISessionStore
         return Task.FromResult<IReadOnlyList<string>>(sessions);
     }
 
+    /// <summary>
+    /// Executes the set metadata async operation.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="key">The key.</param>
+    /// <param name="value">The value.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SetMetadataAsync(string sessionId, string key, string value, CancellationToken ct)
     {
         var meta = await LoadMetadataAsync(sessionId, ct);
@@ -92,12 +136,25 @@ public sealed class SessionStore : ISessionStore
         await SaveMetadataAsync(sessionId, meta, ct);
     }
 
+    /// <summary>
+    /// Executes the get metadata async operation.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="key">The key.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<string?> GetMetadataAsync(string sessionId, string key, CancellationToken ct)
     {
         var meta = await LoadMetadataAsync(sessionId, ct);
         return meta.GetValueOrDefault(key);
     }
 
+    /// <summary>
+    /// Executes the get all metadata async operation.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<IReadOnlyDictionary<string, string>> GetAllMetadataAsync(string sessionId, CancellationToken ct)
     {
         return await LoadMetadataAsync(sessionId, ct);

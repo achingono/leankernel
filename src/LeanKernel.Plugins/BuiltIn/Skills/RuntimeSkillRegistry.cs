@@ -9,10 +9,25 @@ namespace LeanKernel.Plugins.BuiltIn.Skills;
 /// </summary>
 public interface ISkillRegistry
 {
+    /// <summary>
+    /// Gets skill async information.
+    /// </summary>
     Task<SkillDefinition?> GetSkillAsync(string skillName);
+    /// <summary>
+    /// Gets all skills async information.
+    /// </summary>
     Task<IReadOnlyDictionary<string, SkillDefinition>> GetAllSkillsAsync();
+    /// <summary>
+    /// Gets or performs the refresh skills async operation.
+    /// </summary>
     Task RefreshSkillsAsync();
+    /// <summary>
+    /// Gets or performs the initialize async operation.
+    /// </summary>
     Task InitializeAsync(IEnumerable<string> skillDirectories);
+    /// <summary>
+    /// Gets quarantined skills information.
+    /// </summary>
     List<string> GetQuarantinedSkills();
 }
 
@@ -31,6 +46,9 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
     private const string QUARANTINED_KEY = "skills:quarantined";
     private const int CACHE_DURATION_MINUTES = 60;
 
+    /// <summary>
+    /// Represents the runtime skill registry.
+    /// </summary>
     public RuntimeSkillRegistry(
         SkillParser parser,
         IBinaryResolver binaryResolver,
@@ -63,12 +81,21 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
         _logger.LogInformation("RuntimeSkillRegistry initialized with {Count} directories", _skillDirectories.Count);
     }
 
+    /// <summary>
+    /// Executes the get skill async operation.
+    /// </summary>
+    /// <param name="skillName">The skill name.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<SkillDefinition?> GetSkillAsync(string skillName)
     {
         var allSkills = await GetAllSkillsAsync();
         return allSkills.TryGetValue(skillName, out var skill) ? skill : null;
     }
 
+    /// <summary>
+    /// Executes the get all skills async operation.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public async Task<IReadOnlyDictionary<string, SkillDefinition>> GetAllSkillsAsync()
     {
         if (_cache.TryGetValue(CACHE_KEY, out Dictionary<string, SkillDefinition>? cached))
@@ -84,6 +111,10 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
         return skills;
     }
 
+    /// <summary>
+    /// Executes the get quarantined skills operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public List<string> GetQuarantinedSkills()
     {
         if (_cache.TryGetValue(QUARANTINED_KEY, out List<string>? quarantined))
@@ -91,6 +122,10 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
         return [];
     }
 
+    /// <summary>
+    /// Executes the refresh skills async operation.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public Task RefreshSkillsAsync()
     {
         _cache.Remove(CACHE_KEY);
@@ -98,6 +133,12 @@ public sealed class RuntimeSkillRegistry : ISkillRegistry
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Executes the watch skill directory async operation.
+    /// </summary>
+    /// <param name="directory">The directory.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task WatchSkillDirectoryAsync(string directory, CancellationToken ct)
     {
         if (!Directory.Exists(directory))

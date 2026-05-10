@@ -12,6 +12,9 @@ public sealed class BearerTokenAuthHandler : AuthenticationHandler<Authenticatio
 {
     private readonly ITokenService _tokenService;
 
+    /// <summary>
+    /// Represents the bearer token auth handler.
+    /// </summary>
     public BearerTokenAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
@@ -22,6 +25,7 @@ public sealed class BearerTokenAuthHandler : AuthenticationHandler<Authenticatio
         _tokenService = tokenService;
     }
 
+    /// <inheritdoc />
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var authHeader = Request.Headers.Authorization.ToString();

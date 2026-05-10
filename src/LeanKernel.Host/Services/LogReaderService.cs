@@ -10,6 +10,10 @@ public sealed class LogReaderService
 {
     private readonly string _logDirectory;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LogReaderService" /> class.
+    /// </summary>
+    /// <param name="config">The config.</param>
     public LogReaderService(IOptions<LeanKernelConfig> config)
     {
         var wikiPath = config.Value.Wiki.BasePath;
@@ -17,6 +21,10 @@ public sealed class LogReaderService
         _logDirectory = Path.Combine(dataDir, "logs");
     }
 
+    /// <summary>
+    /// Executes the list log files operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public IReadOnlyList<string> ListLogFiles()
     {
         if (!Directory.Exists(_logDirectory)) return [];
@@ -29,6 +37,9 @@ public sealed class LogReaderService
             .ToList();
     }
 
+    /// <summary>
+    /// Represents the search async.
+    /// </summary>
     public async Task<LogSearchResult> SearchAsync(
         string? query = null,
         string? level = null,
@@ -132,14 +143,32 @@ public sealed class LogReaderService
     }
 }
 
+/// <summary>
+/// Represents the log search result.
+/// </summary>
 public sealed class LogSearchResult
 {
+    /// <summary>
+    /// Gets or sets the lines.
+    /// </summary>
     public List<LogLine> Lines { get; init; } = [];
+    /// <summary>
+    /// Gets or sets the total files.
+    /// </summary>
     public int TotalFiles { get; init; }
 }
 
+/// <summary>
+/// Represents the log line.
+/// </summary>
 public sealed class LogLine
 {
+    /// <summary>
+    /// Gets or sets the content.
+    /// </summary>
     public required string Content { get; init; }
+    /// <summary>
+    /// Gets or sets the file.
+    /// </summary>
     public required string File { get; init; }
 }

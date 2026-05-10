@@ -12,10 +12,22 @@ namespace LeanKernel.Thinker.Agents;
 /// </summary>
 public class WorkerAgent
 {
+    /// <summary>
+    /// Gets or sets the definition.
+    /// </summary>
     public AgentDefinition Definition { get; }
+    /// <summary>
+    /// Gets or sets the agent factory.
+    /// </summary>
     public AgentFactory AgentFactory { get; }
+    /// <summary>
+    /// Gets or performs the logger operation.
+    /// </summary>
     protected readonly ILogger Logger;
 
+    /// <summary>
+    /// Represents the worker agent.
+    /// </summary>
     public WorkerAgent(
         AgentDefinition definition,
         AgentFactory agentFactory,
@@ -26,6 +38,9 @@ public class WorkerAgent
         Logger = logger;
     }
 
+    /// <summary>
+    /// Represents the execute async.
+    /// </summary>
     public virtual async Task<string> ExecuteAsync(
         string task,
         ContextBudget budget,
@@ -53,6 +68,12 @@ public class WorkerAgent
 /// </summary>
 public sealed class ResearchWorker : WorkerAgent
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ResearchWorker" /> class.
+    /// </summary>
+    /// <param name="agentFactory">The agent factory.</param>
+    /// <param name="logger">The logger.</param>
+    /// <returns>The operation result.</returns>
     public ResearchWorker(AgentFactory agentFactory, ILogger<ResearchWorker> logger)
         : base(
             new AgentDefinition
@@ -75,6 +96,12 @@ public sealed class ResearchWorker : WorkerAgent
 /// </summary>
 public sealed class CodeWorker : WorkerAgent
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CodeWorker" /> class.
+    /// </summary>
+    /// <param name="agentFactory">The agent factory.</param>
+    /// <param name="logger">The logger.</param>
+    /// <returns>The operation result.</returns>
     public CodeWorker(AgentFactory agentFactory, ILogger<CodeWorker> logger)
         : base(
             new AgentDefinition
@@ -97,6 +124,12 @@ public sealed class CodeWorker : WorkerAgent
 /// </summary>
 public sealed class ScheduleWorker : WorkerAgent
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ScheduleWorker" /> class.
+    /// </summary>
+    /// <param name="agentFactory">The agent factory.</param>
+    /// <param name="logger">The logger.</param>
+    /// <returns>The operation result.</returns>
     public ScheduleWorker(AgentFactory agentFactory, ILogger<ScheduleWorker> logger)
         : base(
             new AgentDefinition

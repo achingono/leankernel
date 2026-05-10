@@ -13,11 +13,23 @@ public sealed class CronScheduler : IScheduler
     private readonly Dictionary<string, ScheduledJob> _jobs = [];
     private readonly ILogger<CronScheduler> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CronScheduler" /> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
     public CronScheduler(ILogger<CronScheduler> logger)
     {
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the schedule async operation.
+    /// </summary>
+    /// <param name="jobId">The job id.</param>
+    /// <param name="cronExpression">The cron expression.</param>
+    /// <param name="action">The action.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public Task ScheduleAsync(string jobId, string cronExpression, Func<CancellationToken, Task> action, CancellationToken ct)
     {
         if (_jobs.ContainsKey(jobId))
@@ -35,6 +47,12 @@ public sealed class CronScheduler : IScheduler
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Executes the cancel async operation.
+    /// </summary>
+    /// <param name="jobId">The job id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public Task CancelAsync(string jobId, CancellationToken ct)
     {
         if (_jobs.Remove(jobId, out var job))
@@ -46,6 +64,10 @@ public sealed class CronScheduler : IScheduler
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Executes the list scheduled jobs operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public IReadOnlyList<string> ListScheduledJobs() => _jobs.Keys.ToList();
 
     private async Task RunJobLoopAsync(ScheduledJob job)

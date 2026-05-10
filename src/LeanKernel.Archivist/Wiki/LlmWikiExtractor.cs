@@ -33,6 +33,9 @@ public sealed class LlmWikiExtractor
         Return empty array [] if no facts are present.
         """;
 
+    /// <summary>
+    /// Represents the llm wiki extractor.
+    /// </summary>
     public LlmWikiExtractor(
         HttpClient liteLlmClient,
         IWikiStore wiki,

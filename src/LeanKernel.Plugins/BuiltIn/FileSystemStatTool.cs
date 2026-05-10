@@ -5,6 +5,9 @@ using LeanKernel.Plugins.Sdk;
 
 namespace LeanKernel.Plugins.BuiltIn;
 
+/// <summary>
+/// Represents the file system stat tool.
+/// </summary>
 [ToolMetadata(
     Name = "file_stat",
     Description = "Get file or directory metadata within the allowed data directory.",
@@ -13,9 +16,21 @@ public sealed class FileSystemStatTool : ITool
 {
     private readonly string _allowedBasePath;
 
+    /// <summary>
+    /// Gets or sets the name.
+    /// </summary>
     public string Name => "file_stat";
+    /// <summary>
+    /// Gets or sets the description.
+    /// </summary>
     public string Description => "Return metadata for a file or directory within the data directory.";
+    /// <summary>
+    /// Gets or sets the category.
+    /// </summary>
     public string Category => ToolCategory.FileSystem.ToString().ToLower();
+    /// <summary>
+    /// Gets or sets the parameters schema.
+    /// </summary>
     public string ParametersSchema =>
         """
         {
@@ -27,11 +42,21 @@ public sealed class FileSystemStatTool : ITool
         }
         """;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileSystemStatTool" /> class.
+    /// </summary>
+    /// <param name="allowedBasePath">The allowed base path.</param>
     public FileSystemStatTool(string allowedBasePath = "/app/data")
     {
         _allowedBasePath = Path.GetFullPath(allowedBasePath);
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
+    /// <param name="parametersJson">The parameters json.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation and contains the result.</returns>
     public Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

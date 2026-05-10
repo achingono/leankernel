@@ -5,6 +5,9 @@ using LeanKernel.Core.Configuration;
 
 namespace LeanKernel.Host.Services;
 
+/// <summary>
+/// Represents the runtime lean kernel config store.
+/// </summary>
 public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
 {
     private readonly IOptionsMonitor<LeanKernelConfig> _config;
@@ -16,6 +19,9 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
         WriteIndented = true
     };
 
+    /// <summary>
+    /// Represents the runtime lean kernel config store.
+    /// </summary>
     public RuntimeLeanKernelConfigStore(
         IOptionsMonitor<LeanKernelConfig> config,
         LeanKernelHostPaths paths,
@@ -27,8 +33,18 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
         Directory.CreateDirectory(_paths.DataDirectory);
     }
 
+    /// <summary>
+    /// Executes the get current operation.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public LeanKernelConfig GetCurrent() => Clone(_config.CurrentValue);
 
+    /// <summary>
+    /// Executes the save async operation.
+    /// </summary>
+    /// <param name="config">The config.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SaveAsync(LeanKernelConfig config, CancellationToken ct)
     {
         Directory.CreateDirectory(_paths.DataDirectory);
