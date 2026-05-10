@@ -45,6 +45,7 @@ LeanKernel.Core.Interfaces.IContextGatekeeper
 LeanKernel.Core.Interfaces.IEmbeddingService
 LeanKernel.Core.Interfaces.IIdentityFileUpdateService
 LeanKernel.Core.Interfaces.IKnowledgeSearchService
+LeanKernel.Core.Interfaces.ILearningStep
 LeanKernel.Core.Interfaces.IMessageQueue
 LeanKernel.Core.Interfaces.IOnboardingOrchestrator
 LeanKernel.Core.Interfaces.IOnboardingStateStore
@@ -52,6 +53,7 @@ LeanKernel.Core.Interfaces.IOnboardingStep
 LeanKernel.Core.Interfaces.IOperationsTool
 LeanKernel.Core.Interfaces.IRuntimeLeanKernelConfigStore
 LeanKernel.Core.Interfaces.IScheduler
+LeanKernel.Core.Interfaces.ISelfImprovementPipeline
 LeanKernel.Core.Interfaces.ISessionStore
 LeanKernel.Core.Interfaces.IThinkerService
 LeanKernel.Core.Interfaces.ITimeBoundaryService
@@ -73,6 +75,7 @@ LeanKernel.Core.Models.InboundAttachment
 LeanKernel.Core.Models.InboundAttachmentTextExtractor
 LeanKernel.Core.Models.InboundMessageContentFormatter
 LeanKernel.Core.Models.LeanKernelMessage
+LeanKernel.Core.Models.LearningStepResult
 LeanKernel.Core.Models.MessageQueueResult
 LeanKernel.Core.Models.MessageQueueStats
 LeanKernel.Core.Models.OnboardingCompletionResult
@@ -84,8 +87,10 @@ LeanKernel.Core.Models.OnboardingValidationResult
 LeanKernel.Core.Models.QueuedMessage
 LeanKernel.Core.Models.RelevanceScore
 LeanKernel.Core.Models.RelevanceSourceType
+LeanKernel.Core.Models.SelfImprovementResult
 LeanKernel.Core.Models.TimeBoundaryStatus
 LeanKernel.Core.Models.ToolResult
+LeanKernel.Core.Models.TurnEvent
 LeanKernel.Core.Models.WikiEntry
 LeanKernel.Core.Models.WikiFact
 LeanKernel.Core.Models.WikiQuery
