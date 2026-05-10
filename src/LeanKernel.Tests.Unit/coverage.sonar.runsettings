@@ -6,7 +6,7 @@
         <Configuration>
           <Format>opencover</Format>
           <ExcludeByAttribute>ExcludeFromCodeCoverageAttribute,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
-          <ExcludeByFile>**/*.g.cs,**/*.Designer.cs,**/*.razor,**/Data/Migrations/*.cs,**/Services/Auth/AuthRegistration.cs,**/Services/Auth/OidcRegistration.cs,**/Services/Auth/BearerTokenAuthHandler.cs,**/Services/EngagementAuthorizationFilter.cs,**/Services/ChannelInitializationService.cs,**/Services/Skills/SkillHostedService.cs,**/Services/AttachmentTextExtractionService.cs,**/Services/EngagementRulesProvider.cs,**/Commander/Adapters/SignalRestApiAdapter.cs,**/Plugins/BuiltIn/Skills/DynamicSkillTool.cs,**/Plugins/BuiltIn/Skills/BinaryResolver.cs,**/Plugins/BuiltIn/Skills/DynamicSkillToolFactory.cs,**/Plugins/BuiltIn/Skills/EgressPolicy.cs,**/Plugins/BuiltIn/Skills/RuntimeSkillRegistry.cs</ExcludeByFile>
+          <ExcludeByFile>**/*.g.cs,**/*.Designer.cs,**/*.razor,**/Data/Migrations/*.cs,**/LeanKernelFeatureServiceCollectionExtensions.cs,**/Services/Auth/AuthRegistration.cs,**/Services/Auth/OidcRegistration.cs,**/Services/Auth/BearerTokenAuthHandler.cs,**/Services/EngagementAuthorizationFilter.cs,**/Services/ChannelInitializationService.cs,**/Services/Skills/SkillHostedService.cs,**/Services/AttachmentTextExtractionService.cs,**/EngagementRulesProvider.cs,**/SignalRestApiAdapter.cs,**/DynamicSkillTool.cs,**/BinaryResolver.cs,**/DynamicSkillToolFactory.cs,**/EgressPolicy.cs,**/RuntimeSkillRegistry.cs</ExcludeByFile>
           <Exclude>[LeanKernel.Host]Program</Exclude>
         </Configuration>
       </DataCollector>
