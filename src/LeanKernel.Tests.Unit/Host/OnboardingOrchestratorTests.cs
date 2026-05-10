@@ -250,6 +250,8 @@ public class OnboardingOrchestratorTests : IDisposable
         Assert.True(result.Success);
         Assert.Equal(1, state.MarkCompletedCount);
         Assert.True(state.State.Completed);
+        Assert.True(File.Exists(Path.Combine(_tempDir, "agents", "main", "SELF.md")));
+        Assert.True(File.Exists(Path.Combine(_tempDir, "agents", "main", "USER.md")));
     }
 
     [Fact]

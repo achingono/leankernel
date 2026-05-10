@@ -179,6 +179,76 @@ public class MessageQueueServiceTests
         Assert.True(result1.Success);
         Assert.False(result2.Success);
     }
+
+    [Fact]
+    public async Task EnqueueAsync_NonUrgentDuringQuietHours_SchedulesForNextActiveWindow()
+    {
+        var nextWindow = DateTime.UtcNow.AddHours(2);
+        var timeBoundary = new StubTimeBoundaryService(isActive: false, nextWindow);
+        var queue = new MessageQueueService(timeBoundary, new NullLogger<MessageQueueService>());
+        var message = new QueuedMessage
+        {
+            Id = "quiet-hours-message",
+            Channel = "Signal",
+            Recipient = "+1234567890",
+            Content = "Hold this until active hours",
+            EnqueuedAt = DateTime.UtcNow
+        };
+
+        var result = await queue.EnqueueAsync(message);
+        var readyMessages = await queue.GetReadyMessagesAsync();
+
+        Assert.True(result.Success);
+        Assert.True(result.WillBeBatched);
+        Assert.Equal(nextWindow, result.ScheduledDeliveryTime);
+        Assert.DoesNotContain(readyMessages, m => m.Id == "quiet-hours-message");
+    }
+
+    [Fact]
+    public async Task GetReadyMessagesAsync_ReturnsQueuedMessagesInPriorityOrder()
+    {
+        var timeBoundary = new StubTimeBoundaryService(isActive: true, DateTime.UtcNow.AddHours(1));
+        var queue = new MessageQueueService(timeBoundary, new NullLogger<MessageQueueService>());
+
+        await queue.EnqueueAsync(new QueuedMessage
+        {
+            Id = "low",
+            Channel = "Signal",
+            Recipient = "+1234567890",
+            Content = "Low priority",
+            EnqueuedAt = DateTime.UtcNow,
+            Priority = 1
+        });
+        await queue.EnqueueAsync(new QueuedMessage
+        {
+            Id = "high",
+            Channel = "Signal",
+            Recipient = "+1234567890",
+            Content = "High priority",
+            EnqueuedAt = DateTime.UtcNow,
+            Priority = 10
+        });
+
+        var readyMessages = await queue.GetReadyMessagesAsync();
+
+        Assert.Equal(["high", "low"], readyMessages.Select(m => m.Id));
+    }
+}
+
+internal sealed class StubTimeBoundaryService(bool isActive, DateTime nextWindow) : ITimeBoundaryService
+{
+    public bool IsInActiveHours() => isActive;
+
+    public DateTime GetNextActiveWindow() => nextWindow;
+
+    public TimeBoundaryStatus GetStatus() => new()
+    {
+        IsInActiveHours = isActive,
+        NextActiveWindow = nextWindow,
+        IsQuietHours = !isActive,
+        IsSabbath = false,
+        CurrentTimeZone = "UTC"
+    };
 }
 
 public class AgentsConfigurationStepTests
