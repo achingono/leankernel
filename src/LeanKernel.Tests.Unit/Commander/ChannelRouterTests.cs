@@ -209,10 +209,45 @@ public class ChannelRouterTests
         Assert.True(typingScope.Disposed);
     }
 
+    [Fact]
+    public void GetChannel_MatchesByChannelIdOrName()
+    {
+        var channel = CreateChannel("signal");
+        channel.Name.Returns("Signal");
+        var router = CreateRouter(Substitute.For<IThinkerService>(), [channel]);
+
+        Assert.Same(channel, router.GetChannel("signal"));
+        Assert.Same(channel, router.GetChannel("Signal"));
+    }
+
+    [Fact]
+    public void GetChannel_ReturnsNullWhenNotConfigured()
+    {
+        var channel = CreateChannel("discord");
+        channel.Name.Returns("Discord");
+        channel.IsConfigured.Returns(false);
+        var router = CreateRouter(Substitute.For<IThinkerService>(), [channel]);
+
+        Assert.Null(router.GetChannel("Discord"));
+    }
+
+    [Fact]
+    public async Task DeliverAsync_ReturnsFailureForUnknownChannel()
+    {
+        var router = CreateRouter(Substitute.For<IThinkerService>(), []);
+
+        var result = await router.DeliverAsync("missing", "user", "message");
+
+        Assert.False(result.Success);
+        Assert.Equal("Channel 'missing' not configured", result.Error);
+    }
+
     private static IChannel CreateChannel(string id)
     {
         var channel = Substitute.For<IChannel>();
         channel.ChannelId.Returns(id);
+        channel.Name.Returns(id);
+        channel.IsConfigured.Returns(true);
         channel.IsAuthorizedSender(Arg.Any<string>()).Returns(true);
         return channel;
     }
@@ -226,6 +261,8 @@ public class ChannelRouterTests
     {
         var channel = Substitute.For<IChannel>();
         channel.ChannelId.Returns(id);
+        channel.Name.Returns(id);
+        channel.IsConfigured.Returns(true);
         channel.IsAuthorizedSender(Arg.Any<string>()).Returns(true);
         channel.When(c => c.OnMessageReceived += Arg.Any<Func<LeanKernelMessage, CancellationToken, Task>>())
             .Do(ci => onHandlerSet(ci.Arg<Func<LeanKernelMessage, CancellationToken, Task>>()));

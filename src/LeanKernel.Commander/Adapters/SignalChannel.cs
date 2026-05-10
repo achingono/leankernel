@@ -16,6 +16,14 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
 {
     public string ChannelId => "signal";
 
+    public string Name => "Signal";
+
+    public bool IsConfigured =>
+        _config.Signal.Enabled &&
+        !string.IsNullOrWhiteSpace(_config.Signal.Account) &&
+        (!string.IsNullOrWhiteSpace(_config.Signal.DaemonBaseUrl) ||
+         !string.IsNullOrWhiteSpace(_cliPath));
+
     private readonly LeanKernelConfig _config;
     private readonly string _cliPath;
     private readonly ILogger<SignalChannel> _logger;
@@ -59,26 +67,7 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(_config.Signal.DaemonBaseUrl))
-        {
-            var http = _httpClientFactory.CreateClient("signal-daemon");
-            _adapter = new SignalRestApiAdapter(
-                _config.Signal.DaemonBaseUrl,
-                _config.Signal.Account,
-                http,
-                _logger,
-                _attachmentTextExtractor);
-            _logger.LogInformation("Signal channel using HTTP daemon at {DaemonUrl}", _config.Signal.DaemonBaseUrl);
-        }
-        else
-        {
-            _adapter = new SignalCliAdapter(
-                _cliPath,
-                _config.Signal.Account,
-                _logger,
-                _attachmentTextExtractor);
-            _logger.LogInformation("Signal channel using local signal-cli process");
-        }
+        InitializeAdapter();
 
         _adapter.OnMessage += msg =>
         {
@@ -126,6 +115,8 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
 
     public async Task SendAsync(string recipientId, string content, CancellationToken ct)
     {
+        InitializeAdapter();
+
         if (_adapter is null)
         {
             _logger.LogWarning("Signal adapter not initialized — message not sent");
@@ -134,6 +125,66 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
 
         await _adapter.SendMessageAsync(recipientId, content, ct);
         _logger.LogDebug("Signal message sent to {Recipient}", recipientId);
+    }
+
+    public async Task<ChannelDeliveryResult> DeliverAsync(
+        string recipientId,
+        string content,
+        CancellationToken ct = default)
+    {
+        if (!_config.Signal.Enabled)
+        {
+            return ChannelDeliveryResult.Failed(
+                Name,
+                "Signal channel is disabled",
+                retryable: false);
+        }
+
+        if (!IsConfigured)
+        {
+            return ChannelDeliveryResult.Failed(
+                Name,
+                "Signal channel is not configured",
+                retryable: false);
+        }
+
+        if (string.IsNullOrWhiteSpace(recipientId))
+        {
+            return ChannelDeliveryResult.Failed(
+                Name,
+                "Recipient phone number is required",
+                retryable: false);
+        }
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return ChannelDeliveryResult.Failed(
+                Name,
+                "Message content cannot be empty",
+                retryable: false);
+        }
+
+        try
+        {
+            await SendAsync(recipientId, content, ct);
+            return ChannelDeliveryResult.Successful(Name);
+        }
+        catch (OperationCanceledException)
+        {
+            return ChannelDeliveryResult.Failed(
+                Name,
+                "Message delivery was cancelled",
+                retryable: true,
+                TimeSpan.FromSeconds(4));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error sending Signal message to {Recipient}", recipientId);
+            return ChannelDeliveryResult.Failed(
+                Name,
+                $"Unexpected error: {ex.Message}",
+                retryable: false);
+        }
     }
 
     public async ValueTask<IAsyncDisposable> BeginTypingAsync(string recipientId, CancellationToken ct)
@@ -171,6 +222,32 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         }
 
         return null;
+    }
+
+    private void InitializeAdapter()
+    {
+        if (_adapter is not null || !IsConfigured)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(_config.Signal.DaemonBaseUrl))
+        {
+            var http = _httpClientFactory.CreateClient("signal-daemon");
+            _adapter = new SignalRestApiAdapter(
+                _config.Signal.DaemonBaseUrl,
+                _config.Signal.Account,
+                http,
+                _logger,
+                _attachmentTextExtractor);
+            _logger.LogInformation("Signal channel using HTTP daemon at {DaemonUrl}", _config.Signal.DaemonBaseUrl);
+            return;
+        }
+
+        _adapter = new SignalCliAdapter(
+            _cliPath,
+            _config.Signal.Account,
+            _logger,
+            _attachmentTextExtractor);
+        _logger.LogInformation("Signal channel using local signal-cli process");
     }
 
     private sealed class SignalTypingScope : IAsyncDisposable

@@ -21,6 +21,47 @@ public class SignalChannelTests
             CreateExtractor(),
             CreateHttpClientFactory());
         Assert.Equal("signal", channel.ChannelId);
+        Assert.Equal("Signal", channel.Name);
+    }
+
+    [Fact]
+    public void SignalChannel_IsConfiguredRequiresEnabledAccountAndTransport()
+    {
+        var config = Microsoft.Extensions.Options.Options.Create(new Core.Configuration.LeanKernelConfig
+        {
+            Signal = new Core.Configuration.SignalConfig
+            {
+                Enabled = true,
+                Account = "+15550000000",
+                DaemonBaseUrl = "http://localhost:8080"
+            }
+        });
+        var channel = new SignalChannel(
+            config,
+            new Microsoft.Extensions.Logging.Abstractions.NullLogger<SignalChannel>(),
+            CreateExtractor(),
+            CreateHttpClientFactory());
+
+        Assert.True(channel.IsConfigured);
+    }
+
+    [Fact]
+    public async Task SignalChannel_DeliverAsync_ReturnsFailureWhenNotConfigured()
+    {
+        var config = Microsoft.Extensions.Options.Options.Create(new Core.Configuration.LeanKernelConfig
+        {
+            Signal = new Core.Configuration.SignalConfig { Enabled = false }
+        });
+        var channel = new SignalChannel(
+            config,
+            new Microsoft.Extensions.Logging.Abstractions.NullLogger<SignalChannel>(),
+            CreateExtractor(),
+            CreateHttpClientFactory());
+
+        var result = await channel.DeliverAsync("+recipient", "message");
+
+        Assert.False(result.Success);
+        Assert.Equal("Signal channel is disabled", result.Error);
     }
 
     [Fact]

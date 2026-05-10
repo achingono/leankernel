@@ -43,6 +43,51 @@ public sealed class ChannelRouter
         }
     }
 
+    public IChannel? GetChannel(string channelName)
+    {
+        if (string.IsNullOrWhiteSpace(channelName))
+        {
+            _logger.LogWarning("Attempted to get channel with null or empty name");
+            return null;
+        }
+
+        var channel = _channels.FirstOrDefault(c =>
+            string.Equals(c.ChannelId, channelName, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(c.Name, channelName, StringComparison.OrdinalIgnoreCase));
+
+        if (channel is null)
+        {
+            _logger.LogWarning("Channel '{ChannelName}' not registered", channelName);
+            return null;
+        }
+
+        if (!channel.IsConfigured)
+        {
+            _logger.LogWarning("Channel '{ChannelName}' is not properly configured", channelName);
+            return null;
+        }
+
+        return channel;
+    }
+
+    public async Task<ChannelDeliveryResult> DeliverAsync(
+        string channelName,
+        string recipientId,
+        string content,
+        CancellationToken ct = default)
+    {
+        var channel = GetChannel(channelName);
+        if (channel is null)
+        {
+            return ChannelDeliveryResult.Failed(
+                channelName,
+                $"Channel '{channelName}' not configured",
+                retryable: false);
+        }
+
+        return await channel.DeliverAsync(recipientId, content, ct);
+    }
+
     private async Task HandleMessageAsync(LeanKernelMessage message, CancellationToken ct)
     {
         var channel = _channels.FirstOrDefault(c => c.ChannelId == message.ChannelId);

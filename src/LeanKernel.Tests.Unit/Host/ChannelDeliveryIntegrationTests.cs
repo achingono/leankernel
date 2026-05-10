@@ -1,11 +1,10 @@
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using LeanKernel.Commander;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Core.Interfaces;
 using LeanKernel.Host.Services;
-using LeanKernel.Host.Services.Channels;
-using LeanKernel.Host.Services.Channels.Adapters;
 using Xunit;
-using HostChannelDeliveryResult = LeanKernel.Host.Services.Channels.ChannelDeliveryResult;
 
 namespace LeanKernel.Tests.Unit.Host;
 
@@ -29,16 +28,14 @@ public sealed class ChannelDeliveryIntegrationTests
         var timeBoundary = new TimeBoundaryService(rules, _loggerFactory.CreateLogger<TimeBoundaryService>());
         var messageQueue = new MessageQueueService(timeBoundary, _loggerFactory.CreateLogger<MessageQueueService>());
 
-        var registry = new ChannelRegistry(_loggerFactory.CreateLogger<ChannelRegistry>());
-        
         var mockChannel = CreateMockChannel("TestChannel", successDelivery: true);
-        registry.RegisterChannel(mockChannel);
+        var router = CreateRouter(mockChannel);
 
         var backgroundService = new MessageProcessingBackgroundService(
             _loggerFactory.CreateLogger<MessageProcessingBackgroundService>(),
             messageQueue,
             timeBoundary,
-            registry);
+            router);
 
         // Enqueue a message
         var message = new QueuedMessage
@@ -76,14 +73,13 @@ public sealed class ChannelDeliveryIntegrationTests
         var timeBoundary = new TimeBoundaryService(rules, _loggerFactory.CreateLogger<TimeBoundaryService>());
         var messageQueue = new MessageQueueService(timeBoundary, _loggerFactory.CreateLogger<MessageQueueService>());
         
-        var registry = new ChannelRegistry(_loggerFactory.CreateLogger<ChannelRegistry>());
-        // Don't register any channels
+        var router = CreateRouter();
 
         var backgroundService = new MessageProcessingBackgroundService(
             _loggerFactory.CreateLogger<MessageProcessingBackgroundService>(),
             messageQueue,
             timeBoundary,
-            registry);
+            router);
 
         // Enqueue message for non-existent channel
         var message = new QueuedMessage
@@ -119,17 +115,14 @@ public sealed class ChannelDeliveryIntegrationTests
         var timeBoundary = new TimeBoundaryService(rules, _loggerFactory.CreateLogger<TimeBoundaryService>());
         var messageQueue = new MessageQueueService(timeBoundary, _loggerFactory.CreateLogger<MessageQueueService>());
 
-        var registry = new ChannelRegistry(_loggerFactory.CreateLogger<ChannelRegistry>());
-        
-        // Channel that fails with retryable error
         var mockChannel = CreateMockChannel("RetryChannel", successDelivery: false, isRetryable: true);
-        registry.RegisterChannel(mockChannel);
+        var router = CreateRouter(mockChannel);
 
         var backgroundService = new MessageProcessingBackgroundService(
             _loggerFactory.CreateLogger<MessageProcessingBackgroundService>(),
             messageQueue,
             timeBoundary,
-            registry);
+            router);
 
         var message = new QueuedMessage
         {
@@ -169,15 +162,14 @@ public sealed class ChannelDeliveryIntegrationTests
         var timeBoundary = new TimeBoundaryService(rules, _loggerFactory.CreateLogger<TimeBoundaryService>());
         var messageQueue = new MessageQueueService(timeBoundary, _loggerFactory.CreateLogger<MessageQueueService>());
 
-        var registry = new ChannelRegistry(_loggerFactory.CreateLogger<ChannelRegistry>());
         var mockChannel = CreateMockChannel("QuietChannel", successDelivery: true);
-        registry.RegisterChannel(mockChannel);
+        var router = CreateRouter(mockChannel);
 
         var backgroundService = new MessageProcessingBackgroundService(
             _loggerFactory.CreateLogger<MessageProcessingBackgroundService>(),
             messageQueue,
             timeBoundary,
-            registry);
+            router);
 
         // Enqueue non-urgent message
         var message = new QueuedMessage
@@ -219,15 +211,14 @@ public sealed class ChannelDeliveryIntegrationTests
         var timeBoundary = new TimeBoundaryService(rules, _loggerFactory.CreateLogger<TimeBoundaryService>());
         var messageQueue = new MessageQueueService(timeBoundary, _loggerFactory.CreateLogger<MessageQueueService>());
 
-        var registry = new ChannelRegistry(_loggerFactory.CreateLogger<ChannelRegistry>());
         var mockChannel = CreateMockChannel("UrgentChannel", successDelivery: true);
-        registry.RegisterChannel(mockChannel);
+        var router = CreateRouter(mockChannel);
 
         var backgroundService = new MessageProcessingBackgroundService(
             _loggerFactory.CreateLogger<MessageProcessingBackgroundService>(),
             messageQueue,
             timeBoundary,
-            registry);
+            router);
 
         // Enqueue URGENT message during quiet hours
         var message = new QueuedMessage
@@ -268,23 +259,31 @@ public sealed class ChannelDeliveryIntegrationTests
         };
     }
 
-    private IMessageChannel CreateMockChannel(
+    private ChannelRouter CreateRouter(params IChannel[] channels) =>
+        new(
+            Substitute.For<IThinkerService>(),
+            channels,
+            _loggerFactory.CreateLogger<ChannelRouter>());
+
+    private IChannel CreateMockChannel(
         string name,
         bool successDelivery,
         bool isRetryable = false)
     {
-        var mock = Substitute.For<IMessageChannel>();
+        var mock = Substitute.For<IChannel>();
+        mock.ChannelId.Returns(name);
         mock.Name.Returns(name);
         mock.IsConfigured.Returns(true);
+        mock.IsAuthorizedSender(Arg.Any<string>()).Returns(true);
 
         if (successDelivery)
         {
             mock.DeliverAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-                .Returns(HostChannelDeliveryResult.Successful(name, "delivery-ref-123"));
+                .Returns(ChannelDeliveryResult.Successful(name, "delivery-ref-123"));
         }
         else
         {
-            var result = HostChannelDeliveryResult.Failed(
+            var result = ChannelDeliveryResult.Failed(
                 name,
                 "Delivery failed",
                 retryable: isRetryable,

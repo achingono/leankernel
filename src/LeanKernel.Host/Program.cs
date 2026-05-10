@@ -16,8 +16,6 @@ using LeanKernel.Host;
 using LeanKernel.Host.Data;
 using LeanKernel.Host.Services;
 using LeanKernel.Host.Services.Auth;
-using LeanKernel.Host.Services.Channels;
-using LeanKernel.Host.Services.Channels.Adapters;
 using LeanKernel.Host.Services.Skills;
 using LeanKernel.Plugins;
 using LeanKernel.Plugins.BuiltIn;
@@ -176,6 +174,18 @@ try
 
     // Commander — channels
     builder.Services.AddSingleton<IChannel, SignalChannel>();
+    builder.Services.AddSingleton<IChannel>(sp =>
+    {
+        var logger = sp.GetRequiredService<ILogger<DiscordChannelAdapter>>();
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+        var httpClient = httpClientFactory.CreateClient();
+        var LeanKernelConfig = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
+
+        var botToken = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_BOT_TOKEN") ?? LeanKernelConfig.DiscordBotToken;
+        var channelId = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_CHANNEL_ID") ?? LeanKernelConfig.DiscordChannelId;
+
+        return new DiscordChannelAdapter(logger, httpClient, botToken, channelId);
+    });
     builder.Services.AddSingleton<ChannelRouter>();
 
     // Plugins — Built-in tools
@@ -322,45 +332,6 @@ try
         var logger = sp.GetRequiredService<ILogger<PersistentMessageQueueService>>();
         return new PersistentMessageQueueService(inMemoryQueue, dbContext, logger);
     });
-    
-    // Phase 4: Channel-specific message delivery
-    builder.Services.AddSingleton<ChannelRegistry>();
-    
-    // Register channel adapters
-    builder.Services.AddSingleton(sp =>
-    {
-        var logger = sp.GetRequiredService<ILogger<SignalChannelAdapter>>();
-        var LeanKernelConfig = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
-        
-        var isEnabled = bool.TryParse(
-            Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_ENABLED"), 
-            out var parsedEnabled)
-            ? parsedEnabled
-            : LeanKernelConfig.Signal.Enabled;
-
-        var cliPath = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_CLI_PATH") 
-            ?? LeanKernelConfig.Signal.CliPath;
-        var account = Environment.GetEnvironmentVariable("LEANKERNEL_SIGNAL_ACCOUNT")
-            ?? LeanKernelConfig.Signal.Account;
-
-        return new SignalChannelAdapter(logger, cliPath, account, isEnabled);
-    });
-    
-    builder.Services.AddSingleton(sp =>
-    {
-        var logger = sp.GetRequiredService<ILogger<LeanKernel.Host.Services.Channels.Adapters.DiscordChannelAdapter>>();
-        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-        var httpClient = httpClientFactory.CreateClient();
-        var LeanKernelConfig = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
-        
-        var botToken = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_BOT_TOKEN") ?? LeanKernelConfig.DiscordBotToken;
-        var channelId = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_CHANNEL_ID") ?? LeanKernelConfig.DiscordChannelId;
-        
-        return new LeanKernel.Host.Services.Channels.Adapters.DiscordChannelAdapter(logger, httpClient, botToken, channelId);
-    });
-    
-    // Initialize channels on startup
-    builder.Services.AddHostedService<ChannelInitializationService>();
     
     builder.Services.AddScoped<AgentsConfigurationStep>();
     builder.Services.AddScoped<SelfConfigurationStep>();

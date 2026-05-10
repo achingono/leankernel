@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using LeanKernel.Host.Services.Channels;
+using LeanKernel.Commander;
 
 namespace LeanKernel.Host.Services;
 
@@ -13,19 +13,19 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
     private readonly ILogger<MessageProcessingBackgroundService> _logger;
     private readonly IMessageQueue _messageQueue;
     private readonly TimeBoundaryService _timeBoundary;
-    private readonly ChannelRegistry _channelRegistry;
+    private readonly ChannelRouter _channelRouter;
     private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(1);
 
     public MessageProcessingBackgroundService(
         ILogger<MessageProcessingBackgroundService> logger,
         IMessageQueue messageQueue,
         TimeBoundaryService timeBoundary,
-        ChannelRegistry channelRegistry)
+        ChannelRouter channelRouter)
     {
         _logger = logger;
         _messageQueue = messageQueue;
         _timeBoundary = timeBoundary;
-        _channelRegistry = channelRegistry;
+        _channelRouter = channelRouter;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -135,7 +135,7 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
     private async Task DeliverMessageAsync(QueuedMessage message, CancellationToken ct)
     {
         // Resolve the channel adapter
-        var channel = _channelRegistry.GetChannel(message.Channel);
+        var channel = _channelRouter.GetChannel(message.Channel);
 
         if (channel == null)
         {
@@ -159,7 +159,7 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
             message.Recipient);
 
         // Attempt delivery
-        var result = await channel.DeliverAsync(message.Recipient, message.Content, ct);
+        var result = await _channelRouter.DeliverAsync(message.Channel, message.Recipient, message.Content, ct);
 
         if (result.Success)
         {

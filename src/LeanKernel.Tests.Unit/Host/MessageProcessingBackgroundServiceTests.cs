@@ -1,15 +1,16 @@
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using LeanKernel.Commander;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Core.Interfaces;
 using LeanKernel.Host.Services;
-using LeanKernel.Host.Services.Channels;
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Host;
 
 public class MessageProcessingBackgroundServiceTests
 {
-    private static (MessageProcessingBackgroundService, IMessageQueue, TimeBoundaryService, ChannelRegistry) CreateService()
+    private static (MessageProcessingBackgroundService, IMessageQueue, TimeBoundaryService, ChannelRouter) CreateService()
     {
         var rules = new EngagementRules
         {
@@ -24,13 +25,14 @@ public class MessageProcessingBackgroundServiceTests
         var messageQueueLogger = Substitute.For<ILogger<MessageQueueService>>();
         var messageQueue = new MessageQueueService(timeBoundary, messageQueueLogger);
         
-        var registryLogger = Substitute.For<ILogger<ChannelRegistry>>();
-        var channelRegistry = new ChannelRegistry(registryLogger);
+        var thinker = Substitute.For<IThinkerService>();
+        var routerLogger = Substitute.For<ILogger<ChannelRouter>>();
+        var channelRouter = new ChannelRouter(thinker, [], routerLogger);
 
         var serviceLogger = Substitute.For<ILogger<MessageProcessingBackgroundService>>();
-        var service = new MessageProcessingBackgroundService(serviceLogger, (IMessageQueue)messageQueue, timeBoundary, channelRegistry);
+        var service = new MessageProcessingBackgroundService(serviceLogger, (IMessageQueue)messageQueue, timeBoundary, channelRouter);
 
-        return (service, (IMessageQueue)messageQueue, timeBoundary, channelRegistry);
+        return (service, (IMessageQueue)messageQueue, timeBoundary, channelRouter);
     }
 
     [Fact]
@@ -83,11 +85,12 @@ public class MessageProcessingBackgroundServiceTests
         var messageQueueLogger = Substitute.For<ILogger<MessageQueueService>>();
         var messageQueue = new MessageQueueService(timeBoundary, messageQueueLogger);
         
-        var registryLogger = Substitute.For<ILogger<ChannelRegistry>>();
-        var channelRegistry = new ChannelRegistry(registryLogger);
+        var thinker = Substitute.For<IThinkerService>();
+        var routerLogger = Substitute.For<ILogger<ChannelRouter>>();
+        var channelRouter = new ChannelRouter(thinker, [], routerLogger);
 
         var serviceLogger = Substitute.For<ILogger<MessageProcessingBackgroundService>>();
-        var service = new MessageProcessingBackgroundService(serviceLogger, (IMessageQueue)messageQueue, timeBoundary, channelRegistry);
+        var service = new MessageProcessingBackgroundService(serviceLogger, (IMessageQueue)messageQueue, timeBoundary, channelRouter);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 

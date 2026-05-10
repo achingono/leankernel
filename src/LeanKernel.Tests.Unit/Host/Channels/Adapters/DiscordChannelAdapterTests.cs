@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using LeanKernel.Host.Services.Channels.Adapters;
+using LeanKernel.Commander.Adapters;
 using Xunit;
 
-namespace LeanKernel.Tests.Unit.Host.Channels.Adapters;
+namespace LeanKernel.Tests.Unit.Commander;
 
 public sealed class DiscordChannelAdapterTests
 {
