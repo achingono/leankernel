@@ -67,14 +67,18 @@ public sealed class EngagementToolExecutionAuthorizer : IToolExecutionAuthorizer
             return null;
 
         var normalized = path.Replace('\\', '/').TrimStart('/');
+        var upper = normalized.ToUpperInvariant();
 
-        return normalized.ToUpperInvariant() switch
-        {
-            "SELF.MD" => "WriteSelfMd",
-            "USER.MD" => "WriteUserMd",
-            "AGENTS/MAIN/AGENTS.MD" => "WriteAgentsMd",
-            _ => null
-        };
+        if (upper == "SELF.MD" || upper.EndsWith("/SELF.MD", StringComparison.Ordinal))
+            return "WriteSelfMd";
+
+        if (upper == "USER.MD" || upper.EndsWith("/USER.MD", StringComparison.Ordinal))
+            return "WriteUserMd";
+
+        if (upper == "AGENTS.MD" || upper.EndsWith("/AGENTS.MD", StringComparison.Ordinal))
+            return "WriteAgentsMd";
+
+        return null;
     }
 
     private static string? TryGetPath(string parametersJson, string propertyName)

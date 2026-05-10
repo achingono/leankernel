@@ -193,6 +193,20 @@ public class ThinkerServiceTests
         Assert.Equal("query", messages[0].Text);
     }
 
+    [Fact]
+    public void BuildMessages_CurrentQueryAlreadyPersisted_DoesNotDuplicateUserTurn()
+    {
+        var history = new List<ConversationTurn>
+        {
+            new() { Role = "user", Content = "Update USER.md", Timestamp = DateTimeOffset.UtcNow }
+        };
+
+        var messages = ThinkerService.BuildMessages(history, "Update USER.md").ToList();
+
+        Assert.Single(messages);
+        Assert.Equal("Update USER.md", messages[0].Text);
+    }
+
     private sealed class TestChatClient : IChatClient
     {
         private readonly string _response;

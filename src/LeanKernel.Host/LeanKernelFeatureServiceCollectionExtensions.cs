@@ -21,6 +21,7 @@ using LeanKernel.Scheduler;
 using LeanKernel.Thinker;
 using LeanKernel.Thinker.Authorization;
 using LeanKernel.Thinker.Agents;
+using LeanKernel.Thinker.Enhancement;
 using LeanKernel.Thinker.Routing;
 using LeanKernel.Thinker.Services;
 using LeanKernel.Thinker.Strategies;
@@ -100,7 +101,23 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<PromptAssembler>();
 
         services.AddSingleton<KnowledgeEnhancementService>();
-        services.AddSingleton<IResponseEnhancer>(sp => sp.GetRequiredService<KnowledgeEnhancementService>());
+        services.AddSingleton<IEngagementIntentClassifier, SmallModelEngagementIntentClassifier>();
+        services.AddSingleton<IResponseEnhancer>(sp =>
+        {
+            var toolRegistry = sp.GetRequiredService<IToolRegistry>();
+            var actionAuthorizer = sp.GetRequiredService<IActionAuthorizer>();
+            var logger = sp.GetRequiredService<ILogger<RefusalInterceptorResponseEnhancer>>();
+            var refusalInterceptor = new RefusalInterceptorResponseEnhancer(toolRegistry, actionAuthorizer, logger);
+            var engagementFileMaintenance = new EngagementFileMaintenanceResponseEnhancer(
+                sp.GetRequiredService<IIdentityFileUpdateService>(),
+                sp.GetRequiredService<IOptions<LeanKernelConfig>>(),
+                sp.GetRequiredService<ILogger<EngagementFileMaintenanceResponseEnhancer>>(),
+                sp.GetService<IEngagementIntentClassifier>());
+            
+            var knowledgeEnhancer = sp.GetRequiredService<KnowledgeEnhancementService>();
+            
+            return new ChainedResponseEnhancer(refusalInterceptor, engagementFileMaintenance, knowledgeEnhancer);
+        });
         services.AddSingleton<IIdentityFileUpdateService, IdentityFileUpdateService>();
         services.AddSingleton<RequestFailureHandler>();
         services.AddSingleton<IToolExecutionAuthorizer, EngagementToolExecutionAuthorizer>();
@@ -210,21 +227,24 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     /// <param name="services">The service collection to update.</param>
     /// <param name="skillDirectories">The skill directories that should be loaded at startup.</param>
     /// <returns>The updated service collection.</returns>
-    public static IServiceCollection AddPlugins(this IServiceCollection services, IReadOnlyList<string> skillDirectories)
+    public static IServiceCollection AddPlugins(
+        this IServiceCollection services,
+        IReadOnlyList<string> skillDirectories,
+        string? dataDirectory = null)
     {
         services.AddSingleton<ITool, WikiQueryTool>();
         services.AddSingleton<ITool, KnowledgeSearchTool>();
-        services.AddSingleton<ITool, FileSystemReadTool>();
-        services.AddSingleton<ITool, FileSystemWriteTool>();
-        services.AddSingleton<ITool, FileSystemEditTool>();
-        services.AddSingleton<ITool, FileSystemDeleteTool>();
-        services.AddSingleton<ITool, FileSystemMoveTool>();
-        services.AddSingleton<ITool, FileSystemCopyTool>();
-        services.AddSingleton<ITool, FileSystemChmodTool>();
-        services.AddSingleton<ITool, DirectoryMkdirTool>();
-        services.AddSingleton<ITool, FileSystemTouchTool>();
-        services.AddSingleton<ITool, DirectoryListTool>();
-        services.AddSingleton<ITool, FileSystemStatTool>();
+        services.AddSingleton<ITool>(_ => new FileSystemReadTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new FileSystemWriteTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new FileSystemEditTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new FileSystemDeleteTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new FileSystemMoveTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new FileSystemCopyTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new FileSystemChmodTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new DirectoryMkdirTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new FileSystemTouchTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new DirectoryListTool(dataDirectory ?? "/app/data"));
+        services.AddSingleton<ITool>(_ => new FileSystemStatTool(dataDirectory ?? "/app/data"));
 
         services.AddMemoryCache();
         services.AddSingleton<SkillParser>();

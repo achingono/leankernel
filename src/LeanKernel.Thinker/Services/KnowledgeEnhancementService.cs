@@ -40,6 +40,11 @@ public sealed class KnowledgeEnhancementService : IResponseEnhancer
     {
         try
         {
+            if (IsEngagementFileMaintenanceQuery(userQuery))
+            {
+                return assistantResponse;
+            }
+
             // Skip enhancement if response is very short or looks like an error message
             if (assistantResponse.Length < 50 || 
                 assistantResponse.Contains("encountered an error", StringComparison.OrdinalIgnoreCase))
@@ -135,5 +140,13 @@ public sealed class KnowledgeEnhancementService : IResponseEnhancer
         string insights)
     {
         return originalResponse + insights;
+    }
+
+    private static bool IsEngagementFileMaintenanceQuery(string userQuery)
+    {
+        return userQuery.Contains("AGENTS.md", StringComparison.OrdinalIgnoreCase) ||
+               userQuery.Contains("SELF.md", StringComparison.OrdinalIgnoreCase) ||
+               userQuery.Contains("USER.md", StringComparison.OrdinalIgnoreCase) ||
+               userQuery.Contains("engagement file", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -92,7 +92,7 @@ try
         .AddArchivist()
         .AddThinker()
         .AddCommander(configuredDataDir)
-        .AddPlugins(skillDirs)
+        .AddPlugins(skillDirs, configuredDataDir)
         .AddScheduler();
 
     // Web API services

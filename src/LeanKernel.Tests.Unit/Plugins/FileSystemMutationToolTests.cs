@@ -27,6 +27,34 @@ public class FileSystemMutationToolTests
     }
 
     [Fact]
+    public async Task WriteTool_AllowsEngagementFilesInAgentsMainPath()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+
+        try
+        {
+            var tool = new FileSystemWriteTool(tmpDir);
+
+            var selfResult = await tool.ExecuteAsync(
+                """{"path": "agents/main/SELF.md", "content": "self"}""",
+                CancellationToken.None);
+            var userResult = await tool.ExecuteAsync(
+                """{"path": "agents/main/USER.md", "content": "user"}""",
+                CancellationToken.None);
+
+            Assert.True(selfResult.Success);
+            Assert.True(userResult.Success);
+            Assert.True(File.Exists(Path.Combine(tmpDir, "agents", "main", "SELF.md")));
+            Assert.True(File.Exists(Path.Combine(tmpDir, "agents", "main", "USER.md")));
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
     public async Task WriteTool_BlocksNonAllowlistedPathByDefault()
     {
         var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));

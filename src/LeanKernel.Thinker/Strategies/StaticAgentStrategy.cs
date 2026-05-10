@@ -68,6 +68,11 @@ public sealed class StaticAgentStrategy : IAgentStrategy
             yield return msg;
         }
 
-        yield return new ChatMessage(ChatRole.User, currentQuery);
+        var currentQueryAlreadyInHistory = history.LastOrDefault() is { Role: "user" } lastUser &&
+            string.Equals(lastUser.Content, currentQuery, StringComparison.Ordinal);
+        if (!currentQueryAlreadyInHistory)
+        {
+            yield return new ChatMessage(ChatRole.User, currentQuery);
+        }
     }
 }

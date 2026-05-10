@@ -17,8 +17,11 @@ namespace LeanKernel.Archivist.Identity;
 public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
 {
     private readonly LeanKernelConfig _config;
-    private readonly IWikiStore _wiki;
+    private readonly IAgentSelfProfileInitializer? _selfProfileInitializer;
+    private readonly IUserProfileSynchronizer? _userProfileSynchronizer;
+    private readonly IActionAuthorizer? _actionAuthorizer;
     private readonly ILogger<IdentityFileUpdateService> _logger;
+    private readonly IReadOnlyList<IOnboardingStep> _onboardingSteps;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="IdentityFileUpdateService" /> class.
@@ -29,11 +32,19 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
     public IdentityFileUpdateService(
         IOptions<LeanKernelConfig> config,
         IWikiStore wiki,
-        ILogger<IdentityFileUpdateService> logger)
+        IAgentSelfProfileInitializer? selfProfileInitializer,
+        IUserProfileSynchronizer? userProfileSynchronizer,
+        IActionAuthorizer? actionAuthorizer,
+        ILogger<IdentityFileUpdateService> logger,
+        IEnumerable<IOnboardingStep>? onboardingSteps = null)
     {
         _config = config.Value;
-        _wiki = wiki;
+        _ = wiki;
+        _selfProfileInitializer = selfProfileInitializer;
+        _userProfileSynchronizer = userProfileSynchronizer;
+        _actionAuthorizer = actionAuthorizer;
         _logger = logger;
+        _onboardingSteps = onboardingSteps?.ToList() ?? [];
     }
 
     /// <summary>
@@ -48,11 +59,25 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
     {
         try
         {
+            await EnsureIdentityFilesExistAsync(ct);
+
+            // If the user explicitly points out a miss, codify it as an operational correction.
+            // This keeps the agent useful-by-default without requiring explicit file-update instructions.
+            await ApplyCorrectiveFeedbackAsync(userMessage, ct);
+
             // Extract user insights
             var userInsights = ExtractUserInsights(userMessage);
             if (userInsights.Count > 0)
             {
                 await UpdateUserProfileAsync(userInsights, ct);
+
+                var agentProfileInsights = userInsights
+                    .Where(kv => kv.Key is "agent_name" or "engagement_model" or "autonomy")
+                    .ToDictionary(kv => kv.Key, kv => kv.Value);
+                if (agentProfileInsights.Count > 0)
+                {
+                    await UpdateAgentProfileAsync(agentProfileInsights, ct);
+                }
             }
 
             // Extract agent insights
@@ -77,6 +102,78 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
         {
             _logger.LogWarning(ex, "Identity file update failed for session {SessionId}", sessionId);
         }
+    }
+
+    private async Task EnsureIdentityFilesExistAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (await CanWriteAsync("WriteAgentsMd", ct))
+            {
+                var agentsStep = _onboardingSteps.FirstOrDefault(s =>
+                    string.Equals(s.Name, "agents", StringComparison.OrdinalIgnoreCase));
+                if (agentsStep is not null)
+                {
+                    var agentsResult = await agentsStep.InitializeAsync(ct);
+                    if (!agentsResult.Success)
+                    {
+                        _logger.LogWarning("Failed to initialize AGENTS.md during identity refresh: {Message}", agentsResult.Message);
+                    }
+                }
+                else
+                {
+                    await EnsureAgentsFileFallbackAsync(ct);
+                }
+            }
+
+            if (await CanWriteAsync("WriteSelfMd", ct) && _selfProfileInitializer is not null)
+            {
+                var selfResult = await _selfProfileInitializer.InitializeAsync(ct);
+                if (!selfResult.Success)
+                {
+                    _logger.LogWarning("Failed to initialize SELF.md during identity refresh: {Message}", selfResult.Message);
+                }
+            }
+
+            if (await CanWriteAsync("WriteUserMd", ct) && _userProfileSynchronizer is not null)
+            {
+                var userResult = await _userProfileSynchronizer.InitializeAsync(ct);
+                if (!userResult.Success)
+                {
+                    _logger.LogWarning("Failed to initialize USER.md during identity refresh: {Message}", userResult.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Identity file self-healing failed.");
+        }
+    }
+
+    private async Task EnsureAgentsFileFallbackAsync(CancellationToken ct)
+    {
+        var agentsPath = Path.Combine(_config.Agents.BasePath, "main", "AGENTS.md");
+        if (File.Exists(agentsPath))
+            return;
+
+        var agentsDir = Path.GetDirectoryName(agentsPath);
+        if (agentsDir is not null)
+            Directory.CreateDirectory(agentsDir);
+
+        await File.WriteAllTextAsync(agentsPath, GenerateFallbackAgentsTemplate(), ct);
+    }
+
+    private async Task<bool> CanWriteAsync(string actionType, CancellationToken ct)
+    {
+        if (_actionAuthorizer is null)
+            return true;
+
+        var result = await _actionAuthorizer.AuthorizeAsync(actionType, ct);
+        if (result.IsAuthorized)
+            return true;
+
+        _logger.LogDebug("Skipped {ActionType}: {Reason}", actionType, result.Reason ?? "not authorized");
+        return false;
     }
 
     /// <summary>
@@ -113,7 +210,125 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
             insights["expertise"] = contextWindow;
         }
 
+        var agentNameMatch = Regex.Match(userMessage, @"Agent name:\s*(?<value>[^\r\n]+)", RegexOptions.IgnoreCase);
+        if (agentNameMatch.Success)
+        {
+            insights["agent_name"] = agentNameMatch.Groups["value"].Value.Trim();
+        }
+
+        var engagementMatch = Regex.Match(userMessage, @"Engagement model:\s*(?<value>[^\r\n]+)", RegexOptions.IgnoreCase);
+        if (engagementMatch.Success)
+        {
+            insights["engagement_model"] = engagementMatch.Groups["value"].Value.Trim();
+        }
+
+        var communicationsMatch = Regex.Match(userMessage, @"Communications?:\s*(?<value>[^\r\n]+)", RegexOptions.IgnoreCase);
+        if (communicationsMatch.Success)
+        {
+            insights["communication_preferences"] = communicationsMatch.Groups["value"].Value.Trim();
+        }
+
+        var autonomyMatch = Regex.Match(userMessage, @"Autonomy:\s*(?<value>[^\r\n]+)", RegexOptions.IgnoreCase);
+        if (autonomyMatch.Success)
+        {
+            insights["autonomy"] = autonomyMatch.Groups["value"].Value.Trim();
+        }
+
+        var timezoneMatch = Regex.Match(userMessage, @"Timezone:\s*(?<value>[^\r\n,]+)", RegexOptions.IgnoreCase);
+        if (timezoneMatch.Success)
+        {
+            insights["timezone"] = timezoneMatch.Groups["value"].Value.Trim();
+        }
+
+        if (userMessage.Contains("Availability:", StringComparison.OrdinalIgnoreCase))
+        {
+            insights["availability"] = ExtractContextWindow(userMessage, 500);
+        }
+
+        if (userMessage.Contains("Sabbath", StringComparison.OrdinalIgnoreCase))
+        {
+            insights["sabbath"] = ExtractContextWindow(userMessage, 500);
+        }
+
+        if (userMessage.Contains("Top Priorities", StringComparison.OrdinalIgnoreCase) ||
+            userMessage.Contains("Find a role/opportunity", StringComparison.OrdinalIgnoreCase))
+        {
+            insights["priorities"] = ExtractContextWindow(userMessage, 700);
+        }
+
+        if (userMessage.Contains("Microsoft Todo", StringComparison.OrdinalIgnoreCase) ||
+            userMessage.Contains("Doughray", StringComparison.OrdinalIgnoreCase) ||
+            userMessage.Contains("Career", StringComparison.OrdinalIgnoreCase))
+        {
+            insights["tools_and_integrations"] = ExtractContextWindow(userMessage, 700);
+        }
+
         return insights;
+    }
+
+    private static string? ExtractCorrectiveFeedback(string userMessage)
+    {
+        if (string.IsNullOrWhiteSpace(userMessage))
+            return null;
+
+        var normalized = userMessage.Trim();
+        var patterns = new[]
+        {
+            @"\byou\s+(?:still\s+)?(?:haven't|didn't|did not|failed to|never)\b",
+            @"\bit looks like you\b",
+            @"\blooks like you\b",
+            @"\bmissed\b",
+            @"\bnot done\b"
+        };
+
+        return patterns.Any(p => Regex.IsMatch(normalized, p, RegexOptions.IgnoreCase))
+            ? normalized
+            : null;
+    }
+
+    private async Task ApplyCorrectiveFeedbackAsync(string userMessage, CancellationToken ct)
+    {
+        var correctiveFeedback = ExtractCorrectiveFeedback(userMessage);
+        if (correctiveFeedback is null)
+            return;
+
+        var correctionBullet = $"- {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm} UTC: User flagged a missed action. Verify state first, then execute correction without waiting for explicit file-update instructions. Trigger: \"{correctiveFeedback}\"";
+
+        if (await CanWriteAsync("WriteSelfMd", ct))
+        {
+            var selfPath = Path.Combine(_config.Agents.BasePath, "main", "SELF.md");
+            if (File.Exists(selfPath))
+            {
+                var selfContent = await File.ReadAllTextAsync(selfPath, ct);
+                selfContent = AppendToSection(selfContent, "Correction Protocol", correctionBullet);
+                await File.WriteAllTextAsync(selfPath, selfContent, ct);
+            }
+        }
+
+        if (await CanWriteAsync("WriteAgentsMd", ct))
+        {
+            var agentsPath = Path.Combine(_config.Agents.BasePath, "main", "AGENTS.md");
+            if (File.Exists(agentsPath))
+            {
+                var agentsContent = await File.ReadAllTextAsync(agentsPath, ct);
+                agentsContent = AppendToSection(agentsContent, "Useful By Default", correctionBullet);
+                await File.WriteAllTextAsync(agentsPath, agentsContent, ct);
+            }
+        }
+
+        if (await CanWriteAsync("WriteUserMd", ct))
+        {
+            var userPath = Path.Combine(_config.Agents.BasePath, "main", "USER.md");
+            if (File.Exists(userPath))
+            {
+                var userContent = await File.ReadAllTextAsync(userPath, ct);
+                userContent = AppendToSection(
+                    userContent,
+                    "Agent Operation Preferences",
+                    "- When I point out a missed action, self-correct and update engagement files by default unless I explicitly require permission-first behavior.");
+                await File.WriteAllTextAsync(userPath, userContent, ct);
+            }
+        }
     }
 
     /// <summary>
@@ -205,6 +420,51 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
                 content = AppendToSection(content, "Expertise", expertise);
             }
 
+            if (insights.TryGetValue("agent_name", out var agentName))
+            {
+                content = AppendUniqueToSection(content, "Agent Operation Preferences", $"- Preferred agent name: {agentName}");
+            }
+
+            if (insights.TryGetValue("engagement_model", out var engagementModel))
+            {
+                content = AppendUniqueToSection(content, "Agent Operation Preferences", $"- Engagement model: {engagementModel}");
+            }
+
+            if (insights.TryGetValue("autonomy", out var autonomy))
+            {
+                content = AppendUniqueToSection(content, "Agent Operation Preferences", $"- Autonomy: {autonomy}");
+            }
+
+            if (insights.TryGetValue("communication_preferences", out var communicationPreferences))
+            {
+                content = AppendUniqueToSection(content, "Communication Preferences", $"- {communicationPreferences}");
+            }
+
+            if (insights.TryGetValue("timezone", out var timezone))
+            {
+                content = AppendUniqueToSection(content, "Availability and Time Boundaries", $"- Timezone: {timezone}");
+            }
+
+            if (insights.TryGetValue("availability", out var availability))
+            {
+                content = AppendUniqueToSection(content, "Availability and Time Boundaries", $"- Availability: {availability}");
+            }
+
+            if (insights.TryGetValue("sabbath", out var sabbath))
+            {
+                content = AppendUniqueToSection(content, "Availability and Time Boundaries", $"- Sabbath boundary: {sabbath}");
+            }
+
+            if (insights.TryGetValue("priorities", out var priorities))
+            {
+                content = AppendUniqueToSection(content, "Priorities", $"- {priorities}");
+            }
+
+            if (insights.TryGetValue("tools_and_integrations", out var tools))
+            {
+                content = AppendUniqueToSection(content, "Tools and Integrations", $"- {tools}");
+            }
+
             await File.WriteAllTextAsync(userPath, content, ct);
             _logger.LogDebug("Updated USER.md with new insights");
         }
@@ -241,6 +501,22 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
             {
                 content = AppendToSection(content, "Limitations Observed", 
                     $"- {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm}: Limitation detected in response");
+            }
+
+            if (insights.TryGetValue("agent_name", out var agentName))
+            {
+                content = UpdateSection(content, "Agent Name", agentName);
+                content = AppendUniqueToSection(content, "Agent Identity", $"- Name: {agentName}");
+            }
+
+            if (insights.TryGetValue("engagement_model", out var engagementModel))
+            {
+                content = AppendUniqueToSection(content, "Operating Model", $"- {engagementModel}");
+            }
+
+            if (insights.TryGetValue("autonomy", out var autonomy))
+            {
+                content = AppendUniqueToSection(content, "Operating Model", $"- Autonomy: {autonomy}");
             }
 
             await File.WriteAllTextAsync(selfPath, content, ct);
@@ -295,7 +571,7 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
             return sectionPattern.Replace(content, replacement, 1);
         }
 
-        return content;
+        return content.TrimEnd() + $"\n\n## {sectionName}\n\n{value}\n";
     }
 
     /// <summary>
@@ -316,6 +592,14 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
         return content.TrimEnd() + $"\n\n## {sectionName}\n\n{value}\n";
     }
 
+    private static string AppendUniqueToSection(string content, string sectionName, string value)
+    {
+        if (content.Contains(value, StringComparison.OrdinalIgnoreCase))
+            return content;
+
+        return AppendToSection(content, sectionName, value);
+    }
+
     /// <summary>
     /// Extract a window of context around a pattern for analysis.
     /// </summary>
@@ -324,5 +608,61 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
         return text.Length > windowSize 
             ? text.Substring(0, windowSize) + "..." 
             : text;
+    }
+
+    private static string GenerateFallbackAgentsTemplate()
+    {
+        return """
+        ---
+        version: 2
+        ---
+
+        # AGENTS.md - Rules of Engagement
+
+        ## Agent Personality
+
+        **Tone:** direct, concise, authentic
+
+        ## Scope of Autonomy
+
+        ### Can Do Without Asking
+
+        - ReadFile
+        - ListFiles
+        - StatFile
+        - SearchKnowledge
+        - SearchWiki
+        - WriteAgentsMd
+        - WriteSelfMd
+        - WriteUserMd
+
+        ### Must Ask Before
+
+        - WriteFile
+        - CreateDirectory
+        - MoveFile
+        - CopyFile
+        - ChangeFilePermissions
+        - DeleteFile
+        - SendEmail
+        - SendMessage
+        - PushCode
+        - ModifyConfig
+
+        ### Never Do
+
+        - CommitSecrets
+        - DeleteProductionData
+        - ExposeSecret
+
+        ## Time Boundaries
+
+        **Timezone:** Eastern
+
+        ## Useful By Default
+
+        - Verify state before claiming file creation or updates.
+        - Self-correct missed engagement-file actions without waiting for another prompt when policy allows.
+        """;
     }
 }

@@ -26,6 +26,52 @@ public class EngagementToolExecutionAuthorizerTests
     }
 
     [Fact]
+    public async Task AuthorizeAsync_ProfileWrite_WithAbsolutePath_UsesSpecificWriteAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("WriteUserMd", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "WriteUserMd",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync(
+            "file_write",
+            """{"path":"/app/data/agents/main/USER.md","content":"hi"}""",
+            CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("WriteUserMd", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("WriteUserMd", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_AgentsWrite_WithRelativePath_UsesSpecificWriteAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("WriteAgentsMd", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "WriteAgentsMd",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync(
+            "file_write",
+            """{"path":"data/agents/main/AGENTS.md","content":"hi"}""",
+            CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("WriteAgentsMd", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("WriteAgentsMd", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AuthorizeAsync_DirectoryList_UsesListFilesAction()
     {
         var actionAuthorizer = Substitute.For<IActionAuthorizer>();

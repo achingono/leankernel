@@ -6,6 +6,8 @@ internal static class FileSystemPolicy
     [
         "SELF.md",
         "USER.md",
+        "agents/main/SELF.md",
+        "agents/main/USER.md",
         "agents/main/AGENTS.md"
     ];
 

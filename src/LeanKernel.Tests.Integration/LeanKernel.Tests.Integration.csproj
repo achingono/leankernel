@@ -28,6 +28,7 @@
     <ProjectReference Include="..\LeanKernel.Archivist\LeanKernel.Archivist.csproj" />
     <ProjectReference Include="..\LeanKernel.Thinker\LeanKernel.Thinker.csproj" />
     <ProjectReference Include="..\LeanKernel.Plugins\LeanKernel.Plugins.csproj" />
+    <ProjectReference Include="..\LeanKernel.Host\LeanKernel.Host.csproj" />
   </ItemGroup>
 
 </Project>
