@@ -30,7 +30,17 @@ public sealed class LeanKernelSelectionStrategy : ILeanKernelSelectionStrategy
         var cfg = _config.Context;
         var scored = candidates.Select(c => c with
         {
-            Score = c.ComputeSourceAwareScore()
+            Score = c.SourceType == RelevanceSourceType.Vector
+                ? c.SemanticSimilarity
+                : RelevanceScore.ComputeScore(
+                    c.SemanticSimilarity,
+                    c.RecencyDecay,
+                    c.DimensionMatch,
+                    c.InteractionFrequency,
+                    cfg.SemanticSimilarityWeight,
+                    cfg.RecencyDecayWeight,
+                    cfg.DimensionMatchWeight,
+                    cfg.InteractionFrequencyWeight)
         })
         .OrderByDescending(c => c.Score)
         .ToList();

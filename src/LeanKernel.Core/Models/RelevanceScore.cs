@@ -46,6 +46,32 @@ public sealed record RelevanceScore
          + (interactionFrequency * 0.15);
 
     /// <summary>
+    /// Computes a weighted composite score for wiki results using caller-supplied weights.
+    /// </summary>
+    /// <param name="semanticSimilarity">The semantic similarity component.</param>
+    /// <param name="recencyDecay">The recency decay component.</param>
+    /// <param name="dimensionMatch">The 5W1H dimension match component.</param>
+    /// <param name="interactionFrequency">The interaction frequency component.</param>
+    /// <param name="semanticSimilarityWeight">The semantic similarity weight.</param>
+    /// <param name="recencyDecayWeight">The recency decay weight.</param>
+    /// <param name="dimensionMatchWeight">The dimension match weight.</param>
+    /// <param name="interactionFrequencyWeight">The interaction frequency weight.</param>
+    /// <returns>The weighted composite score.</returns>
+    public static double ComputeScore(
+        double semanticSimilarity,
+        double recencyDecay,
+        double dimensionMatch,
+        double interactionFrequency,
+        double semanticSimilarityWeight,
+        double recencyDecayWeight,
+        double dimensionMatchWeight,
+        double interactionFrequencyWeight)
+        => (semanticSimilarity * semanticSimilarityWeight)
+         + (recencyDecay * recencyDecayWeight)
+         + (dimensionMatch * dimensionMatchWeight)
+         + (interactionFrequency * interactionFrequencyWeight);
+
+    /// <summary>
     /// Compute score based on source type. Vector results use semantic similarity directly;
     /// wiki results use the multi-factor formula.
     /// </summary>
