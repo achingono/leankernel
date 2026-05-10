@@ -76,6 +76,24 @@ RETRYABLE_EMBEDDING_ERRORS = (
 UNSTRUCTURED_MAX_RETRIES = int(os.getenv("UNSTRUCTURED_MAX_RETRIES", "5"))
 UNSTRUCTURED_RETRY_BASE_SECONDS = float(os.getenv("UNSTRUCTURED_RETRY_BASE_SECONDS", "1.0"))
 UNSTRUCTURED_RETRY_MAX_SECONDS = float(os.getenv("UNSTRUCTURED_RETRY_MAX_SECONDS", "15"))
+UNSTRUCTURED_STRATEGY = os.getenv("UNSTRUCTURED_STRATEGY", "fast")
+UNSTRUCTURED_CHUNKING_STRATEGY = os.getenv("UNSTRUCTURED_CHUNKING_STRATEGY", "by_title")
+UNSTRUCTURED_PDF_INFER_TABLE_STRUCTURE = os.getenv(
+    "UNSTRUCTURED_PDF_INFER_TABLE_STRUCTURE",
+    "false",
+).lower() in {"1", "true", "yes", "on"}
+MARKITDOWN_FALLBACK_ENABLED = os.getenv("MARKITDOWN_FALLBACK_ENABLED", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+MARKITDOWN_FALLBACK_MIN_BYTES = int(os.getenv("MARKITDOWN_FALLBACK_MIN_BYTES", "750000"))
+MARKITDOWN_FALLBACK_EXTENSIONS = {
+    ext.strip().lower()
+    for ext in os.getenv("MARKITDOWN_FALLBACK_EXTENSIONS", ".pdf,.epub").split(",")
+    if ext.strip()
+}
 RETRYABLE_UNSTRUCTURED_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
 RETRYABLE_UNSTRUCTURED_ERRORS = (
     httpx.ConnectError,
@@ -83,6 +101,7 @@ RETRYABLE_UNSTRUCTURED_ERRORS = (
     httpx.WriteTimeout,
     httpx.PoolTimeout,
     httpx.NetworkError,
+    httpx.RemoteProtocolError,  # Unstructured container crash mid-request ("Server disconnected")
 )
 
 # Document extensions that should go through Unstructured
@@ -296,15 +315,19 @@ class UnstructuredClient:
 
         for attempt in range(1, UNSTRUCTURED_MAX_RETRIES + 1):
             try:
+                request_data: dict[str, Any] = {
+                    "strategy": UNSTRUCTURED_STRATEGY,
+                    "chunking_strategy": UNSTRUCTURED_CHUNKING_STRATEGY,
+                    "max_characters": CHUNK_SIZE_TOKENS * 4,
+                }
+                if UNSTRUCTURED_PDF_INFER_TABLE_STRUCTURE:
+                    request_data["pdf_infer_table_structure"] = True
+
                 with open(file_path, "rb") as f:
                     response = await self.client.post(
                         f"{self.base_url}/general/v0/general",
                         files={"files": (os.path.basename(file_path), f)},
-                        data={
-                            "strategy": "auto",
-                            "chunking_strategy": "by_title",
-                            "max_characters": CHUNK_SIZE_TOKENS * 4,
-                        },
+                        data=request_data,
                     )
                 response.raise_for_status()
                 return response.json()
@@ -454,6 +477,21 @@ def chunk_text(text: str, max_tokens: int = 500) -> list[str]:
         chunks.append(current_chunk.strip())
 
     return chunks if chunks else [text[:max_chars]]
+
+
+def convert_with_markitdown(file_path: str) -> str:
+    """Convert a file to text via MarkItDown."""
+    from markitdown import MarkItDown
+
+    converter = MarkItDown()
+    result = converter.convert(file_path)
+
+    text = getattr(result, "text_content", None)
+    if not text:
+        text = getattr(result, "markdown", None)
+    if not text:
+        text = str(result or "")
+    return text or ""
 
 
 def source_metadata(file_path: str) -> tuple[str, str]:
@@ -687,13 +725,48 @@ class Indexer:
 
     async def _process_unstructured_file(self, file_path: str) -> list[str]:
         """Process a document through Unstructured API."""
-        elements = await self.unstructured_client.parse(file_path)
-        chunks = []
-        for element in elements:
-            text = element.get("text", "").strip()
-            if text and len(text) > 20:
-                chunks.append(text)
-        return chunks
+        try:
+            elements = await self.unstructured_client.parse(file_path)
+            chunks = []
+            for element in elements:
+                text = element.get("text", "").strip()
+                if text and len(text) > 20:
+                    chunks.append(text)
+            return chunks
+        except Exception as unstructured_error:
+            ext = os.path.splitext(file_path)[1].lower()
+            if not self._should_try_markitdown_fallback(file_path, ext):
+                raise
+
+            logger.warning(
+                "Unstructured failed after retries for %s (%r). Trying MarkItDown fallback.",
+                file_path,
+                unstructured_error,
+            )
+            fallback_text = await asyncio.to_thread(convert_with_markitdown, file_path)
+            fallback_chunks = chunk_text(fallback_text, CHUNK_SIZE_TOKENS) if fallback_text.strip() else []
+
+            if fallback_chunks:
+                logger.info(
+                    "MarkItDown fallback succeeded for %s with %s chunks",
+                    file_path,
+                    len(fallback_chunks),
+                )
+                return fallback_chunks
+
+            logger.warning("MarkItDown fallback produced no content for: %s", file_path)
+            raise
+
+    @staticmethod
+    def _should_try_markitdown_fallback(file_path: str, ext: str) -> bool:
+        if not MARKITDOWN_FALLBACK_ENABLED:
+            return False
+        if ext not in MARKITDOWN_FALLBACK_EXTENSIONS:
+            return False
+        try:
+            return os.path.getsize(file_path) >= MARKITDOWN_FALLBACK_MIN_BYTES
+        except OSError:
+            return False
 
     async def _process_text_file(self, file_path: str) -> list[str]:
         """Process a plain text file directly."""
