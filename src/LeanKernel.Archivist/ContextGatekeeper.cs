@@ -18,6 +18,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private readonly ISessionStore _sessions;
     private readonly IKnowledgeSearchService _knowledgeSearch;
     private readonly SystemPromptBuilder _systemPromptBuilder;
+    private readonly OnboardingGapDetector _onboardingGapDetector;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ContextGatekeeper> _logger;
 
@@ -31,6 +32,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     /// <param name="logger">The logger used for context-gating diagnostics.</param>
     /// <param name="capabilityGapStore">The optional capability-gap store used to enrich prompts.</param>
     /// <param name="systemPromptBuilder">The optional system prompt builder collaborator.</param>
+    /// <param name="onboardingGapDetector">The optional onboarding gap detector collaborator.</param>
     public ContextGatekeeper(
         IWikiStore wiki,
         ISessionStore sessions,
@@ -38,7 +40,8 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         IOptions<LeanKernelConfig> config,
         ILogger<ContextGatekeeper> logger,
         ICapabilityGapStore? capabilityGapStore = null,
-        SystemPromptBuilder? systemPromptBuilder = null)
+        SystemPromptBuilder? systemPromptBuilder = null,
+        OnboardingGapDetector? onboardingGapDetector = null)
     {
         _wiki = wiki;
         _sessions = sessions;
@@ -46,6 +49,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         _config = config.Value;
         _logger = logger;
         _systemPromptBuilder = systemPromptBuilder ?? new SystemPromptBuilder(config, capabilityGapStore);
+        _onboardingGapDetector = onboardingGapDetector ?? new OnboardingGapDetector(config);
     }
 
     /// <inheritdoc />
@@ -97,7 +101,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 
         // Phase 5a: On the very first message of a session, check for identity gaps
         var onboardingInstruction = history.Count == 1
-            ? await BuildOnboardingInstructionAsync(ct)
+            ? await _onboardingGapDetector.BuildInstructionAsync(ct)
             : null;
 
         var totalTokens = EstimateTokens(systemPrompt)
@@ -282,56 +286,6 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         }
 
         return result;
-    }
-
-    private async Task<string?> BuildOnboardingInstructionAsync(CancellationToken ct)
-    {
-        var agentDir = Path.Combine(_config.Agents.BasePath, "main");
-        var soulPath = Path.Combine(agentDir, "SELF.md");
-        var userPath = Path.Combine(agentDir, "USER.md");
-
-        var soulContent = File.Exists(soulPath) ? await File.ReadAllTextAsync(soulPath, ct) : null;
-        var userContent = File.Exists(userPath) ? await File.ReadAllTextAsync(userPath, ct) : null;
-
-        var gaps = new List<string>();
-
-        // Check SELF.md for gaps
-        if (string.IsNullOrWhiteSpace(soulContent) || soulContent.Contains("TODO") || soulContent.Length < 100)
-        {
-            gaps.Add("agent identity (name, role, personality, capabilities, communication style)");
-        }
-
-        // Check USER.md for gaps
-        if (string.IsNullOrWhiteSpace(userContent) || userContent.Contains("TODO") || userContent.Length < 50)
-        {
-            gaps.Add("user preferences (name, timezone, communication preferences, goals)");
-        }
-        else
-        {
-            // Check for specific missing sections
-            if (!userContent.Contains("name", StringComparison.OrdinalIgnoreCase) &&
-                !userContent.Contains("who", StringComparison.OrdinalIgnoreCase))
-                gaps.Add("the user's name");
-
-            if (!userContent.Contains("timezone", StringComparison.OrdinalIgnoreCase) &&
-                !userContent.Contains("location", StringComparison.OrdinalIgnoreCase))
-                gaps.Add("the user's timezone or location");
-        }
-
-        if (gaps.Count == 0)
-            return null;
-
-        return $"""
-            IMPORTANT: This is the first message in a new conversation session.
-            Before answering the user's question, briefly introduce yourself and ask 1-2 focused questions
-            to fill in missing information about: {string.Join(", ", gaps)}.
-            Keep it conversational and natural — don't make it feel like a form.
-            After gathering this context, answer their question.
-            Once you have gathered the information, output it as a structured block at the end of your response:
-            [IDENTITY_UPDATE]
-            <the gathered facts as key: value pairs>
-            [/IDENTITY_UPDATE]
-            """;
     }
 
     private static string FormatWikiEntryCompact(WikiEntry entry) =>

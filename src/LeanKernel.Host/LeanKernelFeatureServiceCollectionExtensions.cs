@@ -68,6 +68,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             return new ActionAuthorizer(rules, logger);
         });
         services.AddSingleton<SystemPromptBuilder>();
+        services.AddSingleton<OnboardingGapDetector>();
         services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
         services.AddHttpClient<LlmWikiExtractor>((sp, client) =>
         {
