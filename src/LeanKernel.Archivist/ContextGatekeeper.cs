@@ -17,6 +17,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private readonly IWikiStore _wiki;
     private readonly ISessionStore _sessions;
     private readonly IKnowledgeSearchService _knowledgeSearch;
+    private readonly ICapabilityGapStore? _capabilityGapStore;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ContextGatekeeper> _logger;
 
@@ -36,20 +37,32 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         Structure important facts as Who/What/Where/When/Why/How.
         """;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ContextGatekeeper" /> class.
+    /// </summary>
+    /// <param name="wiki">The wiki store used for structured knowledge retrieval.</param>
+    /// <param name="sessions">The session store used for conversation history.</param>
+    /// <param name="knowledgeSearch">The semantic knowledge search service.</param>
+    /// <param name="config">The LeanKernel configuration.</param>
+    /// <param name="logger">The logger used for context-gating diagnostics.</param>
+    /// <param name="capabilityGapStore">The optional capability-gap store used to enrich prompts.</param>
     public ContextGatekeeper(
         IWikiStore wiki,
         ISessionStore sessions,
         IKnowledgeSearchService knowledgeSearch,
         IOptions<LeanKernelConfig> config,
-        ILogger<ContextGatekeeper> logger)
+        ILogger<ContextGatekeeper> logger,
+        ICapabilityGapStore? capabilityGapStore = null)
     {
         _wiki = wiki;
         _sessions = sessions;
         _knowledgeSearch = knowledgeSearch;
+        _capabilityGapStore = capabilityGapStore;
         _config = config.Value;
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<ConversationContext> GateContextAsync(
         LeanKernelMessage query,
         ContextBudget budget,
@@ -60,6 +73,15 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         return await GateContextAsync(query, budget, sessionId, ["*"], ct);
     }
 
+    /// <summary>
+    /// Builds a deny-by-default context window constrained to the supplied agent knowledge tags.
+    /// </summary>
+    /// <param name="query">The inbound user message.</param>
+    /// <param name="budget">The context budget for selected knowledge and history.</param>
+    /// <param name="sessionId">The conversation session identifier.</param>
+    /// <param name="agentKnowledgeTags">The allowed knowledge tags for the active agent.</param>
+    /// <param name="ct">A token used to cancel context assembly.</param>
+    /// <returns>The assembled conversation context.</returns>
     public async Task<ConversationContext> GateContextAsync(
         LeanKernelMessage query,
         ContextBudget budget,
@@ -310,6 +332,16 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         {
             sb.AppendLine();
             sb.AppendLine(userContent);
+        }
+
+        if (_capabilityGapStore is not null)
+        {
+            var capabilityGaps = await _capabilityGapStore.ReadPromptSectionAsync(ct);
+            if (!string.IsNullOrWhiteSpace(capabilityGaps))
+            {
+                sb.AppendLine();
+                sb.AppendLine(capabilityGaps);
+            }
         }
 
         return sb.ToString().Trim();

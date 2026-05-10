@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using LeanKernel.Archivist;
+using LeanKernel.Archivist.CapabilityGaps;
 using LeanKernel.Archivist.Embedding;
 using LeanKernel.Archivist.Knowledge;
 using LeanKernel.Archivist.Sessions;
@@ -50,6 +51,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<IKnowledgeSearchService, KnowledgeSearchService>();
         services.AddSingleton<WikiCompiler>();
         services.AddSingleton<ConversationCompactor>();
+        services.AddSingleton<ICapabilityGapStore, MarkdownCapabilityGapStore>();
         services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
         services.AddHttpClient<LlmWikiExtractor>((sp, client) =>
         {

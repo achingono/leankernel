@@ -9,14 +9,19 @@ namespace LeanKernel.Thinker.Services;
 public sealed class FailureRecoveryStep : ILearningStep
 {
     private readonly RequestFailureHandler _failureHandler;
+    private readonly ICapabilityGapStore _capabilityGapStore;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FailureRecoveryStep" /> class.
     /// </summary>
     /// <param name="failureHandler">The failure handler used to classify failed turns.</param>
-    public FailureRecoveryStep(RequestFailureHandler failureHandler)
+    /// <param name="capabilityGapStore">The store that persists capability gaps.</param>
+    public FailureRecoveryStep(
+        RequestFailureHandler failureHandler,
+        ICapabilityGapStore capabilityGapStore)
     {
         _failureHandler = failureHandler;
+        _capabilityGapStore = capabilityGapStore;
     }
 
     /// <inheritdoc />
@@ -34,6 +39,16 @@ public sealed class FailureRecoveryStep : ILearningStep
             turnEvent.AssistantResponse,
             exception,
             ct);
+
+        await _capabilityGapStore.AppendAsync(new CapabilityGap
+        {
+            TurnEventId = turnEvent.Id,
+            SessionId = turnEvent.SessionId,
+            UserRequest = turnEvent.UserMessage.Content,
+            GapType = turnEvent.ErrorType ?? "unknown",
+            Description = turnEvent.ErrorMessage ?? turnEvent.AssistantResponse,
+            ObservedAt = turnEvent.CompletedAt
+        }, ct);
 
         return LearningStepResult.Succeeded(Name, turnEvent.ErrorType ?? "failure captured");
     }

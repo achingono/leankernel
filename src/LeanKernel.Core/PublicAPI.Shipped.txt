@@ -41,6 +41,7 @@ LeanKernel.Core.Enums.WikiDimension
 LeanKernel.Core.Interfaces.IAgentOrchestrator
 LeanKernel.Core.Interfaces.IActionAuthorizer
 LeanKernel.Core.Interfaces.IAttachmentTextExtractionService
+LeanKernel.Core.Interfaces.ICapabilityGapStore
 LeanKernel.Core.Interfaces.IChannel
 LeanKernel.Core.Interfaces.IContextGatekeeper
 LeanKernel.Core.Interfaces.IEmbeddingService
@@ -69,6 +70,7 @@ LeanKernel.Core.Interfaces.NoopAsyncDisposable
 LeanKernel.Core.Interfaces.ToolExecutionAuthorizationResult
 LeanKernel.Core.Interfaces.ToolOperationDescriptor
 LeanKernel.Core.Models.AuthorizationResult
+LeanKernel.Core.Models.CapabilityGap
 LeanKernel.Core.Models.ChannelDeliveryResult
 LeanKernel.Core.Models.ConfigurationStepResult
 LeanKernel.Core.Models.ContextBudget
