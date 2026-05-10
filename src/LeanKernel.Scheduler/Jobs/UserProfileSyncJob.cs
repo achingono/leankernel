@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using LeanKernel.Host.Services;
+using LeanKernel.Core.Interfaces;
 using LeanKernel.Scheduler;
 
-namespace LeanKernel.Host.Services.Jobs;
+namespace LeanKernel.Scheduler.Jobs;
 
 /// <summary>
 /// Periodic user profile sync job that updates USER.md from extracted wiki facts.
@@ -11,13 +11,19 @@ namespace LeanKernel.Host.Services.Jobs;
 /// </summary>
 public sealed class UserProfileSyncJob : IAsyncJob
 {
-    private readonly SelfConfigurationStep _selfConfig;
-    private readonly UserConfigurationStep _userConfig;
+    private readonly IAgentSelfProfileInitializer _selfConfig;
+    private readonly IUserProfileSynchronizer _userConfig;
     private readonly ILogger<UserProfileSyncJob> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UserProfileSyncJob" /> class.
+    /// </summary>
+    /// <param name="selfConfig">The service that ensures the agent self-profile exists.</param>
+    /// <param name="userConfig">The service that initializes and synchronizes the user profile.</param>
+    /// <param name="logger">The logger used for profile sync diagnostics.</param>
     public UserProfileSyncJob(
-        SelfConfigurationStep selfConfig,
-        UserConfigurationStep userConfig,
+        IAgentSelfProfileInitializer selfConfig,
+        IUserProfileSynchronizer userConfig,
         ILogger<UserProfileSyncJob> logger)
     {
         _selfConfig = selfConfig;
@@ -26,8 +32,10 @@ public sealed class UserProfileSyncJob : IAsyncJob
     }
 
     /// <summary>
-    /// Execute the user profile sync from wiki facts.
+    /// Executes the user profile sync from wiki facts.
     /// </summary>
+    /// <param name="ct">A token used to cancel the sync operation.</param>
+    /// <returns>A task that completes when the profile sync attempt is finished.</returns>
     public async Task ExecuteAsync(CancellationToken ct)
     {
         try

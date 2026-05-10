@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Core.Interfaces;
 
 namespace LeanKernel.Host.Services;
 
@@ -7,7 +8,7 @@ namespace LeanKernel.Host.Services;
 /// Handles SELF.md configuration step during onboarding.
 /// Captures the agent's self-definition: personality, capabilities, and preferences.
 /// </summary>
-public sealed class SelfConfigurationStep
+public sealed class SelfConfigurationStep : IAgentSelfProfileInitializer
 {
     private readonly LeanKernelHostPaths _paths;
     private readonly ILogger<SelfConfigurationStep> _logger;

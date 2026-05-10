@@ -40,6 +40,7 @@ LeanKernel.Core.Enums.TaskComplexity
 LeanKernel.Core.Enums.WikiDimension
 LeanKernel.Core.Interfaces.IAgentOrchestrator
 LeanKernel.Core.Interfaces.IActionAuthorizer
+LeanKernel.Core.Interfaces.IAgentSelfProfileInitializer
 LeanKernel.Core.Interfaces.IAttachmentTextExtractionService
 LeanKernel.Core.Interfaces.ICapabilityGapStore
 LeanKernel.Core.Interfaces.IChannel
@@ -65,6 +66,7 @@ LeanKernel.Core.Interfaces.IToolExecutionAuthorizer
 LeanKernel.Core.Interfaces.IToolRegistry
 LeanKernel.Core.Interfaces.ITurnEventSink
 LeanKernel.Core.Interfaces.ITypingIndicatorChannel
+LeanKernel.Core.Interfaces.IUserProfileSynchronizer
 LeanKernel.Core.Interfaces.IWikiStore
 LeanKernel.Core.Interfaces.NoopAsyncDisposable
 LeanKernel.Core.Interfaces.ToolExecutionAuthorizationResult

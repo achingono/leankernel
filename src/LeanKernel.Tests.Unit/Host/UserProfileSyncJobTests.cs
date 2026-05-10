@@ -3,7 +3,7 @@ using NSubstitute;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 using LeanKernel.Host.Services;
-using LeanKernel.Host.Services.Jobs;
+using LeanKernel.Scheduler.Jobs;
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Host;

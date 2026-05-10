@@ -3,7 +3,7 @@ using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
-namespace LeanKernel.Host.Services;
+namespace LeanKernel.Scheduler;
 
 /// <summary>
 /// Service for checking time boundaries from engagement rules.
@@ -14,6 +14,11 @@ public sealed class TimeBoundaryService : ITimeBoundaryService
     private readonly TimeZoneInfo _userTimeZone;
     private readonly ILogger<TimeBoundaryService> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TimeBoundaryService" /> class.
+    /// </summary>
+    /// <param name="rules">The engagement rules that define active hours and quiet windows.</param>
+    /// <param name="logger">The logger used for time-boundary diagnostics.</param>
     public TimeBoundaryService(EngagementRules rules, ILogger<TimeBoundaryService> logger)
     {
         _rules = rules;
@@ -45,6 +50,7 @@ public sealed class TimeBoundaryService : ITimeBoundaryService
         }
     }
 
+    /// <inheritdoc />
     public bool IsInActiveHours()
     {
         var now = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _userTimeZone);
@@ -74,6 +80,7 @@ public sealed class TimeBoundaryService : ITimeBoundaryService
         return true;
     }
 
+    /// <inheritdoc />
     public DateTime GetNextActiveWindow()
     {
         var now = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _userTimeZone);
@@ -99,6 +106,7 @@ public sealed class TimeBoundaryService : ITimeBoundaryService
         return nextUtc;
     }
 
+    /// <inheritdoc />
     public TimeBoundaryStatus GetStatus()
     {
         var now = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _userTimeZone);

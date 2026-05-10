@@ -9,7 +9,7 @@ namespace LeanKernel.Host.Services;
 /// Captures user profile, preferences, and communication patterns.
 /// Auto-updates from wiki facts extracted during conversations.
 /// </summary>
-public sealed class UserConfigurationStep
+public sealed class UserConfigurationStep : IUserProfileSynchronizer
 {
     private readonly LeanKernelHostPaths _paths;
     private readonly IWikiStore _wikiStore;

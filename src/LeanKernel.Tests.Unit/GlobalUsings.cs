@@ -4,4 +4,6 @@ global using LeanKernel.Core.Models;
 global using LeanKernel.Archivist.Engagement;
 global using LeanKernel.Archivist.Identity;
 global using LeanKernel.Plugins.Attachments;
+global using LeanKernel.Scheduler;
+global using LeanKernel.Scheduler.Jobs;
 global using LeanKernel.Thinker.Authorization;

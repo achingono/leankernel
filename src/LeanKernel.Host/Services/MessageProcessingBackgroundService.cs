@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using LeanKernel.Commander;
+using LeanKernel.Core.Interfaces;
 
 namespace LeanKernel.Host.Services;
 
@@ -12,14 +13,14 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
 {
     private readonly ILogger<MessageProcessingBackgroundService> _logger;
     private readonly IMessageQueue _messageQueue;
-    private readonly TimeBoundaryService _timeBoundary;
+    private readonly ITimeBoundaryService _timeBoundary;
     private readonly ChannelRouter _channelRouter;
     private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(1);
 
     public MessageProcessingBackgroundService(
         ILogger<MessageProcessingBackgroundService> logger,
         IMessageQueue messageQueue,
-        TimeBoundaryService timeBoundary,
+        ITimeBoundaryService timeBoundary,
         ChannelRouter channelRouter)
     {
         _logger = logger;

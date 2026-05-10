@@ -224,8 +224,8 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>();
         services.AddSingleton<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>();
         services.AddSingleton<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>();
-        services.AddSingleton<Services.Jobs.UserProfileSyncJob>();
-        services.AddSingleton<IAsyncJob>(sp => sp.GetRequiredService<Services.Jobs.UserProfileSyncJob>());
+        services.AddSingleton<LeanKernel.Scheduler.Jobs.UserProfileSyncJob>();
+        services.AddSingleton<IAsyncJob>(sp => sp.GetRequiredService<LeanKernel.Scheduler.Jobs.UserProfileSyncJob>());
         services.AddSingleton<ProactiveTaskRunner>();
 
         return services;

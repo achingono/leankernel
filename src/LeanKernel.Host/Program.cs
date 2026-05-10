@@ -170,8 +170,10 @@ try
     });
     
     builder.Services.AddScoped<AgentsConfigurationStep>();
-    builder.Services.AddScoped<SelfConfigurationStep>();
-    builder.Services.AddScoped<UserConfigurationStep>();
+    builder.Services.AddSingleton<SelfConfigurationStep>();
+    builder.Services.AddSingleton<IAgentSelfProfileInitializer>(sp => sp.GetRequiredService<SelfConfigurationStep>());
+    builder.Services.AddSingleton<UserConfigurationStep>();
+    builder.Services.AddSingleton<IUserProfileSynchronizer>(sp => sp.GetRequiredService<UserConfigurationStep>());
     builder.Services.AddHostedService<MessageProcessingBackgroundService>();
 
     // Forwarded headers (for reverse proxy HTTPS detection)
