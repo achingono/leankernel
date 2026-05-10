@@ -92,6 +92,26 @@ public class EngagementToolExecutionAuthorizerTests
     }
 
     [Fact]
+    public async Task AuthorizeAsync_FileSearch_UsesSearchFilesAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("SearchFiles", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "SearchFiles",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("file_search", """{"query":"resume"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("SearchFiles", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("SearchFiles", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AuthorizeAsync_UnknownTool_AllowsWithoutCallingActionAuthorizer()
     {
         var actionAuthorizer = Substitute.For<IActionAuthorizer>();

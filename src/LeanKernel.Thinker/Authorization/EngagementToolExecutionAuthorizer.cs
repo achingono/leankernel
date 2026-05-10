@@ -44,6 +44,7 @@ public sealed class EngagementToolExecutionAuthorizer : IToolExecutionAuthorizer
         return normalizedToolName switch
         {
             "file_read" => "ReadFile",
+            "file_search" => "SearchFiles",
             "directory_list" => "ListFiles",
             "file_stat" => "StatFile",
             "directory_mkdir" => "CreateDirectory",

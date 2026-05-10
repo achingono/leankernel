@@ -85,6 +85,7 @@ public sealed class AutonomyScope
     [
         "ReadFile",
         "ListFiles",
+        "SearchFiles",
         "StatFile",
         "SearchKnowledge",
         "SearchWiki",

@@ -16,6 +16,7 @@ namespace LeanKernel.Plugins.BuiltIn;
 public class FileSystemReadTool : ITool
 {
     private readonly string _allowedBasePath;
+    private readonly IAttachmentTextExtractionService? _textExtractor;
 
     /// <summary>
     /// Gets or sets the name.
@@ -48,9 +49,10 @@ public class FileSystemReadTool : ITool
     /// </summary>
     /// <param name="allowedBasePath">The allowed base path.</param>
     /// <returns>The operation result.</returns>
-    public FileSystemReadTool(string allowedBasePath = "/app/data")
+    public FileSystemReadTool(string allowedBasePath = "/app/data", IAttachmentTextExtractionService? textExtractor = null)
     {
         _allowedBasePath = Path.GetFullPath(allowedBasePath);
+        _textExtractor = textExtractor;
     }
 
     /// <summary>
@@ -65,14 +67,12 @@ public class FileSystemReadTool : ITool
 
         try
         {
-            var doc = JsonDocument.Parse(parametersJson);
-            var relativePath = doc.RootElement.GetProperty("path").GetString()!;
-            var maxLines = doc.RootElement.TryGetProperty("maxLines", out var ml) ? ml.GetInt32() : 100;
+            var parameters = ReadParameters.Parse(parametersJson);
+            var relativePath = parameters.Path;
+            var maxLines = parameters.MaxLines;
 
-            var fullPath = Path.GetFullPath(Path.Combine(_allowedBasePath, relativePath));
-
-            // Security: ensure path is within allowed directory
-            if (!fullPath.StartsWith(_allowedBasePath, StringComparison.OrdinalIgnoreCase))
+            var fullPath = FileSystemPolicy.ResolveWithinBase(_allowedBasePath, relativePath);
+            if (fullPath is null)
             {
                 return new ToolResult
                 {
@@ -83,6 +83,7 @@ public class FileSystemReadTool : ITool
                 };
             }
 
+            fullPath = ResolveExistingPath(fullPath, relativePath);
             if (!File.Exists(fullPath))
             {
                 return new ToolResult
@@ -94,10 +95,7 @@ public class FileSystemReadTool : ITool
                 };
             }
 
-            var lines = await File.ReadAllLinesAsync(fullPath, ct);
-            var content = string.Join("\n", lines.Take(maxLines));
-            if (lines.Length > maxLines)
-                content += $"\n... ({lines.Length - maxLines} more lines)";
+            var content = await ReadContentAsync(fullPath, relativePath, maxLines, ct);
 
             return new ToolResult
             {
@@ -118,6 +116,114 @@ public class FileSystemReadTool : ITool
             };
         }
     }
+
+    private async Task<string> ReadContentAsync(string fullPath, string relativePath, int maxLines, CancellationToken ct)
+    {
+        if (_textExtractor is not null)
+        {
+            var contentType = GuessContentType(relativePath);
+            if (_textExtractor.CanExtractText(contentType, relativePath))
+            {
+                var bytes = await File.ReadAllBytesAsync(fullPath, ct);
+                var extractedText = await _textExtractor.ExtractTextAsync(contentType, relativePath, bytes, ct);
+                if (!string.IsNullOrWhiteSpace(extractedText))
+                    return TruncateLines(extractedText, maxLines);
+
+                if (RequiresTextExtraction(relativePath))
+                    throw new InvalidOperationException($"No text could be extracted from '{relativePath}'. Verify the document parser service is available and supports this file.");
+            }
+        }
+
+        if (RequiresTextExtraction(relativePath))
+            throw new InvalidOperationException($"Cannot read '{relativePath}' as plain text. Document text extraction is not available for this file.");
+
+        var lines = await File.ReadAllLinesAsync(fullPath, ct);
+        return TruncateLines(string.Join("\n", lines), maxLines);
+    }
+
+    private string ResolveExistingPath(string fullPath, string relativePath)
+    {
+        if (File.Exists(fullPath))
+            return fullPath;
+
+        var normalizedRelativePath = FileSystemPolicy.NormalizeRelativePath(relativePath);
+        var current = _allowedBasePath;
+        foreach (var segment in normalizedRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!Directory.Exists(current))
+                return fullPath;
+
+            var next = Directory
+                .EnumerateFileSystemEntries(current)
+                .FirstOrDefault(path => string.Equals(Path.GetFileName(path), segment, StringComparison.OrdinalIgnoreCase));
+
+            if (next is null)
+                return fullPath;
+
+            current = next;
+        }
+
+        return FileSystemPolicy.IsWithinBase(_allowedBasePath, current) ? current : fullPath;
+    }
+
+    private static string TruncateLines(string content, int maxLines)
+    {
+        var lines = content.Split('\n');
+        var truncated = string.Join("\n", lines.Take(maxLines));
+        if (lines.Length > maxLines)
+            truncated += $"\n... ({lines.Length - maxLines} more lines)";
+
+        return truncated;
+    }
+
+    private static string? GuessContentType(string path)
+    {
+        return Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".pdf" => "application/pdf",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".doc" => "application/msword",
+            ".rtf" => "application/rtf",
+            ".odt" => "application/vnd.oasis.opendocument.text",
+            ".epub" => "application/epub+zip",
+            ".ppt" => "application/vnd.ms-powerpoint",
+            ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".xls" => "application/vnd.ms-excel",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".txt" => "text/plain",
+            ".md" => "text/markdown",
+            ".csv" => "text/csv",
+            ".json" => "application/json",
+            ".xml" => "application/xml",
+            ".html" or ".htm" => "text/html",
+            _ => null
+        };
+    }
+
+    private static bool RequiresTextExtraction(string path)
+    {
+        return Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".pdf" or ".doc" or ".docx" or ".rtf" or ".odt" or ".epub" or ".ppt" or ".pptx" or ".xls" or ".xlsx" => true,
+            _ => false
+        };
+    }
+
+    private sealed record ReadParameters(string Path, int MaxLines)
+    {
+        public static ReadParameters Parse(string parametersJson)
+        {
+            const int defaultMaxLines = 100;
+            using var doc = JsonDocument.Parse(parametersJson);
+            var root = doc.RootElement;
+            var path = root.GetProperty("path").GetString() ?? string.Empty;
+            var maxLines = root.TryGetProperty("maxLines", out var maxLinesEl) && maxLinesEl.TryGetInt32(out var value)
+                ? Math.Clamp(value, 1, 10_000)
+                : defaultMaxLines;
+
+            return new ReadParameters(path, maxLines);
+        }
+    }
 }
 
 /// <summary>
@@ -130,8 +236,8 @@ public sealed class FileSystemTool : FileSystemReadTool
     /// Initializes a new instance of the <see cref="FileSystemTool" /> class.
     /// </summary>
     /// <param name="allowedBasePath">The allowed base path.</param>
-    public FileSystemTool(string allowedBasePath = "/app/data")
-        : base(allowedBasePath)
+    public FileSystemTool(string allowedBasePath = "/app/data", IAttachmentTextExtractionService? textExtractor = null)
+        : base(allowedBasePath, textExtractor)
     {
     }
 }

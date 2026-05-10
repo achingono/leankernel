@@ -98,6 +98,77 @@ public class FileSystemToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_UsesTextExtractorForSupportedDocuments()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        var testFile = Path.Combine(tmpDir, "document.pdf");
+        await File.WriteAllTextAsync(testFile, "%PDF raw bytes");
+        var extractor = new FakeAttachmentTextExtractionService("Alfero Chingono\nPrincipal Architect");
+
+        try
+        {
+            var tool = new FileSystemReadTool(tmpDir, extractor);
+            var result = await tool.ExecuteAsync(
+                """{"path": "document.pdf"}""",
+                CancellationToken.None);
+
+            Assert.True(result.Success);
+            Assert.Contains("Principal Architect", result.Output!);
+            Assert.Equal("application/pdf", extractor.ContentType);
+            Assert.Equal("document.pdf", extractor.FileName);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ResolvesPathCaseInsensitively()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(tmpDir, "documents"));
+        await File.WriteAllTextAsync(Path.Combine(tmpDir, "documents", "Profile.txt"), "case insensitive path");
+
+        try
+        {
+            var tool = new FileSystemReadTool(tmpDir);
+            var result = await tool.ExecuteAsync("""{"path":"Documents/profile.txt"}""", CancellationToken.None);
+
+            Assert.True(result.Success);
+            Assert.Contains("case insensitive path", result.Output!);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DocumentWithoutExtractedText_ReturnsError()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        await File.WriteAllTextAsync(Path.Combine(tmpDir, "document.pdf"), "%PDF raw bytes");
+        var extractor = new FakeAttachmentTextExtractionService(null);
+
+        try
+        {
+            var tool = new FileSystemReadTool(tmpDir, extractor);
+            var result = await tool.ExecuteAsync("""{"path":"document.pdf"}""", CancellationToken.None);
+
+            Assert.False(result.Success);
+            Assert.Contains("No text could be extracted", result.Error!);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+
+    [Fact]
     public async Task ExecuteAsync_InvalidJson_ReturnsError()
     {
         var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
@@ -134,5 +205,25 @@ public class FileSystemToolTests
     {
         var tool = new FileSystemReadTool("/tmp");
         Assert.Contains("path", tool.ParametersSchema);
+    }
+
+    private sealed class FakeAttachmentTextExtractionService(string? extractedText) : IAttachmentTextExtractionService
+    {
+        public string? ContentType { get; private set; }
+
+        public string? FileName { get; private set; }
+
+        public bool CanExtractText(string? contentType, string? fileName) => true;
+
+        public Task<string?> ExtractTextAsync(
+            string? contentType,
+            string? fileName,
+            byte[] bytes,
+            CancellationToken ct)
+        {
+            ContentType = contentType;
+            FileName = fileName;
+            return Task.FromResult<string?>(extractedText);
+        }
     }
 }

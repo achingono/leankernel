@@ -629,6 +629,7 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
 
         - ReadFile
         - ListFiles
+        - SearchFiles
         - StatFile
         - SearchKnowledge
         - SearchWiki

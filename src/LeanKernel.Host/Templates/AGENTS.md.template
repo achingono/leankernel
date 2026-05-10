@@ -39,6 +39,7 @@ These actions are pre-approved and need no permission:
 - SearchCodebase
 - ReadFile
 - ListFiles
+- SearchFiles
 - StatFile
 - ViewConfiguration
 - ViewErrorLogs

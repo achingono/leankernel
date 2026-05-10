@@ -125,6 +125,38 @@ public class ToolFunctionAdapterTests
     }
 
     [Fact]
+    public void BuildTools_SimpleTool_FunctionSchemaContainsToolParameters()
+    {
+        const string schema = """{"type":"object","properties":{"path":{"type":"string"},"maxLines":{"type":"integer"}},"required":["path"]}""";
+        var tool = new FakeTool("file_read", "Read file", success: true, output: "ok", parametersSchema: schema);
+        var registry = new FakeToolRegistry([tool]);
+        var adapter = new ToolFunctionAdapter(registry, NullLogger<ToolFunctionAdapter>.Instance);
+
+        var tools = adapter.BuildTools();
+
+        var aiFunc = Assert.IsAssignableFrom<Microsoft.Extensions.AI.AIFunction>(Assert.Single(tools));
+        var jsonSchema = aiFunc.JsonSchema.ToString();
+        Assert.Contains("path", jsonSchema);
+        Assert.Contains("maxLines", jsonSchema);
+        Assert.DoesNotContain("input", jsonSchema);
+    }
+
+    [Fact]
+    public async Task BuildTools_SimpleTool_InvokesWithNamedSchemaArguments()
+    {
+        const string schema = """{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""";
+        var tool = new FakeTool("file_read", "Read file", success: true, output: "ok", parametersSchema: schema);
+        var registry = new FakeToolRegistry([tool]);
+        var adapter = new ToolFunctionAdapter(registry, NullLogger<ToolFunctionAdapter>.Instance);
+
+        var aiFunc = Assert.IsAssignableFrom<Microsoft.Extensions.AI.AIFunction>(Assert.Single(adapter.BuildTools()));
+        var result = await aiFunc.InvokeAsync(new AIFunctionArguments { ["path"] = "documents/profile.pdf" }, CancellationToken.None);
+
+        Assert.Equal("ok", result?.ToString());
+        Assert.Contains("\"path\":\"documents/profile.pdf\"", tool.LastParametersJson);
+    }
+
+    [Fact]
     public async Task BuildTools_SimpleTool_DeniedByExecutionAuthorizer_ReturnsError()
     {
         var tool = new FakeTool("file_write", "Write file", success: true, output: "ok");
@@ -134,7 +166,7 @@ public class ToolFunctionAdapterTests
 
         var tools = adapter.BuildTools();
         var aiFunc = Assert.IsAssignableFrom<Microsoft.Extensions.AI.AIFunction>(Assert.Single(tools));
-        var result = await aiFunc.InvokeAsync(new AIFunctionArguments { ["input"] = "{}" }, CancellationToken.None);
+        var result = await aiFunc.InvokeAsync(new AIFunctionArguments { ["path"] = "SELF.md" }, CancellationToken.None);
 
         Assert.Equal("Error: User permission required", result?.ToString());
     }
@@ -169,21 +201,31 @@ public class ToolFunctionAdapterTests
             Task.FromResult(new ToolResult { ToolName = name, Success = true, Output = "ok" });
     }
 
-    private sealed class FakeTool(string name, string description, bool success, string? output) : ITool
+    private sealed class FakeTool(
+        string name,
+        string description,
+        bool success,
+        string? output,
+        string parametersSchema = "{}") : ITool
     {
         public string Name => name;
         public string Description => description;
         public string Category => "general";
-        public string ParametersSchema => "{}";
+        public string ParametersSchema => parametersSchema;
 
-        public Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct) =>
-            Task.FromResult(new ToolResult
+        public string? LastParametersJson { get; private set; }
+
+        public Task<ToolResult> ExecuteAsync(string parametersJson, CancellationToken ct)
+        {
+            LastParametersJson = parametersJson;
+            return Task.FromResult(new ToolResult
             {
                 ToolName = name,
                 Success = success,
                 Output = output,
                 Error = success ? null : "error"
             });
+        }
     }
 
     private sealed class FakeToolRegistry(IEnumerable<ITool> tools) : IToolRegistry
