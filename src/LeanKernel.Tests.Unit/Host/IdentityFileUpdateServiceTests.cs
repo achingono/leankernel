@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Host.Services;
 using NSubstitute;
@@ -96,13 +98,10 @@ public sealed class IdentityFileUpdateServiceTests : IDisposable
     }
 
     private IdentityFileUpdateService CreateService() => new(
-        new LeanKernelHostPaths
+        Options.Create(new LeanKernelConfig
         {
-            DataDirectory = _tempDir,
-            AgentsDirectory = _agentsDir,
-            RuntimeConfigPath = Path.Combine(_tempDir, "runtime-settings.json"),
-            OnboardingStatePath = Path.Combine(_tempDir, "onboarding-state.json")
-        },
+            Agents = new AgentsConfig { BasePath = _agentsDir }
+        }),
         Substitute.For<IWikiStore>(),
         NullLogger<IdentityFileUpdateService>.Instance);
 }

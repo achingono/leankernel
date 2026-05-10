@@ -1,11 +1,11 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
-using LeanKernel.Host.Services;
 
-namespace LeanKernel.Host.Services;
+namespace LeanKernel.Archivist.Identity;
 
 /// <summary>
 /// Continuously updates identity files (USER.md, SELF.md, AGENTS.md) from conversation insights.
@@ -16,16 +16,22 @@ namespace LeanKernel.Host.Services;
 /// </summary>
 public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
 {
-    private readonly LeanKernelHostPaths _paths;
+    private readonly LeanKernelConfig _config;
     private readonly IWikiStore _wiki;
     private readonly ILogger<IdentityFileUpdateService> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="IdentityFileUpdateService" /> class.
+    /// </summary>
+    /// <param name="config">The LeanKernel configuration containing the agent path.</param>
+    /// <param name="wiki">The wiki store available for identity-related lookup.</param>
+    /// <param name="logger">The logger used for identity update diagnostics.</param>
     public IdentityFileUpdateService(
-        LeanKernelHostPaths paths,
+        IOptions<LeanKernelConfig> config,
         IWikiStore wiki,
         ILogger<IdentityFileUpdateService> logger)
     {
-        _paths = paths;
+        _config = config.Value;
         _wiki = wiki;
         _logger = logger;
     }
@@ -172,7 +178,7 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
     {
         try
         {
-            var userPath = Path.Combine(_paths.AgentsDirectory, "main", "USER.md");
+            var userPath = Path.Combine(_config.Agents.BasePath, "main", "USER.md");
             if (!File.Exists(userPath))
             {
                 _logger.LogDebug("USER.md not found at {Path}, skipping update", userPath);
@@ -215,7 +221,7 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
     {
         try
         {
-            var selfPath = Path.Combine(_paths.AgentsDirectory, "main", "SELF.md");
+            var selfPath = Path.Combine(_config.Agents.BasePath, "main", "SELF.md");
             if (!File.Exists(selfPath))
             {
                 _logger.LogDebug("SELF.md not found at {Path}, skipping update", selfPath);
@@ -253,7 +259,7 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
     {
         try
         {
-            var selfPath = Path.Combine(_paths.AgentsDirectory, "main", "SELF.md");
+            var selfPath = Path.Combine(_config.Agents.BasePath, "main", "SELF.md");
             if (!File.Exists(selfPath))
                 return;
 

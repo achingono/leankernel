@@ -2,6 +2,8 @@ using Microsoft.Extensions.Options;
 using LeanKernel.Archivist;
 using LeanKernel.Archivist.CapabilityGaps;
 using LeanKernel.Archivist.Engagement;
+using LeanKernel.Archivist.Identity;
+using LeanKernel.Plugins.Attachments;
 using LeanKernel.Archivist.Embedding;
 using LeanKernel.Archivist.Knowledge;
 using LeanKernel.Archivist.Sessions;
@@ -81,7 +83,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
 
         services.AddSingleton<KnowledgeEnhancementService>();
         services.AddSingleton<IResponseEnhancer>(sp => sp.GetRequiredService<KnowledgeEnhancementService>());
-        services.AddSingleton<IIdentityFileUpdateService, Services.IdentityFileUpdateService>();
+        services.AddSingleton<IIdentityFileUpdateService, IdentityFileUpdateService>();
         services.AddSingleton<RequestFailureHandler>();
         services.AddSelfImprovement();
 

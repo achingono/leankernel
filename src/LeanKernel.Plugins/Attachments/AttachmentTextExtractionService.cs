@@ -1,12 +1,16 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
-namespace LeanKernel.Host.Services;
+namespace LeanKernel.Plugins.Attachments;
 
+/// <summary>
+/// Extracts text from inbound attachments using direct decoders or the Unstructured service.
+/// </summary>
 public sealed class AttachmentTextExtractionService : IAttachmentTextExtractionService
 {
     private const int MaxExtractedCharacters = 12_000;
@@ -17,6 +21,12 @@ public sealed class AttachmentTextExtractionService : IAttachmentTextExtractionS
     private readonly HashSet<string> _supportedMimeTypes;
     private readonly HashSet<string> _supportedExtensions;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AttachmentTextExtractionService" /> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client used for Unstructured requests.</param>
+    /// <param name="config">The LeanKernel configuration containing extraction options.</param>
+    /// <param name="logger">The logger used for extraction diagnostics.</param>
     public AttachmentTextExtractionService(
         HttpClient httpClient,
         IOptions<LeanKernelConfig> config,
@@ -33,6 +43,7 @@ public sealed class AttachmentTextExtractionService : IAttachmentTextExtractionS
             StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <inheritdoc />
     public bool CanExtractText(string? contentType, string? fileName)
     {
         if (InboundAttachmentTextExtractor.CanExtractText(contentType, fileName))
@@ -48,6 +59,7 @@ public sealed class AttachmentTextExtractionService : IAttachmentTextExtractionS
         return !string.IsNullOrWhiteSpace(extension) && _supportedExtensions.Contains(extension);
     }
 
+    /// <inheritdoc />
     public async Task<string?> ExtractTextAsync(
         string? contentType,
         string? fileName,
