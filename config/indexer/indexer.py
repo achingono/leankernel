@@ -551,8 +551,12 @@ class Indexer:
         if not os.path.isfile(file_path):
             return
 
-        file_hash = compute_file_hash(file_path)
-        stored_hash = self.state.get_file_hash(file_path)
+        try:
+            file_hash = compute_file_hash(file_path)
+            stored_hash = self.state.get_file_hash(file_path)
+        except Exception as e:
+            logger.error(f"Failed to read/hash {file_path}: {e}")
+            return
 
         if stored_hash == file_hash:
             logger.debug(f"Skipping unchanged file: {file_path}")
@@ -745,11 +749,14 @@ class Indexer:
         indexed_paths = self.state.get_all_paths()
         current_paths = set()
 
+        def _walk_error(error: OSError):
+            logger.error(f"Directory walk error: {error}")
+
         scan_paths = [WIKI_PATH, *DOCUMENTS_PATHS]
         for base_path in scan_paths:
             if not os.path.isdir(base_path):
                 continue
-            for root, _, files in os.walk(base_path):
+            for root, _, files in os.walk(base_path, onerror=_walk_error):
                 for filename in files:
                     file_path = os.path.join(root, filename)
                     if should_ignore_path(file_path):
