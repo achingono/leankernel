@@ -2,8 +2,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using LeanKernel.Commander;
 using LeanKernel.Core.Interfaces;
+using LeanKernel.Core.Models;
 
-namespace LeanKernel.Host.Services;
+namespace LeanKernel.Commander.Queue;
 
 /// <summary>
 /// Background service that processes queued messages at regular intervals,
@@ -17,6 +18,13 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
     private readonly ChannelRouter _channelRouter;
     private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(1);
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MessageProcessingBackgroundService" /> class.
+    /// </summary>
+    /// <param name="logger">The logger used for processing diagnostics.</param>
+    /// <param name="messageQueue">The queue that supplies ready outbound messages.</param>
+    /// <param name="timeBoundary">The time-boundary service used to determine active delivery windows.</param>
+    /// <param name="channelRouter">The router used to deliver messages through configured channels.</param>
     public MessageProcessingBackgroundService(
         ILogger<MessageProcessingBackgroundService> logger,
         IMessageQueue messageQueue,
@@ -29,6 +37,7 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
         _channelRouter = channelRouter;
     }
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await RunAsync(stoppingToken);
@@ -37,6 +46,11 @@ public sealed class MessageProcessingBackgroundService : BackgroundService
     /// <summary>
     /// Public entry point for testing. Runs the message processing loop until cancellation.
     /// </summary>
+    /// <summary>
+    /// Runs the message processing loop until cancellation is requested.
+    /// </summary>
+    /// <param name="stoppingToken">A token that stops the processing loop.</param>
+    /// <returns>A task that completes when the processing loop exits.</returns>
     public async Task RunAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("MessageProcessingBackgroundService started");

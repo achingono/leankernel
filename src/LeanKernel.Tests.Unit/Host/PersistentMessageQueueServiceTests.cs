@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using LeanKernel.Host.Data;
 using LeanKernel.Host.Services;
 
 namespace LeanKernel.Tests.Unit.Host;

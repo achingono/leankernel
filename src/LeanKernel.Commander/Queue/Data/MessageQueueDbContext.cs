@@ -1,19 +1,27 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace LeanKernel.Host.Data;
+namespace LeanKernel.Commander.Queue.Data;
 
 /// <summary>
 /// Database context for message queue persistence.
 /// </summary>
-public class MessageQueueDbContext : DbContext
+public sealed class MessageQueueDbContext : DbContext
 {
-    public DbSet<QueuedMessageEntity> QueuedMessages => Set<QueuedMessageEntity>();
-
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MessageQueueDbContext" /> class.
+    /// </summary>
+    /// <param name="options">The configured database context options.</param>
     public MessageQueueDbContext(DbContextOptions<MessageQueueDbContext> options)
         : base(options)
     {
     }
 
+    /// <summary>
+    /// Gets the persisted queued messages.
+    /// </summary>
+    public DbSet<QueuedMessageEntity> QueuedMessages => Set<QueuedMessageEntity>();
+
+    /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

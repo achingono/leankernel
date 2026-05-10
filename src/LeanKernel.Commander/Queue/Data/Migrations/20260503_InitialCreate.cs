@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace LeanKernel.Host.Data.Migrations
+namespace LeanKernel.Commander.Queue.Data.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

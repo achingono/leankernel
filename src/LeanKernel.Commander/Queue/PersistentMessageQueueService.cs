@@ -1,19 +1,27 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using LeanKernel.Host.Data;
+using LeanKernel.Commander.Queue.Data;
+using LeanKernel.Core.Interfaces;
+using LeanKernel.Core.Models;
 
-namespace LeanKernel.Host.Services;
+namespace LeanKernel.Commander.Queue;
 
 /// <summary>
 /// Message queue service with persistent database storage.
 /// Wraps the in-memory queue and syncs to SQLite for durability.
 /// </summary>
-public class PersistentMessageQueueService : IMessageQueue
+public sealed class PersistentMessageQueueService : IMessageQueue
 {
     private readonly IMessageQueue _inMemoryQueue;
     private readonly MessageQueueDbContext _dbContext;
     private readonly ILogger<PersistentMessageQueueService> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PersistentMessageQueueService" /> class.
+    /// </summary>
+    /// <param name="inMemoryQueue">The in-memory queue that provides immediate scheduling behavior.</param>
+    /// <param name="dbContext">The database context used to persist queued message state.</param>
+    /// <param name="logger">The logger used for persistence diagnostics.</param>
     public PersistentMessageQueueService(
         IMessageQueue inMemoryQueue,
         MessageQueueDbContext dbContext,
@@ -24,6 +32,7 @@ public class PersistentMessageQueueService : IMessageQueue
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<MessageQueueResult> EnqueueAsync(
         QueuedMessage message,
         bool isUrgent = false,
@@ -75,6 +84,7 @@ public class PersistentMessageQueueService : IMessageQueue
         }
     }
 
+    /// <inheritdoc />
     public async Task<IReadOnlyList<QueuedMessage>> GetReadyMessagesAsync(CancellationToken ct = default)
     {
         try
@@ -90,6 +100,7 @@ public class PersistentMessageQueueService : IMessageQueue
         }
     }
 
+    /// <inheritdoc />
     public async Task MarkDeliveredAsync(string messageId, CancellationToken ct = default)
     {
         try
@@ -117,6 +128,7 @@ public class PersistentMessageQueueService : IMessageQueue
         }
     }
 
+    /// <inheritdoc />
     public async Task MarkFailedAsync(string messageId, string error, CancellationToken ct = default)
     {
         try
@@ -145,6 +157,7 @@ public class PersistentMessageQueueService : IMessageQueue
         }
     }
 
+    /// <inheritdoc />
     public async Task MarkRetryableAsync(string messageId, string error, DateTime nextRetryAt, CancellationToken ct = default)
     {
         try
@@ -175,6 +188,7 @@ public class PersistentMessageQueueService : IMessageQueue
         }
     }
 
+    /// <inheritdoc />
     public async Task<MessageQueueStats> GetStatsAsync(CancellationToken ct = default)
     {
         try
@@ -211,8 +225,10 @@ public class PersistentMessageQueueService : IMessageQueue
     }
 
     /// <summary>
-    /// Recover undelivered messages from database on startup.
+    /// Recovers undelivered messages from database storage on startup.
     /// </summary>
+    /// <param name="ct">A token used to cancel the recovery operation.</param>
+    /// <returns>A task that completes when recovery has been attempted.</returns>
     public async Task RecoverUndeliveredMessagesAsync(CancellationToken ct = default)
     {
         try
@@ -256,8 +272,11 @@ public class PersistentMessageQueueService : IMessageQueue
     }
 
     /// <summary>
-    /// Archive delivered messages and clean up old records.
+    /// Archives delivered messages by removing records older than the retention window.
     /// </summary>
+    /// <param name="daysToKeep">The number of days of delivered messages to retain.</param>
+    /// <param name="ct">A token used to cancel the cleanup operation.</param>
+    /// <returns>The number of deleted database rows.</returns>
     public async Task<int> CleanupDeliveredMessagesAsync(int daysToKeep = 30, CancellationToken ct = default)
     {
         try

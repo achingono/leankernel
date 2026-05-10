@@ -3,11 +3,11 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using LeanKernel.Host.Data;
+using LeanKernel.Commander.Queue.Data;
 
 #nullable disable
 
-namespace LeanKernel.Host.Data.Migrations
+namespace LeanKernel.Commander.Queue.Data.Migrations
 {
     [DbContext(typeof(MessageQueueDbContext))]
     partial class MessageQueueDbContextModelSnapshot : ModelSnapshot
@@ -17,7 +17,7 @@ namespace LeanKernel.Host.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.1");
 
-            modelBuilder.Entity("LeanKernel.Host.Data.QueuedMessageEntity", b =>
+            modelBuilder.Entity("LeanKernel.Commander.Queue.Data.QueuedMessageEntity", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");

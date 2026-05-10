@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
-namespace LeanKernel.Host.Services;
+namespace LeanKernel.Commander.Queue;
 
 /// <summary>
 /// In-memory message queue service that respects quiet hours.
@@ -17,6 +17,11 @@ public sealed class MessageQueueService : IMessageQueue
     private readonly ConcurrentDictionary<string, QueuedMessage> _messages;
     private int _messageCounter;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MessageQueueService" /> class.
+    /// </summary>
+    /// <param name="timeBoundary">The time-boundary service used to defer non-urgent messages during quiet hours.</param>
+    /// <param name="logger">The logger used for message queue diagnostics.</param>
     public MessageQueueService(
         ITimeBoundaryService timeBoundary,
         ILogger<MessageQueueService> logger)
@@ -26,6 +31,7 @@ public sealed class MessageQueueService : IMessageQueue
         _messages = new ConcurrentDictionary<string, QueuedMessage>();
     }
 
+    /// <inheritdoc />
     public Task<MessageQueueResult> EnqueueAsync(
         QueuedMessage message,
         bool isUrgent = false,
@@ -72,6 +78,7 @@ public sealed class MessageQueueService : IMessageQueue
         });
     }
 
+    /// <inheritdoc />
     public Task<IReadOnlyList<QueuedMessage>> GetReadyMessagesAsync(CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
@@ -93,6 +100,7 @@ public sealed class MessageQueueService : IMessageQueue
         return Task.FromResult((IReadOnlyList<QueuedMessage>)readyMessages);
     }
 
+    /// <inheritdoc />
     public Task MarkDeliveredAsync(string messageId, CancellationToken ct = default)
     {
         if (!_messages.TryGetValue(messageId, out var message))
@@ -115,6 +123,7 @@ public sealed class MessageQueueService : IMessageQueue
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task MarkFailedAsync(string messageId, string error, CancellationToken ct = default)
     {
         if (!_messages.TryGetValue(messageId, out var message))
@@ -141,6 +150,7 @@ public sealed class MessageQueueService : IMessageQueue
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task MarkRetryableAsync(string messageId, string error, DateTime nextRetryAt, CancellationToken ct = default)
     {
         if (!_messages.TryGetValue(messageId, out var message))
@@ -169,6 +179,7 @@ public sealed class MessageQueueService : IMessageQueue
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task<MessageQueueStats> GetStatsAsync(CancellationToken ct = default)
     {
         var totalMessages = _messages.Values.ToList();
