@@ -59,6 +59,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<WikiCompiler>();
         services.AddSingleton<ConversationCompactor>();
         services.AddSingleton<ICapabilityGapStore, MarkdownCapabilityGapStore>();
+        services.AddSingleton<ITokenEstimator, DefaultTokenEstimator>();
         services.AddSingleton<IEngagementRulesProvider, EngagementRulesProvider>();
         services.AddSingleton<IActionAuthorizer>(sp =>
         {

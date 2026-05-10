@@ -66,6 +66,7 @@ LeanKernel.Core.Interfaces.ITimeBoundaryService
 LeanKernel.Core.Interfaces.ITool
 LeanKernel.Core.Interfaces.IToolExecutionAuthorizer
 LeanKernel.Core.Interfaces.IToolRegistry
+LeanKernel.Core.Interfaces.ITokenEstimator
 LeanKernel.Core.Interfaces.ITurnEventSink
 LeanKernel.Core.Interfaces.ITypingIndicatorChannel
 LeanKernel.Core.Interfaces.IUserProfileSynchronizer
@@ -80,6 +81,7 @@ LeanKernel.Core.Models.ConfigurationStepResult
 LeanKernel.Core.Models.ContextBudget
 LeanKernel.Core.Models.ConversationContext
 LeanKernel.Core.Models.ConversationTurn
+LeanKernel.Core.Models.DefaultTokenEstimator
 LeanKernel.Core.Models.InboundAttachment
 LeanKernel.Core.Models.InboundAttachmentTextExtractor
 LeanKernel.Core.Models.InboundMessageContentFormatter

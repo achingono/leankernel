@@ -1,5 +1,6 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
 namespace LeanKernel.Thinker.Middleware;
@@ -12,10 +13,12 @@ namespace LeanKernel.Thinker.Middleware;
 public sealed class ContextGatingMiddleware
 {
     private readonly ILogger<ContextGatingMiddleware> _logger;
+    private readonly ITokenEstimator _tokenEstimator;
 
-    public ContextGatingMiddleware(ILogger<ContextGatingMiddleware> logger)
+    public ContextGatingMiddleware(ILogger<ContextGatingMiddleware> logger, ITokenEstimator? tokenEstimator = null)
     {
         _logger = logger;
+        _tokenEstimator = tokenEstimator ?? new DefaultTokenEstimator();
     }
 
     /// <summary>
@@ -28,7 +31,7 @@ public sealed class ContextGatingMiddleware
                 getResponseFunc: async (messages, options, innerClient, ct) =>
                 {
                     var original = messages.ToList();
-                    var pruned = PruneMessages(original, budget);
+                    var pruned = PruneMessages(original, budget, _tokenEstimator);
 
                     _logger.LogDebug(
                         "Context gating: {Original} → {Pruned} messages (budget={TotalTokens})",
@@ -39,7 +42,7 @@ public sealed class ContextGatingMiddleware
                 getStreamingResponseFunc: (messages, options, innerClient, ct) =>
                 {
                     var original = messages.ToList();
-                    var pruned = PruneMessages(original, budget);
+                    var pruned = PruneMessages(original, budget, _tokenEstimator);
 
                     return innerClient.GetStreamingResponseAsync(pruned, options, ct);
                 })
@@ -54,6 +57,12 @@ public sealed class ContextGatingMiddleware
     internal static List<ChatMessage> PruneMessages(
         IReadOnlyList<ChatMessage> messages,
         ContextBudget budget)
+        => PruneMessages(messages, budget, new DefaultTokenEstimator());
+
+    private static List<ChatMessage> PruneMessages(
+        IReadOnlyList<ChatMessage> messages,
+        ContextBudget budget,
+        ITokenEstimator tokenEstimator)
     {
         if (messages.Count == 0)
             return [];
@@ -75,9 +84,8 @@ public sealed class ContextGatingMiddleware
         // Always keep the last message (current query)
         var lastMessage = conversationMessages[^1];
 
-        // Estimate tokens: ~4 chars per token
-        var usedTokens = result.Sum(m => EstimateTokens(m));
-        var lastMessageTokens = EstimateTokens(lastMessage);
+        var usedTokens = result.Sum(m => EstimateTokens(m, tokenEstimator));
+        var lastMessageTokens = EstimateTokens(lastMessage, tokenEstimator);
         var remainingBudget = budget.ConversationBudget - lastMessageTokens;
 
         // Add history messages from most recent backwards, within budget
@@ -85,7 +93,7 @@ public sealed class ContextGatingMiddleware
         for (int i = conversationMessages.Count - 2; i >= 0; i--)
         {
             var msg = conversationMessages[i];
-            var tokens = EstimateTokens(msg);
+            var tokens = EstimateTokens(msg, tokenEstimator);
             if (usedTokens + tokens <= remainingBudget)
             {
                 historyToAdd.Add(msg);
@@ -105,6 +113,6 @@ public sealed class ContextGatingMiddleware
         return result;
     }
 
-    private static int EstimateTokens(ChatMessage message) =>
-        (message.Text?.Length ?? 0) / 4;
+    private static int EstimateTokens(ChatMessage message, ITokenEstimator tokenEstimator) =>
+        tokenEstimator.EstimateTokens(message.Text);
 }

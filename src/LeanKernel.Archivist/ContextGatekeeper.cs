@@ -20,6 +20,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private readonly ILeanKernelSelectionStrategy _selectionStrategy;
     private readonly SystemPromptBuilder _systemPromptBuilder;
     private readonly OnboardingGapDetector _onboardingGapDetector;
+    private readonly ITokenEstimator _tokenEstimator;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ContextGatekeeper> _logger;
 
@@ -35,6 +36,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     /// <param name="systemPromptBuilder">The optional system prompt builder collaborator.</param>
     /// <param name="onboardingGapDetector">The optional onboarding gap detector collaborator.</param>
     /// <param name="selectionStrategy">The optional LeanKernel selection strategy collaborator.</param>
+    /// <param name="tokenEstimator">The optional token estimator collaborator.</param>
     public ContextGatekeeper(
         IWikiStore wiki,
         ISessionStore sessions,
@@ -44,7 +46,8 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         ICapabilityGapStore? capabilityGapStore = null,
         SystemPromptBuilder? systemPromptBuilder = null,
         OnboardingGapDetector? onboardingGapDetector = null,
-        ILeanKernelSelectionStrategy? selectionStrategy = null)
+        ILeanKernelSelectionStrategy? selectionStrategy = null,
+        ITokenEstimator? tokenEstimator = null)
     {
         _wiki = wiki;
         _sessions = sessions;
@@ -54,6 +57,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         _logger = logger;
         _systemPromptBuilder = systemPromptBuilder ?? new SystemPromptBuilder(config, capabilityGapStore);
         _onboardingGapDetector = onboardingGapDetector ?? new OnboardingGapDetector(config);
+        _tokenEstimator = tokenEstimator ?? new DefaultTokenEstimator();
     }
 
     /// <inheritdoc />
@@ -108,10 +112,10 @@ public sealed class ContextGatekeeper : IContextGatekeeper
             ? await _onboardingGapDetector.BuildInstructionAsync(ct)
             : null;
 
-        var totalTokens = EstimateTokens(systemPrompt)
+        var totalTokens = _tokenEstimator.EstimateTokens(systemPrompt)
             + rankedWiki.Sum(s => s.EstimatedTokens)
             + rankedRetrieval.Sum(s => s.EstimatedTokens)
-            + history.Sum(t => EstimateTokens(t.Content));
+            + history.Sum(t => _tokenEstimator.EstimateTokens(t.Content));
 
         _logger.LogInformation(
             "Context gated: {WikiLeanKernels} wiki, {VectorLeanKernels} vector, {Turns} turns, ~{Tokens} tokens, {Excluded} excluded",
@@ -288,9 +292,6 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         var daysSince = (DateTimeOffset.UtcNow - lastAccessed).TotalDays;
         return Math.Max(0.0, 1.0 - (daysSince / 90.0)); // Decays to 0 over 90 days
     }
-
-    private static int EstimateTokens(string text) =>
-        (int)Math.Ceiling(text.Length / 4.0); // ~4 chars per token approximation
 
     private static string Truncate(string text, int maxLength) =>
         text.Length <= maxLength ? text : text[..maxLength] + "...";
