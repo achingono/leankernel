@@ -1,40 +1,9 @@
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Core.Interfaces;
+using LeanKernel.Core.Models;
 
 namespace LeanKernel.Host.Services;
-
-/// <summary>
-/// Manages time-based engagement boundaries (active hours, quiet hours, Sabbath).
-/// </summary>
-public interface ITimeBoundaryService
-{
-    /// <summary>
-    /// Check if current time is within active hours.
-    /// </summary>
-    bool IsInActiveHours();
-    
-    /// <summary>
-    /// Get the next active window start time.
-    /// </summary>
-    DateTime GetNextActiveWindow();
-    
-    /// <summary>
-    /// Get current status (for diagnostics).
-    /// </summary>
-    TimeBoundaryStatus GetStatus();
-}
-
-/// <summary>
-/// Current time boundary status.
-/// </summary>
-public sealed class TimeBoundaryStatus
-{
-    public required bool IsInActiveHours { get; init; }
-    public required DateTime NextActiveWindow { get; init; }
-    public required bool IsSabbath { get; init; }
-    public required bool IsQuietHours { get; init; }
-    public required string CurrentTimeZone { get; init; }
-}
 
 /// <summary>
 /// Service for checking time boundaries from engagement rules.

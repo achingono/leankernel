@@ -1,29 +1,9 @@
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Core.Interfaces;
+using LeanKernel.Core.Models;
 
 namespace LeanKernel.Host.Services;
-
-/// <summary>
-/// Authorizes actions based on engagement rules.
-/// </summary>
-public interface IActionAuthorizer
-{
-    /// <summary>
-    /// Check if an action is authorized.
-    /// </summary>
-    Task<AuthorizationResult> AuthorizeAsync(string actionType, CancellationToken ct);
-}
-
-/// <summary>
-/// Result of an authorization check.
-/// </summary>
-public sealed class AuthorizationResult
-{
-    public required bool IsAuthorized { get; init; }
-    public string? Reason { get; init; }
-    public required string ActionType { get; init; }
-    public DateTimeOffset CheckedAt { get; init; } = DateTimeOffset.UtcNow;
-}
 
 /// <summary>
 /// Decorator-based authorization service.

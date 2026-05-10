@@ -1,91 +1,9 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using LeanKernel.Core.Interfaces;
+using LeanKernel.Core.Models;
 
 namespace LeanKernel.Host.Services;
-
-/// <summary>
-/// Queues messages for delivery during active hours (batching for quiet hours).
-/// </summary>
-public interface IMessageQueue
-{
-    /// <summary>
-    /// Enqueue a message for delivery (either now or later if in quiet hours).
-    /// </summary>
-    Task<MessageQueueResult> EnqueueAsync(
-        QueuedMessage message,
-        bool isUrgent = false,
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// Get all pending messages ready for delivery.
-    /// </summary>
-    Task<IReadOnlyList<QueuedMessage>> GetReadyMessagesAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Mark a message as delivered.
-    /// </summary>
-    Task MarkDeliveredAsync(string messageId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Mark a message as failed with error details.
-    /// </summary>
-    Task MarkFailedAsync(string messageId, string error, CancellationToken ct = default);
-
-    /// <summary>
-    /// Mark a message for retry with scheduled time.
-    /// </summary>
-    Task MarkRetryableAsync(string messageId, string error, DateTime nextRetryAt, CancellationToken ct = default);
-
-    /// <summary>
-    /// Get queue statistics.
-    /// </summary>
-    Task<MessageQueueStats> GetStatsAsync(CancellationToken ct = default);
-}
-
-/// <summary>
-/// A message queued for delivery during active hours.
-/// </summary>
-public sealed record QueuedMessage
-{
-    public required string Id { get; init; }
-    public required string Channel { get; init; }
-    public required string Recipient { get; init; }
-    public required string Content { get; init; }
-    public required DateTime EnqueuedAt { get; init; }
-    public DateTime? ScheduledFor { get; init; }
-    public bool IsUrgent { get; init; }
-    public int Priority { get; init; } = 5;
-    public bool IsDelivered { get; init; }
-    public DateTime? DeliveredAt { get; init; }
-    public int RetryAttempts { get; init; }
-    public DateTime? NextRetryAt { get; init; }
-    public string? LastError { get; init; }
-}
-
-/// <summary>
-/// Result of queuing operation.
-/// </summary>
-public sealed class MessageQueueResult
-{
-    public required bool Success { get; init; }
-    public required string MessageId { get; init; }
-    public string? Reason { get; init; }
-    public bool WillBeBatched { get; init; }
-    public DateTime? ScheduledDeliveryTime { get; init; }
-}
-
-/// <summary>
-/// Statistics about the message queue.
-/// </summary>
-public sealed class MessageQueueStats
-{
-    public int TotalEnqueued { get; init; }
-    public int PendingMessages { get; init; }
-    public int DeliveredMessages { get; init; }
-    public int UrgentMessages { get; init; }
-    public DateTime? OldestMessageAge { get; init; }
-    public DateTime? NextBatchWindow { get; init; }
-}
 
 /// <summary>
 /// In-memory message queue service that respects quiet hours.
