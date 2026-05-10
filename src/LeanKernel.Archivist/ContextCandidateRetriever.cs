@@ -17,6 +17,21 @@ public sealed class ContextCandidateRetriever
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ContextCandidateRetriever> _logger;
 
+    // Pre-compiled keyword map for O(1) dimension classification
+    private static readonly Dictionary<string, WikiDimension> DimensionKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "who", WikiDimension.Who }, { "person", WikiDimension.Who }, { "contact", WikiDimension.Who }, { "name", WikiDimension.Who },
+        { "what", WikiDimension.What }, { "thing", WikiDimension.What }, { "event", WikiDimension.What }, { "task", WikiDimension.What },
+        { "where", WikiDimension.Where }, { "place", WikiDimension.Where }, { "location", WikiDimension.Where }, { "address", WikiDimension.Where },
+        { "when", WikiDimension.When }, { "time", WikiDimension.When }, { "date", WikiDimension.When }, { "schedule", WikiDimension.When },
+        { "why", WikiDimension.Why }, { "reason", WikiDimension.Why }, { "cause", WikiDimension.Why }, { "because", WikiDimension.Why },
+        { "how", WikiDimension.How }, { "method", WikiDimension.How }, { "step", WikiDimension.How }, { "process", WikiDimension.How }
+    };
+
+    // Shared punctuation for tokenization to reduce allocation
+    private static readonly char[] Delimiters = 
+        [' ', '\t', '\r', '\n', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '"', '\'', '/', '\\', '-', '_'];
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ContextCandidateRetriever" /> class.
     /// </summary>
@@ -30,10 +45,10 @@ public sealed class ContextCandidateRetriever
         IOptions<LeanKernelConfig> config,
         ILogger<ContextCandidateRetriever> logger)
     {
-        _wiki = wiki;
-        _knowledgeSearch = knowledgeSearch;
-        _config = config.Value;
-        _logger = logger;
+        _wiki = wiki ?? throw new ArgumentNullException(nameof(wiki));
+        _knowledgeSearch = knowledgeSearch ?? throw new ArgumentNullException(nameof(knowledgeSearch));
+        _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -48,6 +63,8 @@ public sealed class ContextCandidateRetriever
         HashSet<WikiDimension> dimensions,
         CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(query?.Content)) return [];
+
         var entries = await _wiki.QueryAsync(new WikiQuery
         {
             TextQuery = query.Content,
@@ -56,15 +73,20 @@ public sealed class ContextCandidateRetriever
             MinConfidence = _config.Wiki.MinConfidenceThreshold
         }, ct);
 
+        // Pre-tokenize query once to avoid re-tokenizing the same query for every entry in the Select loop.
+        // Keep this as HashSet to preserve O(1) membership checks in lexical overlap scoring.
+        var queryTokens = Tokenize(query.Content);
+        var queryTokenCount = queryTokens.Count;
+
         return entries.Select(e => new RelevanceScore
         {
             EntryId = e.Id,
             Content = FormatWikiEntryCompact(e),
             EstimatedTokens = e.Facts.Sum(f => f.EstimatedTokens),
-            SemanticSimilarity = ComputeLexicalSimilarity(query.Content, e),
+            SemanticSimilarity = ComputeLexicalSimilarityOptimized(queryTokens, queryTokenCount, e),
             RecencyDecay = ComputeRecencyDecay(e.LastAccessed),
             DimensionMatch = dimensions.Contains(e.Dimension) ? 1.0 : 0.2,
-            InteractionFrequency = Math.Min(e.AccessCount / 100.0, 1.0),
+            InteractionFrequency = Math.Clamp(e.AccessCount / 100.0, 0.0, 1.0),
             Score = 0.0
         }).ToList();
     }
@@ -83,7 +105,10 @@ public sealed class ContextCandidateRetriever
     {
         try
         {
-            return (await _knowledgeSearch.SearchAsync(query.Content, agentTags, limit: 10, ct)).ToList();
+            if (string.IsNullOrWhiteSpace(query?.Content)) return [];
+            
+            var results = await _knowledgeSearch.SearchAsync(query.Content, agentTags, limit: 10, ct);
+            return results?.ToList() ?? [];
         }
         catch (Exception ex)
         {
@@ -93,71 +118,80 @@ public sealed class ContextCandidateRetriever
     }
 
     /// <summary>
-    /// Classifies a query into active 5W1H dimensions.
+    /// Classifies a query into active 5W1H dimensions using tokenized lookup.
     /// </summary>
     /// <param name="query">The query text to classify.</param>
     /// <returns>The active wiki dimensions.</returns>
     public static HashSet<WikiDimension> ClassifyDimensions(string query)
     {
+        if (string.IsNullOrWhiteSpace(query)) return GetDefaultDimensions();
+
+        var tokens = Tokenize(query);
         var dims = new HashSet<WikiDimension>();
-        var lower = query.ToLowerInvariant();
 
-        if (lower.Contains("who") || lower.Contains("person") || lower.Contains("contact") || lower.Contains("name"))
-            dims.Add(WikiDimension.Who);
-        if (lower.Contains("what") || lower.Contains("thing") || lower.Contains("event") || lower.Contains("task"))
-            dims.Add(WikiDimension.What);
-        if (lower.Contains("where") || lower.Contains("place") || lower.Contains("location") || lower.Contains("address"))
-            dims.Add(WikiDimension.Where);
-        if (lower.Contains("when") || lower.Contains("time") || lower.Contains("date") || lower.Contains("schedule"))
-            dims.Add(WikiDimension.When);
-        if (lower.Contains("why") || lower.Contains("reason") || lower.Contains("cause") || lower.Contains("because"))
-            dims.Add(WikiDimension.Why);
-        if (lower.Contains("how") || lower.Contains("method") || lower.Contains("step") || lower.Contains("process"))
-            dims.Add(WikiDimension.How);
-
-        if (dims.Count == 0)
+        foreach (var token in tokens)
         {
-            dims.Add(WikiDimension.Who);
-            dims.Add(WikiDimension.What);
+            if (DimensionKeywords.TryGetValue(token, out var dim))
+            {
+                dims.Add(dim);
+            }
         }
 
-        return dims;
+        return dims.Count > 0 ? dims : GetDefaultDimensions();
     }
 
+    private static HashSet<WikiDimension> GetDefaultDimensions() => 
+        [WikiDimension.Who, WikiDimension.What];
+
     private static string FormatWikiEntryCompact(WikiEntry entry) =>
-        $"[{entry.Dimension}:{entry.Subject}] " +
-        string.Join("; ", entry.Facts.Select(f => f.Claim));
+        $"[{entry.Dimension}:{entry.Subject}] {string.Join("; ", entry.Facts.Select(f => f.Claim))}";
 
-    private static double ComputeLexicalSimilarity(string queryText, WikiEntry entry)
+    private static double ComputeLexicalSimilarityOptimized(
+        HashSet<string> queryTokens,
+        int queryTokenCount,
+        WikiEntry entry)
     {
-        var queryTokens = Tokenize(queryText);
-        if (queryTokens.Count == 0)
-            return 0.0;
+        if (queryTokenCount == 0) return 0.0;
 
+        // Combine subject and facts for context
         var entryText = $"{entry.Subject} {string.Join(' ', entry.Facts.Select(f => f.Claim))}";
         var entryTokens = Tokenize(entryText);
-        if (entryTokens.Count == 0)
-            return 0.0;
+        
+        if (entryTokens.Count == 0) return 0.0;
 
-        var overlap = queryTokens.Count(token => entryTokens.Contains(token));
-        return overlap / (double)queryTokens.Count;
+        // Iterate the smaller set to minimize total membership checks.
+        var iterateSet = entryTokens.Count <= queryTokenCount ? entryTokens : queryTokens;
+        var lookupSet = entryTokens.Count <= queryTokenCount ? queryTokens : entryTokens;
+        int overlap = CountTokenOverlap(iterateSet, lookupSet);
+
+        return (double)overlap / queryTokenCount;
     }
 
     private static HashSet<string> Tokenize(string text)
     {
-        if (string.IsNullOrWhiteSpace(text))
-            return [];
+        if (string.IsNullOrWhiteSpace(text)) return [];
 
-        return text
-            .ToLowerInvariant()
-            .Split([' ', '\t', '\r', '\n', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '"', '\'', '/', '\\', '-', '_'], StringSplitOptions.RemoveEmptyEntries)
-            .Where(token => token.Length >= 2)
+        return text.ToLowerInvariant()
+            .Split(Delimiters, StringSplitOptions.RemoveEmptyEntries)
+            .Where(t => t.Length >= 2)
             .ToHashSet();
+    }
+
+    private static int CountTokenOverlap(HashSet<string> iterateSet, HashSet<string> lookupSet)
+    {
+        int overlap = 0;
+        foreach (var token in iterateSet)
+        {
+            if (lookupSet.Contains(token)) overlap++;
+        }
+
+        return overlap;
     }
 
     private static double ComputeRecencyDecay(DateTimeOffset lastAccessed)
     {
         var daysSince = (DateTimeOffset.UtcNow - lastAccessed).TotalDays;
+        // Linear decay over 90 days, clamped at 0
         return Math.Max(0.0, 1.0 - (daysSince / 90.0));
     }
 }
