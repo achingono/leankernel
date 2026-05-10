@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using LeanKernel.Host.Services.Channels;
 using Xunit;
+using HostChannelDeliveryResult = LeanKernel.Host.Services.Channels.ChannelDeliveryResult;
 
 namespace LeanKernel.Tests.Unit.Host.Channels;
 
@@ -168,7 +169,7 @@ public sealed class ChannelRegistryTests
         mock.Name.Returns(name);
         mock.IsConfigured.Returns(isConfigured);
         mock.DeliverAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(ChannelDeliveryResult.Successful(name));
+            .Returns(HostChannelDeliveryResult.Successful(name));
 
         return mock;
     }

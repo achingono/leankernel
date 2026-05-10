@@ -14,6 +14,16 @@ public interface IChannel : IAsyncDisposable
     string ChannelId { get; }
 
     /// <summary>
+    /// Gets the display name used by queueing and diagnostics.
+    /// </summary>
+    string Name => ChannelId;
+
+    /// <summary>
+    /// Gets whether the channel is configured for outbound delivery.
+    /// </summary>
+    bool IsConfigured => true;
+
+    /// <summary>
     /// Determines whether the sender is allowed to interact through this channel.
     /// </summary>
     /// <param name="senderId">The sender identifier from the channel.</param>
@@ -39,6 +49,19 @@ public interface IChannel : IAsyncDisposable
     /// <param name="content">The response content to send.</param>
     /// <param name="ct">A token used to cancel sending.</param>
     Task SendAsync(string recipientId, string content, CancellationToken ct);
+
+    /// <summary>
+    /// Delivers a message to a channel recipient and returns a delivery result.
+    /// </summary>
+    /// <param name="recipientId">The recipient identifier for the channel.</param>
+    /// <param name="content">The response content to deliver.</param>
+    /// <param name="ct">A token used to cancel delivery.</param>
+    /// <returns>The channel delivery result.</returns>
+    async Task<ChannelDeliveryResult> DeliverAsync(string recipientId, string content, CancellationToken ct = default)
+    {
+        await SendAsync(recipientId, content, ct);
+        return ChannelDeliveryResult.Successful(Name);
+    }
 
     /// <summary>
     /// Raised when a message is received from the channel.

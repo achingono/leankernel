@@ -5,6 +5,7 @@ using LeanKernel.Host.Services;
 using LeanKernel.Host.Services.Channels;
 using LeanKernel.Host.Services.Channels.Adapters;
 using Xunit;
+using HostChannelDeliveryResult = LeanKernel.Host.Services.Channels.ChannelDeliveryResult;
 
 namespace LeanKernel.Tests.Unit.Host;
 
@@ -279,11 +280,11 @@ public sealed class ChannelDeliveryIntegrationTests
         if (successDelivery)
         {
             mock.DeliverAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-                .Returns(ChannelDeliveryResult.Successful(name, "delivery-ref-123"));
+                .Returns(HostChannelDeliveryResult.Successful(name, "delivery-ref-123"));
         }
         else
         {
-            var result = ChannelDeliveryResult.Failed(
+            var result = HostChannelDeliveryResult.Failed(
                 name,
                 "Delivery failed",
                 retryable: isRetryable,

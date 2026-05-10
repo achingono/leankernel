@@ -64,6 +64,7 @@ LeanKernel.Core.Interfaces.NoopAsyncDisposable
 LeanKernel.Core.Interfaces.ToolExecutionAuthorizationResult
 LeanKernel.Core.Interfaces.ToolOperationDescriptor
 LeanKernel.Core.Models.AuthorizationResult
+LeanKernel.Core.Models.ChannelDeliveryResult
 LeanKernel.Core.Models.ConfigurationStepResult
 LeanKernel.Core.Models.ContextBudget
 LeanKernel.Core.Models.ConversationContext
