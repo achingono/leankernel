@@ -49,6 +49,7 @@ LeanKernel.Core.Interfaces.IContextGatekeeper
 LeanKernel.Core.Interfaces.IEmbeddingService
 LeanKernel.Core.Interfaces.IIdentityFileUpdateService
 LeanKernel.Core.Interfaces.IKnowledgeSearchService
+LeanKernel.Core.Interfaces.ILeanKernelSelectionStrategy
 LeanKernel.Core.Interfaces.ILearningStep
 LeanKernel.Core.Interfaces.IMessageQueue
 LeanKernel.Core.Interfaces.IOnboardingOrchestrator

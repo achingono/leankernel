@@ -17,6 +17,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private readonly IWikiStore _wiki;
     private readonly ISessionStore _sessions;
     private readonly IKnowledgeSearchService _knowledgeSearch;
+    private readonly ILeanKernelSelectionStrategy _selectionStrategy;
     private readonly SystemPromptBuilder _systemPromptBuilder;
     private readonly OnboardingGapDetector _onboardingGapDetector;
     private readonly LeanKernelConfig _config;
@@ -33,6 +34,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     /// <param name="capabilityGapStore">The optional capability-gap store used to enrich prompts.</param>
     /// <param name="systemPromptBuilder">The optional system prompt builder collaborator.</param>
     /// <param name="onboardingGapDetector">The optional onboarding gap detector collaborator.</param>
+    /// <param name="selectionStrategy">The optional LeanKernel selection strategy collaborator.</param>
     public ContextGatekeeper(
         IWikiStore wiki,
         ISessionStore sessions,
@@ -41,11 +43,13 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         ILogger<ContextGatekeeper> logger,
         ICapabilityGapStore? capabilityGapStore = null,
         SystemPromptBuilder? systemPromptBuilder = null,
-        OnboardingGapDetector? onboardingGapDetector = null)
+        OnboardingGapDetector? onboardingGapDetector = null,
+        ILeanKernelSelectionStrategy? selectionStrategy = null)
     {
         _wiki = wiki;
         _sessions = sessions;
         _knowledgeSearch = knowledgeSearch;
+        _selectionStrategy = selectionStrategy ?? new LeanKernelSelectionStrategy(config);
         _config = config.Value;
         _logger = logger;
         _systemPromptBuilder = systemPromptBuilder ?? new SystemPromptBuilder(config, capabilityGapStore);
@@ -90,8 +94,8 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         var vectorCandidates = await RetrieveVectorLeanKernelsAsync(query, agentKnowledgeTags, ct);
 
         // Phase 3: Competitive ranking — all candidates compete for budget
-        var rankedWiki = RankLeanKernels(wikiCandidates, budget.WikiFactsBudget, exclusionLog);
-        var rankedRetrieval = RankLeanKernels(vectorCandidates, budget.RetrievalBudget, exclusionLog);
+        var rankedWiki = _selectionStrategy.Select(wikiCandidates, budget.WikiFactsBudget, exclusionLog);
+        var rankedRetrieval = _selectionStrategy.Select(vectorCandidates, budget.RetrievalBudget, exclusionLog);
 
         // Phase 4: Assemble conversation history (sliding window with compaction)
         var history = await AssembleHistoryAsync(sessionId, ct);
@@ -117,8 +121,8 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         {
             SystemPrompt = systemPrompt,
             History = history,
-            WikiLeanKernels = rankedWiki,
-            RetrievedLeanKernels = rankedRetrieval,
+            WikiLeanKernels = rankedWiki.ToList(),
+            RetrievedLeanKernels = rankedRetrieval.ToList(),
             ActiveToolNames = [], // Populated by Thinker based on intent
             EstimatedTotalTokens = totalTokens,
             ExclusionLog = exclusionLog,
@@ -201,46 +205,6 @@ public sealed class ContextGatekeeper : IContextGatekeeper
             _logger.LogWarning(ex, "Knowledge search failed — falling back to wiki-only context");
             return [];
         }
-    }
-
-    private List<RelevanceScore> RankLeanKernels(
-        List<RelevanceScore> candidates,
-        int tokenBudget,
-        List<string> exclusionLog)
-    {
-        var cfg = _config.Context;
-
-        // Score each candidate using source-aware scoring
-        var scored = candidates.Select(c => c with
-        {
-            Score = c.ComputeSourceAwareScore()
-        })
-        .OrderByDescending(c => c.Score)
-        .ToList();
-
-        // Greedy budget fill
-        var selected = new List<RelevanceScore>();
-        var remainingBudget = tokenBudget;
-
-        foreach (var LeanKernel in scored)
-        {
-            if (LeanKernel.Score < cfg.MinRelevanceThreshold)
-            {
-                exclusionLog.Add($"EXCLUDED [{LeanKernel.EntryId}]: score {LeanKernel.Score:F2} below threshold {cfg.MinRelevanceThreshold}");
-                continue;
-            }
-
-            if (LeanKernel.EstimatedTokens > remainingBudget)
-            {
-                exclusionLog.Add($"EXCLUDED [{LeanKernel.EntryId}]: {LeanKernel.EstimatedTokens} tokens exceeds remaining budget {remainingBudget}");
-                continue;
-            }
-
-            selected.Add(LeanKernel);
-            remainingBudget -= LeanKernel.EstimatedTokens;
-        }
-
-        return selected;
     }
 
     private async Task<List<ConversationTurn>> AssembleHistoryAsync(
