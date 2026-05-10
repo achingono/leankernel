@@ -67,6 +67,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             var rules = rulesProvider.GetCurrent();
             return new ActionAuthorizer(rules, logger);
         });
+        services.AddSingleton<SystemPromptBuilder>();
         services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
         services.AddHttpClient<LlmWikiExtractor>((sp, client) =>
         {

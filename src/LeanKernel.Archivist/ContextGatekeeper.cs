@@ -17,25 +17,9 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     private readonly IWikiStore _wiki;
     private readonly ISessionStore _sessions;
     private readonly IKnowledgeSearchService _knowledgeSearch;
-    private readonly ICapabilityGapStore? _capabilityGapStore;
+    private readonly SystemPromptBuilder _systemPromptBuilder;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ContextGatekeeper> _logger;
-
-    private const string DefaultSystemPrompt = """
-        You are an AI assistant and a user's personal agent.
-        
-        Your goal is to understand their needs and preferences by asking clarifying questions:
-        - What would you like my name to be?
-        - What is your preferred engagement model? (e.g., proactive, reactive, advisory)
-        - What are your communication preferences? (tone, formality, detail level)
-        - What actions should I handle autonomously vs. asking for permission?
-        - What are your availability and timezone preferences?
-        
-        Once you understand their preferences, help them configure SELF.md and USER.md.
-        Answer concisely and accurately using only the context provided.
-        If you don't have enough context, ask clarifying questions rather than guessing.
-        Structure important facts as Who/What/Where/When/Why/How.
-        """;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ContextGatekeeper" /> class.
@@ -46,20 +30,22 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     /// <param name="config">The LeanKernel configuration.</param>
     /// <param name="logger">The logger used for context-gating diagnostics.</param>
     /// <param name="capabilityGapStore">The optional capability-gap store used to enrich prompts.</param>
+    /// <param name="systemPromptBuilder">The optional system prompt builder collaborator.</param>
     public ContextGatekeeper(
         IWikiStore wiki,
         ISessionStore sessions,
         IKnowledgeSearchService knowledgeSearch,
         IOptions<LeanKernelConfig> config,
         ILogger<ContextGatekeeper> logger,
-        ICapabilityGapStore? capabilityGapStore = null)
+        ICapabilityGapStore? capabilityGapStore = null,
+        SystemPromptBuilder? systemPromptBuilder = null)
     {
         _wiki = wiki;
         _sessions = sessions;
         _knowledgeSearch = knowledgeSearch;
-        _capabilityGapStore = capabilityGapStore;
         _config = config.Value;
         _logger = logger;
+        _systemPromptBuilder = systemPromptBuilder ?? new SystemPromptBuilder(config, capabilityGapStore);
     }
 
     /// <inheritdoc />
@@ -107,7 +93,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         var history = await AssembleHistoryAsync(sessionId, ct);
 
         // Phase 5: Build final context
-        var systemPrompt = await BuildSystemPromptAsync(ct);
+        var systemPrompt = await _systemPromptBuilder.BuildAsync(ct);
 
         // Phase 5a: On the very first message of a session, check for identity gaps
         var onboardingInstruction = history.Count == 1
@@ -296,55 +282,6 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         }
 
         return result;
-    }
-
-    private async Task<string> BuildSystemPromptAsync(CancellationToken ct)
-    {
-        var agentDir = Path.Combine(_config.Agents.BasePath, "main");
-        var soulPath = Path.Combine(agentDir, "SELF.md");
-        var userPath = Path.Combine(agentDir, "USER.md");
-
-        var soulContent = File.Exists(soulPath)
-            ? await File.ReadAllTextAsync(soulPath, ct)
-            : null;
-
-        var userContent = File.Exists(userPath)
-            ? await File.ReadAllTextAsync(userPath, ct)
-            : null;
-
-        if (soulContent is null && userContent is null)
-        {
-            return DefaultSystemPrompt;
-        }
-
-        var sb = new System.Text.StringBuilder();
-
-        if (soulContent is not null)
-        {
-            sb.AppendLine(soulContent);
-        }
-        else
-        {
-            sb.AppendLine(DefaultSystemPrompt);
-        }
-
-        if (userContent is not null)
-        {
-            sb.AppendLine();
-            sb.AppendLine(userContent);
-        }
-
-        if (_capabilityGapStore is not null)
-        {
-            var capabilityGaps = await _capabilityGapStore.ReadPromptSectionAsync(ct);
-            if (!string.IsNullOrWhiteSpace(capabilityGaps))
-            {
-                sb.AppendLine();
-                sb.AppendLine(capabilityGaps);
-            }
-        }
-
-        return sb.ToString().Trim();
     }
 
     private async Task<string?> BuildOnboardingInstructionAsync(CancellationToken ct)
