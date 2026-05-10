@@ -1,17 +1,25 @@
 using System.Text.Json;
 using LeanKernel.Core.Interfaces;
 
-namespace LeanKernel.Host.Services;
+namespace LeanKernel.Thinker.Authorization;
 
+/// <summary>
+/// Maps tool calls to engagement-rule action types before execution.
+/// </summary>
 public sealed class EngagementToolExecutionAuthorizer : IToolExecutionAuthorizer
 {
     private readonly IActionAuthorizer _actionAuthorizer;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EngagementToolExecutionAuthorizer" /> class.
+    /// </summary>
+    /// <param name="actionAuthorizer">The action authorizer used to enforce engagement rules.</param>
     public EngagementToolExecutionAuthorizer(IActionAuthorizer actionAuthorizer)
     {
         _actionAuthorizer = actionAuthorizer;
     }
 
+    /// <inheritdoc />
     public async Task<ToolExecutionAuthorizationResult> AuthorizeAsync(
         string toolName,
         string parametersJson,

@@ -23,6 +23,7 @@ using LeanKernel.Plugins.BuiltIn;
 using LeanKernel.Plugins.BuiltIn.Skills;
 using LeanKernel.Scheduler;
 using LeanKernel.Thinker;
+using LeanKernel.Thinker.Authorization;
 using LeanKernel.Thinker.Agents;
 using LeanKernel.Thinker.Workflows;
 
