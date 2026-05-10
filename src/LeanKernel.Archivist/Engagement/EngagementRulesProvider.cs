@@ -1,28 +1,35 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 
-namespace LeanKernel.Host.Services;
+namespace LeanKernel.Archivist.Engagement;
 
 /// <summary>
 /// Loads and parses AGENTS.md from the wiki.
 /// </summary>
 public sealed class EngagementRulesProvider : IEngagementRulesProvider
 {
-    private readonly LeanKernelHostPaths _paths;
+    private readonly LeanKernelConfig _config;
     private readonly ILogger<EngagementRulesProvider> _logger;
     private EngagementRules? _cached;
 
-    public EngagementRulesProvider(LeanKernelHostPaths paths, ILogger<EngagementRulesProvider> logger)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EngagementRulesProvider" /> class.
+    /// </summary>
+    /// <param name="config">The LeanKernel configuration containing the agent path.</param>
+    /// <param name="logger">The logger used for rules loading diagnostics.</param>
+    public EngagementRulesProvider(IOptions<LeanKernelConfig> config, ILogger<EngagementRulesProvider> logger)
     {
-        _paths = paths;
+        _config = config.Value;
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<EngagementRules> LoadAsync(CancellationToken ct)
     {
-        var agentsPath = Path.Combine(_paths.AgentsDirectory, "main", "AGENTS.md");
+        var agentsPath = Path.Combine(_config.Agents.BasePath, "main", "AGENTS.md");
         
         if (!File.Exists(agentsPath))
         {
@@ -52,6 +59,7 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
         }
     }
 
+    /// <inheritdoc />
     public EngagementRules GetCurrent()
     {
         return _cached ?? new EngagementRules();

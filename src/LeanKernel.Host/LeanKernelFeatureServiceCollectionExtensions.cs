@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using LeanKernel.Archivist;
 using LeanKernel.Archivist.CapabilityGaps;
+using LeanKernel.Archivist.Engagement;
 using LeanKernel.Archivist.Embedding;
 using LeanKernel.Archivist.Knowledge;
 using LeanKernel.Archivist.Sessions;

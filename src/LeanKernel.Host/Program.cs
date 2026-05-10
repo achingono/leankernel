@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Serilog;
 using LeanKernel.Archivist;
+using LeanKernel.Archivist.Engagement;
 using LeanKernel.Archivist.Embedding;
 using LeanKernel.Archivist.Knowledge;
 using LeanKernel.Archivist.Sessions;

@@ -3,7 +3,7 @@ using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
-namespace LeanKernel.Host.Services;
+namespace LeanKernel.Archivist.Engagement;
 
 /// <summary>
 /// Decorator-based authorization service.
@@ -14,12 +14,18 @@ public sealed class ActionAuthorizer : IActionAuthorizer
     private readonly EngagementRules _rules;
     private readonly ILogger<ActionAuthorizer> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ActionAuthorizer" /> class.
+    /// </summary>
+    /// <param name="rules">The engagement rules that define autonomy boundaries.</param>
+    /// <param name="logger">The logger used for authorization decisions.</param>
     public ActionAuthorizer(EngagementRules rules, ILogger<ActionAuthorizer> logger)
     {
         _rules = rules;
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public Task<AuthorizationResult> AuthorizeAsync(string actionType, CancellationToken ct)
     {
         var autonomy = _rules.Autonomy;
@@ -76,20 +82,5 @@ public sealed class ActionAuthorizer : IActionAuthorizer
         
         _logger.LogWarning("Action denied (unknown): {Action}", actionType);
         return Task.FromResult(unknownResult);
-    }
-}
-
-/// <summary>
-/// Attribute for marking actions that require engagement authorization.
-/// Usage: [RequiresEngagementPermission("SendEmail")]
-/// </summary>
-[AttributeUsage(AttributeTargets.Method)]
-public sealed class RequiresEngagementPermissionAttribute : Attribute
-{
-    public string ActionType { get; }
-
-    public RequiresEngagementPermissionAttribute(string actionType)
-    {
-        ActionType = actionType;
     }
 }
