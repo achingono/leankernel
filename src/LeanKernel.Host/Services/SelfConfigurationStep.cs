@@ -8,10 +8,13 @@ namespace LeanKernel.Host.Services;
 /// Handles SELF.md configuration step during onboarding.
 /// Captures the agent's self-definition: personality, capabilities, and preferences.
 /// </summary>
-public sealed class SelfConfigurationStep : IAgentSelfProfileInitializer
+public sealed class SelfConfigurationStep : IAgentSelfProfileInitializer, IOnboardingStep
 {
     private readonly LeanKernelHostPaths _paths;
     private readonly ILogger<SelfConfigurationStep> _logger;
+
+    /// <inheritdoc />
+    public string Name => "self";
 
     public SelfConfigurationStep(
         LeanKernelHostPaths paths,
@@ -203,6 +206,9 @@ public sealed class SelfConfigurationStep : IAgentSelfProfileInitializer
 
         return await File.ReadAllTextAsync(selfPath, ct);
     }
+
+    /// <inheritdoc />
+    public Task<string> GetMarkdownAsync(CancellationToken ct) => GetSelfMdAsync(ct);
 
     private string GetSelfPath() =>
         Path.Combine(_paths.AgentsDirectory, "main", "SELF.md");

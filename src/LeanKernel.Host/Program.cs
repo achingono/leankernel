@@ -127,11 +127,14 @@ try
 
     builder.Services.AddScoped<EngagementAuthorizationFilter>();
     
-    builder.Services.AddScoped<AgentsConfigurationStep>();
+    builder.Services.AddSingleton<AgentsConfigurationStep>();
+    builder.Services.AddSingleton<IOnboardingStep>(sp => sp.GetRequiredService<AgentsConfigurationStep>());
     builder.Services.AddSingleton<SelfConfigurationStep>();
     builder.Services.AddSingleton<IAgentSelfProfileInitializer>(sp => sp.GetRequiredService<SelfConfigurationStep>());
+    builder.Services.AddSingleton<IOnboardingStep>(sp => sp.GetRequiredService<SelfConfigurationStep>());
     builder.Services.AddSingleton<UserConfigurationStep>();
     builder.Services.AddSingleton<IUserProfileSynchronizer>(sp => sp.GetRequiredService<UserConfigurationStep>());
+    builder.Services.AddSingleton<IOnboardingStep>(sp => sp.GetRequiredService<UserConfigurationStep>());
 
     // Forwarded headers (for reverse proxy HTTPS detection)
     builder.Services.Configure<ForwardedHeadersOptions>(options =>

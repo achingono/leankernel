@@ -1,16 +1,20 @@
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Core.Models;
 
 namespace LeanKernel.Host.Services;
 
 /// <summary>
 /// Handles AGENTS.md configuration step during onboarding.
 /// </summary>
-public sealed class AgentsConfigurationStep
+public sealed class AgentsConfigurationStep : IOnboardingStep
 {
     private readonly LeanKernelHostPaths _paths;
     private readonly IEngagementRulesProvider _rulesProvider;
     private readonly ILogger<AgentsConfigurationStep> _logger;
+
+    /// <inheritdoc />
+    public string Name => "agents";
 
     public AgentsConfigurationStep(
         LeanKernelHostPaths paths,
@@ -227,6 +231,33 @@ public sealed class AgentsConfigurationStep
 
         return await File.ReadAllTextAsync(agentsPath, ct);
     }
+
+    /// <inheritdoc />
+    async Task<ConfigurationStepResult> IOnboardingStep.InitializeAsync(CancellationToken ct)
+    {
+        var result = await InitializeAsync("basic", ct);
+        return ToConfigurationStepResult(result);
+    }
+
+    /// <inheritdoc />
+    async Task<ConfigurationStepResult> IOnboardingStep.ValidateAsync(CancellationToken ct)
+    {
+        var result = await ValidateAsync(ct);
+        return ToConfigurationStepResult(result);
+    }
+
+    /// <inheritdoc />
+    public Task<string> GetMarkdownAsync(CancellationToken ct) => GetAgentsMdAsync(ct);
+
+    private static ConfigurationStepResult ToConfigurationStepResult(AgentsStepResult result) => new()
+    {
+        Success = result.Success,
+        Message = result.Message,
+        AlreadyExists = result.AlreadyExists,
+        IsValid = result.IsValid ?? result.Success,
+        FilePath = result.AgentsPath,
+        Errors = result.Errors
+    };
 
     /// <summary>
     /// Get available onboarding presets.

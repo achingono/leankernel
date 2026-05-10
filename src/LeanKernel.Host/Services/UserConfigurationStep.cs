@@ -9,11 +9,14 @@ namespace LeanKernel.Host.Services;
 /// Captures user profile, preferences, and communication patterns.
 /// Auto-updates from wiki facts extracted during conversations.
 /// </summary>
-public sealed class UserConfigurationStep : IUserProfileSynchronizer
+public sealed class UserConfigurationStep : IUserProfileSynchronizer, IOnboardingStep
 {
     private readonly LeanKernelHostPaths _paths;
     private readonly IWikiStore _wikiStore;
     private readonly ILogger<UserConfigurationStep> _logger;
+
+    /// <inheritdoc />
+    public string Name => "user";
 
     public UserConfigurationStep(
         LeanKernelHostPaths paths,
@@ -207,6 +210,9 @@ public sealed class UserConfigurationStep : IUserProfileSynchronizer
 
         return await File.ReadAllTextAsync(userPath, ct);
     }
+
+    /// <inheritdoc />
+    public Task<string> GetMarkdownAsync(CancellationToken ct) => GetUserMdAsync(ct);
 
     /// <summary>
     /// Update USER.md from extracted wiki facts.
