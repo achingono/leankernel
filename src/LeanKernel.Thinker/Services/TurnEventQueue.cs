@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
+using LeanKernel.Thinker.Resources;
 
 namespace LeanKernel.Thinker.Services;
 
@@ -79,7 +80,7 @@ public sealed class TurnEventQueue : ITurnEventSink
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to restore queued turn event from {Path}", file);
+                _logger.LogError(ex, ResourceText.Log("TurnEventRestoreFailed"), file);
             }
         }
     }

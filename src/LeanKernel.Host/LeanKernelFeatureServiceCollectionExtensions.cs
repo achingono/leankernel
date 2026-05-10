@@ -71,6 +71,8 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         });
         services.AddSingleton<SystemPromptBuilder>();
         services.AddSingleton<OnboardingGapDetector>();
+        services.AddSingleton<ContextCandidateRetriever>();
+        services.AddSingleton<ConversationHistoryAssembler>();
         services.AddSingleton<ILeanKernelSelectionStrategy, LeanKernelSelectionStrategy>();
         services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
         services.AddHttpClient<LlmWikiExtractor>((sp, client) =>

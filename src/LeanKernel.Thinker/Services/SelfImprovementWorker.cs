@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Interfaces;
+using LeanKernel.Thinker.Resources;
 
 namespace LeanKernel.Thinker.Services;
 
@@ -45,7 +46,7 @@ public sealed class SelfImprovementWorker : BackgroundService
                 }
 
                 _logger.LogWarning(
-                    "Self-improvement pipeline completed with failures for {TurnEventId}: {Failures}",
+                    ResourceText.Log("SelfImprovementPipelineCompletedWithFailures"),
                     turnEvent.Id,
                     string.Join(", ", result.StepResults.Where(r => !r.Success).Select(r => r.StepName)));
             }
@@ -55,7 +56,7 @@ public sealed class SelfImprovementWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Self-improvement worker failed for turn event {TurnEventId}", turnEvent.Id);
+                _logger.LogError(ex, ResourceText.Log("SelfImprovementWorkerFailed"), turnEvent.Id);
             }
         }
     }

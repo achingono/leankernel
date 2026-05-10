@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
+using LeanKernel.Thinker.Resources;
 
 namespace LeanKernel.Thinker.Services;
 
@@ -40,7 +41,7 @@ public sealed class SelfImprovementPipeline : ISelfImprovementPipeline
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Learning step {StepName} failed for turn event {TurnEventId}",
+                _logger.LogError(ex, ResourceText.Log("LearningStepFailed"),
                     step.Name, turnEvent.Id);
                 results.Add(LearningStepResult.Failed(step.Name, ex.Message));
             }

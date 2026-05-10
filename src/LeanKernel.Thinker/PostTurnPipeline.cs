@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
+using LeanKernel.Thinker.Resources;
 
 namespace LeanKernel.Thinker;
 
@@ -78,7 +79,7 @@ public sealed class PostTurnPipeline
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to enqueue turn event for self-improvement");
+            _logger.LogError(ex, ResourceText.Log("TurnEventEnqueueFailed"));
         }
     }
 }

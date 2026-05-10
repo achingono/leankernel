@@ -46,13 +46,17 @@ Recurring issues in production agent deployments map directly to the problems Le
 
 ## Architecture
 
-LeanKernel is organized into three decoupled subsystems:
+LeanKernel is organized around a single agent runtime and feature-owned subsystems:
 
 | Component | Role |
 |-----------|------|
-| **Commander** | Channel adapters (Signal, future Telegram/Discord). Routes messages. |
-| **Thinker** | LLM reasoning via Microsoft Agent Framework. Prompt assembly, tool dispatch, agent orchestration. |
-| **Archivist** | Memory & context gatekeeper. 5W1H wiki, vector search, deny-by-default context gating. |
+| **Agent Runtime** | Canonical entry point for each turn via `IAgentRuntime`. |
+| **Commander** | Channel adapters, channel routing, and durable outbound message queue. |
+| **Thinker** | Turn orchestration, prompt assembly, tool dispatch, model invocation strategies, and post-turn event publication. |
+| **Archivist** | Sessions, identity/profile artifacts, engagement policy, 5W1H wiki, vector search, capability gaps, and deny-by-default context gating. |
+| **Scheduler** | Cron jobs and proactive maintenance. |
+| **Plugins** | Built-in tools, attachment extraction, and runtime skill loading. |
+| **Host** | ASP.NET Core API, Blazor UI, authentication, onboarding UI, and composition. |
 
 ### Component Diagram
 
@@ -61,23 +65,27 @@ LeanKernel is organized into three decoupled subsystems:
 │                    Docker Compose Network                        │
 │                                                                  │
 │  ┌────────────┐   ┌──────────────────────────────────────────┐  │
-│  │ signal-cli  │◄─►│         LeanKernel.Engine (.NET 10)           │  │
+│  │ signal-cli  │◄─►│         LeanKernel-engine (.NET 10)           │  │
 │  │ (JSON-RPC)  │   │                                          │  │
-│  └────────────┘   │  Commander ──► Thinker ──► Archivist      │  │
-│                    │       │            │           │           │  │
-│  ┌────────────┐   │       │            │           ▼           │  │
-│  │  LiteLLM   │◄─►│       │            │      5W1H Wiki       │  │
-│  │  (proxy)   │   │       │            │      Qdrant Search   │  │
-│  └────────────┘   │       │            ▼                       │  │
-│                    │       │     Agent Orchestrator             │  │
-│  ┌────────────┐   │       │     ├── ResearchWorker             │  │
-│  │  Qdrant    │◄─►│       │     ├── CodeWorker                 │  │
-│  │  (vectors) │   │       │     └── ScheduleWorker             │  │
+│  └────────────┘   │  Channels/UI/API ──► IAgentRuntime        │  │
+│                    │       │                   │                │  │
+│  ┌────────────┐   │       ▼                   ▼                │  │
+│  │  LiteLLM   │◄─►│  Commander ──► Thinker ──► Archivist      │  │
+│  │  (proxy)   │   │       │            │           │           │  │
+│  └────────────┘   │       │            │      5W1H Wiki       │  │
+│                    │       │            │      Qdrant Search   │  │
+│  ┌────────────┐   │       │            ▼                       │  │
+│  │  Qdrant    │◄─►│       │     Agent Strategies               │  │
+│  │  (vectors) │   │       │     ├── ResearchWorker             │  │
+│  │            │   │       │     ├── CodeWorker                 │  │
+│  │            │   │       │     └── ScheduleWorker             │  │
 │  └────────────┘   │       ▼                                    │  │
 │                    │  Scheduler · Plugins · Source Generators   │  │
 │                    └──────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the contributor-oriented architecture explanation and ownership rules.
 
 ### Context Gatekeeper (Core Differentiator)
 
@@ -105,6 +113,10 @@ Knowledge is stored as structured facts across six dimensions:
 | **How** | Processes, methods, procedures |
 
 Each fact carries confidence scores, source citations, and is automatically extracted from conversations via heuristic pattern matching.
+
+### Self-Improvement by Default
+
+Every successful turn can emit a durable `TurnEvent` after the response is returned. A background `SelfImprovementWorker` drains the queue through configured `ILearningStep` implementations for fact extraction, identity refresh, and failure recovery. This keeps the user-facing path fast while ensuring learning is enabled by explicit configuration rather than fragile optional service wiring.
 
 Wiki entries are stored as **markdown files** with YAML frontmatter — human-readable, editable, and git-friendly:
 
@@ -258,9 +270,9 @@ LeanKernel/
 │   └── wiki-backup.sh          # Wiki backup/restore
 └── src/
     ├── LeanKernel.Core/             # Interfaces, models, configuration
-    ├── LeanKernel.Commander/        # Channel adapters (Signal)
-    ├── LeanKernel.Thinker/          # LLM reasoning + agent orchestration
-    ├── LeanKernel.Archivist/        # Memory, context gatekeeper, wiki
+    ├── LeanKernel.Commander/        # Channel adapters + durable message queue
+    ├── LeanKernel.Thinker/          # Agent runtime, model strategies, learning pipeline
+    ├── LeanKernel.Archivist/        # Memory, context gatekeeper, wiki, identity/policy
     ├── LeanKernel.Scheduler/        # Cron-based proactive tasks
     ├── LeanKernel.Plugins/          # Tool/plugin system
     ├── LeanKernel.Generators/       # Roslyn source generators

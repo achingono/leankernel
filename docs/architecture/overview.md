@@ -1,19 +1,19 @@
 # Architecture Overview
 
-LeanKernel is a personal AI agent platform built around a .NET 10 host, a channel layer, a reasoning layer, a memory layer, runtime skills, scheduled work, and containerized sidecars for model routing, vector search, document parsing, and messaging.
+LeanKernel is a personal AI agent platform built around a .NET 10 host, a canonical agent runtime, a channel layer, a reasoning layer, a memory layer, runtime skills, scheduled work, and containerized sidecars for model routing, vector search, document parsing, and messaging.
 
 ## Solution Components
 
 | Project | Responsibility |
 |---------|----------------|
 | `LeanKernel.Core` | Shared configuration, interfaces, enums, and message/context/wiki models. |
-| `LeanKernel.Commander` | Inbound channel routing, message normalization, and Signal adapters. |
-| `LeanKernel.Thinker` | Prompt assembly, Microsoft Agent Framework integration, tool adaptation, model routing, and worker-agent orchestration. |
-| `LeanKernel.Archivist` | Conversation sessions, 5W1H wiki memory, context gating, embedding cache, and Qdrant-backed knowledge search. |
-| `LeanKernel.Scheduler` | Cron scheduler and proactive jobs such as wiki maintenance and model limit synchronization. |
-| `LeanKernel.Plugins` | Built-in tools and runtime skill loading. |
+| `LeanKernel.Commander` | Inbound channel routing, message normalization, channel delivery, and durable outbound message queue. |
+| `LeanKernel.Thinker` | Agent runtime facade, prompt assembly, Microsoft Agent Framework integration, tool adaptation, model invocation strategies, response enhancement, and self-improvement event publication. |
+| `LeanKernel.Archivist` | Conversation sessions, identity/profile artifacts, engagement policy, capability gaps, 5W1H wiki memory, context gating, embedding cache, and Qdrant-backed knowledge search. |
+| `LeanKernel.Scheduler` | Cron scheduler, time-boundary services, and proactive jobs such as wiki maintenance and model limit synchronization. |
+| `LeanKernel.Plugins` | Built-in tools, attachment extraction, and runtime skill loading. |
 | `LeanKernel.Generators` | Source generation for tool registry support. |
-| `LeanKernel.Host` | ASP.NET Core API, Blazor UI, authentication, onboarding, message queue, channel delivery, health checks, and background services. |
+| `LeanKernel.Host` | ASP.NET Core API, Blazor UI, authentication, onboarding UI, health checks, hosted-service startup, and feature composition. |
 | `LeanKernel.Tests.Unit` | Unit tests for core behavior, host services/controllers, plugins, scheduler, thinker, commander, and archivist. |
 | `LeanKernel.Tests.Integration` | Integration tests for skill loading and basic cross-project behavior. |
 
@@ -64,11 +64,12 @@ flowchart LR
     User[User / Channel] --> Commander
 
     subgraph Engine["LeanKernel-engine (.NET 10)"]
-        Commander --> Host
-        Host --> Thinker
+        Commander --> Runtime[IAgentRuntime]
+        Host --> Runtime
+        Runtime --> Thinker
         Thinker --> Archivist
         Thinker --> Plugins
-        Host --> Queue[(SQLite Queue)]
+        Commander --> Queue[(SQLite Queue)]
         Queue --> Adapters[Channel Adapters]
     end
 
@@ -97,5 +98,6 @@ flowchart LR
 | Sessions | JSON files under `data/sessions` | Created per channel/sender. |
 | Wiki memory | Markdown files with frontmatter under `data/wiki` | Structured by 5W1H dimensions. |
 | Message queue | SQLite `messagequeue.db` | Wraps an in-memory queue for recovery across restarts. |
+| Self-improvement queue | JSON files under the configured learning queue path | Restores pending `TurnEvent` records after restart. |
 | Vector index | Qdrant collection, default `LEANKERNEL_knowledge` | Populated by the indexer and queried by Archivist/tools. |
 | Logs | Rolling Serilog files under `data/logs` | Also emitted to console. |
