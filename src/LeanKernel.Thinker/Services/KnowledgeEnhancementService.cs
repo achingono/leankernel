@@ -12,7 +12,7 @@ namespace LeanKernel.Thinker.Services;
 /// Example: User discusses workplace conflict → service finds HBR articles
 /// on conflict resolution and weaves them into the response.
 /// </summary>
-public sealed class KnowledgeEnhancementService
+public sealed class KnowledgeEnhancementService : IResponseEnhancer
 {
     private readonly IKnowledgeSearchService _knowledge;
     private readonly ILogger<KnowledgeEnhancementService> _logger;

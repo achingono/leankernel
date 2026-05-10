@@ -50,6 +50,9 @@ public sealed class LlmWikiExtractor
     /// Fire-and-forget async extraction. Does not await or return result.
     /// Failures are logged but don't propagate.
     /// </summary>
+    /// <param name="userMessage">The user message from the completed turn.</param>
+    /// <param name="assistantResponse">The assistant response from the completed turn.</param>
+    /// <param name="sourceId">The source identifier used when persisting facts.</param>
     public void ExtractAsync(string userMessage, string assistantResponse, string sourceId)
     {
         _ = Task.Run(async () =>
@@ -65,7 +68,14 @@ public sealed class LlmWikiExtractor
         });
     }
 
-    internal async Task ExtractAndIngestAsync(string userMessage, string assistantResponse, string sourceId, CancellationToken ct)
+    /// <summary>
+    /// Extracts semantic facts from an exchange and ingests them into the wiki.
+    /// </summary>
+    /// <param name="userMessage">The user message from the completed turn.</param>
+    /// <param name="assistantResponse">The assistant response from the completed turn.</param>
+    /// <param name="sourceId">The source identifier used when persisting facts.</param>
+    /// <param name="ct">A token used to cancel extraction.</param>
+    public async Task ExtractAndIngestAsync(string userMessage, string assistantResponse, string sourceId, CancellationToken ct)
     {
         var response = await CallLiteLlmAsync(userMessage, assistantResponse, ct);
 

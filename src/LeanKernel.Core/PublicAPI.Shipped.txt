@@ -28,6 +28,7 @@ LeanKernel.Core.Configuration.RateLimitConfig
 LeanKernel.Core.Configuration.RoutingConfig
 LeanKernel.Core.Configuration.SafetyBoundaries
 LeanKernel.Core.Configuration.SchedulerConfig
+LeanKernel.Core.Configuration.SelfImprovementConfig
 LeanKernel.Core.Configuration.SignalConfig
 LeanKernel.Core.Configuration.SpendGuardConfig
 LeanKernel.Core.Configuration.TagRule
@@ -51,6 +52,7 @@ LeanKernel.Core.Interfaces.IOnboardingOrchestrator
 LeanKernel.Core.Interfaces.IOnboardingStateStore
 LeanKernel.Core.Interfaces.IOnboardingStep
 LeanKernel.Core.Interfaces.IOperationsTool
+LeanKernel.Core.Interfaces.IResponseEnhancer
 LeanKernel.Core.Interfaces.IRuntimeLeanKernelConfigStore
 LeanKernel.Core.Interfaces.IScheduler
 LeanKernel.Core.Interfaces.ISelfImprovementPipeline
@@ -60,6 +62,7 @@ LeanKernel.Core.Interfaces.ITimeBoundaryService
 LeanKernel.Core.Interfaces.ITool
 LeanKernel.Core.Interfaces.IToolExecutionAuthorizer
 LeanKernel.Core.Interfaces.IToolRegistry
+LeanKernel.Core.Interfaces.ITurnEventSink
 LeanKernel.Core.Interfaces.ITypingIndicatorChannel
 LeanKernel.Core.Interfaces.IWikiStore
 LeanKernel.Core.Interfaces.NoopAsyncDisposable

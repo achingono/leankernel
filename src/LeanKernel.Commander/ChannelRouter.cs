@@ -43,6 +43,11 @@ public sealed class ChannelRouter
         }
     }
 
+    /// <summary>
+    /// Resolves a configured channel by stable identifier or display name.
+    /// </summary>
+    /// <param name="channelName">The channel identifier or display name.</param>
+    /// <returns>The configured channel, or <see langword="null" /> when no usable channel is registered.</returns>
     public IChannel? GetChannel(string channelName)
     {
         if (string.IsNullOrWhiteSpace(channelName))
@@ -70,6 +75,14 @@ public sealed class ChannelRouter
         return channel;
     }
 
+    /// <summary>
+    /// Delivers an outbound queued message through the named channel.
+    /// </summary>
+    /// <param name="channelName">The channel identifier or display name.</param>
+    /// <param name="recipientId">The channel-specific recipient identifier.</param>
+    /// <param name="content">The message content to deliver.</param>
+    /// <param name="ct">A token used to cancel delivery.</param>
+    /// <returns>The delivery result from the resolved channel.</returns>
     public async Task<ChannelDeliveryResult> DeliverAsync(
         string channelName,
         string recipientId,

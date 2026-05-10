@@ -16,8 +16,10 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
 {
     public string ChannelId => "signal";
 
+    /// <inheritdoc />
     public string Name => "Signal";
 
+    /// <inheritdoc />
     public bool IsConfigured =>
         _config.Signal.Enabled &&
         !string.IsNullOrWhiteSpace(_config.Signal.Account) &&
@@ -68,6 +70,11 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         }
 
         InitializeAdapter();
+        if (_adapter is null)
+        {
+            _logger.LogWarning("Signal channel is not properly configured");
+            return;
+        }
 
         _adapter.OnMessage += msg =>
         {

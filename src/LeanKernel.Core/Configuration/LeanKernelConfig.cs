@@ -20,6 +20,10 @@ public sealed class LeanKernelConfig
     public AuthConfig Auth { get; set; } = new();
     public RoutingConfig Routing { get; set; } = new();
     public EngagementRules Engagement { get; set; } = new();
+    /// <summary>
+    /// Gets or sets options for the post-turn self-improvement pipeline.
+    /// </summary>
+    public SelfImprovementConfig SelfImprovement { get; set; } = new();
 
     // Channel configuration for Phase 4
     public string? SignalPhoneNumber { get; set; }
@@ -27,6 +31,42 @@ public sealed class LeanKernelConfig
     public string? SignalApiToken { get; set; }
     public string? DiscordBotToken { get; set; }
     public string? DiscordChannelId { get; set; }
+}
+
+/// <summary>
+/// Configuration for durable post-turn learning.
+/// </summary>
+public sealed class SelfImprovementConfig
+{
+    /// <summary>
+    /// Gets or sets whether the self-improvement pipeline is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the directory used for durable queued turn events.
+    /// </summary>
+    public string QueuePath { get; set; } = "queue/learning";
+
+    /// <summary>
+    /// Gets or sets whether deterministic regex-based fact extraction runs.
+    /// </summary>
+    public bool RegexExtractionEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether semantic LLM-based fact extraction runs.
+    /// </summary>
+    public bool LlmExtractionEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether identity files are refreshed from completed turns.
+    /// </summary>
+    public bool IdentityRefreshEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether failed turns are classified for recovery and capability-gap learning.
+    /// </summary>
+    public bool FailureRecoveryEnabled { get; set; } = true;
 }
 
 public enum AuthMode { LocalPasscode, Oidc, Disabled }

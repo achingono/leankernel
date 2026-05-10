@@ -16,6 +16,17 @@ namespace LeanKernel.Thinker;
 /// </summary>
 public sealed class ThinkerServiceDependencies
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ThinkerServiceDependencies" /> class.
+    /// </summary>
+    /// <param name="gatekeeper">The service that selects context for a turn.</param>
+    /// <param name="sessions">The session store used for conversation history.</param>
+    /// <param name="wiki">The wiki store used by the thinker.</param>
+    /// <param name="agentFactory">The factory that creates AI agents.</param>
+    /// <param name="toolAdapter">The adapter that exposes tools to the AI agent.</param>
+    /// <param name="promptAssembler">The service that builds system instructions.</param>
+    /// <param name="responseEnhancer">The optional synchronous response enhancer.</param>
+    /// <param name="turnEventSink">The optional sink for durable post-turn learning.</param>
     public ThinkerServiceDependencies(
         IContextGatekeeper gatekeeper,
         ISessionStore sessions,
@@ -23,10 +34,8 @@ public sealed class ThinkerServiceDependencies
         AgentFactory agentFactory,
         ToolFunctionAdapter toolAdapter,
         PromptAssembler promptAssembler,
-        LlmWikiExtractor? llmExtractor = null,
-        KnowledgeEnhancementService? knowledgeEnhancement = null,
-        IIdentityFileUpdateService? identityUpdater = null,
-        RequestFailureHandler? failureHandler = null)
+        IResponseEnhancer? responseEnhancer = null,
+        ITurnEventSink? turnEventSink = null)
     {
         Gatekeeper = gatekeeper;
         Sessions = sessions;
@@ -34,10 +43,8 @@ public sealed class ThinkerServiceDependencies
         AgentFactory = agentFactory;
         ToolAdapter = toolAdapter;
         PromptAssembler = promptAssembler;
-        LlmExtractor = llmExtractor;
-        KnowledgeEnhancement = knowledgeEnhancement;
-        IdentityUpdater = identityUpdater;
-        FailureHandler = failureHandler;
+        ResponseEnhancer = responseEnhancer;
+        TurnEventSink = turnEventSink;
     }
 
     public IContextGatekeeper Gatekeeper { get; }
@@ -46,10 +53,8 @@ public sealed class ThinkerServiceDependencies
     public AgentFactory AgentFactory { get; }
     public ToolFunctionAdapter ToolAdapter { get; }
     public PromptAssembler PromptAssembler { get; }
-    public LlmWikiExtractor? LlmExtractor { get; }
-    public KnowledgeEnhancementService? KnowledgeEnhancement { get; }
-    public IIdentityFileUpdateService? IdentityUpdater { get; }
-    public RequestFailureHandler? FailureHandler { get; }
+    public IResponseEnhancer? ResponseEnhancer { get; }
+    public ITurnEventSink? TurnEventSink { get; }
 }
 
 /// <summary>
@@ -67,10 +72,8 @@ public sealed class ThinkerService : IThinkerService
     private readonly PromptAssembler _promptAssembler;
     private readonly ModelRoutingService? _routing;
     private readonly SelectionLogStore? _selectionLog;
-    private readonly LlmWikiExtractor? _llmExtractor;
-    private readonly KnowledgeEnhancementService? _knowledgeEnhancement;
-    private readonly IIdentityFileUpdateService? _identityUpdater;
-    private readonly RequestFailureHandler? _failureHandler;
+    private readonly IResponseEnhancer? _responseEnhancer;
+    private readonly ITurnEventSink? _turnEventSink;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -87,10 +90,8 @@ public sealed class ThinkerService : IThinkerService
         _agentFactory = dependencies.AgentFactory;
         _toolAdapter = dependencies.ToolAdapter;
         _promptAssembler = dependencies.PromptAssembler;
-        _llmExtractor = dependencies.LlmExtractor;
-        _knowledgeEnhancement = dependencies.KnowledgeEnhancement;
-        _identityUpdater = dependencies.IdentityUpdater;
-        _failureHandler = dependencies.FailureHandler;
+        _responseEnhancer = dependencies.ResponseEnhancer;
+        _turnEventSink = dependencies.TurnEventSink;
         _routing = routing;
         _selectionLog = selectionLog;
         _config = config.Value;
@@ -123,6 +124,8 @@ public sealed class ThinkerService : IThinkerService
         // 4. Call LLM — via intelligent routing when enabled, otherwise static default.
         string response;
         Exception? captureException = null;
+        string? errorType = null;
+        string? errorMessage = null;
 
         try
         {
@@ -154,21 +157,16 @@ public sealed class ThinkerService : IThinkerService
         catch (Exception ex)
         {
             captureException = ex;
+            errorType = ex.GetType().Name;
+            errorMessage = ex.Message;
             _logger.LogError(ex, "LLM invocation failed");
             response = "I'm sorry, I encountered an error processing your request. Please try again.";
-            
-            // Attempt to enhance error response with knowledge fallback
-            if (_failureHandler is not null)
-            {
-                response = await _failureHandler.HandleFailureAsync(
-                    message.Content, response, ex, ct);
-            }
         }
 
         // 4a. Enhance response with knowledge synthesis (if enabled)
-        if (_knowledgeEnhancement is not null && captureException is null)
+        if (_responseEnhancer is not null && captureException is null)
         {
-            response = await _knowledgeEnhancement.EnhanceResponseAsync(
+            response = await _responseEnhancer.EnhanceResponseAsync(
                 message.Content, response, context, ct);
         }
 
@@ -180,35 +178,29 @@ public sealed class ThinkerService : IThinkerService
             Timestamp = DateTimeOffset.UtcNow
         }, ct);
 
-        // 6. Extract and persist 5W1H facts from the exchange
         var sourceId = $"conversation:{DateTimeOffset.UtcNow:yyyy-MM-ddTHH:mm:ss}";
-        
-        // 6a. Synchronous regex extraction (fast, non-blocking)
-        try
+
+        if (_turnEventSink is not null)
         {
-            var facts = WikiExtractor.ExtractFacts(message.Content, response, sourceId);
-            if (facts.Count > 0)
+            try
             {
-                await _wiki.IngestFactsAsync(facts, ct);
-                _logger.LogDebug("Regex extraction: ingested {Count} wiki entries", facts.Count);
+                await _turnEventSink.EnqueueAsync(new TurnEvent
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    SessionId = sessionId,
+                    UserMessage = message,
+                    AssistantResponse = response,
+                    Context = context,
+                    SourceId = sourceId,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    ErrorType = errorType,
+                    ErrorMessage = errorMessage
+                }, ct);
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Regex fact extraction failed — continuing without persistence");
-        }
-
-        // 6b. Async LLM extraction (semantic, fire-and-forget, doesn't block turn latency)
-        if (_llmExtractor is not null)
-        {
-            _llmExtractor.ExtractAsync(message.Content, response, sourceId);
-        }
-
-        // 6c. Update identity files from conversation insights (continuous self-improvement)
-        if (_identityUpdater is not null)
-        {
-            _ = _identityUpdater.UpdateFromTurnAsync(
-                message.Content, response, sessionId, ct);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to enqueue turn event for self-improvement");
+            }
         }
 
         return response;
