@@ -176,7 +176,7 @@ services:
       - RESCAN_INTERVAL_SECONDS=${INDEXER_RESCAN_INTERVAL:-300}
       - WIKI_DEBOUNCE_SECONDS=5
       - STATE_DB_PATH=/app/data/indexer-state/indexer-state.db
-      - TAG_RULES_JSON=${TAG_RULES_JSON:-[{"pathPattern":"wiki/**","tags":["wiki"]},{"pathPattern":"agents/main/documents/technical/**","tags":["technical"]},{"pathPattern":"agents/main/documents/books/**","tags":["books","general"]}]}
+      - TAG_RULES_JSON=${TAG_RULES_JSON:-[{"pathPattern":"wiki/**","tags":["wiki"]},{"pathPattern":"documents/**","tags":["documents"]},{"pathPattern":"attachments/**","tags":["documents"]},{"pathPattern":"agents/main/documents/technical/**","tags":["technical","documents"]},{"pathPattern":"agents/main/documents/books/**","tags":["books","documents"]}]}
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data/wiki:/app/data/wiki

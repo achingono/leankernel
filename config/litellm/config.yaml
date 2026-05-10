@@ -219,9 +219,9 @@ routes:
       keys: [github_copilot1]
       order: 9
   embedding-small:
-    - provider: ollama
-      model: qwen3_embedding_8b
-      keys: [ollama1]
+    - provider: gemini
+      model: embedding_2
+      keys: [gemini1, gemini2, gemini3]
       order: 1
   embedding-large:
     - provider: azure

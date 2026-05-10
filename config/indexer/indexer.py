@@ -247,10 +247,9 @@ class EmbeddingClient:
     def _embedding_payload(self, text: str) -> dict[str, Any]:
         payload: dict[str, Any] = {"input": text, "model": self.model}
         if self.request_dimension and self.request_dimension > 0:
-            # Some providers expect `dimensions`; others accept `dimension`.
-            # LiteLLM drop_params=true will remove unsupported fields safely.
+            # `dimensions` is OpenAI-compatible and works across our configured
+            # providers. Sending `dimension` causes Gemini to reject requests.
             payload["dimensions"] = self.request_dimension
-            payload["dimension"] = self.request_dimension
         return payload
 
     def _fit_requested_dimension(self, embedding: list[float]) -> list[float]:
