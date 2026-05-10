@@ -23,6 +23,7 @@ using LeanKernel.Thinker.Authorization;
 using LeanKernel.Thinker.Agents;
 using LeanKernel.Thinker.Routing;
 using LeanKernel.Thinker.Services;
+using LeanKernel.Thinker.Strategies;
 using LeanKernel.Thinker.Workflows;
 
 namespace LeanKernel.Host;
@@ -101,6 +102,10 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<IIdentityFileUpdateService, IdentityFileUpdateService>();
         services.AddSingleton<RequestFailureHandler>();
         services.AddSingleton<IToolExecutionAuthorizer, EngagementToolExecutionAuthorizer>();
+        services.AddSingleton<StaticAgentStrategy>();
+        services.AddSingleton<RoutedAgentStrategy>();
+        services.AddSingleton<ShadowRoutingStrategy>();
+        services.AddSingleton<AgentStrategySelector>();
         services.AddSingleton<PostTurnPipeline>();
         services.AddSelfImprovement();
 
@@ -112,12 +117,13 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             var agentFactory = sp.GetRequiredService<AgentFactory>();
             var toolAdapter = sp.GetRequiredService<ToolFunctionAdapter>();
             var promptAssembler = sp.GetRequiredService<PromptAssembler>();
+            var strategySelector = sp.GetService<AgentStrategySelector>();
             var responseEnhancer = sp.GetService<IResponseEnhancer>();
             var postTurnPipeline = sp.GetService<PostTurnPipeline>();
 
             return new ThinkerServiceDependencies(
                 gatekeeper, sessions, wiki, agentFactory, toolAdapter, promptAssembler,
-                responseEnhancer, postTurnPipeline);
+                strategySelector, responseEnhancer, postTurnPipeline);
         });
 
         services.AddSingleton<TaskComplexityScorer>();

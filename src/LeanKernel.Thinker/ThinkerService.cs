@@ -1,4 +1,3 @@
-using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -7,8 +6,8 @@ using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
-using LeanKernel.Thinker.Routing;
 using LeanKernel.Thinker.Services;
+using LeanKernel.Thinker.Strategies;
 
 namespace LeanKernel.Thinker;
 
@@ -26,6 +25,7 @@ public sealed class ThinkerServiceDependencies
     /// <param name="agentFactory">The factory that creates AI agents.</param>
     /// <param name="toolAdapter">The adapter that exposes tools to the AI agent.</param>
     /// <param name="promptAssembler">The service that builds system instructions.</param>
+    /// <param name="strategySelector">The selector that chooses the model invocation strategy.</param>
     /// <param name="responseEnhancer">The optional synchronous response enhancer.</param>
     /// <param name="postTurnPipeline">The pipeline that persists assistant output and publishes learning events.</param>
     public ThinkerServiceDependencies(
@@ -35,6 +35,7 @@ public sealed class ThinkerServiceDependencies
         AgentFactory agentFactory,
         ToolFunctionAdapter toolAdapter,
         PromptAssembler promptAssembler,
+        AgentStrategySelector? strategySelector = null,
         IResponseEnhancer? responseEnhancer = null,
         PostTurnPipeline? postTurnPipeline = null)
     {
@@ -44,6 +45,7 @@ public sealed class ThinkerServiceDependencies
         AgentFactory = agentFactory;
         ToolAdapter = toolAdapter;
         PromptAssembler = promptAssembler;
+        StrategySelector = strategySelector;
         ResponseEnhancer = responseEnhancer;
         PostTurnPipeline = postTurnPipeline;
     }
@@ -54,6 +56,7 @@ public sealed class ThinkerServiceDependencies
     public AgentFactory AgentFactory { get; }
     public ToolFunctionAdapter ToolAdapter { get; }
     public PromptAssembler PromptAssembler { get; }
+    public AgentStrategySelector? StrategySelector { get; }
     public IResponseEnhancer? ResponseEnhancer { get; }
     public PostTurnPipeline? PostTurnPipeline { get; }
 }
@@ -68,11 +71,10 @@ public sealed class ThinkerService : IThinkerService
     private readonly IContextGatekeeper _gatekeeper;
     private readonly ISessionStore _sessions;
     private readonly IWikiStore _wiki;
-    private readonly AgentFactory _agentFactory;
     private readonly ToolFunctionAdapter _toolAdapter;
     private readonly PromptAssembler _promptAssembler;
-    private readonly ModelRoutingService? _routing;
-    private readonly SelectionLogStore? _selectionLog;
+    private readonly AgentStrategySelector? _strategySelector;
+    private readonly IAgentStrategy _fallbackStrategy;
     private readonly IResponseEnhancer? _responseEnhancer;
     private readonly PostTurnPipeline? _postTurnPipeline;
     private readonly LeanKernelConfig _config;
@@ -81,21 +83,18 @@ public sealed class ThinkerService : IThinkerService
     public ThinkerService(
         ThinkerServiceDependencies dependencies,
         IOptions<LeanKernelConfig> config,
-        ILogger<ThinkerService> logger,
-        ModelRoutingService? routing = null,
-        SelectionLogStore? selectionLog = null)
+        ILogger<ThinkerService> logger)
     {
         _gatekeeper = dependencies.Gatekeeper;
         _sessions = dependencies.Sessions;
         _wiki = dependencies.Wiki;
-        _agentFactory = dependencies.AgentFactory;
         _toolAdapter = dependencies.ToolAdapter;
         _promptAssembler = dependencies.PromptAssembler;
+        _strategySelector = dependencies.StrategySelector;
+        _fallbackStrategy = new StaticAgentStrategy(dependencies.AgentFactory, _sessions);
         _responseEnhancer = dependencies.ResponseEnhancer;
         _postTurnPipeline = dependencies.PostTurnPipeline
             ?? new PostTurnPipeline(_sessions, NullLogger<PostTurnPipeline>.Instance);
-        _routing = routing;
-        _selectionLog = selectionLog;
         _config = config.Value;
         _logger = logger;
     }
@@ -134,27 +133,10 @@ public sealed class ThinkerService : IThinkerService
             var instructions = _promptAssembler.AssembleSystemMessage(context);
             var tools = _toolAdapter.BuildTools();
 
-            if (_config.Routing.Enabled && _routing is not null)
-            {
-                if (_config.Routing.ShadowMode)
-                {
-                    // Phase 1 — Shadow: run routing for logging only, return static response.
-                    response = await InvokeStaticAsync(
-                        message, context, instructions, tools, sessionId, ct);
-
-                    _ = RunShadowRoutingAsync(message, context, instructions, tools, ct);
-                }
-                else
-                {
-                    response = await InvokeWithRoutingAsync(
-                        message, context, instructions, tools, sessionId, ct);
-                }
-            }
-            else
-            {
-                response = await InvokeStaticAsync(
-                    message, context, instructions, tools, sessionId, ct);
-            }
+            var strategy = _strategySelector?.Select() ?? _fallbackStrategy;
+            response = await strategy.InvokeAsync(
+                new AgentStrategyContext(message, context, instructions, tools, sessionId),
+                ct);
         }
         catch (Exception ex)
         {
@@ -188,110 +170,6 @@ public sealed class ThinkerService : IThinkerService
     }
 
     /// <summary>
-    /// Invokes the LLM through the intelligent routing pipeline (FR-1 through FR-8).
-    /// </summary>
-    private async Task<string> InvokeWithRoutingAsync(
-        LeanKernelMessage message,
-        ConversationContext context,
-        string instructions,
-        IReadOnlyList<AITool> tools,
-        string sessionId,
-        CancellationToken ct)
-    {
-        var (response, metadata) = await _routing!.RouteAsync(
-            requestId: message.Id,
-            prompt: message.Content,
-            existingContextTokens: context.EstimatedTotalTokens,
-            systemInstructions: instructions,
-            tools: tools,
-            ct: ct);
-
-        // Persist routing metadata to session store for observability.
-        await _sessions.SetMetadataAsync(sessionId, "routing:alias", metadata.SelectedAlias, ct);
-        await _sessions.SetMetadataAsync(sessionId, "routing:tier", metadata.SelectedTier, ct);
-        await _sessions.SetMetadataAsync(sessionId, "routing:complexity", metadata.Complexity.ToString(), ct);
-        await _sessions.SetMetadataAsync(sessionId, "routing:cost_bucket", metadata.CostBucket, ct);
-        await _sessions.SetMetadataAsync(sessionId, "routing:latency_ms", metadata.LatencyMs.ToString(), ct);
-        await _sessions.SetMetadataAsync(sessionId, "routing:attempts", metadata.AttemptCount.ToString(), ct);
-
-        _selectionLog?.Record(metadata);
-
-        return response;
-    }
-
-    /// <summary>
-    /// Invokes the LLM via the static default model (phase 0 / routing disabled).
-    /// </summary>
-    private async Task<string> InvokeStaticAsync(
-        LeanKernelMessage message,
-        ConversationContext context,
-        string instructions,
-        IReadOnlyList<AITool> tools,
-        string sessionId,
-        CancellationToken ct)
-    {
-        var agent = _agentFactory.CreateAgent(instructions, tools);
-
-        // Build history messages from gated context using SessionExtensions
-        var messages = BuildMessages(context.History, message.Content);
-        var agentSession = await agent.CreateSessionAsync(ct);
-        var agentResponse = await agent.RunAsync(messages, agentSession, cancellationToken: ct);
-
-        var response = agentResponse.Text ?? string.Empty;
-
-        // Persist diagnostics metadata from middleware StateBag
-        if (agentSession?.StateBag is { } bag)
-        {
-            // Known middleware keys set by DiagnosticsMiddleware
-            string[] diagKeys = ["last_duration_ms", "last_message_count", "last_tool_calls"];
-            foreach (var key in diagKeys)
-            {
-                var val = bag.GetValue<string>(key);
-                if (val is not null)
-                    await _sessions.SetMetadataAsync(sessionId, key, val, ct);
-            }
-        }
-
-        return response;
-    }
-
-    /// <summary>
-    /// Phase 1 shadow: fires routing in the background, records the SelectionResult for
-    /// observability, but the caller has already returned the static response to the user.
-    /// </summary>
-    private async Task RunShadowRoutingAsync(
-        LeanKernelMessage message,
-        ConversationContext context,
-        string instructions,
-        IReadOnlyList<AITool> tools,
-        CancellationToken ct)
-    {
-        try
-        {
-            var (_, metadata) = await _routing!.RouteAsync(
-                requestId: message.Id,
-                prompt: message.Content,
-                existingContextTokens: context.EstimatedTotalTokens,
-                systemInstructions: instructions,
-                tools: tools,
-                ct: ct);
-
-            _selectionLog?.Record(metadata);
-
-            _logger.LogInformation(
-                "Shadow routing [{RequestId}]: would have selected alias='{Alias}' tier='{Tier}' " +
-                "complexity={Complexity} cost={CostBucket} reason='{Reason}' attempts={Attempts} latency={LatencyMs}ms",
-                metadata.RequestId, metadata.SelectedAlias, metadata.SelectedTier,
-                metadata.Complexity, metadata.CostBucket, metadata.SelectionReason,
-                metadata.AttemptCount, metadata.LatencyMs);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Shadow routing [{RequestId}]: suppressed exception", message.Id);
-        }
-    }
-
-    /// <summary>
     /// Convert gated conversation history + current query into ChatMessage list.
     /// Uses <see cref="SessionExtensions"/> for ConversationTurn → ChatMessage mapping.
     /// The system message is handled by the agent's <c>instructions</c> parameter.
@@ -299,10 +177,5 @@ public sealed class ThinkerService : IThinkerService
     internal static IEnumerable<ChatMessage> BuildMessages(
         IReadOnlyList<ConversationTurn> history,
         string currentQuery)
-    {
-        foreach (var msg in history.ToChatMessages())
-            yield return msg;
-
-        yield return new ChatMessage(ChatRole.User, currentQuery);
-    }
+        => StaticAgentStrategy.BuildMessages(history, currentQuery);
 }
