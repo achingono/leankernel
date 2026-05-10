@@ -11,13 +11,16 @@ namespace LeanKernel.Host.Services.Jobs;
 /// </summary>
 public sealed class UserProfileSyncJob : IAsyncJob
 {
+    private readonly SelfConfigurationStep _selfConfig;
     private readonly UserConfigurationStep _userConfig;
     private readonly ILogger<UserProfileSyncJob> _logger;
 
     public UserProfileSyncJob(
+        SelfConfigurationStep selfConfig,
         UserConfigurationStep userConfig,
         ILogger<UserProfileSyncJob> logger)
     {
+        _selfConfig = selfConfig;
         _userConfig = userConfig;
         _logger = logger;
     }
@@ -30,6 +33,19 @@ public sealed class UserProfileSyncJob : IAsyncJob
         try
         {
             _logger.LogInformation("User profile sync job starting...");
+
+            var selfInitResult = await _selfConfig.InitializeAsync(ct);
+            if (!selfInitResult.Success)
+            {
+                _logger.LogWarning("SELF.md initialization failed during nightly sync: {Message}", selfInitResult.Message);
+            }
+
+            var userInitResult = await _userConfig.InitializeAsync(ct);
+            if (!userInitResult.Success)
+            {
+                _logger.LogWarning("USER.md initialization failed during nightly sync: {Message}", userInitResult.Message);
+            }
+
             var result = await _userConfig.SyncFromWikiAsync(ct);
             
             if (result.Success)

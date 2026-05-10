@@ -30,7 +30,7 @@ public sealed class UserConfigurationStep
     /// </summary>
     public async Task<ConfigurationStepResult> InitializeAsync(CancellationToken ct = default)
     {
-        var userPath = Path.Combine(_paths.DataDirectory, "USER.md");
+        var userPath = GetUserPath();
         var userDir = Path.GetDirectoryName(userPath);
 
         if (userDir is not null && !Directory.Exists(userDir))
@@ -71,7 +71,7 @@ public sealed class UserConfigurationStep
     /// </summary>
     public async Task<ConfigurationStepResult> ValidateAsync(CancellationToken ct = default)
     {
-        var userPath = Path.Combine(_paths.DataDirectory, "USER.md");
+        var userPath = GetUserPath();
 
         if (!File.Exists(userPath))
         {
@@ -134,7 +134,7 @@ public sealed class UserConfigurationStep
     /// </summary>
     public async Task<ConfigurationStepResult> UpdateSectionAsync(string sectionName, string content, CancellationToken ct = default)
     {
-        var userPath = Path.Combine(_paths.DataDirectory, "USER.md");
+        var userPath = GetUserPath();
 
         if (!File.Exists(userPath))
         {
@@ -198,7 +198,7 @@ public sealed class UserConfigurationStep
     /// </summary>
     public async Task<string> GetUserMdAsync(CancellationToken ct = default)
     {
-        var userPath = Path.Combine(_paths.DataDirectory, "USER.md");
+        var userPath = GetUserPath();
 
         if (!File.Exists(userPath))
         {
@@ -214,7 +214,7 @@ public sealed class UserConfigurationStep
     /// </summary>
     public async Task<ConfigurationStepResult> SyncFromWikiAsync(CancellationToken ct = default)
     {
-        var userPath = Path.Combine(_paths.DataDirectory, "USER.md");
+        var userPath = GetUserPath();
 
         if (!File.Exists(userPath))
         {
@@ -325,6 +325,9 @@ public sealed class UserConfigurationStep
 
         return $"{before}{sectionMarker}\n\n{newContent}\n\n{after}";
     }
+
+    private string GetUserPath() =>
+        Path.Combine(_paths.AgentsDirectory, "main", "USER.md");
 
     private async Task<string> LoadTemplateAsync(CancellationToken ct)
     {

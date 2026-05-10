@@ -25,7 +25,7 @@ public sealed class SelfConfigurationStep
     /// </summary>
     public async Task<ConfigurationStepResult> InitializeAsync(CancellationToken ct = default)
     {
-        var selfPath = Path.Combine(_paths.DataDirectory, "SELF.md");
+        var selfPath = GetSelfPath();
         var selfDir = Path.GetDirectoryName(selfPath);
 
         if (selfDir is not null && !Directory.Exists(selfDir))
@@ -66,7 +66,7 @@ public sealed class SelfConfigurationStep
     /// </summary>
     public async Task<ConfigurationStepResult> ValidateAsync(CancellationToken ct = default)
     {
-        var selfPath = Path.Combine(_paths.DataDirectory, "SELF.md");
+        var selfPath = GetSelfPath();
 
         if (!File.Exists(selfPath))
         {
@@ -129,7 +129,7 @@ public sealed class SelfConfigurationStep
     /// </summary>
     public async Task<ConfigurationStepResult> UpdateSectionAsync(string sectionName, string content, CancellationToken ct = default)
     {
-        var selfPath = Path.Combine(_paths.DataDirectory, "SELF.md");
+        var selfPath = GetSelfPath();
 
         if (!File.Exists(selfPath))
         {
@@ -193,7 +193,7 @@ public sealed class SelfConfigurationStep
     /// </summary>
     public async Task<string> GetSelfMdAsync(CancellationToken ct = default)
     {
-        var selfPath = Path.Combine(_paths.DataDirectory, "SELF.md");
+        var selfPath = GetSelfPath();
 
         if (!File.Exists(selfPath))
         {
@@ -202,6 +202,9 @@ public sealed class SelfConfigurationStep
 
         return await File.ReadAllTextAsync(selfPath, ct);
     }
+
+    private string GetSelfPath() =>
+        Path.Combine(_paths.AgentsDirectory, "main", "SELF.md");
 
     private async Task<string> LoadTemplateAsync(CancellationToken ct)
     {
