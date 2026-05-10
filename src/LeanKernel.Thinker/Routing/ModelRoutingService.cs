@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Enums;
 using LeanKernel.Core.Models;
+using LeanKernel.Thinker.Strategies;
 
 namespace LeanKernel.Thinker.Routing;
 
@@ -102,6 +103,7 @@ public sealed class ModelRoutingService
         int existingContextTokens,
         string systemInstructions,
         IReadOnlyList<AITool>? tools,
+        IReadOnlyList<ConversationTurn>? history,
         CancellationToken ct)
     {
         var overallSw = Stopwatch.StartNew();
@@ -143,7 +145,7 @@ public sealed class ModelRoutingService
             fallbackPath.Add(candidate.Alias);
 
             LogCandidateAttempt(requestId, attemptCount, candidate);
-            var attempt = await InvokeCandidateSafelyAsync(candidate, requestId, systemInstructions, tools, prompt, ct);
+            var attempt = await InvokeCandidateSafelyAsync(candidate, requestId, systemInstructions, tools, prompt, history, ct);
             if (attempt.SelectionReason is not null)
             {
                 selectionReason = attempt.SelectionReason;
@@ -231,11 +233,12 @@ public sealed class ModelRoutingService
         string systemInstructions,
         IReadOnlyList<AITool>? tools,
         string prompt,
+        IReadOnlyList<ConversationTurn>? history,
         CancellationToken ct)
     {
         try
         {
-            var response = await InvokeAsync(candidate.Alias, systemInstructions, tools, prompt, ct);
+            var response = await InvokeAsync(candidate.Alias, systemInstructions, tools, prompt, history, ct);
             return new CandidateAttemptResult(response, null);
         }
         catch (Exception ex) when (IsTransientFailure(ex, out var statusCode))
@@ -278,10 +281,13 @@ public sealed class ModelRoutingService
         string systemInstructions,
         IReadOnlyList<AITool>? tools,
         string userPrompt,
+        IReadOnlyList<ConversationTurn>? history,
         CancellationToken ct)
     {
         var agent = _agentFactory.CreateAgentForModel(alias, systemInstructions, tools);
-        var messages = new[] { new ChatMessage(ChatRole.User, userPrompt) };
+        IEnumerable<ChatMessage> messages = history is { Count: > 0 }
+            ? StaticAgentStrategy.BuildMessages(history, userPrompt)
+            : [new ChatMessage(ChatRole.User, userPrompt)];
         var session = await agent.CreateSessionAsync(ct);
         var result = await agent.RunAsync(messages, session, cancellationToken: ct);
         return result.Text ?? string.Empty;

@@ -53,6 +53,7 @@ public sealed class ShadowRoutingStrategy : IAgentStrategy
                 existingContextTokens: context.Context.EstimatedTotalTokens,
                 systemInstructions: context.Instructions,
                 tools: context.Tools,
+                history: context.Context.History,
                 ct: ct);
 
             _selectionLog.Record(metadata);

@@ -40,6 +40,7 @@ public sealed class RoutedAgentStrategy : IAgentStrategy
             existingContextTokens: context.Context.EstimatedTotalTokens,
             systemInstructions: context.Instructions,
             tools: context.Tools,
+            history: context.Context.History,
             ct: ct);
 
         await _sessions.SetMetadataAsync(context.SessionId, "routing:alias", metadata.SelectedAlias, ct);

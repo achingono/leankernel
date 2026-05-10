@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Enums;
+using LeanKernel.Core.Models;
 using LeanKernel.Thinker;
 using LeanKernel.Thinker.Routing;
 using System.Net;
@@ -342,6 +343,7 @@ public class ModelRoutingServiceTests
             existingContextTokens: 0,
             systemInstructions: "system",
             tools: null,
+            history: null,
             CancellationToken.None);
 
         Assert.Equal("accepted response", response);
@@ -367,6 +369,7 @@ public class ModelRoutingServiceTests
             existingContextTokens: 0,
             systemInstructions: "system",
             tools: null,
+            history: null,
             CancellationToken.None);
 
         Assert.Equal("fallback response", response);
@@ -391,6 +394,7 @@ public class ModelRoutingServiceTests
             existingContextTokens: 0,
             systemInstructions: "system",
             tools: null,
+            history: null,
             CancellationToken.None);
 
         Assert.Equal("this response is long enough to pass the quality gate", response);
@@ -398,6 +402,41 @@ public class ModelRoutingServiceTests
         Assert.StartsWith("escalation:quality_gate(output_too_short", metadata.SelectionReason);
         Assert.Equal(2, metadata.AttemptCount);
         Assert.True(metadata.QualityGateTriggered);
+    }
+
+    [Fact]
+    public async Task RouteAsync_IncludesConversationHistory()
+    {
+        var chatClient = new RoutingTestChatClient("accepted response");
+        var service = CreateService(chatClient);
+        var history = new List<ConversationTurn>
+        {
+            new()
+            {
+                Role = "user",
+                Content = "The document is named Chingono Alfero.pdf.",
+                Timestamp = DateTimeOffset.UtcNow
+            },
+            new()
+            {
+                Role = "assistant",
+                Content = "I will remember that filename.",
+                Timestamp = DateTimeOffset.UtcNow
+            }
+        };
+
+        await service.RouteAsync(
+            "req-4",
+            "Read that document now.",
+            existingContextTokens: 0,
+            systemInstructions: "system",
+            tools: null,
+            history: history,
+            CancellationToken.None);
+
+        var messages = chatClient.LastMessages;
+        Assert.Contains(messages, m => m.Role == ChatRole.User && m.Text.Contains("Chingono Alfero.pdf"));
+        Assert.Contains(messages, m => m.Role == ChatRole.User && m.Text.Contains("Read that document now."));
     }
 
     private static ModelRoutingService CreateService(
@@ -446,6 +485,8 @@ public class ModelRoutingServiceTests
 
         public ChatClientMetadata Metadata => new();
 
+        public IReadOnlyList<ChatMessage> LastMessages { get; private set; } = [];
+
         public void Dispose()
         {
         }
@@ -458,6 +499,7 @@ public class ModelRoutingServiceTests
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
+            LastMessages = messages.ToList();
             var next = _responses.Count > 0 ? _responses.Dequeue() : string.Empty;
             if (next is Exception exception)
                 throw exception;
