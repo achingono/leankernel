@@ -128,7 +128,7 @@ public sealed class ModelRoutingService
 
             lastResponse = attempt.Response ?? string.Empty;
 
-            // FR-4: Quality gate — only when EnableQualityEscalation=true (Phase 3+).
+            // Quality escalation is opt-in so shadow/static routing can run without retrying.
             if (ShouldEscalateForQuality(lastResponse, prompt, constraintCount, candidate, requestId, out var failReason))
             {
                 qualityGateTriggered = true;

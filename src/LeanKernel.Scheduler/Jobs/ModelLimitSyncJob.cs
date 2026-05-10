@@ -6,8 +6,7 @@ using LeanKernel.Core.Configuration;
 namespace LeanKernel.Scheduler.Jobs;
 
 /// <summary>
-/// Phase 4 — Scheduled job that syncs model context-window and max-token limits
-/// from live provider APIs into the LiteLLM config.yaml.
+/// Scheduled job that syncs model context-window and max-token limits from live provider APIs into the LiteLLM config.yaml.
 /// Shells out to <c>scripts/sync_litellm_model_limits.py</c> with <c>--write</c>
 /// so the running LiteLLM proxy picks up the changes on its next hot-reload cycle.
 /// </summary>
@@ -16,12 +15,21 @@ public sealed class ModelLimitSyncJob
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ModelLimitSyncJob> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ModelLimitSyncJob" /> class.
+    /// </summary>
+    /// <param name="config">The LeanKernel configuration containing routing settings.</param>
+    /// <param name="logger">The logger used for sync diagnostics.</param>
     public ModelLimitSyncJob(IOptions<LeanKernelConfig> config, ILogger<ModelLimitSyncJob> logger)
     {
         _config = config.Value;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Runs the configured model-limit synchronization script when routing is enabled.
+    /// </summary>
+    /// <param name="ct">A token used to cancel the sync job.</param>
     public async Task ExecuteAsync(CancellationToken ct)
     {
         if (!_config.Routing.Enabled)
@@ -32,12 +40,11 @@ public sealed class ModelLimitSyncJob
 
         _logger.LogInformation("ModelLimitSyncJob: starting model-limit sync");
 
-        // Locate the Python script relative to the application base directory.
-        // In Docker the working directory is /app, and the scripts folder is mounted there.
+        // Prefer the repository-relative script path used by local development.
         var appBase = AppContext.BaseDirectory;
         var scriptPath = Path.GetFullPath(Path.Combine(appBase, "../../../../scripts/sync_litellm_model_limits.py"));
 
-        // Fallback: try the Docker path.
+        // Docker images mount scripts under /app/scripts.
         if (!File.Exists(scriptPath))
             scriptPath = "/app/scripts/sync_litellm_model_limits.py";
 

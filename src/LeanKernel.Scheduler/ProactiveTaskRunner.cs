@@ -66,14 +66,14 @@ public sealed class ProactiveTaskRunner
             _chatFactScrubJob.ExecuteAsync,
             ct);
 
-        // User profile sync (learn from wiki facts)
+        // User profile sync learns durable identity updates from wiki facts.
         await _scheduler.ScheduleAsync(
             "user-profile-sync",
             _config.Scheduler.UserProfileSyncCron,
             _userProfileSyncJob.ExecuteAsync,
             ct);
 
-        // Phase 4 — model limit sync (only when routing is enabled)
+        // Model-limit sync only runs when intelligent routing is enabled.
         if (_config.Routing.Enabled)
         {
             await _scheduler.ScheduleAsync(

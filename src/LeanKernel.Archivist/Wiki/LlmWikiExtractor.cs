@@ -12,7 +12,7 @@ namespace LeanKernel.Archivist.Wiki;
 
 /// <summary>
 /// Semantic extraction using LiteLLM's OpenAI-compatible chat completions API.
-/// Runs asynchronously to avoid turn latency.
+/// Exposes both awaited extraction for the self-improvement pipeline and a compatibility wrapper for callers that do not await results.
 /// </summary>
 public sealed class LlmWikiExtractor
 {
@@ -47,8 +47,8 @@ public sealed class LlmWikiExtractor
     }
 
     /// <summary>
-    /// Fire-and-forget async extraction. Does not await or return result.
-    /// Failures are logged but don't propagate.
+    /// Starts extraction in the background for compatibility with callers that cannot await pipeline work.
+    /// Prefer <see cref="ExtractAndIngestAsync" /> for new learning pipeline code.
     /// </summary>
     /// <param name="userMessage">The user message from the completed turn.</param>
     /// <param name="assistantResponse">The assistant response from the completed turn.</param>

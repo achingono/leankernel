@@ -73,7 +73,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         string sessionId,
         CancellationToken ct)
     {
-        // Default: unrestricted access for backward compatibility
+        // Existing callers use unrestricted knowledge access unless an agent scope is supplied.
         return await GateContextAsync(query, budget, sessionId, ["*"], ct);
     }
 
@@ -95,25 +95,24 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     {
         var exclusionLog = new List<string>();
 
-        // Phase 1: Classify intent → determine active 5W1H dimensions
+        // Classify intent to determine the active 5W1H dimensions.
         var activeDimensions = ClassifyDimensions(query.Content);
         _logger.LogDebug("Active dimensions for query: {Dimensions}", string.Join(", ", activeDimensions));
 
-        // Phase 2: Retrieve candidate LeanKernels from wiki + vector store
+        // Retrieve candidates from both structured wiki memory and vector search.
         var wikiCandidates = await _candidateRetriever.RetrieveWikiLeanKernelsAsync(query, activeDimensions, ct);
         var vectorCandidates = await _candidateRetriever.RetrieveVectorLeanKernelsAsync(query, agentKnowledgeTags, ct);
 
-        // Phase 3: Competitive ranking — all candidates compete for budget
+        // Rank each source independently against its budget slice.
         var rankedWiki = _selectionStrategy.Select(wikiCandidates, budget.WikiFactsBudget, exclusionLog);
         var rankedRetrieval = _selectionStrategy.Select(vectorCandidates, budget.RetrievalBudget, exclusionLog);
 
-        // Phase 4: Assemble conversation history (sliding window with compaction)
+        // Assemble recent history with compaction for older turns.
         var history = await _historyAssembler.AssembleAsync(sessionId, ct);
 
-        // Phase 5: Build final context
         var systemPrompt = await _systemPromptBuilder.BuildAsync(ct);
 
-        // Phase 5a: On the very first message of a session, check for identity gaps
+        // Prompt for identity setup only at the beginning of a session.
         var onboardingInstruction = history.Count == 1
             ? await _onboardingGapDetector.BuildInstructionAsync(ct)
             : null;
@@ -133,7 +132,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
             History = history,
             WikiLeanKernels = rankedWiki.ToList(),
             RetrievedLeanKernels = rankedRetrieval.ToList(),
-            ActiveToolNames = [], // Populated by Thinker based on intent
+            ActiveToolNames = [],
             EstimatedTotalTokens = totalTokens,
             ExclusionLog = exclusionLog,
             OnboardingInstruction = onboardingInstruction
@@ -141,8 +140,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
     }
 
     /// <summary>
-    /// Simple keyword-based dimension classifier.
-    /// Future: replace with a lightweight local classifier model.
+    /// Classifies a query into 5W1H dimensions using the current keyword-based classifier.
     /// </summary>
     public static HashSet<WikiDimension> ClassifyDimensions(string query) => ContextCandidateRetriever.ClassifyDimensions(query);
 }

@@ -84,7 +84,7 @@ try
 
     builder.Services.AddHttpClient("onboarding-probe");
 
-    // Get skill directories for DynamicPluginHost initialization
+    // Skill directories are passed to the plugin feature registration so runtime skills load at startup.
     var skillDirs = builder.Configuration["LeanKernel:Skills:BasePaths"]?.Split(',')
         ?? [Path.Combine(configuredDataDir, "skills")];
 
@@ -190,7 +190,7 @@ try
 
     var app = builder.Build();
 
-    // Phase 3: Apply database migrations and recover undelivered messages
+    // Ensure the durable outbound queue is ready before hosted services start dispatching.
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<MessageQueueDbContext>();

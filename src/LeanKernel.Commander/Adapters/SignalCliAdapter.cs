@@ -196,7 +196,7 @@ public sealed class SignalCliAdapter : ISignalAdapter
         if (stop)
             @params["stop"] = true;
 
-        // sendTyping is fire-and-forget — send as a notification (no id, no response expected)
+        // signal-cli expects typing indicators as notifications without a response id.
         await SendNotificationAsync("sendTyping", @params, ct);
     }
 

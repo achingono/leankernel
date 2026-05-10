@@ -15,7 +15,7 @@ public sealed class ThinkerServiceDependencies
     /// </summary>
     /// <param name="gatekeeper">The service that selects context for a turn.</param>
     /// <param name="sessions">The session store used for conversation history.</param>
-    /// <param name="wiki">The wiki store used by legacy thinker tests and compatibility paths.</param>
+    /// <param name="wiki">The wiki store used by compatibility construction paths.</param>
     /// <param name="agentFactory">The factory that creates AI agents.</param>
     /// <param name="toolAdapter">The adapter that exposes tools to the AI agent.</param>
     /// <param name="promptAssembler">The service that builds system instructions.</param>

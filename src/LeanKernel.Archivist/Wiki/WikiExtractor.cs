@@ -5,8 +5,8 @@ namespace LeanKernel.Archivist.Wiki;
 
 /// <summary>
 /// Extracts 5W1H structured facts from raw text (LLM responses,
-/// user messages, or ingested documents). Uses heuristic patterns
-/// for fast extraction; future: delegate to LLM for complex text.
+/// user messages, or ingested documents) using deterministic heuristic patterns.
+/// Semantic extraction is handled separately by <see cref="LlmWikiExtractor" />.
 /// </summary>
 public static class WikiExtractor
 {
@@ -23,15 +23,15 @@ public static class WikiExtractor
         var profileFacts = ExtractUserProfileFacts(userMessage, sourceId);
         entries.AddRange(profileFacts);
 
-        // Extract entity mentions (Who)
+        // Extract entity mentions (Who).
         var whoFacts = ExtractWhoFacts(combined, sourceId);
         entries.AddRange(whoFacts);
 
-        // Extract events/actions (What)
+        // Extract events/actions (What).
         var whatFacts = ExtractWhatFacts(combined, sourceId);
         entries.AddRange(whatFacts);
 
-        // Extract temporal references (When)
+        // Extract temporal references (When).
         var whenFacts = ExtractWhenFacts(combined, sourceId);
         entries.AddRange(whenFacts);
 

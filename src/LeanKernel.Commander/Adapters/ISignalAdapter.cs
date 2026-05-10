@@ -21,7 +21,7 @@ public interface ISignalAdapter : IAsyncDisposable
 
     /// <summary>
     /// Start or stop the typing indicator for <paramref name="recipient"/>.
-    /// Fire-and-forget semantics — implementations should swallow transport errors.
+    /// Typing indicators are best-effort notifications; message delivery must not depend on them.
     /// </summary>
     Task SendTypingAsync(string recipient, bool stop, CancellationToken ct);
 }

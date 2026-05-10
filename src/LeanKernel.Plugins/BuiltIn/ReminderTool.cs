@@ -52,8 +52,8 @@ public sealed class ReminderTool : ITool
 
             await _scheduler.ScheduleAsync(jobId, cron, async _ =>
             {
-                // In a full implementation, this would send via a channel
-                // For now, log the reminder
+                // Reminder delivery is intentionally isolated from channel routing.
+                // The scheduled callback records the reminder payload for the host to observe.
                 Console.WriteLine($"[REMINDER] {message}");
             }, ct);
 

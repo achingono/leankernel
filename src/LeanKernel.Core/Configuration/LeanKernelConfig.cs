@@ -25,11 +25,29 @@ public sealed class LeanKernelConfig
     /// </summary>
     public SelfImprovementConfig SelfImprovement { get; set; } = new();
 
-    // Channel configuration for Phase 4
+    /// <summary>
+    /// Gets or sets the Signal account phone number used by channel adapters.
+    /// </summary>
     public string? SignalPhoneNumber { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Signal daemon base URL.
+    /// </summary>
     public string? SignalServerUrl { get; set; }
+
+    /// <summary>
+    /// Gets or sets the optional API token for Signal daemon calls.
+    /// </summary>
     public string? SignalApiToken { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Discord bot token.
+    /// </summary>
     public string? DiscordBotToken { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Discord channel identifier used for outbound delivery.
+    /// </summary>
     public string? DiscordChannelId { get; set; }
 }
 
@@ -276,48 +294,90 @@ public sealed class RoutingConfig
 {
     /// <summary>
     /// When true, the intelligent routing pipeline is active.
-    /// When false (default/phase-0), the static DefaultModel is used for all requests.
+    /// When false, the static default model is used for all requests.
     /// </summary>
     public bool Enabled { get; set; } = false;
 
     /// <summary>
-    /// Phase 1 — Shadow mode: routing runs in parallel but its response is discarded.
+    /// Shadow mode runs routing in parallel but discards its response.
     /// Only the SelectionLog is emitted; the static response is returned to the user.
     /// Requires Enabled=true.
     /// </summary>
     public bool ShadowMode { get; set; } = true;
 
     /// <summary>
-    /// Phase 2/3 — Whether the quality gate is applied and can trigger escalation.
-    /// Set false (Phase 2) to use routing without quality-based retries.
-    /// Set true (Phase 3) to enable full escalation on quality failures.
+    /// Gets or sets whether the quality gate can trigger escalation to another model candidate.
     /// </summary>
     public bool EnableQualityEscalation { get; set; } = false;
 
-    // Complexity classification thresholds (FR-1)
+    /// <summary>
+    /// Gets or sets the maximum prompt tokens for a request to be considered small.
+    /// </summary>
     public int SmallMaxTokens { get; set; } = 4_000;
+
+    /// <summary>
+    /// Gets or sets the maximum detected constraints for a request to be considered small.
+    /// </summary>
     public int SmallMaxConstraints { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the maximum prompt tokens for a request to be considered medium.
+    /// </summary>
     public int MediumMaxTokens { get; set; } = 16_000;
+
+    /// <summary>
+    /// Gets or sets the maximum detected constraints for a request to be considered medium.
+    /// </summary>
     public int MediumMaxConstraints { get; set; } = 8;
 
-    // LiteLLM tier aliases (AC-5)
+    /// <summary>
+    /// Gets or sets the LiteLLM alias used for small requests.
+    /// </summary>
     public string SmallAlias { get; set; } = "small";
+
+    /// <summary>
+    /// Gets or sets the LiteLLM alias used for medium requests.
+    /// </summary>
     public string MediumAlias { get; set; } = "medium";
+
+    /// <summary>
+    /// Gets or sets the LiteLLM alias used for large requests.
+    /// </summary>
     public string LargeAlias { get; set; } = "large";
 
-    // Provider health / failure handling (FR-5)
+    /// <summary>
+    /// Gets or sets how long unhealthy providers stay in cooldown.
+    /// </summary>
     public int CooldownSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// Gets or sets the maximum model/provider attempts for one routed turn.
+    /// </summary>
     public int MaxProviderAttempts { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the maximum time allowed for selecting and invoking a model candidate.
+    /// </summary>
     public int MaxSelectionBudgetMs { get; set; } = 30_000;
 
-    // Quality gate thresholds (FR-4)
+    /// <summary>
+    /// Gets or sets the minimum output length used by the response quality gate.
+    /// </summary>
     public int QualityMinOutputLength { get; set; } = 80;
+
+    /// <summary>
+    /// Gets or sets the minimum constraint coverage required by the response quality gate.
+    /// </summary>
     public double QualityMinConstraintCoverage { get; set; } = 0.80;
 
-    // Spend guard (FR-8)
+    /// <summary>
+    /// Gets or sets spend-guard thresholds for paid fallback usage.
+    /// </summary>
     public SpendGuardConfig SpendGuard { get; set; } = new();
 
-    // Phase 4 — model limit sync job
+    /// <summary>
+    /// Gets or sets the cron expression for synchronizing model limits from provider metadata.
+    /// </summary>
     public string ModelLimitSyncCron { get; set; } = "0 4 * * *"; // 4 AM daily
 }
 
