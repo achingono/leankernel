@@ -85,7 +85,7 @@ LeanKernel is organized around a single agent runtime and feature-owned subsyste
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the contributor-oriented architecture explanation and ownership rules.
+See [docs/architecture/architecture.md](docs/architecture/architecture.md) for the contributor-oriented architecture explanation and ownership rules.
 
 ### Context Gatekeeper (Core Differentiator)
 
