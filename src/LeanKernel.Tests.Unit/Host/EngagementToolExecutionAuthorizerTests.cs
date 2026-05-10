@@ -51,7 +51,7 @@ public class EngagementToolExecutionAuthorizerTests
         var actionAuthorizer = Substitute.For<IActionAuthorizer>();
         var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
 
-        var result = await authorizer.AuthorizeAsync("wiki_query", "{}", CancellationToken.None);
+        var result = await authorizer.AuthorizeAsync("unknown_tool", "{}", CancellationToken.None);
 
         Assert.True(result.IsAuthorized);
         Assert.Null(result.ActionType);

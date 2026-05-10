@@ -53,7 +53,6 @@ public class SkillLoadingTests
     [InlineData("simplefin")]
     [InlineData("ms-todo")]
     [InlineData("doughray")]
-    [InlineData("emanate")]
     [InlineData("screenshot-ocr")]
     public async Task LoadSkill_AllExistingSkills_ParseSuccessfully(string skillName)
     {
@@ -173,7 +172,7 @@ public class SkillLoadingTests
     public async Task LoadSkill_AllSkills_HaveNonEmptyMetadata()
     {
         // Arrange
-        var skillNames = new[] { "simplefin", "ms-todo", "doughray", "emanate", "screenshot-ocr" };
+        var skillNames = new[] { "simplefin", "ms-todo", "doughray", "screenshot-ocr" };
 
         foreach (var skillName in skillNames)
         {
@@ -192,7 +191,7 @@ public class SkillLoadingTests
     public async Task LoadSkill_AllSkills_HaveOperationsWithParameters()
     {
         // Arrange
-        var skillNames = new[] { "simplefin", "ms-todo", "doughray", "emanate", "screenshot-ocr" };
+        var skillNames = new[] { "simplefin", "ms-todo", "doughray", "screenshot-ocr" };
 
         foreach (var skillName in skillNames)
         {
@@ -265,7 +264,7 @@ public class SkillLoadingTests
     public async Task LoadSkill_AllOperations_HaveValidJsonSchema()
     {
         // Arrange
-        var skillNames = new[] { "simplefin", "ms-todo", "doughray", "emanate", "screenshot-ocr" };
+        var skillNames = new[] { "simplefin", "ms-todo", "doughray", "screenshot-ocr" };
 
         foreach (var skillName in skillNames)
         {
@@ -337,7 +336,7 @@ public class SkillLoadingTests
     public async Task ValidateSkill_AllSkills_HaveNoValidationErrors()
     {
         // Arrange
-        var skillNames = new[] { "simplefin", "ms-todo", "doughray", "emanate", "screenshot-ocr" };
+        var skillNames = new[] { "simplefin", "ms-todo", "doughray", "screenshot-ocr" };
 
         foreach (var skillName in skillNames)
         {
