@@ -348,7 +348,7 @@ try
     
     builder.Services.AddSingleton(sp =>
     {
-        var logger = sp.GetRequiredService<ILogger<DiscordChannelAdapter>>();
+        var logger = sp.GetRequiredService<ILogger<LeanKernel.Host.Services.Channels.Adapters.DiscordChannelAdapter>>();
         var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
         var httpClient = httpClientFactory.CreateClient();
         var LeanKernelConfig = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
@@ -356,7 +356,7 @@ try
         var botToken = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_BOT_TOKEN") ?? LeanKernelConfig.DiscordBotToken;
         var channelId = Environment.GetEnvironmentVariable("LEANKERNEL_DISCORD_CHANNEL_ID") ?? LeanKernelConfig.DiscordChannelId;
         
-        return new DiscordChannelAdapter(logger, httpClient, botToken, channelId);
+        return new LeanKernel.Host.Services.Channels.Adapters.DiscordChannelAdapter(logger, httpClient, botToken, channelId);
     });
     
     // Initialize channels on startup
