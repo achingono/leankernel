@@ -7,6 +7,7 @@ using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 using LeanKernel.Thinker.Routing;
+using LeanKernel.Thinker.Services;
 
 namespace LeanKernel.Thinker;
 
@@ -22,7 +23,10 @@ public sealed class ThinkerServiceDependencies
         AgentFactory agentFactory,
         ToolFunctionAdapter toolAdapter,
         PromptAssembler promptAssembler,
-        LlmWikiExtractor? llmExtractor = null)
+        LlmWikiExtractor? llmExtractor = null,
+        KnowledgeEnhancementService? knowledgeEnhancement = null,
+        IIdentityFileUpdateService? identityUpdater = null,
+        RequestFailureHandler? failureHandler = null)
     {
         Gatekeeper = gatekeeper;
         Sessions = sessions;
@@ -31,6 +35,9 @@ public sealed class ThinkerServiceDependencies
         ToolAdapter = toolAdapter;
         PromptAssembler = promptAssembler;
         LlmExtractor = llmExtractor;
+        KnowledgeEnhancement = knowledgeEnhancement;
+        IdentityUpdater = identityUpdater;
+        FailureHandler = failureHandler;
     }
 
     public IContextGatekeeper Gatekeeper { get; }
@@ -40,6 +47,9 @@ public sealed class ThinkerServiceDependencies
     public ToolFunctionAdapter ToolAdapter { get; }
     public PromptAssembler PromptAssembler { get; }
     public LlmWikiExtractor? LlmExtractor { get; }
+    public KnowledgeEnhancementService? KnowledgeEnhancement { get; }
+    public IIdentityFileUpdateService? IdentityUpdater { get; }
+    public RequestFailureHandler? FailureHandler { get; }
 }
 
 /// <summary>
@@ -58,6 +68,9 @@ public sealed class ThinkerService : IThinkerService
     private readonly ModelRoutingService? _routing;
     private readonly SelectionLogStore? _selectionLog;
     private readonly LlmWikiExtractor? _llmExtractor;
+    private readonly KnowledgeEnhancementService? _knowledgeEnhancement;
+    private readonly IIdentityFileUpdateService? _identityUpdater;
+    private readonly RequestFailureHandler? _failureHandler;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -75,6 +88,9 @@ public sealed class ThinkerService : IThinkerService
         _toolAdapter = dependencies.ToolAdapter;
         _promptAssembler = dependencies.PromptAssembler;
         _llmExtractor = dependencies.LlmExtractor;
+        _knowledgeEnhancement = dependencies.KnowledgeEnhancement;
+        _identityUpdater = dependencies.IdentityUpdater;
+        _failureHandler = dependencies.FailureHandler;
         _routing = routing;
         _selectionLog = selectionLog;
         _config = config.Value;
@@ -106,6 +122,8 @@ public sealed class ThinkerService : IThinkerService
 
         // 4. Call LLM — via intelligent routing when enabled, otherwise static default.
         string response;
+        Exception? captureException = null;
+
         try
         {
             var instructions = _promptAssembler.AssembleSystemMessage(context);
@@ -135,8 +153,23 @@ public sealed class ThinkerService : IThinkerService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "LLM invocation failed — returning error message");
+            captureException = ex;
+            _logger.LogError(ex, "LLM invocation failed");
             response = "I'm sorry, I encountered an error processing your request. Please try again.";
+            
+            // Attempt to enhance error response with knowledge fallback
+            if (_failureHandler is not null)
+            {
+                response = await _failureHandler.HandleFailureAsync(
+                    message.Content, response, ex, ct);
+            }
+        }
+
+        // 4a. Enhance response with knowledge synthesis (if enabled)
+        if (_knowledgeEnhancement is not null && captureException is null)
+        {
+            response = await _knowledgeEnhancement.EnhanceResponseAsync(
+                message.Content, response, context, ct);
         }
 
         // 5. Record outbound turn
@@ -169,6 +202,13 @@ public sealed class ThinkerService : IThinkerService
         if (_llmExtractor is not null)
         {
             _llmExtractor.ExtractAsync(message.Content, response, sourceId);
+        }
+
+        // 6c. Update identity files from conversation insights (continuous self-improvement)
+        if (_identityUpdater is not null)
+        {
+            _ = _identityUpdater.UpdateFromTurnAsync(
+                message.Content, response, sessionId, ct);
         }
 
         return response;

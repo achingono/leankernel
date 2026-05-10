@@ -126,6 +126,12 @@ try
     builder.Services.AddSingleton<AgentFactory>();
     builder.Services.AddSingleton<ToolFunctionAdapter>();
     builder.Services.AddSingleton<PromptAssembler>();
+    
+    // Knowledge synthesis and self-improvement services
+    builder.Services.AddSingleton<LeanKernel.Thinker.Services.KnowledgeEnhancementService>();
+    builder.Services.AddSingleton<IIdentityFileUpdateService, LeanKernel.Host.Services.IdentityFileUpdateService>();
+    builder.Services.AddSingleton<LeanKernel.Thinker.Services.RequestFailureHandler>();
+    
     builder.Services.AddSingleton<ThinkerServiceDependencies>(sp =>
     {
         var gatekeeper = sp.GetRequiredService<IContextGatekeeper>();
@@ -135,9 +141,13 @@ try
         var toolAdapter = sp.GetRequiredService<ToolFunctionAdapter>();
         var promptAssembler = sp.GetRequiredService<PromptAssembler>();
         var llmExtractor = sp.GetService<LeanKernel.Archivist.Wiki.LlmWikiExtractor>();
+        var knowledgeEnhancement = sp.GetService<LeanKernel.Thinker.Services.KnowledgeEnhancementService>();
+        var identityUpdater = sp.GetService<IIdentityFileUpdateService>();
+        var failureHandler = sp.GetService<LeanKernel.Thinker.Services.RequestFailureHandler>();
         
         return new ThinkerServiceDependencies(
-            gatekeeper, sessions, wiki, agentFactory, toolAdapter, promptAssembler, llmExtractor);
+            gatekeeper, sessions, wiki, agentFactory, toolAdapter, promptAssembler, 
+            llmExtractor, knowledgeEnhancement, identityUpdater, failureHandler);
     });
 
     // Intelligent routing (FR-1 through FR-8) — disabled by default until LeanKernel:Routing:Enabled = true
