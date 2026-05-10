@@ -42,6 +42,9 @@ These actions are pre-approved and need no permission:
 - StatFile
 - ViewConfiguration
 - ViewErrorLogs
+- SearchKnowledge
+- SearchWiki
+- SearchWeb
 - CreateBranch
 - CreateTestCommits
 - WriteAgentsMd

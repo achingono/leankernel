@@ -239,24 +239,24 @@ public sealed class AgentsConfigurationStep
             {
                 Name = "basic",
                 DisplayName = "Basic (Recommended)",
-                Description = "Conservative defaults: cautious autonomy, limited channels, strict safety",
-                CanDoCount = 7,
-                MustAskCount = 6
+                Description = "Conservative defaults: cautious autonomy with read/search access, limited write permissions",
+                CanDoCount = 8,
+                MustAskCount = 7
             },
             new AgentsPreset
             {
                 Name = "autonomous",
                 DisplayName = "Autonomous",
-                Description = "Trust-based: broad autonomy, many auto-approved actions, active hours only",
-                CanDoCount = 15,
-                MustAskCount = 5
+                Description = "Trust-based: broad autonomy with comprehensive read/search/write capabilities",
+                CanDoCount = 22,
+                MustAskCount = 6
             },
             new AgentsPreset
             {
                 Name = "cautious",
                 DisplayName = "Cautious",
-                Description = "Paranoid-safe: minimal autonomy, requires approval for most actions",
-                CanDoCount = 3,
+                Description = "Paranoid-safe: minimal autonomy, limited read-only access, requires approval for most actions",
+                CanDoCount = 8,
                 MustAskCount = 12
             }
         };
@@ -282,10 +282,10 @@ public sealed class AgentsConfigurationStep
         {
             "autonomous" => ReplaceSection(template,
                 "CanDoWithoutAsking",
-                new[] { "ViewRepositoryStructure", "ReadPublicDocumentation", "SearchCodebase", "ReadFile", "ListFiles", "StatFile", "ViewConfiguration", "ViewErrorLogs", "CreateBranch", "CreateTestCommits", "ViewDeploymentStatus", "RunTests", "ViewBuildLogs", "ReadWiki", "ViewAnalytics", "CheckSystemHealth", "UpdateDocumentation", "CommentOnPRs", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
+                new[] { "ViewRepositoryStructure", "ReadPublicDocumentation", "SearchCodebase", "ReadFile", "ListFiles", "StatFile", "ViewConfiguration", "ViewErrorLogs", "SearchKnowledge", "SearchWiki", "SearchWeb", "CreateBranch", "CreateTestCommits", "ViewDeploymentStatus", "RunTests", "ViewBuildLogs", "ViewAnalytics", "CheckSystemHealth", "UpdateDocumentation", "CommentOnPRs", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
             "cautious" => ReplaceSection(template,
                 "CanDoWithoutAsking",
-                new[] { "ViewRepositoryStructure", "SearchCodebase", "ReadFile", "ListFiles", "StatFile", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
+                new[] { "ViewRepositoryStructure", "SearchCodebase", "ReadFile", "ListFiles", "StatFile", "SearchKnowledge", "SearchWiki", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
             _ => template // basic preset (default)
         };
     }
@@ -335,6 +335,8 @@ created: 2024-01-01
 - ReadFile
 - ListFiles
 - StatFile
+- SearchKnowledge
+- SearchWiki
 - WriteAgentsMd
 - WriteSelfMd
 - WriteUserMd
@@ -348,11 +350,18 @@ created: 2024-01-01
 - MoveFile
 - CopyFile
 - ChangeFilePermissions
+- DeleteFile
+- SendEmail
+- SendMessage
+- PushCode
+- ModifyConfig
 
 ### Never Do
 
 - CommitSecrets
 - DeleteProductionData
+- ExposeSecret
+- PushToProduction
 
 ## Time Boundaries
 

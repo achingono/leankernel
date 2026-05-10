@@ -116,6 +116,7 @@ try
         {
             var cfg = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
             client.BaseAddress = new Uri(cfg.LiteLlm.BaseUrl);
+            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {cfg.LiteLlm.ApiKey}");
         });
 
     // Thinker
