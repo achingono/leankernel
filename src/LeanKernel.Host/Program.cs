@@ -91,7 +91,7 @@ try
     builder.Services
         .AddArchivist()
         .AddThinker()
-        .AddCommander()
+        .AddCommander(configuredDataDir)
         .AddPlugins(skillDirs)
         .AddScheduler();
 
@@ -125,57 +125,13 @@ try
     builder.Services.AddLeanKernelAuth(builder.Configuration, configuredDataDir);
     builder.Services.AddLeanKernelOidc(builder.Configuration);
 
-    // Engagement Rules (AGENTS.md) — rules of engagement between user and agent
-    builder.Services.AddSingleton<IEngagementRulesProvider, EngagementRulesProvider>();
-    builder.Services.AddSingleton<IActionAuthorizer>(sp =>
-    {
-        var rulesProvider = sp.GetRequiredService<IEngagementRulesProvider>();
-        var logger = sp.GetRequiredService<ILogger<ActionAuthorizer>>();
-        var rules = rulesProvider.GetCurrent();
-        return new ActionAuthorizer(rules, logger);
-    });
-    builder.Services.AddSingleton<IToolExecutionAuthorizer, EngagementToolExecutionAuthorizer>();
-    builder.Services.AddSingleton(sp =>
-    {
-        var rulesProvider = sp.GetRequiredService<IEngagementRulesProvider>();
-        var logger = sp.GetRequiredService<ILogger<TimeBoundaryService>>();
-        var rules = rulesProvider.GetCurrent();
-        return new TimeBoundaryService(rules, logger);
-    });
-    builder.Services.AddSingleton<ITimeBoundaryService>(sp => sp.GetRequiredService<TimeBoundaryService>());
     builder.Services.AddScoped<EngagementAuthorizationFilter>();
-
-    // Phase 3: Persistent Message Queue with Database Storage
-    builder.Services.AddDbContext<MessageQueueDbContext>(options =>
-    {
-        var dbPath = Path.Combine(configuredDataDir, "messagequeue.db");
-        var dbDir = Path.GetDirectoryName(dbPath);
-        if (dbDir != null && !Directory.Exists(dbDir))
-        {
-            Directory.CreateDirectory(dbDir);
-        }
-        options.UseSqlite($"Data Source={dbPath}");
-    });
-
-    // Phase 2: Message Queue and Agents Configuration
-    // Register in-memory queue first (wrapped by persistent queue)
-    builder.Services.AddSingleton<MessageQueueService>();
-    
-    // Register persistent queue as the primary IMessageQueue interface
-    builder.Services.AddSingleton<IMessageQueue>(sp =>
-    {
-        var inMemoryQueue = sp.GetRequiredService<MessageQueueService>();
-        var dbContext = sp.GetRequiredService<MessageQueueDbContext>();
-        var logger = sp.GetRequiredService<ILogger<PersistentMessageQueueService>>();
-        return new PersistentMessageQueueService(inMemoryQueue, dbContext, logger);
-    });
     
     builder.Services.AddScoped<AgentsConfigurationStep>();
     builder.Services.AddSingleton<SelfConfigurationStep>();
     builder.Services.AddSingleton<IAgentSelfProfileInitializer>(sp => sp.GetRequiredService<SelfConfigurationStep>());
     builder.Services.AddSingleton<UserConfigurationStep>();
     builder.Services.AddSingleton<IUserProfileSynchronizer>(sp => sp.GetRequiredService<UserConfigurationStep>());
-    builder.Services.AddHostedService<MessageProcessingBackgroundService>();
 
     // Forwarded headers (for reverse proxy HTTPS detection)
     builder.Services.Configure<ForwardedHeadersOptions>(options =>

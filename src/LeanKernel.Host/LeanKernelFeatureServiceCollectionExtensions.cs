@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 using LeanKernel.Archivist;
 using LeanKernel.Archivist.CapabilityGaps;
 using LeanKernel.Archivist.Engagement;
@@ -10,6 +11,8 @@ using LeanKernel.Archivist.Sessions;
 using LeanKernel.Archivist.Wiki;
 using LeanKernel.Commander;
 using LeanKernel.Commander.Adapters;
+using LeanKernel.Commander.Queue;
+using LeanKernel.Commander.Queue.Data;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Plugins.BuiltIn;
@@ -56,6 +59,14 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<WikiCompiler>();
         services.AddSingleton<ConversationCompactor>();
         services.AddSingleton<ICapabilityGapStore, MarkdownCapabilityGapStore>();
+        services.AddSingleton<IEngagementRulesProvider, EngagementRulesProvider>();
+        services.AddSingleton<IActionAuthorizer>(sp =>
+        {
+            var rulesProvider = sp.GetRequiredService<IEngagementRulesProvider>();
+            var logger = sp.GetRequiredService<ILogger<ActionAuthorizer>>();
+            var rules = rulesProvider.GetCurrent();
+            return new ActionAuthorizer(rules, logger);
+        });
         services.AddSingleton<IContextGatekeeper, ContextGatekeeper>();
         services.AddHttpClient<LlmWikiExtractor>((sp, client) =>
         {
@@ -85,6 +96,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<IResponseEnhancer>(sp => sp.GetRequiredService<KnowledgeEnhancementService>());
         services.AddSingleton<IIdentityFileUpdateService, IdentityFileUpdateService>();
         services.AddSingleton<RequestFailureHandler>();
+        services.AddSingleton<IToolExecutionAuthorizer, EngagementToolExecutionAuthorizer>();
         services.AddSelfImprovement();
 
         services.AddSingleton<ThinkerServiceDependencies>(sp =>
@@ -130,8 +142,9 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     /// Registers Commander channels and routing services.
     /// </summary>
     /// <param name="services">The service collection to update.</param>
+    /// <param name="dataDirectory">The data directory that contains the durable queue database.</param>
     /// <returns>The updated service collection.</returns>
-    public static IServiceCollection AddCommander(this IServiceCollection services)
+    public static IServiceCollection AddCommander(this IServiceCollection services, string dataDirectory)
     {
         services.AddHttpClient("signal-daemon", client =>
         {
@@ -153,6 +166,26 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             return new DiscordChannelAdapter(logger, httpClient, botToken, channelId);
         });
         services.AddSingleton<ChannelRouter>();
+        services.AddDbContext<MessageQueueDbContext>(options =>
+        {
+            var dbPath = Path.Combine(dataDirectory, "messagequeue.db");
+            var dbDir = Path.GetDirectoryName(dbPath);
+            if (dbDir != null && !Directory.Exists(dbDir))
+            {
+                Directory.CreateDirectory(dbDir);
+            }
+
+            options.UseSqlite($"Data Source={dbPath}");
+        });
+        services.AddSingleton<MessageQueueService>();
+        services.AddSingleton<IMessageQueue>(sp =>
+        {
+            var inMemoryQueue = sp.GetRequiredService<MessageQueueService>();
+            var dbContext = sp.GetRequiredService<MessageQueueDbContext>();
+            var logger = sp.GetRequiredService<ILogger<PersistentMessageQueueService>>();
+            return new PersistentMessageQueueService(inMemoryQueue, dbContext, logger);
+        });
+        services.AddHostedService<MessageProcessingBackgroundService>();
 
         return services;
     }
@@ -226,6 +259,14 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>();
         services.AddSingleton<LeanKernel.Scheduler.Jobs.UserProfileSyncJob>();
         services.AddSingleton<IAsyncJob>(sp => sp.GetRequiredService<LeanKernel.Scheduler.Jobs.UserProfileSyncJob>());
+        services.AddSingleton(sp =>
+        {
+            var rulesProvider = sp.GetRequiredService<IEngagementRulesProvider>();
+            var logger = sp.GetRequiredService<ILogger<TimeBoundaryService>>();
+            var rules = rulesProvider.GetCurrent();
+            return new TimeBoundaryService(rules, logger);
+        });
+        services.AddSingleton<ITimeBoundaryService>(sp => sp.GetRequiredService<TimeBoundaryService>());
         services.AddSingleton<ProactiveTaskRunner>();
 
         return services;
