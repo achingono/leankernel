@@ -363,45 +363,21 @@ updated: 2024-01-01
 
 # USER.md - User Profile & Preferences
 
-## User Profile
+## Verified Profile
 
-- Your role or title (auto-detected from wiki)
-- Years of experience
-- Primary programming languages
-- Key expertise areas
+No verified facts yet.
 
-## Communication Preferences
+## Verified Preferences and Priorities
 
-- Preferred response length: concise/moderate/detailed
-- Code examples: yes/no
-- Preferred explanation depth
-- Tone preference
+No verified facts yet.
 
-## Knowledge & Expertise
+## Source-Backed Document Insights
 
-- Technical specializations
-- Preferred tools and frameworks
-- Recent projects or interests
-- Learning goals
+No verified facts yet.
 
-## Preferences & Patterns
+## Tools and Integrations
 
-- Response format preferences
-- Areas of focus
-- Topics to avoid
-- Preferred documentation style
-
-## Context & Background
-
-- Team structure (if applicable)
-- Project scope
-- Business context
-- Success criteria
-
-## Notes
-
-Auto-synced from wiki facts. Update manually for ad-hoc preferences.
-Last wiki sync: Not yet synced
+No verified facts yet.
 """;
     }
 }

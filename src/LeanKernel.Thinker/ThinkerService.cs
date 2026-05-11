@@ -96,7 +96,7 @@ public sealed class ThinkerService : IThinkerService
             response = ResourceText.Error("LlmInvocationFallbackResponse");
         }
 
-        if (_responseEnhancer is not null && captureException is null)
+        if (_responseEnhancer is not null)
         {
             response = await _responseEnhancer.EnhanceResponseAsync(
                 message.Content, response, context, ct);

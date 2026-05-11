@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
+using LeanKernel.Core.Models;
 
 namespace LeanKernel.Archivist.Identity;
 
@@ -51,12 +52,14 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
     /// Extract insights from a conversation turn and update identity files.
     /// This is called at the end of ProcessAsync to enable continuous learning.
     /// </summary>
-    public async Task UpdateFromTurnAsync(
+    public async Task<IdentityFileUpdateResult> UpdateFromTurnAsync(
         string userMessage,
         string assistantResponse,
         string sessionId,
         CancellationToken ct)
     {
+        var before = await SnapshotIdentityFilesAsync(ct);
+        var errors = new List<string>();
         try
         {
             await EnsureIdentityFilesExistAsync(ct);
@@ -69,14 +72,14 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
             var userInsights = ExtractUserInsights(userMessage);
             if (userInsights.Count > 0)
             {
-                await UpdateUserProfileAsync(userInsights, ct);
+                await UpdateUserProfileAsync(userInsights, errors, ct);
 
                 var agentProfileInsights = userInsights
                     .Where(kv => kv.Key is "agent_name" or "engagement_model" or "autonomy")
                     .ToDictionary(kv => kv.Key, kv => kv.Value);
                 if (agentProfileInsights.Count > 0)
                 {
-                    await UpdateAgentProfileAsync(agentProfileInsights, ct);
+                    await UpdateAgentProfileAsync(agentProfileInsights, errors, ct);
                 }
             }
 
@@ -84,24 +87,89 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
             var agentInsights = ExtractAgentInsights(assistantResponse);
             if (agentInsights.Count > 0)
             {
-                await UpdateAgentProfileAsync(agentInsights, ct);
+                await UpdateAgentProfileAsync(agentInsights, errors, ct);
             }
 
             // Extract capability needs (e.g., "I don't have a tool for...")
             var capabilityGaps = ExtractCapabilityGaps(assistantResponse);
             if (capabilityGaps.Count > 0)
             {
-                await UpdateCapabilityGapsAsync(capabilityGaps, ct);
+                await UpdateCapabilityGapsAsync(capabilityGaps, errors, ct);
             }
 
             _logger.LogDebug(
                 "Identity files updated: {UserInsights} user, {AgentInsights} agent, {CapGaps} capability gap insights",
                 userInsights.Count, agentInsights.Count, capabilityGaps.Count);
+
+            return await BuildUpdateResultAsync(before, errors, ct);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Identity file update failed for session {SessionId}", sessionId);
+            var partialResult = await BuildUpdateResultAsync(before, errors, ct);
+            return partialResult with
+            {
+                Success = false,
+                Errors = partialResult.Errors.Concat([ex.Message]).ToArray()
+            };
         }
+    }
+
+    private async Task<Dictionary<string, string?>> SnapshotIdentityFilesAsync(CancellationToken ct)
+    {
+        var snapshot = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in GetIdentityFilePaths())
+        {
+            snapshot[path] = File.Exists(path)
+                ? await File.ReadAllTextAsync(path, ct)
+                : null;
+        }
+
+        return snapshot;
+    }
+
+    private async Task<IdentityFileUpdateResult> BuildUpdateResultAsync(
+        IReadOnlyDictionary<string, string?> before,
+        IReadOnlyList<string>? priorErrors,
+        CancellationToken ct)
+    {
+        var changed = new List<string>();
+        var verified = new List<string>();
+        var errors = priorErrors is { Count: > 0 } ? priorErrors.ToList() : [];
+
+        foreach (var path in GetIdentityFilePaths())
+        {
+            try
+            {
+                if (!File.Exists(path))
+                    continue;
+
+                verified.Add(path);
+                var after = await File.ReadAllTextAsync(path, ct);
+                if (!before.TryGetValue(path, out var previous) || !string.Equals(previous, after, StringComparison.Ordinal))
+                    changed.Add(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                errors.Add($"{Path.GetFileName(path)}: {ex.Message}");
+            }
+        }
+
+        return new IdentityFileUpdateResult
+        {
+            Success = errors.Count == 0,
+            ChangedFiles = changed,
+            VerifiedFiles = verified,
+            Errors = errors
+        };
+    }
+
+    private IEnumerable<string> GetIdentityFilePaths()
+    {
+        var agentDir = Path.Combine(_config.Agents.BasePath, "main");
+        yield return Path.Combine(agentDir, "AGENTS.md");
+        yield return Path.Combine(agentDir, "SELF.md");
+        yield return Path.Combine(agentDir, "USER.md");
     }
 
     private async Task EnsureIdentityFilesExistAsync(CancellationToken ct)
@@ -389,7 +457,10 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
     /// <summary>
     /// Update USER.md with new user insights.
     /// </summary>
-    private async Task UpdateUserProfileAsync(Dictionary<string, string> insights, CancellationToken ct)
+    private async Task UpdateUserProfileAsync(
+        Dictionary<string, string> insights,
+        List<string> errors,
+        CancellationToken ct)
     {
         try
         {
@@ -471,13 +542,17 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to update USER.md");
+            errors.Add($"USER.md: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Update SELF.md with agent insights about its own performance.
     /// </summary>
-    private async Task UpdateAgentProfileAsync(Dictionary<string, string> insights, CancellationToken ct)
+    private async Task UpdateAgentProfileAsync(
+        Dictionary<string, string> insights,
+        List<string> errors,
+        CancellationToken ct)
     {
         try
         {
@@ -525,13 +600,17 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to update SELF.md");
+            errors.Add($"SELF.md: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Track capability gaps for future tool creation or skill enhancement.
     /// </summary>
-    private async Task UpdateCapabilityGapsAsync(Dictionary<string, string> gaps, CancellationToken ct)
+    private async Task UpdateCapabilityGapsAsync(
+        Dictionary<string, string> gaps,
+        List<string> errors,
+        CancellationToken ct)
     {
         try
         {
@@ -553,6 +632,7 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to update capability gaps");
+            errors.Add($"SELF.md capability gaps: {ex.Message}");
         }
     }
 
@@ -621,7 +701,7 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
 
         ## Agent Personality
 
-        **Tone:** direct, concise, authentic
+        **Tone:** direct, concise
 
         ## Scope of Autonomy
 
@@ -658,7 +738,7 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
 
         ## Time Boundaries
 
-        **Timezone:** Eastern
+        No verified time boundaries yet.
 
         ## Useful By Default
 

@@ -113,6 +113,38 @@ public class FileSystemSearchToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FindsNamedPdfAndDocxDocumentsExactly()
+    {
+        var tmpDir = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(tmpDir, "documents", "profiles"));
+        await File.WriteAllTextAsync(Path.Combine(tmpDir, "documents", "profiles", "Alfero Profile.pdf"), "%PDF");
+        await File.WriteAllTextAsync(Path.Combine(tmpDir, "documents", "profiles", "Strengths Report.docx"), "docx bytes");
+
+        try
+        {
+            var tool = new FileSystemSearchTool(tmpDir);
+            var pdfResult = await tool.ExecuteAsync(
+                """{"query":"Alfero Profile.pdf","path":"documents","limit":5}""",
+                CancellationToken.None);
+            var docxResult = await tool.ExecuteAsync(
+                """{"query":"Strengths Report.docx","path":"documents","limit":5}""",
+                CancellationToken.None);
+
+            Assert.True(pdfResult.Success);
+            Assert.True(docxResult.Success);
+
+            using var pdfDoc = JsonDocument.Parse(pdfResult.Output!);
+            using var docxDoc = JsonDocument.Parse(docxResult.Output!);
+            Assert.Equal("documents/profiles/Alfero Profile.pdf", pdfDoc.RootElement.GetProperty("Results")[0].GetProperty("Path").GetString());
+            Assert.Equal("documents/profiles/Strengths Report.docx", docxDoc.RootElement.GetProperty("Results")[0].GetProperty("Path").GetString());
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_BlocksPathTraversal()
     {
         var tmpDir = CreateTempDirectory();

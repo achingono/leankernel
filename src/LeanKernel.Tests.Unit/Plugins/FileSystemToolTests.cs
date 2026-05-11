@@ -167,6 +167,26 @@ public class FileSystemToolTests
         }
     }
 
+    [Fact]
+    public async Task ExecuteAsync_DocumentWithoutExtractor_ReturnsExplicitError()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        await File.WriteAllTextAsync(Path.Combine(tmpDir, "document.docx"), "raw docx bytes");
+
+        try
+        {
+            var tool = new FileSystemReadTool(tmpDir);
+            var result = await tool.ExecuteAsync("""{"path":"document.docx"}""", CancellationToken.None);
+
+            Assert.False(result.Success);
+            Assert.Contains("Text extraction is not available", result.Error!, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
 
     [Fact]
     public async Task ExecuteAsync_InvalidJson_ReturnsError()

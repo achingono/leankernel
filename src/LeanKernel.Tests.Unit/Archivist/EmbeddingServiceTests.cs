@@ -41,8 +41,11 @@ public class EmbeddingServiceTests
             CreateClient(handler), DefaultConfig(), NullLogger<EmbeddingService>.Instance);
         var result = await service.EmbedAsync("test text", CancellationToken.None);
 
-        Assert.Equal(3, result.Length);
+        Assert.Equal(384, result.Length);
         Assert.Equal(0.1f, result[0]);
+        Assert.Equal(0.2f, result[1]);
+        Assert.Equal(0.3f, result[2]);
+        Assert.All(result.Skip(3), value => Assert.Equal(0f, value));
     }
 
     [Fact]

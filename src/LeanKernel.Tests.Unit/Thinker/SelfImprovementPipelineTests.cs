@@ -4,6 +4,7 @@ using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 using LeanKernel.Thinker.Services;
+using NSubstitute;
 
 namespace LeanKernel.Tests.Unit.Thinker;
 
@@ -42,6 +43,25 @@ public sealed class SelfImprovementPipelineTests
         Assert.False(result.Success);
         Assert.Contains(result.StepResults, r => r.StepName == "broken" && !r.Success);
         Assert.Equal(["after"], order);
+    }
+
+    [Fact]
+    public async Task IdentityRefreshStep_ProcessAsync_PropagatesUpdateFailure()
+    {
+        var updater = Substitute.For<IIdentityFileUpdateService>();
+        updater.UpdateFromTurnAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(IdentityFileUpdateResult.Failed("USER.md: write denied"));
+        var step = new IdentityRefreshStep(updater);
+
+        var result = await step.ProcessAsync(CreateTurnEvent(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("identity-refresh", result.StepName);
+        Assert.Contains("USER.md: write denied", result.Message);
     }
 
     [Fact]

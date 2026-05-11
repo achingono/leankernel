@@ -71,7 +71,7 @@ public sealed class SystemPromptBuilder
 
         if (soulContent is null && userContent is null)
         {
-            return DefaultSystemPrompt;
+            return AppendFilesystemLocations(DefaultSystemPrompt);
         }
 
         var sb = new System.Text.StringBuilder();
@@ -101,6 +101,46 @@ public sealed class SystemPromptBuilder
             }
         }
 
+        return AppendFilesystemLocations(sb.ToString().Trim());
+    }
+
+    private string AppendFilesystemLocations(string prompt)
+    {
+        var agentMainPath = Path.Combine(_config.Agents.BasePath, "main");
+        var dataRoot = Path.GetDirectoryName(_config.Wiki.BasePath) ?? "/app/data";
+        var locations = new (string Label, string Path)[]
+        {
+            ("Data root", dataRoot),
+            ("Agent identity folder", agentMainPath),
+            ("Agents base folder", _config.Agents.BasePath),
+            ("Knowledge documents folder", _config.Knowledge.DocumentsPath),
+            ("Wiki folder", _config.Wiki.BasePath)
+        };
+
+        var sb = new System.Text.StringBuilder(prompt.Trim());
+        sb.AppendLine();
+        sb.AppendLine();
+        sb.AppendLine("## Configured filesystem locations");
+        sb.AppendLine("Use these configured data folders when searching for or updating local files. If the exact path is unknown, use file_search first, then use file_read, file_write, or file_edit with the discovered path.");
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (label, path) in locations)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            var normalized = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!seen.Add($"{label}:{normalized}"))
+            {
+                continue;
+            }
+
+            sb.AppendLine($"- {label}: {normalized}");
+        }
+
+        sb.AppendLine("- Important identity files: AGENTS.md, SELF.md, and USER.md are under the agent identity folder.");
         return sb.ToString().Trim();
     }
 }

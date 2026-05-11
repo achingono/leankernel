@@ -1,3 +1,5 @@
+using LeanKernel.Core.Models;
+
 namespace LeanKernel.Core.Interfaces;
 
 /// <summary>
@@ -9,7 +11,7 @@ public interface IIdentityFileUpdateService
     /// <summary>
     /// Extract insights from a conversation turn and update identity files.
     /// </summary>
-    Task UpdateFromTurnAsync(
+    Task<IdentityFileUpdateResult> UpdateFromTurnAsync(
         string userMessage,
         string assistantResponse,
         string sessionId,

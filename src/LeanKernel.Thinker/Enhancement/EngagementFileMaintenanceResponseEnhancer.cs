@@ -1,35 +1,31 @@
+using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
-using System.Text.RegularExpressions;
 
 namespace LeanKernel.Thinker.Enhancement;
 
 /// <summary>
-/// Ensures requested engagement-file maintenance is executed and verified before responding.
+/// Replaces engagement-file update claims with deterministic, verified maintenance results.
 /// </summary>
 public sealed class EngagementFileMaintenanceResponseEnhancer : IResponseEnhancer
 {
-    private readonly IIdentityFileUpdateService _identityFileUpdateService;
-    private readonly LeanKernelConfig _config;
+    private static readonly string[] EngagementFiles = ["AGENTS.md", "SELF.md", "USER.md"];
+    private readonly IEngagementFileMaintenanceService _maintenanceService;
     private readonly ILogger<EngagementFileMaintenanceResponseEnhancer> _logger;
-    private readonly IEngagementIntentClassifier? _intentClassifier;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EngagementFileMaintenanceResponseEnhancer" /> class.
     /// </summary>
+    /// <param name="maintenanceService">The deterministic engagement maintenance service.</param>
+    /// <param name="logger">The logger used for diagnostics.</param>
     public EngagementFileMaintenanceResponseEnhancer(
-        IIdentityFileUpdateService identityFileUpdateService,
-        IOptions<LeanKernelConfig> config,
-        ILogger<EngagementFileMaintenanceResponseEnhancer> logger,
-        IEngagementIntentClassifier? intentClassifier = null)
+        IEngagementFileMaintenanceService maintenanceService,
+        ILogger<EngagementFileMaintenanceResponseEnhancer> logger)
     {
-        _identityFileUpdateService = identityFileUpdateService;
-        _config = config.Value;
+        _maintenanceService = maintenanceService;
         _logger = logger;
-        _intentClassifier = intentClassifier;
     }
 
     /// <inheritdoc />
@@ -39,169 +35,104 @@ public sealed class EngagementFileMaintenanceResponseEnhancer : IResponseEnhance
         ConversationContext context,
         CancellationToken ct)
     {
-        var ruleBasedMatch = IsEngagementFileMaintenanceRequest(userQuery, assistantResponse);
-        var classification = _intentClassifier is null
-            ? EngagementIntentClassification.NoUpdate("No classifier configured.")
-            : await _intentClassifier.ClassifyAsync(userQuery, ct);
-
-        if (!ruleBasedMatch && !classification.ShouldUpdate)
+        if (!IsEngagementMaintenanceRequest(userQuery))
             return assistantResponse;
 
-        try
-        {
-            await ReplayRecentContextAsync(context, ct);
-            await _identityFileUpdateService.UpdateFromTurnAsync(
-                BuildIdentityUpdateMessage(userQuery, classification),
-                assistantResponse,
-                "engagement-file-maintenance",
-                ct);
-
-            var verification = VerifyEngagementFiles();
-            if (verification.AllPresent)
-            {
-                return $"""
-                    Engagement files verified and updated:
-                    - AGENTS.md: {verification.AgentsPath}
-                    - SELF.md: {verification.SelfPath}
-                    - USER.md: {verification.UserPath}
-
-                    {assistantResponse}
-                    """;
-            }
-
-            return $"""
-                Engagement file maintenance ran, but verification is incomplete: {verification.MissingSummary}
-
-                {assistantResponse}
-                """;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Engagement file maintenance failed.");
-            return $"""
-                Engagement file maintenance failed: {ex.Message}
-
-                {assistantResponse}
-                """;
-        }
-    }
-
-    private async Task ReplayRecentContextAsync(ConversationContext context, CancellationToken ct)
-    {
-        for (var i = 0; i < context.History.Count; i++)
-        {
-            var turn = context.History[i];
-            if (!string.Equals(turn.Role, "user", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var nextAssistant = context.History
-                .Skip(i + 1)
-                .FirstOrDefault(t => string.Equals(t.Role, "assistant", StringComparison.OrdinalIgnoreCase));
-
-            await _identityFileUpdateService.UpdateFromTurnAsync(
-                turn.Content,
-                nextAssistant?.Content ?? string.Empty,
-                "engagement-file-maintenance-context",
-                ct);
-        }
-    }
-
-    private EngagementFileVerification VerifyEngagementFiles()
-    {
-        var agentDir = Path.Combine(_config.Agents.BasePath, "main");
-        var agentsPath = Path.Combine(agentDir, "AGENTS.md");
-        var selfPath = Path.Combine(agentDir, "SELF.md");
-        var userPath = Path.Combine(agentDir, "USER.md");
-
-        return new EngagementFileVerification(
-            agentsPath,
-            selfPath,
-            userPath,
-            File.Exists(agentsPath),
-            File.Exists(selfPath),
-            File.Exists(userPath));
-    }
-
-    private static bool IsEngagementFileMaintenanceRequest(string userQuery, string assistantResponse)
-    {
-        var mentionsEngagementFile = MentionsEngagementFile(userQuery);
-
-        if (!mentionsEngagementFile)
-            return false;
-
-        return HasExplicitMaintenanceIntent(userQuery) ||
-               HasCorrectiveFileFeedback(userQuery) ||
-               AssistantClaimsEngagementFileMutation(assistantResponse);
-    }
-
-    private static bool MentionsEngagementFile(string text)
-    {
-        return Regex.IsMatch(
-            text,
-            @"\b(?:AGENTS\.md|SELF\.md|USER\.md|engagement files?|identity files?)\b",
-            RegexOptions.IgnoreCase);
-    }
-
-    private static bool HasExplicitMaintenanceIntent(string userQuery)
-    {
-        const string verbs = @"(?:create|update|write|initialize|configure|sync|refresh)";
-        const string targets = @"(?:AGENTS\.md|SELF\.md|USER\.md|engagement files?|identity files?)";
-        return Regex.IsMatch(userQuery, $@"\b{verbs}\b[\s\S]{{0,120}}\b{targets}\b", RegexOptions.IgnoreCase) ||
-               Regex.IsMatch(userQuery, $@"\b{targets}\b[\s\S]{{0,120}}\b{verbs}\b", RegexOptions.IgnoreCase);
-    }
-
-    private static bool HasCorrectiveFileFeedback(string userQuery)
-    {
-        return Regex.IsMatch(
+        _logger.LogInformation("Running deterministic engagement file maintenance.");
+        var request = new EngagementFileMaintenanceRequest(
             userQuery,
-            @"\b(?:haven't|didn't|did not|failed to|not created|not updated|missing|don't see|do not see|where are)\b",
+            ExtractDocumentNames(userQuery),
+            ExtractTargetFiles(userQuery));
+
+        var result = await _maintenanceService.MaintainAsync(request, ct);
+        return FormatResult(result);
+    }
+
+    private static bool IsEngagementMaintenanceRequest(string userQuery)
+    {
+        var mentionsEngagementTarget =
+            userQuery.Contains("engagement files", StringComparison.OrdinalIgnoreCase) ||
+            EngagementFiles.Any(file => userQuery.Contains(file, StringComparison.OrdinalIgnoreCase));
+
+        var requestsMaintenance = Regex.IsMatch(
+            userQuery,
+            @"\b(read|find|update|refresh|rewrite|clean|configure|use\s+the\s+insights)\b",
             RegexOptions.IgnoreCase);
+
+        return mentionsEngagementTarget && requestsMaintenance;
     }
 
-    private static bool AssistantClaimsEngagementFileMutation(string assistantResponse)
+    private static IReadOnlyList<string> ExtractDocumentNames(string userQuery)
     {
-        const string claims = @"(?:created|updated|wrote|configured|initialized|synced|refreshed)";
-        const string targets = @"(?:AGENTS\.md|SELF\.md|USER\.md|engagement files?|identity files?|files)";
-        return Regex.IsMatch(
-            assistantResponse,
-            $@"\b{claims}\b[\s\S]{{0,120}}\b{targets}\b",
+        var quotedMatches = Regex.Matches(
+            userQuery,
+            @"[`""](?<name>[^`""\r\n]+?\.(?:pdf|docx|doc|md|txt))[`""]",
             RegexOptions.IgnoreCase);
+        var tokenMatches = Regex.Matches(
+            userQuery,
+            @"(?<![\w./-])(?<name>[\w./()_-]+?\.(?:pdf|docx|doc|md|txt))(?![\w./-])",
+            RegexOptions.IgnoreCase);
+
+        return quotedMatches
+            .Concat(tokenMatches)
+            .Select(match => match.Groups["name"].Value.Trim().Trim('-', '*', ' ', '`', '"'))
+            .Where(value => !string.IsNullOrWhiteSpace(value) && !EngagementFiles.Contains(value, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
-    private static string BuildIdentityUpdateMessage(
-        string userQuery,
-        EngagementIntentClassification classification)
+    private static IReadOnlyList<string> ExtractTargetFiles(string userQuery)
     {
-        if (!classification.ShouldUpdate || string.IsNullOrWhiteSpace(classification.NormalizedInsight))
-            return userQuery;
-
-        var normalizedInsight = classification.NormalizedInsight.Trim();
-        var label = EngagementIntentCategories.ToIdentityUpdateLabel(classification.Category);
-        var normalizedLine = $"{label}: {normalizedInsight}";
-
-        return $"{userQuery}\n{normalizedLine}";
+        return EngagementFiles
+            .Where(file => userQuery.Contains(file, StringComparison.OrdinalIgnoreCase))
+            .DefaultIfEmpty()
+            .Where(file => !string.IsNullOrWhiteSpace(file))
+            .Cast<string>()
+            .ToArray();
     }
 
-    private sealed record EngagementFileVerification(
-        string AgentsPath,
-        string SelfPath,
-        string UserPath,
-        bool AgentsPresent,
-        bool SelfPresent,
-        bool UserPresent)
+    private static string FormatResult(EngagementFileMaintenanceResult result)
     {
-        public bool AllPresent => AgentsPresent && SelfPresent && UserPresent;
+        var builder = new StringBuilder();
+        builder.AppendLine(result.Success
+            ? "Engagement file maintenance completed with verified state."
+            : "Engagement file maintenance completed with errors.");
 
-        public string MissingSummary
+        AppendList(builder, "Source files found", result.SourceFilesFound);
+        AppendList(builder, "Source files read", result.SourceFilesRead);
+        AppendList(builder, "Engagement files changed", result.ChangedFiles);
+        AppendList(builder, "Engagement files verified", result.VerifiedFiles);
+        AppendList(builder, "Skipped", result.SkippedFiles);
+        AppendList(builder, "Errors", result.Errors);
+
+        if (result.SourceExcerpts.Count > 0)
         {
-            get
-            {
-                var missing = new List<string>();
-                if (!AgentsPresent) missing.Add("AGENTS.md");
-                if (!SelfPresent) missing.Add("SELF.md");
-                if (!UserPresent) missing.Add("USER.md");
-                return string.Join(", ", missing);
-            }
+            builder.AppendLine();
+            builder.AppendLine("**Source-backed excerpts used:**");
+            foreach (var excerpt in result.SourceExcerpts.Take(8))
+                builder.AppendLine(excerpt);
         }
+
+        if (!result.HasChanges && result.Errors.Count == 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine("No engagement file content changed after cleanup and verification.");
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private static void AppendList(StringBuilder builder, string title, IReadOnlyList<string> values)
+    {
+        builder.AppendLine();
+        builder.AppendLine($"**{title}:**");
+        if (values.Count == 0)
+        {
+            builder.AppendLine("- none");
+            return;
+        }
+
+        foreach (var value in values)
+            builder.AppendLine($"- {value}");
     }
 }

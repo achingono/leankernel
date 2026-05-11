@@ -83,7 +83,7 @@ public sealed class EmbeddingService : IEmbeddingService
 
             return result.Data
                 .OrderBy(d => d.Index)
-                .Select(d => d.Embedding)
+                .Select(d => FitToEmbeddingDimension(d.Embedding, _config.Qdrant.EmbeddingDimension))
                 .ToList();
         }
         catch (Exception ex)
@@ -91,6 +91,23 @@ public sealed class EmbeddingService : IEmbeddingService
             _logger.LogWarning(ex, "Embedding request failed — returning zero vectors");
             return textList.Select(_ => new float[_config.Qdrant.EmbeddingDimension]).ToList();
         }
+    }
+
+    private static float[] FitToEmbeddingDimension(float[] embedding, int targetDimension)
+    {
+        if (targetDimension <= 0 || embedding.Length == targetDimension)
+        {
+            return embedding;
+        }
+
+        if (embedding.Length > targetDimension)
+        {
+            return embedding.Take(targetDimension).ToArray();
+        }
+
+        var padded = new float[targetDimension];
+        Array.Copy(embedding, padded, embedding.Length);
+        return padded;
     }
 }
 

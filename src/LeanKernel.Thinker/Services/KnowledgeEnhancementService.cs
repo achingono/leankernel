@@ -1,5 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
@@ -16,16 +18,19 @@ public sealed class KnowledgeEnhancementService : IResponseEnhancer
 {
     private readonly IKnowledgeSearchService _knowledge;
     private readonly ILogger<KnowledgeEnhancementService> _logger;
+    private readonly double _minRelevanceThreshold;
 
     /// <summary>
     /// Represents the knowledge enhancement service.
     /// </summary>
     public KnowledgeEnhancementService(
         IKnowledgeSearchService knowledge,
+        IOptions<LeanKernelConfig> config,
         ILogger<KnowledgeEnhancementService> logger)
     {
         _knowledge = knowledge;
         _logger = logger;
+        _minRelevanceThreshold = config.Value.Context.MinRelevanceThreshold;
     }
 
     /// <summary>
@@ -62,13 +67,19 @@ public sealed class KnowledgeEnhancementService : IResponseEnhancer
                 limit: 3, 
                 ct: ct);
 
-            if (searchResults.Count == 0)
+            var relevantResults = searchResults
+                .Where(result => result.Score >= _minRelevanceThreshold)
+                .OrderByDescending(result => result.Score)
+                .Take(3)
+                .ToList();
+
+            if (relevantResults.Count == 0)
             {
-                return assistantResponse; // No relevant knowledge found
+                return assistantResponse; // No sufficiently relevant knowledge found
             }
 
             // Extract relevant insights from search results
-            var relevantInsights = FormatInsights(searchResults);
+            var relevantInsights = FormatInsights(relevantResults);
             if (string.IsNullOrWhiteSpace(relevantInsights))
             {
                 return assistantResponse;
@@ -79,7 +90,7 @@ public sealed class KnowledgeEnhancementService : IResponseEnhancer
             
             _logger.LogDebug(
                 "Enhanced response with {Count} knowledge references", 
-                searchResults.Count);
+                relevantResults.Count);
 
             return enhancedResponse;
         }
@@ -102,7 +113,7 @@ public sealed class KnowledgeEnhancementService : IResponseEnhancer
         insights.AppendLine("\n\n---");
         insights.AppendLine("**Related insights from your knowledge base:**\n");
 
-        foreach (var result in results.OrderByDescending(r => r.Score).Take(3))
+        foreach (var result in results)
         {
             // Extract title or filename
             var title = ExtractTitle(result);

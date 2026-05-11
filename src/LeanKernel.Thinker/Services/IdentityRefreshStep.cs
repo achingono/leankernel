@@ -25,12 +25,23 @@ public sealed class IdentityRefreshStep : ILearningStep
     /// <inheritdoc />
     public async Task<LearningStepResult> ProcessAsync(TurnEvent turnEvent, CancellationToken ct)
     {
-        await _identityUpdater.UpdateFromTurnAsync(
+        var result = await _identityUpdater.UpdateFromTurnAsync(
             turnEvent.UserMessage.Content,
             turnEvent.AssistantResponse,
             turnEvent.SessionId,
             ct);
 
-        return LearningStepResult.Succeeded(Name);
+        if (result.Success)
+        {
+            var message = result.HasChanges
+                ? $"Updated {result.ChangedFiles.Count} identity file(s)."
+                : "No identity file changes detected.";
+            return LearningStepResult.Succeeded(Name, message);
+        }
+
+        var errorMessage = result.Errors.Count > 0
+            ? string.Join("; ", result.Errors)
+            : "Identity file update failed.";
+        return LearningStepResult.Failed(Name, errorMessage);
     }
 }

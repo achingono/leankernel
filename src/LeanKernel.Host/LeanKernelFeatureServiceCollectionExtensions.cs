@@ -101,22 +101,23 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<PromptAssembler>();
 
         services.AddSingleton<KnowledgeEnhancementService>();
-        services.AddSingleton<IEngagementIntentClassifier, SmallModelEngagementIntentClassifier>();
+        services.AddSingleton<IEngagementFileMaintenanceService>(sp =>
+            new EngagementFileMaintenanceService(
+                sp.GetRequiredService<IOptions<LeanKernelConfig>>(),
+                sp.GetService<IAttachmentTextExtractionService>(),
+                sp.GetRequiredService<ILogger<EngagementFileMaintenanceService>>()));
         services.AddSingleton<IResponseEnhancer>(sp =>
         {
             var toolRegistry = sp.GetRequiredService<IToolRegistry>();
             var actionAuthorizer = sp.GetRequiredService<IActionAuthorizer>();
             var logger = sp.GetRequiredService<ILogger<RefusalInterceptorResponseEnhancer>>();
             var refusalInterceptor = new RefusalInterceptorResponseEnhancer(toolRegistry, actionAuthorizer, logger);
-            var engagementFileMaintenance = new EngagementFileMaintenanceResponseEnhancer(
-                sp.GetRequiredService<IIdentityFileUpdateService>(),
-                sp.GetRequiredService<IOptions<LeanKernelConfig>>(),
-                sp.GetRequiredService<ILogger<EngagementFileMaintenanceResponseEnhancer>>(),
-                sp.GetService<IEngagementIntentClassifier>());
-            
+            var engagementMaintenance = new EngagementFileMaintenanceResponseEnhancer(
+                sp.GetRequiredService<IEngagementFileMaintenanceService>(),
+                sp.GetRequiredService<ILogger<EngagementFileMaintenanceResponseEnhancer>>());
             var knowledgeEnhancer = sp.GetRequiredService<KnowledgeEnhancementService>();
             
-            return new ChainedResponseEnhancer(refusalInterceptor, engagementFileMaintenance, knowledgeEnhancer);
+            return new ChainedResponseEnhancer(refusalInterceptor, engagementMaintenance, knowledgeEnhancer);
         });
         services.AddSingleton<IIdentityFileUpdateService, IdentityFileUpdateService>();
         services.AddSingleton<RequestFailureHandler>();
@@ -300,7 +301,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         {
             var rulesProvider = sp.GetRequiredService<IEngagementRulesProvider>();
             var logger = sp.GetRequiredService<ILogger<TimeBoundaryService>>();
-            var rules = rulesProvider.GetCurrent();
+            var rules = rulesProvider.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
             return new TimeBoundaryService(rules, logger);
         });
         services.AddSingleton<ITimeBoundaryService>(sp => sp.GetRequiredService<TimeBoundaryService>());

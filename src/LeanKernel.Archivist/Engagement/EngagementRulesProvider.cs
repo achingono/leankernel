@@ -234,7 +234,7 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
 
     private static int? FindNumberInLine(string content, string pattern)
     {
-        var match = Regex.Match(content, pattern + @".*?(\d+)", RegexOptions.IgnoreCase);
+        var match = Regex.Match(content, $"(?:{pattern}).*?(\\d+)", RegexOptions.IgnoreCase);
         if (match.Success && int.TryParse(match.Groups[1].Value, out var num))
             return num;
         return null;
@@ -245,11 +245,11 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
         // Extract value after colon or equals
         var colonIdx = line.IndexOf(':');
         if (colonIdx != -1)
-            return line.Substring(colonIdx + 1).Trim().Trim('`', '"', '*');
+            return line.Substring(colonIdx + 1).Trim().Trim('`', '"', '*').Trim();
 
         var eqIdx = line.IndexOf('=');
         if (eqIdx != -1)
-            return line.Substring(eqIdx + 1).Trim().Trim('`', '"', '*');
+            return line.Substring(eqIdx + 1).Trim().Trim('`', '"', '*').Trim();
 
         return "";
     }
@@ -268,7 +268,10 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
                 continue;
             }
 
-            if (line.StartsWith("##"))
+            if (line.StartsWith("##", StringComparison.Ordinal))
+                break;
+
+            if (IsSiblingListStart(line, listName, sectionTitle))
                 break;
 
             AddListItem(line, items);
@@ -280,6 +283,25 @@ public sealed class EngagementRulesProvider : IEngagementRulesProvider
     private static bool IsListStart(string line, string listName, string sectionTitle)
         => line.Contains(listName, StringComparison.OrdinalIgnoreCase) ||
            line.Contains(sectionTitle, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsSiblingListStart(string line, string currentListName, string currentSectionTitle)
+    {
+        if (!line.TrimStart().StartsWith("###", StringComparison.Ordinal))
+            return false;
+
+        var knownLists = new[]
+        {
+            ("CanDoWithoutAsking", "Can Do Without Asking"),
+            ("MustAskBefore", "Must Ask Before"),
+            ("NeverDo", "Never Do")
+        };
+
+        return knownLists.Any(list =>
+            !string.Equals(list.Item1, currentListName, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(list.Item2, currentSectionTitle, StringComparison.OrdinalIgnoreCase) &&
+            (line.Contains(list.Item1, StringComparison.OrdinalIgnoreCase) ||
+             line.Contains(list.Item2, StringComparison.OrdinalIgnoreCase)));
+    }
 
     private static void AddListItem(string line, List<string> items)
     {

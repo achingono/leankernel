@@ -358,7 +358,7 @@ created: 2024-01-01
 
 ## Agent Personality
 
-**Tone:** Professional and helpful
+**Tone:** direct, concise
 
 ## Scope of Autonomy
 
@@ -400,24 +400,12 @@ created: 2024-01-01
 
 ## Time Boundaries
 
-**Timezone:** UTC
-**Active Hours:** 8:00 AM - 10:00 PM
+No verified time boundaries yet.
 
-## Communication Rules
+## Useful By Default
 
-Communication preferences for different channels.
-
-## Action Follow-Up
-
-Tracking and follow-up expectations.
-
-## Knowledge Management
-
-What the agent should remember about you.
-
-## Privacy & Safety
-
-Data handling and safety constraints.
+- Verify source reads and post-write file state before claiming file update completion.
+- For engagement-file maintenance, report source files read, files changed, files unchanged, and explicit errors.
 """;
     }
 }

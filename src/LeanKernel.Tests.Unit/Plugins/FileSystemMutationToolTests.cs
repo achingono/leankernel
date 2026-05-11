@@ -215,4 +215,43 @@ public class FileSystemMutationToolTests
             Directory.Delete(tmpDir, true);
         }
     }
+
+    [Fact]
+    public async Task WriteEditAndStatTools_VerifyAllEngagementFiles()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "LeanKernel-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(tmpDir, "agents", "main"));
+        var engagementFiles = new[] { "AGENTS.md", "SELF.md", "USER.md" };
+
+        try
+        {
+            var writeTool = new FileSystemWriteTool(tmpDir);
+            var editTool = new FileSystemEditTool(tmpDir);
+            var statTool = new FileSystemStatTool(tmpDir);
+
+            foreach (var fileName in engagementFiles)
+            {
+                var relativePath = $"agents/main/{fileName}";
+                var write = await writeTool.ExecuteAsync(
+                    $$"""{"path":"{{relativePath}}","content":"status: pending"}""",
+                    CancellationToken.None);
+                var edit = await editTool.ExecuteAsync(
+                    $$"""{"path":"{{relativePath}}","find":"pending","replace":"verified"}""",
+                    CancellationToken.None);
+                var stat = await statTool.ExecuteAsync(
+                    $$"""{"path":"{{relativePath}}"}""",
+                    CancellationToken.None);
+
+                Assert.True(write.Success);
+                Assert.True(edit.Success);
+                Assert.True(stat.Success);
+                Assert.Contains(fileName, stat.Output!);
+                Assert.Contains("verified", await File.ReadAllTextAsync(Path.Combine(tmpDir, "agents", "main", fileName)));
+            }
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
 }
