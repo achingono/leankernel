@@ -65,6 +65,7 @@ TAG_RULES_JSON = os.getenv("TAG_RULES_JSON", "[]")
 EMBEDDING_MAX_RETRIES = int(os.getenv("EMBEDDING_MAX_RETRIES", "6"))
 EMBEDDING_RETRY_BASE_SECONDS = float(os.getenv("EMBEDDING_RETRY_BASE_SECONDS", "0.75"))
 EMBEDDING_RETRY_MAX_SECONDS = float(os.getenv("EMBEDDING_RETRY_MAX_SECONDS", "12"))
+EMBEDDING_MIN_INTERVAL_SECONDS = float(os.getenv("EMBEDDING_MIN_INTERVAL_SECONDS", "0.25"))
 RETRYABLE_EMBEDDING_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
 RETRYABLE_EMBEDDING_ERRORS = (
     httpx.ConnectError,
@@ -203,11 +204,20 @@ class TagResolver:
 class EmbeddingClient:
     """Generates embeddings via LiteLLM API."""
 
-    def __init__(self, base_url: str, api_key: str, model: str, request_dimension: int | None = None):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        request_dimension: int | None = None,
+        min_interval_seconds: float = 0.0,
+    ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.request_dimension = request_dimension
+        self.min_interval_seconds = max(min_interval_seconds, 0.0)
+        self._last_request_time = 0.0
         self.client = httpx.AsyncClient(timeout=60.0)
 
     async def embed(self, text: str) -> list[float]:
@@ -235,6 +245,7 @@ class EmbeddingClient:
         raise RuntimeError("Embedding failed without an explicit exception")
 
     async def _embed_once(self, text: str) -> list[float]:
+        await self._respect_min_interval()
         response = await self.client.post(
             f"{self.base_url}/embeddings",
             json=self._embedding_payload(text),
@@ -252,16 +263,24 @@ class EmbeddingClient:
             payload["dimensions"] = self.request_dimension
         return payload
 
+    async def _respect_min_interval(self):
+        if self.min_interval_seconds <= 0:
+            return
+
+        now = time.monotonic()
+        elapsed = now - self._last_request_time
+        if elapsed < self.min_interval_seconds:
+            await asyncio.sleep(self.min_interval_seconds - elapsed)
+
+        self._last_request_time = time.monotonic()
+
     def _fit_requested_dimension(self, embedding: list[float]) -> list[float]:
         if not self.request_dimension or self.request_dimension <= 0:
             return embedding
         if len(embedding) > self.request_dimension:
             return embedding[: self.request_dimension]
         if len(embedding) < self.request_dimension:
-            raise RuntimeError(
-                f"Embedding length {len(embedding)} is smaller than requested "
-                f"dimension {self.request_dimension} for model {self.model}"
-            )
+            return embedding + ([0.0] * (self.request_dimension - len(embedding)))
         return embedding
 
     async def _sleep_after_http_error(self, error: httpx.HTTPStatusError, attempt: int):
@@ -557,6 +576,7 @@ class Indexer:
             LITELLM_API_KEY,
             EMBEDDING_MODEL,
             request_dimension=EMBEDDING_REQUEST_DIMENSION,
+            min_interval_seconds=EMBEDDING_MIN_INTERVAL_SECONDS,
         )
         self.unstructured_client = UnstructuredClient(UNSTRUCTURED_API_URL)
         self.qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, prefer_grpc=True)
