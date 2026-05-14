@@ -46,7 +46,8 @@ LITELLM_URL = os.getenv("LITELLM_URL", "http://litellm:4000")
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "sk-LeanKernel-local")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6334"))
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "LEANKERNEL_knowledge")
+WIKI_COLLECTION_NAME = os.getenv("WIKI_COLLECTION_NAME", os.getenv("COLLECTION_NAME", "LEANKERNEL_knowledge"))
+DOCUMENTS_COLLECTION_NAME = os.getenv("DOCUMENTS_COLLECTION_NAME", "documents")
 WIKI_PATH = os.getenv("WIKI_PATH", "/app/data/wiki")
 DOCUMENTS_PATH = os.getenv("DOCUMENTS_PATH", "/app/data/documents")
 DOCUMENTS_PATHS = [
@@ -655,14 +656,21 @@ def chunk_payload(
         "source_type": source_type,
         "source_file": relative_path,
         "chunk_index": chunk_index,
+        "chunkIndex": chunk_index,
         "text": chunk_text_content,
         "tags": tags,
         "indexed_at": int(time.time()),
+        "indexedAt": int(time.time()),
     }
     if source_type == "wiki" and wiki_data:
         payload["entry_id"] = wiki_data["id"]
         payload["dimension"] = wiki_data["dimension"]
         payload["subject"] = wiki_data["subject"]
+    else:
+        filename = os.path.basename(relative_path)
+        file_type = os.path.splitext(filename)[1].lower().lstrip(".")
+        payload["filename"] = filename
+        payload["fileType"] = file_type or "unknown"
     return payload
 
 
@@ -681,22 +689,23 @@ class Indexer:
         )
         self.unstructured_client = UnstructuredClient(UNSTRUCTURED_API_URL)
         self.qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, prefer_grpc=True)
-        self._ensure_collection()
+        self._ensure_collection(WIKI_COLLECTION_NAME)
+        self._ensure_collection(DOCUMENTS_COLLECTION_NAME)
 
-    def _ensure_collection(self):
+    def _ensure_collection(self, collection_name: str):
         """Create Qdrant collection if it doesn't exist."""
         try:
-            if not self.qdrant.collection_exists(COLLECTION_NAME):
+            if not self.qdrant.collection_exists(collection_name):
                 self.qdrant.create_collection(
-                    collection_name=COLLECTION_NAME,
+                    collection_name=collection_name,
                     vectors_config=VectorParams(
                         size=EMBEDDING_DIMENSION,
                         distance=Distance.COSINE,
                     ),
                 )
-                logger.info(f"Created Qdrant collection: {COLLECTION_NAME}")
+                logger.info(f"Created Qdrant collection: {collection_name}")
             else:
-                logger.info(f"Qdrant collection exists: {COLLECTION_NAME}")
+                logger.info(f"Qdrant collection exists: {collection_name}")
         except Exception as e:
             logger.error(f"Failed to connect to Qdrant: {e}")
             raise
@@ -747,7 +756,10 @@ class Indexer:
                 return
 
             if points:
-                self.qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
+                self.qdrant.upsert(
+                    collection_name=self._collection_for_source_type(source_type),
+                    points=points,
+                )
                 logger.info(f"Indexed {len(points)}/{expected_chunks} chunks from: {relative_path}")
 
             if failed_chunks > 0:
@@ -996,19 +1008,21 @@ class Indexer:
             return
 
         try:
-            self._delete_file_vectors(file_path)
+            _, source_type = source_metadata(file_path)
+            self._delete_file_vectors(file_path, source_type)
             self.state.remove(file_path)
             logger.info(f"Removed vectors for: {file_path}")
         except Exception as e:
             logger.error(f"Failed to delete vectors for {file_path}: {e} — state retained for retry")
 
-    def _delete_file_vectors(self, file_path: str):
+    def _delete_file_vectors(self, file_path: str, source_type: str | None = None):
         """Delete all vectors associated with a file path. Raises on failure."""
-        relative_path, _ = source_metadata(file_path)
+        relative_path, inferred_source_type = source_metadata(file_path)
+        resolved_source_type = source_type or inferred_source_type
 
         try:
             self.qdrant.delete(
-                collection_name=COLLECTION_NAME,
+                collection_name=self._collection_for_source_type(resolved_source_type),
                 points_selector=Filter(
                     must=[
                         FieldCondition(
@@ -1021,6 +1035,10 @@ class Indexer:
         except Exception as e:
             logger.error(f"Delete vectors failed for {relative_path}: {e}")
             raise
+
+    @staticmethod
+    def _collection_for_source_type(source_type: str) -> str:
+        return WIKI_COLLECTION_NAME if source_type == "wiki" else DOCUMENTS_COLLECTION_NAME
 
     @staticmethod
     def _generate_point_id(file_path: str, chunk_index: int) -> int:
@@ -1117,7 +1135,8 @@ async def main():
     logger.info("LeanKernel Knowledge Indexer starting...")
     logger.info(f"  Wiki path: {WIKI_PATH}")
     logger.info(f"  Documents paths: {DOCUMENTS_PATHS}")
-    logger.info(f"  Qdrant: {QDRANT_HOST}:{QDRANT_PORT}/{COLLECTION_NAME}")
+    logger.info(f"  Qdrant wiki collection: {QDRANT_HOST}:{QDRANT_PORT}/{WIKI_COLLECTION_NAME}")
+    logger.info(f"  Qdrant documents collection: {QDRANT_HOST}:{QDRANT_PORT}/{DOCUMENTS_COLLECTION_NAME}")
     logger.info(f"  Embedding model: {EMBEDDING_MODEL}")
     logger.info(f"  Rescan interval: {RESCAN_INTERVAL}s")
 
