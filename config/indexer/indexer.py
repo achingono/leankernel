@@ -17,6 +17,7 @@ import random
 import re
 import sqlite3
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -115,6 +116,7 @@ UNSTRUCTURED_EXTENSIONS = {
 
 # Text-based extensions that can be read directly
 TEXT_EXTENSIONS = {".md", ".txt", ".json", ".yaml", ".yml", ".xml", ".log"}
+NAMESPACE_LK_WIKI = uuid.UUID("9d6fbf4f-c744-4fa5-9f0f-05e9e9b8f5bf")
 
 
 def _retry_delay(
@@ -418,13 +420,18 @@ def parse_wiki_markdown(file_path: str) -> dict | None:
     body_lines = lines[end_idx + 1:]
     body = "\n".join(body_lines).strip()
     facts = extract_wiki_facts(body_lines)
+    structured_facts = extract_lk_facts(body_lines)
+    subject = frontmatter.get("subject", "")
+    subject_slug = re.sub(r"[^a-z0-9]+", "-", subject.lower()).strip("-")
 
     return {
         "id": frontmatter.get("id", ""),
         "dimension": frontmatter.get("dimension", ""),
-        "subject": frontmatter.get("subject", ""),
+        "subject": subject,
+        "subject_slug": subject_slug,
         "body": body,
         "facts": facts,
+        "structured_facts": structured_facts,
         "text_for_embedding": text_for_wiki_embedding(frontmatter, facts, body),
     }
 
@@ -456,6 +463,100 @@ def extract_wiki_facts(body_lines: list[str]) -> list[str]:
             if claim:
                 facts.append(claim)
     return facts
+
+
+def extract_lk_facts(body_lines: list[str]) -> list[dict[str, Any]]:
+    """Extract structured facts from fenced ```yaml lk-facts block."""
+    start_idx = None
+    for i, line in enumerate(body_lines):
+        if line.strip().lower() == "```yaml lk-facts":
+            start_idx = i
+            break
+    if start_idx is None:
+        return []
+
+    end_idx = None
+    for i in range(start_idx + 1, len(body_lines)):
+        if body_lines[i].strip() == "```":
+            end_idx = i
+            break
+    if end_idx is None:
+        return []
+
+    return parse_lk_facts_yaml(body_lines[start_idx + 1:end_idx])
+
+
+def parse_lk_facts_yaml(lines: list[str]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    in_context = False
+    in_tags = False
+
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+
+        if stripped.startswith("- claim:"):
+            if current is not None:
+                facts.append(current)
+            current = {
+                "claim": unquote_yaml(stripped[len("- claim:"):].strip()),
+                "context": {},
+                "tags": [],
+            }
+            in_context = False
+            in_tags = False
+            continue
+
+        if current is None:
+            continue
+
+        if stripped == "context:":
+            in_context = True
+            in_tags = False
+            continue
+        if stripped == "tags:":
+            in_tags = True
+            in_context = False
+            continue
+
+        if in_tags and stripped.startswith("- "):
+            current["tags"].append(unquote_yaml(stripped[2:].strip()) or "")
+            continue
+
+        if in_context:
+            if ":" not in stripped:
+                continue
+            key, value = stripped.split(":", 1)
+            current["context"][key.strip()] = unquote_yaml(value.strip())
+            continue
+
+        if ":" not in stripped:
+            continue
+        key, value = stripped.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if key == "confidence":
+            try:
+                current[key] = float(value)
+            except ValueError:
+                current[key] = 0.0
+        else:
+            current[key] = unquote_yaml(value)
+
+    if current is not None:
+        facts.append(current)
+
+    return facts
+
+
+def unquote_yaml(value: str) -> str | None:
+    if value == "''" or value == "":
+        return None
+    if len(value) >= 2 and value[0] == "'" and value[-1] == "'":
+        return value[1:-1].replace("''", "'")
+    return value
 
 
 def text_for_wiki_embedding(frontmatter: dict[str, str], facts: list[str], body: str) -> str:
@@ -687,6 +788,9 @@ class Indexer:
         failed_chunks = 0
         wiki_data = parse_wiki_markdown(file_path) if source_type == "wiki" else None
 
+        if source_type == "wiki" and wiki_data and wiki_data.get("structured_facts"):
+            return await self._build_wiki_fact_points(file_path, relative_path, tags, wiki_data)
+
         for i, chunk_text_content in enumerate(chunks):
             point = await self._build_point(
                 file_path,
@@ -703,6 +807,96 @@ class Indexer:
                 failed_chunks += 1
 
         return points, failed_chunks
+
+    async def _build_wiki_fact_points(
+        self,
+        file_path: str,
+        relative_path: str,
+        tags: list[str],
+        wiki_data: dict[str, Any],
+    ) -> tuple[list[PointStruct], int]:
+        points: list[PointStruct] = []
+        failed_chunks = 0
+        for fact in wiki_data.get("structured_facts", []):
+            claim_point = await self._build_wiki_fact_point(
+                fact,
+                "claim",
+                fact.get("claim") or "",
+                relative_path,
+                tags,
+                wiki_data,
+                file_path,
+            )
+            if claim_point:
+                points.append(claim_point)
+            else:
+                failed_chunks += 1
+
+            source_quote = fact.get("sourceQuote") or ""
+            if source_quote.strip():
+                quote_point = await self._build_wiki_fact_point(
+                    fact,
+                    "quote",
+                    source_quote,
+                    relative_path,
+                    tags,
+                    wiki_data,
+                    file_path,
+                )
+                if quote_point:
+                    points.append(quote_point)
+                else:
+                    failed_chunks += 1
+
+        return points, failed_chunks
+
+    async def _build_wiki_fact_point(
+        self,
+        fact: dict[str, Any],
+        vector_type: str,
+        text_for_embedding: str,
+        relative_path: str,
+        tags: list[str],
+        wiki_data: dict[str, Any],
+        file_path: str,
+    ) -> PointStruct | None:
+        if not text_for_embedding.strip():
+            return None
+
+        try:
+            embedding = await self.embedding_client.embed(text_for_embedding)
+        except Exception as e:
+            logger.error(f"Embedding failed for wiki fact point in {file_path}: {e!r}")
+            return None
+
+        normalized_fallback = re.sub(r"[^a-z0-9 ]+", " ", (fact.get("claim") or "").lower()).strip()
+        fact_key = fact.get("normalizedKey") or f"{wiki_data.get('id','')}|{normalized_fallback}"
+        point_id = str(uuid.uuid5(NAMESPACE_LK_WIKI, f"{fact_key}:{vector_type}"))
+        payload = {
+            "source_type": "wiki",
+            "source_file": relative_path,
+            "entryId": wiki_data.get("id", ""),
+            "entry_id": wiki_data.get("id", ""),
+            "factKey": fact_key,
+            "vectorType": vector_type,
+            "dimension": wiki_data.get("dimension", ""),
+            "subject": wiki_data.get("subject", ""),
+            "subjectSlug": wiki_data.get("subject_slug", ""),
+            "subject_slug": wiki_data.get("subject_slug", ""),
+            "claim": fact.get("claim", ""),
+            "sourceQuote": fact.get("sourceQuote"),
+            "confidence": fact.get("confidence", 0.0),
+            "lastConfirmed": fact.get("lastConfirmed"),
+            "source": fact.get("source"),
+            "tags": sorted(set((fact.get("tags") or []) + tags)),
+            "indexed_at": int(time.time()),
+            "text": text_for_embedding,
+        }
+        return PointStruct(
+            id=point_id,
+            vector=embedding,
+            payload=payload,
+        )
 
     async def _build_point(
         self,
