@@ -11,6 +11,7 @@ This section contains execution-ready product requirements documents (PRDs) for 
 | [run-replay-provenance-prd.md](run-replay-provenance-prd.md) | Ship run replay, cost timeline, and context provenance views | Faster debugging and higher operator trust |
 | [budget-guardrails-fallback-prd.md](budget-guardrails-fallback-prd.md) | Implement budget enforcement with graceful fallback routing | Predictable spend with resilient answer quality |
 | [memory-hygiene-quality-prd.md](memory-hygiene-quality-prd.md) | Add memory hygiene and quality scoring pipelines | Higher retrieval accuracy and lower context pollution |
+| [wiki-extraction-store-prd.md](wiki-extraction-store-prd.md) | Replace deterministic wiki extraction and add indexed wiki storage | Human-readable wiki facts with indexed and Qdrant-ready retrieval |
 | [benchmark-scenarios-prd.md](benchmark-scenarios-prd.md) | Publish benchmark scenarios with reproducible metrics | Clear ROI and objective quality tracking |
 
 ## Planning Conventions
@@ -36,6 +37,7 @@ Recommended implementation order:
 2. `run-replay-provenance-prd.md`
 3. `budget-guardrails-fallback-prd.md`
 4. `memory-hygiene-quality-prd.md`
-5. `benchmark-scenarios-prd.md`
+5. `wiki-extraction-store-prd.md`
+6. `benchmark-scenarios-prd.md`
 
 This order reduces operational risk by adding control and observability before increasing automation breadth.
