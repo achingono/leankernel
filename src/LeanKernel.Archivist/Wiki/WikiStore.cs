@@ -49,7 +49,7 @@ public sealed class WikiStore : IWikiStore
     public WikiStore(IOptions<LeanKernelConfig> config, ILogger<WikiStore> logger)
     {
         _basePath = config.Value.Wiki.BasePath;
-        _metaPath = Path.Combine(_basePath, ".LeanKernel");
+        _metaPath = Path.Combine(_basePath, config.Value.Wiki.MetaFolder);
         _indexPath = Path.Combine(_metaPath, "index.json");
         _logger = logger;
         EnsureDirectories();

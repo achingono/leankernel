@@ -29,7 +29,8 @@ public sealed class WikiMigrationService : IWikiMigrationService
     {
         _wikiStore = wikiStore;
         _wikiBasePath = config.Value.Wiki.BasePath;
-        _metaPath = Path.Combine(_wikiBasePath, ".LeanKernel");
+        var metaFolder = config.Value.Wiki.MetaFolder;
+        _metaPath = Path.Combine(_wikiBasePath, metaFolder);
         _legacyPath = Path.Combine(_wikiBasePath, "llm");
         _quarantinePath = Path.Combine(_metaPath, "quarantine");
         _ledgerPath = Path.Combine(_metaPath, "migration.json");

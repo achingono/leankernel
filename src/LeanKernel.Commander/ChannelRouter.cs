@@ -10,9 +10,12 @@ namespace LeanKernel.Commander;
 /// </summary>
 public sealed class ChannelRouter
 {
+    private static readonly TimeSpan DefaultDirectSendTimeout = TimeSpan.FromSeconds(35);
     private readonly IThinkerService _thinker;
     private readonly IReadOnlyList<IChannel> _channels;
     private readonly ILogger<ChannelRouter> _logger;
+    private readonly IMessageQueue? _outboundQueue;
+    private readonly TimeSpan _directSendTimeout;
 
     /// <summary>
     /// Represents the channel router.
@@ -20,11 +23,15 @@ public sealed class ChannelRouter
     public ChannelRouter(
         IThinkerService thinker,
         IEnumerable<IChannel> channels,
-        ILogger<ChannelRouter> logger)
+        ILogger<ChannelRouter> logger,
+        IMessageQueue? outboundQueue = null,
+        TimeSpan? directSendTimeout = null)
     {
         _thinker = thinker;
         _channels = channels.ToList();
         _logger = logger;
+        _outboundQueue = outboundQueue;
+        _directSendTimeout = directSendTimeout ?? DefaultDirectSendTimeout;
     }
 
     /// <summary>
@@ -152,12 +159,93 @@ public sealed class ChannelRouter
             await using (typingScope)
             {
                 var response = await _thinker.ProcessAsync(message, ct);
-                await channel.SendAsync(message.SenderId, response, ct);
+                await SendResponseAsync(channel, message, response, ct);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing message {MessageId}", message.Id);
+        }
+    }
+
+    private async Task SendResponseAsync(
+        IChannel channel,
+        LeanKernelMessage message,
+        string response,
+        CancellationToken ct)
+    {
+        _logger.LogInformation(
+            "Sending response for message {MessageId} to {Recipient} on {Channel}",
+            message.Id,
+            message.SenderId,
+            message.ChannelId);
+
+        try
+        {
+            await SendWithTimeoutAsync(channel, message.SenderId, response, ct);
+            _logger.LogInformation(
+                "Response sent for message {MessageId} to {Recipient} on {Channel}",
+                message.Id,
+                message.SenderId,
+                message.ChannelId);
+        }
+        catch (Exception ex) when (_outboundQueue is not null && !ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(
+                ex,
+                "Direct response delivery failed for message {MessageId}; queueing retry",
+                message.Id);
+
+            var queueResult = await _outboundQueue.EnqueueAsync(new QueuedMessage
+            {
+                Id = $"out_{message.Id}",
+                Channel = message.ChannelId,
+                Recipient = message.SenderId,
+                Content = response,
+                EnqueuedAt = DateTime.UtcNow,
+                IsUrgent = true,
+                Priority = 1
+            }, isUrgent: true, ct);
+
+            if (!queueResult.Success)
+            {
+                _logger.LogError(
+                    "Failed to queue response retry for message {MessageId}: {Reason}",
+                    message.Id,
+                    queueResult.Reason);
+            }
+        }
+    }
+
+    private async Task SendWithTimeoutAsync(
+        IChannel channel,
+        string recipient,
+        string response,
+        CancellationToken ct)
+    {
+        using var timeoutCts = new CancellationTokenSource(_directSendTimeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
+        var sendTask = channel.SendAsync(recipient, response, linkedCts.Token);
+        var delayTask = Task.Delay(_directSendTimeout, ct);
+        var completedTask = await Task.WhenAny(sendTask, delayTask);
+
+        if (completedTask == delayTask)
+        {
+            ct.ThrowIfCancellationRequested();
+            timeoutCts.Cancel();
+            throw new TimeoutException(
+                $"Direct channel send timed out after {_directSendTimeout.TotalSeconds:0} seconds");
+        }
+
+        try
+        {
+            await sendTask;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested && timeoutCts.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Direct channel send timed out after {_directSendTimeout.TotalSeconds:0} seconds");
         }
     }
 

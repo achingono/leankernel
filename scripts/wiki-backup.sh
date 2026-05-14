@@ -36,7 +36,7 @@ backup() {
 
     # Count entries
     local count
-    count=$(find "$WIKI_DIR" -name "*.json" -not -path "*/.LeanKernel/*" | wc -l)
+    count=$(find "$WIKI_DIR" -name "*.json" -not -path "*/.meta/*" | wc -l)
 
     echo "Backing up wiki ($count entries) from $WIKI_DIR"
     tar -czf "$backup_file" -C "$(dirname "$WIKI_DIR")" "$(basename "$WIKI_DIR")"
@@ -75,7 +75,7 @@ restore() {
     tar -xzf "$backup_file" -C "$(dirname "$WIKI_DIR")"
 
     local count
-    count=$(find "$WIKI_DIR" -name "*.json" -not -path "*/.LeanKernel/*" | wc -l)
+    count=$(find "$WIKI_DIR" -name "*.json" -not -path "*/.meta/*" | wc -l)
     echo "Restored $count wiki entries to $WIKI_DIR"
 }
 

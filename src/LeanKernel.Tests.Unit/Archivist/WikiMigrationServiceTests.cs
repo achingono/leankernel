@@ -66,8 +66,9 @@ public sealed class WikiMigrationServiceTests : IDisposable
         Assert.Equal(1, result.Migrated);
         Assert.Equal(1, result.Quarantined);
 
-        var quarantinedWhat = Path.Combine(_wikiPath, ".LeanKernel", "quarantine", "llm", "what-assistant.md");
-        var quarantinedWho = Path.Combine(_wikiPath, ".LeanKernel", "quarantine", "llm", "who-assistant.md");
+        var metaFolder = _config.Wiki.MetaFolder;
+        var quarantinedWhat = Path.Combine(_wikiPath, metaFolder, "quarantine", "llm", "what-assistant.md");
+        var quarantinedWho = Path.Combine(_wikiPath, metaFolder, "quarantine", "llm", "who-assistant.md");
         Assert.True(File.Exists(quarantinedWhat) || File.Exists(quarantinedWho));
     }
 

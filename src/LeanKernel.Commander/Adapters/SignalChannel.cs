@@ -162,7 +162,7 @@ public sealed class SignalChannel : IChannel, ITypingIndicatorChannel
         }
 
         await _adapter.SendMessageAsync(recipientId, content, ct);
-        _logger.LogDebug("Signal message sent to {Recipient}", recipientId);
+        _logger.LogInformation("Signal message sent to {Recipient}", recipientId);
     }
 
     /// <summary>

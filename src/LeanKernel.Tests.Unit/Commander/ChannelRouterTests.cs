@@ -99,6 +99,83 @@ public class ChannelRouterTests
     }
 
     [Fact]
+    public async Task HandleMessage_SendThrows_QueuesUrgentRetry()
+    {
+        Func<LeanKernelMessage, CancellationToken, Task>? capturedHandler = null;
+        var ch = CreateChannelWithEventCapture("signal", h => capturedHandler = h);
+        ch.SendAsync("u1", "AI response", Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("send failed"));
+        var thinker = Substitute.For<IThinkerService>();
+        thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
+            .Returns("AI response");
+        var queue = Substitute.For<IMessageQueue>();
+        queue.EnqueueAsync(Arg.Any<QueuedMessage>(), true, Arg.Any<CancellationToken>())
+            .Returns(new MessageQueueResult { Success = true, MessageId = "out_m1" });
+
+        var router = CreateRouter(thinker, [ch], queue);
+        await router.StartAsync(CancellationToken.None);
+
+        await capturedHandler!(new LeanKernelMessage
+        {
+            Id = "m1",
+            ChannelId = "signal",
+            SenderId = "u1",
+            Content = "Hello",
+            Timestamp = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+
+        await queue.Received(1).EnqueueAsync(
+            Arg.Is<QueuedMessage>(message =>
+                message.Id == "out_m1" &&
+                message.Channel == "signal" &&
+                message.Recipient == "u1" &&
+                message.Content == "AI response" &&
+                message.IsUrgent &&
+                message.Priority == 1),
+            true,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleMessage_SendHangs_QueuesUrgentRetryAfterTimeout()
+    {
+        Func<LeanKernelMessage, CancellationToken, Task>? capturedHandler = null;
+        var ch = CreateChannelWithEventCapture("signal", h => capturedHandler = h);
+        var sendCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        ch.SendAsync("u1", "AI response", Arg.Any<CancellationToken>())
+            .Returns(_ => sendCompletion.Task);
+        var thinker = Substitute.For<IThinkerService>();
+        thinker.ProcessAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<CancellationToken>())
+            .Returns("AI response");
+        var queue = Substitute.For<IMessageQueue>();
+        queue.EnqueueAsync(Arg.Any<QueuedMessage>(), true, Arg.Any<CancellationToken>())
+            .Returns(new MessageQueueResult { Success = true, MessageId = "out_m1" });
+
+        var router = CreateRouter(thinker, [ch], queue, TimeSpan.FromMilliseconds(25));
+        await router.StartAsync(CancellationToken.None);
+
+        await capturedHandler!(new LeanKernelMessage
+        {
+            Id = "m1",
+            ChannelId = "signal",
+            SenderId = "u1",
+            Content = "Hello",
+            Timestamp = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+
+        await queue.Received(1).EnqueueAsync(
+            Arg.Is<QueuedMessage>(message =>
+                message.Id == "out_m1" &&
+                message.Channel == "signal" &&
+                message.Recipient == "u1" &&
+                message.Content == "AI response" &&
+                message.IsUrgent &&
+                message.Priority == 1),
+            true,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task HandleMessage_UnknownChannel_DoesNotSend()
     {
         Func<LeanKernelMessage, CancellationToken, Task>? capturedHandler = null;
@@ -269,8 +346,12 @@ public class ChannelRouterTests
         return channel;
     }
 
-    private static ChannelRouter CreateRouter(IThinkerService thinker, IEnumerable<IChannel> channels) =>
-        new(thinker, channels, NullLogger<ChannelRouter>.Instance);
+    private static ChannelRouter CreateRouter(
+        IThinkerService thinker,
+        IEnumerable<IChannel> channels,
+        IMessageQueue? queue = null,
+        TimeSpan? directSendTimeout = null) =>
+        new(thinker, channels, NullLogger<ChannelRouter>.Instance, queue, directSendTimeout);
 
     private sealed class TrackingAsyncDisposable : IAsyncDisposable
     {

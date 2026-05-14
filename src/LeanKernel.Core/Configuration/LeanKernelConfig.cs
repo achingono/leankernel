@@ -458,14 +458,22 @@ public sealed class WikiConfig
     /// Gets or sets the base path.
     /// </summary>
     public string BasePath { get; set; } = "/app/data/wiki";
+
+    /// <summary>
+    /// Gets or sets the name of the metadata folder (default: ".meta").
+    /// </summary>
+    public string MetaFolder { get; set; } = ".meta";
+
     /// <summary>
     /// Gets or sets the max facts per entry.
     /// </summary>
     public int MaxFactsPerEntry { get; set; } = 20;
+
     /// <summary>
     /// Gets or sets the stale fact days.
     /// </summary>
     public int StaleFactDays { get; set; } = 30;
+
     /// <summary>
     /// Gets or sets the min confidence threshold.
     /// </summary>

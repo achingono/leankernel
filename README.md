@@ -256,7 +256,7 @@ LeanKernel/
 ├── data/
 │   ├── wiki/                   # 5W1H knowledge filesystem (.md files)
 │   │   ├── who/ what/ where/ when/ why/ how/
-│   │   └── .LeanKernel/             # Internal metadata
+│   │   └── .meta/             # Internal metadata
 │   ├── documents/              # Drop PDFs, ebooks, articles here
 │   ├── sessions/               # Conversation history
 │   ├── qdrant/                 # Vector DB storage

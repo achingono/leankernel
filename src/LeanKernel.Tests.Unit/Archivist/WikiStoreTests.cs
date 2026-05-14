@@ -186,7 +186,9 @@ public class WikiStoreTests : IDisposable
         var entry = MakeEntry("who-alice", WikiDimension.Who, "Alice", "Alice is a developer");
         await _store.UpsertAsync(entry, CancellationToken.None);
 
-        var indexPath = Path.Combine(_tempDir, ".LeanKernel", "index.json");
+        var metaFolder = ((LeanKernelConfig)_store.GetType().GetField("_basePath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).DeclaringType
+            .GetProperty("Wiki").GetValue(_store.GetType().GetField("_basePath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(_store))).MetaFolder;
+        var indexPath = Path.Combine(_tempDir, metaFolder, "index.json");
         Assert.True(File.Exists(indexPath));
     }
 
