@@ -14,6 +14,7 @@ public sealed class ContextCandidateRetriever
 {
     private readonly IWikiStore _wiki;
     private readonly IKnowledgeSearchService _knowledgeSearch;
+    private readonly IReranker? _reranker;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ContextCandidateRetriever> _logger;
 
@@ -43,12 +44,14 @@ public sealed class ContextCandidateRetriever
         IWikiStore wiki,
         IKnowledgeSearchService knowledgeSearch,
         IOptions<LeanKernelConfig> config,
-        ILogger<ContextCandidateRetriever> logger)
+        ILogger<ContextCandidateRetriever> logger,
+        IReranker? reranker = null)
     {
         _wiki = wiki ?? throw new ArgumentNullException(nameof(wiki));
         _knowledgeSearch = knowledgeSearch ?? throw new ArgumentNullException(nameof(knowledgeSearch));
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _reranker = reranker;
     }
 
     /// <summary>
@@ -108,12 +111,66 @@ public sealed class ContextCandidateRetriever
             if (string.IsNullOrWhiteSpace(query?.Content)) return [];
             
             var results = await _knowledgeSearch.SearchAsync(query.Content, agentTags, limit: 10, ct);
-            return results?.ToList() ?? [];
+            var candidates = (results ?? []).ToList();
+            return await ApplyRerankPolicyAsync(query.Content, candidates, ct);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Knowledge search failed - falling back to wiki-only context");
             return [];
+        }
+    }
+
+    private async Task<List<RelevanceScore>> ApplyRerankPolicyAsync(
+        string query,
+        List<RelevanceScore> candidates,
+        CancellationToken ct)
+    {
+        if (candidates.Count == 0)
+        {
+            return [];
+        }
+
+        var policy = _config.Context.Reranker;
+        var fallback = candidates
+            .OrderByDescending(c => c.Score)
+            .ThenByDescending(c => c.SemanticSimilarity)
+            .Take(Math.Clamp(policy.TopK, 1, 50))
+            .ToList();
+
+        if (!policy.Enabled || _reranker is null)
+        {
+            return fallback;
+        }
+
+        var topN = Math.Clamp(policy.TopN, 1, 50);
+        var topK = Math.Clamp(policy.TopK, 1, topN);
+        var timeoutMs = Math.Clamp(policy.TimeoutMs, 100, 10_000);
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
+
+        try
+        {
+            var reranked = await _reranker.RerankAsync(
+                query,
+                candidates.Take(topN).ToList(),
+                timeoutCts.Token);
+
+            return reranked
+                .Where(c => c.Score >= policy.MinAcceptanceScore)
+                .Take(topK)
+                .ToList();
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning("Reranker timed out after {TimeoutMs}ms; using deterministic fallback order", timeoutMs);
+            return fallback;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Reranker failed; using deterministic fallback order");
+            return fallback;
         }
     }
 

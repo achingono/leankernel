@@ -7,6 +7,7 @@ using LeanKernel.Archivist.Identity;
 using LeanKernel.Plugins.Attachments;
 using LeanKernel.Archivist.Embedding;
 using LeanKernel.Archivist.Knowledge;
+using LeanKernel.Archivist.Reranking;
 using LeanKernel.Archivist.Sessions;
 using LeanKernel.Archivist.Wiki;
 using LeanKernel.Commander;
@@ -59,6 +60,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {config.LiteLlm.ApiKey}");
         });
         services.AddSingleton<IKnowledgeSearchService, KnowledgeSearchService>();
+        services.AddSingleton<IReranker, LocalLlmReranker>();
         services.AddSingleton<WikiCompiler>();
         services.AddSingleton<ConversationCompactor>();
         services.AddSingleton<ICapabilityGapStore, MarkdownCapabilityGapStore>();

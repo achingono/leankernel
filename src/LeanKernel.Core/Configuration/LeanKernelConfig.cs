@@ -501,6 +501,42 @@ public sealed class ContextConfig
     /// Gets or sets the max conversation turns.
     /// </summary>
     public int MaxConversationTurns { get; set; } = 15;
+
+    /// <summary>
+    /// Gets or sets the reranker configuration used between retrieval and context assembly.
+    /// </summary>
+    public RerankerConfig Reranker { get; set; } = new();
+}
+
+/// <summary>
+/// Configuration for retrieval reranking.
+/// </summary>
+public sealed class RerankerConfig
+{
+    /// <summary>
+    /// Gets or sets whether reranking is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the number of top candidates to rerank.
+    /// </summary>
+    public int TopN { get; set; } = 12;
+
+    /// <summary>
+    /// Gets or sets the number of reranked candidates to keep.
+    /// </summary>
+    public int TopK { get; set; } = 6;
+
+    /// <summary>
+    /// Gets or sets the reranker timeout in milliseconds.
+    /// </summary>
+    public int TimeoutMs { get; set; } = 1200;
+
+    /// <summary>
+    /// Gets or sets the minimum acceptance score after reranking.
+    /// </summary>
+    public double MinAcceptanceScore { get; set; } = 0.0;
 }
 
 /// <summary>
