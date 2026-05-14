@@ -8,6 +8,7 @@ namespace LeanKernel.Archivist.Wiki;
 /// user messages, or ingested documents) using deterministic heuristic patterns.
 /// Semantic extraction is handled separately by <see cref="LlmWikiExtractor" />.
 /// </summary>
+[Obsolete("Deterministic extraction is legacy-only. Runtime extraction uses IWikiFactExtractor.")]
 public static class WikiExtractor
 {
     /// <summary>
