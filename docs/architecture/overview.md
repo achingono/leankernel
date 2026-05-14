@@ -99,5 +99,5 @@ flowchart LR
 | Wiki memory | Markdown files with frontmatter under `data/wiki` | Structured by 5W1H dimensions. |
 | Message queue | SQLite `messagequeue.db` | Wraps an in-memory queue for recovery across restarts. |
 | Self-improvement queue | JSON files under the configured learning queue path | Restores pending `TurnEvent` records after restart. |
-| Vector index | Qdrant collection, default `LEANKERNEL_knowledge` | Populated by the indexer and queried by Archivist/tools. |
+| Vector index | Qdrant collections `LEANKERNEL_knowledge` (wiki) + `documents` | Populated by the sidecar indexer and queried by Archivist/tools with optional source scoping. |
 | Logs | Rolling Serilog files under `data/logs` | Also emitted to console. |

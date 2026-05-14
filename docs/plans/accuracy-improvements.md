@@ -46,7 +46,7 @@ data/wiki/
 ├── where/
 ├── why/
 ├── how/
-├── .meta/          # index.json, migration logs, quarantine/
+├── .LeanKernel/    # index.json, migration logs, quarantine/
 └── quarantine/ (optional visible fallback)
 ```
 

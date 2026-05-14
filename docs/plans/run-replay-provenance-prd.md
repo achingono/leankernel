@@ -100,7 +100,7 @@ Operators struggle to debug poor responses because they cannot easily see which 
   "timestamp": "2026-05-07T12:01:15Z",
   "parentEventId": "evt_009",
   "payload": {
-    "tool": "wiki_query",
+    "tool": "search_wiki",
     "latencyMs": 128,
     "status": "ok"
   }
