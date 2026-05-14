@@ -29,9 +29,11 @@ public class WikiMarkdownFormatTests
 
         var md = WikiStore.SerializeToMarkdown(entry);
 
+        Assert.Contains("## Facts", md);
         Assert.Contains("- Bob is a PM", md);
+        Assert.Contains("```yaml lk-facts", md);
         Assert.Contains("confidence: 0.85", md);
-        Assert.Contains("source: session-123", md);
+        Assert.Contains("source: 'session-123'", md);
     }
 
     [Fact]
@@ -116,6 +118,8 @@ public class WikiMarkdownFormatTests
 
             # Test
 
+            ## Facts
+
             - A simple fact without metadata
             """;
         // Remove leading whitespace from each line (heredoc indentation)
@@ -163,6 +167,8 @@ public class WikiMarkdownFormatTests
 
             # Alice
 
+            ## Facts
+
             - Alice is a developer <!--{confidence: 0.9, source: s1, confirmed: 2024-01-01, tokens: 5}-->
 
             ## Related
@@ -202,6 +208,44 @@ public class WikiMarkdownFormatTests
         Assert.Equal(2, parsed.Relations.Count);
         Assert.Contains("who-bob", parsed.Relations);
         Assert.Contains("what-project-atlas", parsed.Relations);
+    }
+
+    [Fact]
+    public void SerializeAndParse_LkFactsRoundTrip_PreservesContextAndSpecialCharacters()
+    {
+        var entry = new WikiEntry
+        {
+            Id = "who-alice",
+            Dimension = WikiDimension.Who,
+            Subject = "Alice",
+            Summary = "Alice summary",
+            Aliases = ["A|lice", "Al`ice"],
+            Tags = ["tag-one"],
+            Facts =
+            [
+                new WikiFact
+                {
+                    Claim = "Alice said: \"use A|B and `code`\"",
+                    Context = new WikiFactContext { Who = "Alice", Why = "Keep | delimiters and backticks ` safe" },
+                    SourceQuote = "A|B",
+                    NormalizedKey = "who-alice|alice-said-use-a-b",
+                    Source = "conversation:test",
+                    Confidence = 0.91,
+                    LastConfirmed = DateTimeOffset.Parse("2026-01-02T00:00:00Z"),
+                    Tags = ["quote", "special"]
+                }
+            ]
+        };
+
+        var markdown = WikiStore.SerializeToMarkdown(entry);
+        var parsed = WikiStore.ParseMarkdown(markdown, "fallback");
+
+        Assert.NotNull(parsed);
+        Assert.Equal("Alice said: \"use A|B and `code`\"", parsed.Facts[0].Claim);
+        Assert.Equal("A|B", parsed.Facts[0].SourceQuote);
+        Assert.Equal("Alice", parsed.Facts[0].Context?.Who);
+        Assert.Equal("Keep | delimiters and backticks ` safe", parsed.Facts[0].Context?.Why);
+        Assert.Contains("special", parsed.Facts[0].Tags);
     }
 
     private static WikiEntry MakeEntry(string id, WikiDimension dim, string subject, string claim) =>

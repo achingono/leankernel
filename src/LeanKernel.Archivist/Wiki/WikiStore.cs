@@ -205,20 +205,56 @@ public sealed class WikiStore : IWikiStore
         sb.AppendLine($"summary: {entry.Summary ?? string.Empty}");
         sb.AppendLine($"lastAccessed: {entry.LastAccessed:O}");
         sb.AppendLine($"accessCount: {entry.AccessCount}");
+        sb.AppendLine("aliases:");
+        foreach (var alias in entry.Aliases)
+            sb.AppendLine($"  - {alias}");
+        sb.AppendLine("tags:");
+        foreach (var tag in entry.Tags)
+            sb.AppendLine($"  - {tag}");
         sb.AppendLine("---");
         sb.AppendLine();
 
         sb.AppendLine($"# {entry.Subject}");
         sb.AppendLine();
+        sb.AppendLine("## Summary");
+        sb.AppendLine();
+        if (!string.IsNullOrWhiteSpace(entry.Summary))
+            sb.AppendLine(entry.Summary);
+        sb.AppendLine();
 
+        sb.AppendLine("## Facts");
+        sb.AppendLine();
+        foreach (var fact in entry.Facts)
+            sb.AppendLine($"- {fact.Claim}");
+        sb.AppendLine();
+
+        sb.AppendLine("```yaml lk-facts");
         foreach (var fact in entry.Facts)
         {
-            sb.Append($"- {fact.Claim}");
-            var meta = FormatFactMeta(fact);
-            if (!string.IsNullOrEmpty(meta))
-                sb.Append($" <!--{{{meta}}}-->");
-            sb.AppendLine();
+            sb.AppendLine($"- claim: {ToYamlScalar(fact.Claim)}");
+            sb.AppendLine($"  normalizedKey: {ToYamlScalar(fact.NormalizedKey ?? $"{entry.Id}|{WikiFactMapper.NormalizeClaim(fact.Claim)}")}");
+            sb.AppendLine($"  sourceQuote: {ToYamlScalar(fact.SourceQuote)}");
+            sb.AppendLine($"  source: {ToYamlScalar(fact.Source)}");
+            sb.AppendLine($"  confidence: {fact.Confidence.ToString("F2", CultureInfo.InvariantCulture)}");
+            sb.AppendLine($"  lastConfirmed: {fact.LastConfirmed:yyyy-MM-dd}");
+            sb.AppendLine("  context:");
+            sb.AppendLine($"    who: {ToYamlScalar(fact.Context?.Who)}");
+            sb.AppendLine($"    what: {ToYamlScalar(fact.Context?.What)}");
+            sb.AppendLine($"    when: {ToYamlScalar(fact.Context?.When)}");
+            sb.AppendLine($"    where: {ToYamlScalar(fact.Context?.Where)}");
+            sb.AppendLine($"    why: {ToYamlScalar(fact.Context?.Why)}");
+            sb.AppendLine($"    how: {ToYamlScalar(fact.Context?.How)}");
+            sb.AppendLine("  tags:");
+            foreach (var tag in fact.Tags)
+                sb.AppendLine($"    - {ToYamlScalar(tag)}");
         }
+        sb.AppendLine("```");
+
+        sb.AppendLine();
+        sb.AppendLine("## Also Known As");
+        sb.AppendLine();
+        foreach (var alias in entry.Aliases)
+            sb.AppendLine($"- {alias}");
 
         if (entry.Relations.Count > 0)
         {
@@ -244,27 +280,31 @@ public sealed class WikiStore : IWikiStore
         if (!TryReadFrontmatter(lines, out var endIdx, out var frontmatter))
             return null;
 
-        var id = frontmatter.GetValueOrDefault("id", fallbackId);
-        var dimensionStr = frontmatter.GetValueOrDefault("dimension", "what");
-        var subject = frontmatter.GetValueOrDefault("subject", "Unknown");
-        var summary = frontmatter.GetValueOrDefault("summary", string.Empty);
-        var lastAccessed = ParseDateTimeOffset(frontmatter.GetValueOrDefault("lastAccessed", ""));
-        var accessCount = int.TryParse(frontmatter.GetValueOrDefault("accessCount", "0"), out var ac) ? ac : 0;
+        var id = frontmatter.Scalars.GetValueOrDefault("id", fallbackId);
+        var dimensionStr = frontmatter.Scalars.GetValueOrDefault("dimension", "what");
+        var subject = frontmatter.Scalars.GetValueOrDefault("subject", "Unknown");
+        var summary = frontmatter.Scalars.GetValueOrDefault("summary", string.Empty);
+        var lastAccessed = ParseDateTimeOffset(frontmatter.Scalars.GetValueOrDefault("lastAccessed", ""));
+        var accessCount = int.TryParse(frontmatter.Scalars.GetValueOrDefault("accessCount", "0"), out var ac) ? ac : 0;
+        var aliases = frontmatter.Lists.GetValueOrDefault("aliases", []);
+        var tags = frontmatter.Lists.GetValueOrDefault("tags", []);
 
         if (!Enum.TryParse<WikiDimension>(dimensionStr, ignoreCase: true, out var dimension))
             dimension = WikiDimension.What;
 
         var bodyLines = lines.Skip(endIdx + 1).ToList();
-        var (facts, relations) = ParseBodyLines(bodyLines, dimension);
+        var (facts, relations, bodyAliases, bodySummary) = ParseBodyLines(bodyLines, dimension);
 
         return new WikiEntry
         {
             Id = id,
             Dimension = dimension,
             Subject = subject,
-            Summary = string.IsNullOrWhiteSpace(summary) ? null : summary,
+            Summary = string.IsNullOrWhiteSpace(summary) ? bodySummary : summary,
             Facts = facts,
             Relations = relations,
+            Aliases = aliases.Union(bodyAliases, StringComparer.OrdinalIgnoreCase).ToList(),
+            Tags = tags.ToList(),
             LastAccessed = lastAccessed,
             AccessCount = accessCount
         };
@@ -273,10 +313,10 @@ public sealed class WikiStore : IWikiStore
     private static bool TryReadFrontmatter(
         List<string> lines,
         out int endIdx,
-        out Dictionary<string, string> frontmatter)
+        out ParsedFrontmatter frontmatter)
     {
         endIdx = -1;
-        frontmatter = [];
+        frontmatter = new ParsedFrontmatter();
         if (lines.Count < 3 || lines[0] != "---")
             return false;
 
@@ -288,35 +328,103 @@ public sealed class WikiStore : IWikiStore
         return true;
     }
 
-    private static (List<WikiFact> Facts, List<string> Relations) ParseBodyLines(
+    private static (List<WikiFact> Facts, List<string> Relations, List<string> Aliases, string? Summary) ParseBodyLines(
         List<string> bodyLines,
         WikiDimension dimension)
     {
         var facts = new List<WikiFact>();
         var relations = new List<string>();
-        var inRelatedSection = false;
+        var aliases = new List<string>();
+        var summaryBuilder = new StringBuilder();
 
-        foreach (var line in bodyLines)
+        var canonicalFacts = ParseLkFactsBlock(bodyLines);
+        if (canonicalFacts.Count > 0)
+            facts.AddRange(canonicalFacts);
+
+        var inSummarySection = false;
+        var inAliasesSection = false;
+        var inRelatedSection = false;
+        var inFactsSection = false;
+        var insideFactsCodeBlock = false;
+
+        for (var i = 0; i < bodyLines.Count; i++)
         {
+            var line = bodyLines[i];
+            if (line.StartsWith("```", StringComparison.OrdinalIgnoreCase))
+            {
+                insideFactsCodeBlock = !insideFactsCodeBlock;
+                continue;
+            }
+            if (insideFactsCodeBlock)
+                continue;
+
             if (line.StartsWith("## Related", StringComparison.OrdinalIgnoreCase))
             {
                 inRelatedSection = true;
+                inAliasesSection = false;
+                inSummarySection = false;
+                inFactsSection = false;
+                continue;
+            }
+            if (line.StartsWith("## Also Known As", StringComparison.OrdinalIgnoreCase))
+            {
+                inAliasesSection = true;
+                inRelatedSection = false;
+                inSummarySection = false;
+                inFactsSection = false;
+                continue;
+            }
+            if (line.StartsWith("## Summary", StringComparison.OrdinalIgnoreCase))
+            {
+                inSummarySection = true;
+                inAliasesSection = false;
+                inRelatedSection = false;
+                inFactsSection = false;
+                continue;
+            }
+            if (line.StartsWith("## Facts", StringComparison.OrdinalIgnoreCase))
+            {
+                inFactsSection = true;
+                inSummarySection = false;
+                inAliasesSection = false;
+                inRelatedSection = false;
                 continue;
             }
 
             if (line.StartsWith("## "))
             {
                 inRelatedSection = false;
+                inAliasesSection = false;
+                inSummarySection = false;
+                inFactsSection = false;
                 continue;
             }
 
             if (inRelatedSection)
+            {
                 AddRelation(line, dimension, relations);
-            else
+            }
+            else if (inAliasesSection && line.TrimStart().StartsWith("- "))
+            {
+                aliases.Add(line.TrimStart()[2..].Trim());
+            }
+            else if (inSummarySection)
+            {
+                if (summaryBuilder.Length > 0 || !string.IsNullOrWhiteSpace(line))
+                    summaryBuilder.AppendLine(line);
+            }
+            else if (inFactsSection && facts.Count == 0)
+            {
                 AddFact(line, facts);
+            }
+            else if (!inSummarySection && !inAliasesSection && !inRelatedSection && !inFactsSection && facts.Count == 0)
+            {
+                AddFact(line, facts);
+            }
         }
 
-        return (facts, relations);
+        var summary = summaryBuilder.ToString().Trim();
+        return (facts, relations, aliases, string.IsNullOrWhiteSpace(summary) ? null : summary);
     }
 
     private static void AddRelation(string line, WikiDimension dimension, List<string> relations)
@@ -341,21 +449,44 @@ public sealed class WikiStore : IWikiStore
         facts.Add(ParseFact(claim, meta));
     }
 
-    private static Dictionary<string, string> ParseFrontmatter(IEnumerable<string> lines)
+    private static ParsedFrontmatter ParseFrontmatter(IEnumerable<string> lines)
     {
-        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var line in lines)
+        var parsed = new ParsedFrontmatter();
+        string? currentListKey = null;
+
+        foreach (var rawLine in lines)
         {
+            var line = rawLine.TrimEnd();
+            if (line.StartsWith("  - ") && !string.IsNullOrWhiteSpace(currentListKey))
+            {
+                if (!parsed.Lists.TryGetValue(currentListKey, out var list))
+                {
+                    list = [];
+                    parsed.Lists[currentListKey] = list;
+                }
+                list.Add(line[4..].Trim());
+                continue;
+            }
+
             var colonIdx = line.IndexOf(':');
             if (colonIdx <= 0)
                 continue;
 
             var key = line[..colonIdx].Trim();
             var value = line[(colonIdx + 1)..].Trim();
-            dict[key] = value;
+            if (string.IsNullOrEmpty(value))
+            {
+                currentListKey = key;
+                if (!parsed.Lists.ContainsKey(key))
+                    parsed.Lists[key] = [];
+                continue;
+            }
+
+            currentListKey = null;
+            parsed.Scalars[key] = value;
         }
 
-        return dict;
+        return parsed;
     }
 
     private static WikiFact ParseFact(string claim, string metaStr)
@@ -418,6 +549,168 @@ public sealed class WikiStore : IWikiStore
         return string.Join(", ", parts);
     }
 
+    private static string ToYamlScalar(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "''";
+
+        return $"'{value.Replace("'", "''")}'";
+    }
+
+    private static List<WikiFact> ParseLkFactsBlock(List<string> bodyLines)
+    {
+        var facts = new List<WikiFact>();
+        var start = bodyLines.FindIndex(line => line.Trim().Equals("```yaml lk-facts", StringComparison.OrdinalIgnoreCase));
+        if (start < 0)
+            return facts;
+
+        var end = bodyLines.FindIndex(start + 1, line => line.Trim().Equals("```", StringComparison.OrdinalIgnoreCase));
+        if (end < 0)
+            return facts;
+
+        WikiFactBuilder? current = null;
+        var inContext = false;
+        var inTags = false;
+
+        for (var i = start + 1; i < end; i++)
+        {
+            var line = bodyLines[i];
+            var trimmed = line.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+                continue;
+
+            if (trimmed.StartsWith("- claim:"))
+            {
+                if (current is not null)
+                    facts.Add(current.Build());
+                current = new WikiFactBuilder
+                {
+                    Claim = UnquoteYaml(trimmed["- claim:".Length..].Trim())
+                };
+                inContext = false;
+                inTags = false;
+                continue;
+            }
+
+            if (current is null)
+                continue;
+
+            if (trimmed.Equals("context:", StringComparison.OrdinalIgnoreCase))
+            {
+                inContext = true;
+                inTags = false;
+                continue;
+            }
+            if (trimmed.Equals("tags:", StringComparison.OrdinalIgnoreCase))
+            {
+                inTags = true;
+                inContext = false;
+                continue;
+            }
+
+            if (inTags && trimmed.StartsWith("- "))
+            {
+                current.Tags.Add(UnquoteYaml(trimmed[2..].Trim()));
+                continue;
+            }
+
+            if (inContext)
+            {
+                var colon = trimmed.IndexOf(':');
+                if (colon <= 0)
+                    continue;
+                var key = trimmed[..colon].Trim().ToLowerInvariant();
+                var value = UnquoteYaml(trimmed[(colon + 1)..].Trim());
+                current.Context ??= new WikiFactContext();
+                current.Context = key switch
+                {
+                    "who" => current.Context with { Who = value },
+                    "what" => current.Context with { What = value },
+                    "when" => current.Context with { When = value },
+                    "where" => current.Context with { Where = value },
+                    "why" => current.Context with { Why = value },
+                    "how" => current.Context with { How = value },
+                    _ => current.Context
+                };
+                continue;
+            }
+
+            var propertyColon = trimmed.IndexOf(':');
+            if (propertyColon <= 0)
+                continue;
+
+            var property = trimmed[..propertyColon].Trim().ToLowerInvariant();
+            var rawValue = trimmed[(propertyColon + 1)..].Trim();
+            switch (property)
+            {
+                case "normalizedkey":
+                    current.NormalizedKey = UnquoteYaml(rawValue);
+                    break;
+                case "sourcequote":
+                    current.SourceQuote = UnquoteYaml(rawValue);
+                    break;
+                case "source":
+                    current.Source = UnquoteYaml(rawValue);
+                    break;
+                case "confidence":
+                    if (double.TryParse(rawValue, CultureInfo.InvariantCulture, out var confidence))
+                        current.Confidence = confidence;
+                    break;
+                case "lastconfirmed":
+                    current.LastConfirmed = ParseDateTimeOffset(rawValue);
+                    break;
+            }
+        }
+
+        if (current is not null)
+            facts.Add(current.Build());
+
+        return facts;
+    }
+
+    private static string? UnquoteYaml(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value == "''")
+            return null;
+        if (value.Length >= 2 && value[0] == '\'' && value[^1] == '\'')
+            return value[1..^1].Replace("''", "'");
+        return value;
+    }
+
+    private sealed class ParsedFrontmatter
+    {
+        public Dictionary<string, string> Scalars { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, List<string>> Lists { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class WikiFactBuilder
+    {
+        public string Claim { get; init; } = "";
+        public WikiFactContext? Context { get; set; }
+        public string? SourceQuote { get; set; }
+        public string? NormalizedKey { get; set; }
+        public string? Source { get; set; }
+        public double Confidence { get; set; } = 0.5;
+        public DateTimeOffset LastConfirmed { get; set; } = DateTimeOffset.UtcNow;
+        public List<string> Tags { get; } = [];
+
+        public WikiFact Build()
+        {
+            return new WikiFact
+            {
+                Claim = Claim,
+                Context = Context,
+                SourceQuote = SourceQuote,
+                NormalizedKey = NormalizedKey,
+                Source = Source,
+                Confidence = Confidence,
+                LastConfirmed = LastConfirmed,
+                EstimatedTokens = (int)Math.Ceiling(Claim.Length / 4.0),
+                Tags = Tags
+            };
+        }
+    }
+
     private static (string Text, string Path) ResolveRelationLink(string relationId, WikiDimension currentDimension)
     {
         var parts = relationId.Split('-', 2);
@@ -453,10 +746,10 @@ public sealed class WikiStore : IWikiStore
         var mergedFacts = new List<WikiFact>(existing.Facts);
         foreach (var newFact in incoming.Facts)
         {
-            var normalizedKey = newFact.NormalizedKey ?? WikiFactMapper.NormalizeClaim(newFact.Claim);
+            var normalizedKey = ComputeMergeClaimKey(newFact);
             var matchIndex = mergedFacts.FindIndex(f =>
                 string.Equals(
-                    f.NormalizedKey ?? WikiFactMapper.NormalizeClaim(f.Claim),
+                    ComputeMergeClaimKey(f),
                     normalizedKey,
                     StringComparison.OrdinalIgnoreCase));
 
@@ -485,6 +778,20 @@ public sealed class WikiStore : IWikiStore
             LastAccessed = DateTimeOffset.UtcNow,
             Relations = existing.Relations.Union(incoming.Relations).Distinct().ToList()
         };
+    }
+
+    private static string ComputeMergeClaimKey(WikiFact fact)
+    {
+        var key = fact.NormalizedKey;
+        if (!string.IsNullOrWhiteSpace(key))
+        {
+            var separator = key.IndexOf('|');
+            if (separator >= 0 && separator < key.Length - 1)
+                return key[(separator + 1)..];
+            return key;
+        }
+
+        return WikiFactMapper.NormalizeClaim(fact.Claim);
     }
 
     private void ValidateEntryDimension(WikiEntry entry)
