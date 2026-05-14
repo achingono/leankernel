@@ -25,7 +25,7 @@ public class PromptAssemblerFullTests
             new RelevanceScore { EntryId = "e1", Content = "Alice is a developer", EstimatedTokens = 5 }
         ]);
         var result = _assembler.Assemble(ctx);
-        Assert.Contains("Relevant Knowledge", result);
+        Assert.Contains("Wiki", result);
         Assert.Contains("Alice is a developer", result);
     }
 
@@ -37,7 +37,7 @@ public class PromptAssemblerFullTests
             new RelevanceScore { EntryId = "e2", Content = "RAG result", EstimatedTokens = 3 }
         ]);
         var result = _assembler.Assemble(ctx);
-        Assert.Contains("Related Context", result);
+        Assert.Contains("Documents", result);
         Assert.Contains("RAG result", result);
     }
 
@@ -82,7 +82,7 @@ public class PromptAssemblerFullTests
             new RelevanceScore { EntryId = "e1", Content = "Fact one", EstimatedTokens = 2 }
         ]);
         var result = _assembler.AssembleSystemMessage(ctx);
-        Assert.Contains("## Relevant Knowledge", result);
+        Assert.Contains("## Wiki", result);
         Assert.Contains("- Fact one", result);
     }
 
@@ -94,17 +94,17 @@ public class PromptAssemblerFullTests
             new RelevanceScore { EntryId = "e2", Content = "Context data", EstimatedTokens = 3 }
         ]);
         var result = _assembler.AssembleSystemMessage(ctx);
-        Assert.Contains("## Related Context", result);
+        Assert.Contains("## Documents", result);
         Assert.Contains("- Context data", result);
     }
 
     [Fact]
     public void AssembleSystemMessage_WithActiveTools()
     {
-        var ctx = MakeContext("System", toolNames: ["wiki_query", "web_search"]);
+        var ctx = MakeContext("System", toolNames: ["search_wiki", "web_search"]);
         var result = _assembler.AssembleSystemMessage(ctx);
         Assert.Contains("## Available Tools", result);
-        Assert.Contains("wiki_query", result);
+        Assert.Contains("search_wiki", result);
         Assert.Contains("web_search", result);
     }
 
@@ -113,9 +113,22 @@ public class PromptAssemblerFullTests
     {
         var ctx = MakeContext("Just system.");
         var result = _assembler.AssembleSystemMessage(ctx);
-        Assert.DoesNotContain("## Relevant Knowledge", result);
-        Assert.DoesNotContain("## Related Context", result);
+        Assert.DoesNotContain("## Wiki", result);
+        Assert.DoesNotContain("## Documents", result);
         Assert.DoesNotContain("## Available Tools", result);
+    }
+
+    [Fact]
+    public void AssembleSystemMessage_StripsRawStoragePaths()
+    {
+        var ctx = MakeContext("System", retrievedLeanKernels:
+        [
+            new RelevanceScore { EntryId = "e2", Content = "See /app/data/documents/raw/file.pdf", EstimatedTokens = 4 }
+        ]);
+
+        var result = _assembler.AssembleSystemMessage(ctx);
+        Assert.DoesNotContain("/app/data/documents", result);
+        Assert.Contains("documents/raw/file.pdf", result);
     }
 
     private static ConversationContext MakeContext(

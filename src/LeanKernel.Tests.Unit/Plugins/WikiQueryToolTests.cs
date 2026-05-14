@@ -13,7 +13,7 @@ public class WikiQueryToolTests
     {
         var wiki = Substitute.For<IWikiStore>();
         var tool = new WikiQueryTool(wiki);
-        Assert.Equal("wiki_query", tool.Name);
+        Assert.Equal("search_wiki", tool.Name);
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public class WikiQueryToolTests
             .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([entry]));
 
         var tool = new WikiQueryTool(wiki);
-        var result = await tool.ExecuteAsync("alice", CancellationToken.None);
+        var result = await tool.ExecuteAsync("""{"query":"alice"}""", CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Contains("Alice", result.Output);
@@ -54,7 +54,7 @@ public class WikiQueryToolTests
             .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([]));
 
         var tool = new WikiQueryTool(wiki);
-        var result = await tool.ExecuteAsync("nothing", CancellationToken.None);
+        var result = await tool.ExecuteAsync("""{"query":"nothing"}""", CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.Contains("No matching", result.Output);
@@ -68,9 +68,20 @@ public class WikiQueryToolTests
             .Returns<IReadOnlyList<WikiEntry>>(x => throw new InvalidOperationException("fail"));
 
         var tool = new WikiQueryTool(wiki);
-        var result = await tool.ExecuteAsync("test", CancellationToken.None);
+        var result = await tool.ExecuteAsync("""{"query":"test"}""", CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Contains("fail", result.Error);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InvalidJson_ReturnsError()
+    {
+        var wiki = Substitute.For<IWikiStore>();
+        var tool = new WikiQueryTool(wiki);
+        var result = await tool.ExecuteAsync("not json", CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("Invalid parameters JSON", result.Error);
     }
 }

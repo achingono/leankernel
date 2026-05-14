@@ -12,6 +12,8 @@ public class KnowledgeConfigTests
 
         Assert.True(config.Enabled);
         Assert.Equal("LEANKERNEL_knowledge", config.CollectionName);
+        Assert.Equal("LEANKERNEL_knowledge", config.WikiCollectionName);
+        Assert.Equal("documents", config.DocumentsCollectionName);
         Assert.Equal(1536, config.EmbeddingDimension);
         Assert.Equal("/app/data/agents/main/documents", config.DocumentsPath);
         Assert.Equal(["general"], config.DefaultDocumentTags);

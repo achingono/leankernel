@@ -14,6 +14,19 @@ public enum RelevanceSourceType
 }
 
 /// <summary>
+/// Logical source classification for retrieval output grouping.
+/// </summary>
+public enum KnowledgeSourceType
+{
+    /// <summary>Source not explicitly identified.</summary>
+    Unknown,
+    /// <summary>Wiki source.</summary>
+    Wiki,
+    /// <summary>Document source.</summary>
+    Document
+}
+
+/// <summary>
 /// A scored retrieval result from the Archivist's relevance pipeline.
 /// </summary>
 public sealed record RelevanceScore
@@ -57,6 +70,9 @@ public sealed record RelevanceScore
 
     /// <summary>Source type — determines which scoring formula to apply.</summary>
     public RelevanceSourceType SourceType { get; init; } = RelevanceSourceType.Wiki;
+
+    /// <summary>Source class used for output grouping (wiki/documents).</summary>
+    public KnowledgeSourceType KnowledgeSource { get; init; } = KnowledgeSourceType.Unknown;
 
     /// <summary>Weighted composite scoring formula for wiki results.</summary>
     public static double ComputeScore(

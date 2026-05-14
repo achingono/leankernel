@@ -553,6 +553,14 @@ public sealed class KnowledgeConfig
     /// </summary>
     public string CollectionName { get; set; } = "LEANKERNEL_knowledge";
     /// <summary>
+    /// Gets or sets the wiki collection name.
+    /// </summary>
+    public string WikiCollectionName { get; set; } = "LEANKERNEL_knowledge";
+    /// <summary>
+    /// Gets or sets the documents collection name.
+    /// </summary>
+    public string DocumentsCollectionName { get; set; } = "documents";
+    /// <summary>
     /// Gets or sets the embedding dimension.
     /// </summary>
     public int EmbeddingDimension { get; set; } = 1536;
