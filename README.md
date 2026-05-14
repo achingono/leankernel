@@ -86,6 +86,20 @@ Local passcode storage uses **PBKDF2-SHA512** (`200,000` iterations) with per-se
 
 These endpoints require bearer auth (`ApiAccess` policy).
 
+### OpenClaw Wiki Import
+
+Admin endpoint for one-shot import from a remote OpenClaw wiki/session source:
+
+- `POST /api/wiki/import/openclaw?dryRun=true&skipRemoteSync=false`
+
+Configuration lives under `LeanKernel:Wiki:OpenClawImport`:
+
+- `Enabled`
+- `RemoteHost`
+- `RemoteWikiPath`
+- `RemoteAgentsPath`
+- `StagingFolder`
+
 ## Built-in Tools
 
 Built-in tool names registered at startup:

@@ -106,7 +106,15 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
             BasePath = source.Wiki.BasePath,
             MaxFactsPerEntry = source.Wiki.MaxFactsPerEntry,
             StaleFactDays = source.Wiki.StaleFactDays,
-            MinConfidenceThreshold = source.Wiki.MinConfidenceThreshold
+            MinConfidenceThreshold = source.Wiki.MinConfidenceThreshold,
+            OpenClawImport = new OpenClawImportConfig
+            {
+                Enabled = source.Wiki.OpenClawImport.Enabled,
+                RemoteHost = source.Wiki.OpenClawImport.RemoteHost,
+                RemoteWikiPath = source.Wiki.OpenClawImport.RemoteWikiPath,
+                RemoteAgentsPath = source.Wiki.OpenClawImport.RemoteAgentsPath,
+                StagingFolder = source.Wiki.OpenClawImport.StagingFolder
+            }
         },
         Context = new ContextConfig
         {

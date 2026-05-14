@@ -44,6 +44,14 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     {
         services.AddSingleton<IWikiStore, WikiStore>();
         services.AddSingleton<IWikiMigrationService, WikiMigrationService>();
+        services.AddSingleton<OllamaOpenClawExtractor>();
+        services.AddHttpClient<OllamaOpenClawExtractor>((sp, client) =>
+        {
+            var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
+            client.BaseAddress = new Uri(config.Ollama.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(config.Ollama.TimeoutSeconds);
+        });
+        services.AddSingleton<IWikiImportService, OpenClawWikiImportService>();
         services.AddSingleton<WikiFactMapper>();
         services.AddSingleton<ISessionStore>(sp =>
         {

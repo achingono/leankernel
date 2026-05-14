@@ -1,6 +1,22 @@
 namespace LeanKernel.Core.Configuration;
 
 /// <summary>
+/// Strategies for extracting facts from OpenClaw wiki pages.
+/// </summary>
+public enum WikiExtractionStrategy
+{
+    /// <summary>
+    /// Deterministic regex/parsing-based extraction (fast, rule-based).
+    /// </summary>
+    Deterministic = 0,
+
+    /// <summary>
+    /// LLM-based extraction via Ollama (semantic, flexible, slower).
+    /// </summary>
+    LLM = 1
+}
+
+/// <summary>
 /// Root configuration model, bound from appsettings.json under "LeanKernel" key.
 /// </summary>
 public sealed class LeanKernelConfig
@@ -478,6 +494,47 @@ public sealed class WikiConfig
     /// Gets or sets the min confidence threshold.
     /// </summary>
     public double MinConfidenceThreshold { get; set; } = 0.5;
+
+    /// <summary>
+    /// Gets or sets OpenClaw import settings for one-shot wiki ingestion.
+    /// </summary>
+    public OpenClawImportConfig OpenClawImport { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the default extraction strategy (Deterministic or LLM).
+    /// </summary>
+    public WikiExtractionStrategy ExtractionStrategy { get; set; } = WikiExtractionStrategy.Deterministic;
+}
+
+/// <summary>
+/// Configuration for importing wiki data from a remote OpenClaw host.
+/// </summary>
+public sealed class OpenClawImportConfig
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether remote OpenClaw import is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the SSH host used to fetch OpenClaw wiki/session data.
+    /// </summary>
+    public string RemoteHost { get; set; } = "walnut";
+
+    /// <summary>
+    /// Gets or sets the remote path to the OpenClaw wiki root.
+    /// </summary>
+    public string RemoteWikiPath { get; set; } = "/home/achingono/openclaw/workspaces/main/wiki";
+
+    /// <summary>
+    /// Gets or sets the remote path to OpenClaw agents config root.
+    /// </summary>
+    public string RemoteAgentsPath { get; set; } = "/home/achingono/openclaw/config/agents";
+
+    /// <summary>
+    /// Gets or sets the local staging subfolder under wiki meta folder.
+    /// </summary>
+    public string StagingFolder { get; set; } = "imports/openclaw";
 }
 
 /// <summary>

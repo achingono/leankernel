@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Host.Services.Auth;
@@ -16,16 +17,21 @@ public sealed class WikiController : ControllerBase
 {
     private readonly IWikiStore _wiki;
     private readonly IWikiMigrationService _migration;
+    private readonly IWikiImportService _importService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WikiController" /> class.
     /// </summary>
     /// <param name="wiki">The wiki.</param>
     /// <param name="migration">The wiki migration service.</param>
-    public WikiController(IWikiStore wiki, IWikiMigrationService migration)
+    public WikiController(
+        IWikiStore wiki,
+        IWikiMigrationService migration,
+        IWikiImportService importService)
     {
         _wiki = wiki;
         _migration = migration;
+        _importService = importService;
     }
 
     /// <summary>
@@ -112,6 +118,22 @@ public sealed class WikiController : ControllerBase
     public async Task<IActionResult> Migrate(CancellationToken ct)
     {
         var result = await _migration.MigrateAsync(ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Runs a one-shot import from OpenClaw wiki/session data hosted on a remote server.
+    /// </summary>
+    [HttpPost("import/openclaw")]
+    public async Task<IActionResult> ImportOpenClaw(
+        [FromQuery] bool dryRun = true,
+        [FromQuery] bool skipRemoteSync = false,
+        [FromQuery] WikiExtractionStrategy strategy = WikiExtractionStrategy.Deterministic,
+        CancellationToken ct = default)
+    {
+        var result = await _importService.ImportOpenClawAsync(
+            new OpenClawImportRequest(dryRun, skipRemoteSync, strategy),
+            ct);
         return Ok(result);
     }
 }

@@ -24,7 +24,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # Install runtime dependencies + signal-cli (native package)
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates gpg adduser nodejs npm && \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates gpg adduser nodejs npm openssh-client && \
     mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://packaging.gitlab.io/signal-cli/gpg.key \
       | gpg --dearmor -o /etc/apt/keyrings/signal-cli.gpg && \

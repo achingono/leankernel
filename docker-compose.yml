@@ -41,6 +41,7 @@ services:
       - ./data/.signal-cli:/home/LeanKernel/.local/share/signal-cli
       - ./data/.ms-todo-cli:/home/LeanKernel/.ms-todo-cli
       - ./data/.simplefin-cli:/home/LeanKernel/.simplefin-cli
+      - ~/.ssh:/home/LeanKernel/.ssh
     depends_on:
       signal:
         condition: service_healthy
@@ -50,6 +51,8 @@ services:
         condition: service_healthy
     ports:
       - "${LEANKERNEL_PORT:-5080}:5080"            # Web UI + API + OpenAI-compatible
+    extra_hosts:
+      - "walnut:192.168.1.41"
     restart: unless-stopped
     deploy:
       resources:
