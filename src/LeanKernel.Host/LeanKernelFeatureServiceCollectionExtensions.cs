@@ -43,6 +43,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     public static IServiceCollection AddArchivist(this IServiceCollection services)
     {
         services.AddSingleton<IWikiStore, WikiStore>();
+        services.AddSingleton<IWikiMigrationService, WikiMigrationService>();
         services.AddSingleton<WikiFactMapper>();
         services.AddSingleton<ISessionStore>(sp =>
         {
