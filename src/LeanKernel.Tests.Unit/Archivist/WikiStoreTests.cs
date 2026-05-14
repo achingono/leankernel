@@ -180,6 +180,61 @@ public class WikiStoreTests : IDisposable
         Assert.Equal(0.9, result.Facts[0].Confidence);
     }
 
+    [Fact]
+    public async Task UpsertAsync_WritesIndexFile()
+    {
+        var entry = MakeEntry("who-alice", WikiDimension.Who, "Alice", "Alice is a developer");
+        await _store.UpsertAsync(entry, CancellationToken.None);
+
+        var indexPath = Path.Combine(_tempDir, ".LeanKernel", "index.json");
+        Assert.True(File.Exists(indexPath));
+    }
+
+    [Fact]
+    public async Task UpsertAsync_RejectsDimensionIdConflict()
+    {
+        var entry = MakeEntry("what-alice", WikiDimension.Who, "Alice", "Alice is a developer");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _store.UpsertAsync(entry, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ListByDimensionAsync_UsesFactPointersForCrossDimensionLookup()
+    {
+        var entry = new WikiEntry
+        {
+            Id = "who-ada",
+            Dimension = WikiDimension.Who,
+            Subject = "Ada",
+            Facts =
+            [
+                new WikiFact
+                {
+                    Claim = "Ada prefers concise responses because it reduces noise.",
+                    Confidence = 0.9,
+                    Context = new WikiFactContext { Who = "Ada", Why = "Reduce response noise" },
+                    EstimatedTokens = 8
+                }
+            ]
+        };
+        await _store.UpsertAsync(entry, CancellationToken.None);
+
+        var whyEntries = await _store.ListByDimensionAsync(WikiDimension.Why, CancellationToken.None);
+
+        Assert.Contains(whyEntries, e => e.Id == "who-ada");
+    }
+
+    [Fact]
+    public async Task UpsertAsync_DoesNotMisresolveSubjectWithDimensionTokenPrefix()
+    {
+        var entry = MakeEntry("who-what-if-analysis", WikiDimension.Who, "what if analysis", "A strategy note");
+        await _store.UpsertAsync(entry, CancellationToken.None);
+
+        var expectedPath = Path.Combine(_tempDir, "who", "what-if-analysis.md");
+        var wrongPath = Path.Combine(_tempDir, "what", "if-analysis.md");
+        Assert.True(File.Exists(expectedPath));
+        Assert.False(File.Exists(wrongPath));
+    }
+
     private static WikiEntry MakeEntry(string id, WikiDimension dim, string subject, string claim) =>
         new()
         {

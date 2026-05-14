@@ -92,7 +92,7 @@ public sealed class WikiFactMapper
         return entriesById.Values.ToList();
     }
 
-    internal static string NormalizeClaim(string claim)
+    public static string NormalizeClaim(string claim)
     {
         var lowered = claim.ToLowerInvariant();
         lowered = Regex.Replace(lowered, @"[^\w\s]", " ");
@@ -102,7 +102,7 @@ public sealed class WikiFactMapper
         return string.Join(' ', tokens);
     }
 
-    internal static string Slugify(string text) =>
+    public static string Slugify(string text) =>
         Regex.Replace(text.ToLowerInvariant().Trim(), @"[^a-z0-9]+", "-").Trim('-');
 
     private static bool TryParseDimension(string? value, out WikiDimension dimension) =>
