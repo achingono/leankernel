@@ -1,1 +1,5 @@
-# New public API added during the active refactor goes here until released.
+﻿# New public API added during the active refactor goes here until released.
+LeanKernel.Core.Interfaces.IWikiFactExtractor
+LeanKernel.Core.Models.ExtractedWikiFact
+LeanKernel.Core.Models.WikiExtractionResponse
+LeanKernel.Core.Models.WikiFactContext

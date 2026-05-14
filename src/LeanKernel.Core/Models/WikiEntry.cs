@@ -20,6 +20,18 @@ public sealed record WikiEntry
     /// </summary>
     public required string Subject { get; init; }
     /// <summary>
+    /// Gets or sets the summary.
+    /// </summary>
+    public string? Summary { get; init; }
+    /// <summary>
+    /// Gets or sets the aliases.
+    /// </summary>
+    public List<string> Aliases { get; init; } = [];
+    /// <summary>
+    /// Gets or sets the tags.
+    /// </summary>
+    public List<string> Tags { get; init; } = [];
+    /// <summary>
     /// Gets or sets the facts.
     /// </summary>
     public List<WikiFact> Facts { get; init; } = [];
@@ -47,6 +59,22 @@ public sealed record WikiFact
     /// </summary>
     public required string Claim { get; init; }
     /// <summary>
+    /// Gets or sets the context.
+    /// </summary>
+    public WikiFactContext? Context { get; init; }
+    /// <summary>
+    /// Gets or sets the source quote.
+    /// </summary>
+    public string? SourceQuote { get; init; }
+    /// <summary>
+    /// Gets or sets the normalized key.
+    /// </summary>
+    public string? NormalizedKey { get; init; }
+    /// <summary>
+    /// Gets or sets the tags.
+    /// </summary>
+    public List<string> Tags { get; init; } = [];
+    /// <summary>
     /// Gets or sets the confidence.
     /// </summary>
     public double Confidence { get; set; } = 0.5;
@@ -62,4 +90,35 @@ public sealed record WikiFact
     /// Gets or sets the estimated tokens.
     /// </summary>
     public int EstimatedTokens { get; set; }
+}
+
+/// <summary>
+/// Represents structured 5W1H context fields for a single wiki fact.
+/// </summary>
+public sealed record WikiFactContext
+{
+    /// <summary>
+    /// Gets or sets who.
+    /// </summary>
+    public string? Who { get; init; }
+    /// <summary>
+    /// Gets or sets what.
+    /// </summary>
+    public string? What { get; init; }
+    /// <summary>
+    /// Gets or sets when.
+    /// </summary>
+    public string? When { get; init; }
+    /// <summary>
+    /// Gets or sets where.
+    /// </summary>
+    public string? Where { get; init; }
+    /// <summary>
+    /// Gets or sets why.
+    /// </summary>
+    public string? Why { get; init; }
+    /// <summary>
+    /// Gets or sets how.
+    /// </summary>
+    public string? How { get; init; }
 }

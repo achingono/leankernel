@@ -9,15 +9,21 @@ namespace LeanKernel.Thinker.Services;
 /// </summary>
 public sealed class LlmFactExtractionStep : ILearningStep
 {
-    private readonly LlmWikiExtractor _extractor;
+    private readonly IWikiFactExtractor _extractor;
+    private readonly WikiFactMapper _mapper;
+    private readonly IWikiStore _wiki;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LlmFactExtractionStep" /> class.
     /// </summary>
     /// <param name="extractor">The semantic wiki extractor used by this step.</param>
-    public LlmFactExtractionStep(LlmWikiExtractor extractor)
+    /// <param name="mapper">The mapper used to build canonical wiki entries.</param>
+    /// <param name="wiki">The wiki store to ingest mapped entries into.</param>
+    public LlmFactExtractionStep(IWikiFactExtractor extractor, WikiFactMapper mapper, IWikiStore wiki)
     {
         _extractor = extractor;
+        _mapper = mapper;
+        _wiki = wiki;
     }
 
     /// <inheritdoc />
@@ -26,12 +32,17 @@ public sealed class LlmFactExtractionStep : ILearningStep
     /// <inheritdoc />
     public async Task<LearningStepResult> ProcessAsync(TurnEvent turnEvent, CancellationToken ct)
     {
-        await _extractor.ExtractAndIngestAsync(
+        var extracted = await _extractor.ExtractAsync(
             turnEvent.UserMessage.Content,
             turnEvent.AssistantResponse,
             turnEvent.SourceId,
             ct);
 
+        var entries = _mapper.Map(extracted, turnEvent.SourceId);
+        if (entries.Count == 0)
+            return LearningStepResult.Succeeded(Name, "No facts extracted.");
+
+        await _wiki.IngestFactsAsync(entries, ct);
         return LearningStepResult.Succeeded(Name);
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
@@ -13,6 +14,8 @@ public sealed class ConversationCompactor
 {
     private readonly ISessionStore _sessions;
     private readonly IWikiStore _wiki;
+    private readonly IWikiFactExtractor _extractor;
+    private readonly WikiFactMapper _mapper;
     private readonly ILogger<ConversationCompactor> _logger;
 
     /// <summary>
@@ -21,10 +24,14 @@ public sealed class ConversationCompactor
     public ConversationCompactor(
         ISessionStore sessions,
         IWikiStore wiki,
+        IWikiFactExtractor extractor,
+        WikiFactMapper mapper,
         ILogger<ConversationCompactor> logger)
     {
         _sessions = sessions;
         _wiki = wiki;
+        _extractor = extractor;
+        _mapper = mapper;
         _logger = logger;
     }
 
@@ -50,10 +57,12 @@ public sealed class ConversationCompactor
                 continue;
 
             var sourceId = $"session:{sessionId}:{userTurn.Timestamp:yyyy-MM-ddTHH:mm:ss}";
-            var entries = Wiki.WikiExtractor.ExtractFacts(
+            var extractedFacts = await _extractor.ExtractAsync(
                 userTurn.Content,
                 assistantTurn.Content,
-                sourceId);
+                sourceId,
+                ct);
+            var entries = _mapper.Map(extractedFacts, sourceId);
 
             foreach (var entry in entries)
             {

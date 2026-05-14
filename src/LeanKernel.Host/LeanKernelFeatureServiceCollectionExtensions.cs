@@ -42,6 +42,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     public static IServiceCollection AddArchivist(this IServiceCollection services)
     {
         services.AddSingleton<IWikiStore, WikiStore>();
+        services.AddSingleton<WikiFactMapper>();
         services.AddSingleton<ISessionStore>(sp =>
         {
             var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
@@ -82,6 +83,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             client.BaseAddress = new Uri(config.LiteLlm.BaseUrl);
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {config.LiteLlm.ApiKey}");
         });
+        services.AddSingleton<IWikiFactExtractor>(sp => sp.GetRequiredService<LlmWikiExtractor>());
 
         return services;
     }

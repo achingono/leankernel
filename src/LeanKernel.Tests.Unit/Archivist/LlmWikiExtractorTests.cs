@@ -22,7 +22,7 @@ public sealed class LlmWikiExtractorTests
                   "choices": [
                     {
                       "message": {
-                        "content": "[{\"dimension\":\"who\",\"subject\":\"Kem\",\"claims\":[\"Kem is the user's agent\"]}]"
+                        "content": "{\"facts\":[{\"who\":\"Kem\",\"what\":\"Role\",\"claim\":\"Kem is the user's agent\",\"subject\":\"Kem\",\"primaryDimension\":\"who\",\"sourceQuote\":\"I'm Kem.\",\"aliases\":[\"KEM\"],\"tags\":[\"identity\"]}]}"
                       }
                     }
                   ]
@@ -30,13 +30,14 @@ public sealed class LlmWikiExtractorTests
                 """)
         });
         var wiki = Substitute.For<IWikiStore>();
-        var extractor = CreateExtractor(handler, wiki);
+        var extractor = CreateExtractor(handler, wiki, new WikiFactMapper());
 
         await extractor.ExtractAndIngestAsync("Who are you?", "I'm Kem.", "conversation:test", CancellationToken.None);
 
         Assert.Equal("/v1/chat/completions", handler.Requests[0].RequestUri!.AbsolutePath);
         var body = await handler.Requests[0].Content!.ReadAsStringAsync();
         Assert.Contains("\"model\":\"small\"", body);
+        Assert.Contains("\"response_format\":{\"type\":\"json_object\"}", body);
         await wiki.Received(1).IngestFactsAsync(
             Arg.Is<IEnumerable<WikiEntry>>(entries => entries.Any(entry => entry.Subject == "Kem")),
             Arg.Any<CancellationToken>());
@@ -62,7 +63,7 @@ public sealed class LlmWikiExtractorTests
                       "choices": [
                         {
                           "message": {
-                            "content": "[{\"dimension\":\"what\",\"subject\":\"Career\",\"claims\":[\"Career list exists\"]}]"
+                            "content": "{\"facts\":[{\"what\":\"Career\",\"claim\":\"Career list exists in notes\",\"subject\":\"Career\",\"primaryDimension\":\"what\",\"sourceQuote\":\"career list exists\"}]}"
                           }
                         }
                       ]
@@ -71,7 +72,7 @@ public sealed class LlmWikiExtractorTests
             };
         });
         var wiki = Substitute.For<IWikiStore>();
-        var extractor = CreateExtractor(handler, wiki);
+        var extractor = CreateExtractor(handler, wiki, new WikiFactMapper());
 
         await extractor.ExtractAndIngestAsync(new string('u', 5000), "assistant", "conversation:test", CancellationToken.None);
 
@@ -84,7 +85,89 @@ public sealed class LlmWikiExtractorTests
             Arg.Any<CancellationToken>());
     }
 
-    private static LlmWikiExtractor CreateExtractor(HttpMessageHandler handler, IWikiStore wiki)
+    [Fact]
+    public async Task ExtractAsync_RejectsMalformedOrInvalidFacts()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "{\"facts\":[{\"subject\":\"Unknown\",\"claim\":\"ok\",\"primaryDimension\":\"who\"}]}"
+                      }
+                    }
+                  ]
+                }
+                """)
+        });
+        var wiki = Substitute.For<IWikiStore>();
+        var extractor = CreateExtractor(handler, wiki, new WikiFactMapper());
+
+        var facts = await extractor.ExtractAsync("hello", "assistant", "conversation:test", CancellationToken.None);
+
+        Assert.Empty(facts);
+    }
+
+    [Fact]
+    public async Task ExtractAsync_EmptyModelContent_ReturnsEmpty()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": ""
+                      }
+                    }
+                  ]
+                }
+                """)
+        });
+        var wiki = Substitute.For<IWikiStore>();
+        var extractor = CreateExtractor(handler, wiki, new WikiFactMapper());
+
+        var facts = await extractor.ExtractAsync("user", "assistant", "conversation:test", CancellationToken.None);
+
+        Assert.Empty(facts);
+    }
+
+    [Fact]
+    public void ParseExtractedFacts_IgnoresFencedEnvelope()
+    {
+        const string response = """
+            ```json
+            {"facts":[{"who":"Kem","claim":"Kem is an agent","subject":"Kem","primaryDimension":"who","sourceQuote":"I am Kem."}]}
+            ```
+            """;
+
+        var facts = LlmWikiExtractor.ParseExtractedFacts(response, "conversation:test", NullLogger<LlmWikiExtractor>.Instance);
+
+        Assert.Single(facts);
+        Assert.Equal("Kem", facts[0].Subject);
+    }
+
+    [Fact]
+    public void ParseExtractedFacts_MalformedJson_ReturnsEmpty()
+    {
+        var facts = LlmWikiExtractor.ParseExtractedFacts("{\"facts\":[", "conversation:test", NullLogger<LlmWikiExtractor>.Instance);
+        Assert.Empty(facts);
+    }
+
+    [Fact]
+    public void ParseExtractedFacts_InvalidDimension_ReturnsEmpty()
+    {
+        var facts = LlmWikiExtractor.ParseExtractedFacts(
+            "{\"facts\":[{\"who\":\"Kem\",\"claim\":\"Kem is an agent\",\"subject\":\"Kem\",\"primaryDimension\":\"invalid\"}]}",
+            "conversation:test",
+            NullLogger<LlmWikiExtractor>.Instance);
+        Assert.Empty(facts);
+    }
+
+    private static LlmWikiExtractor CreateExtractor(HttpMessageHandler handler, IWikiStore wiki, WikiFactMapper mapper)
     {
         var client = new HttpClient(handler)
         {
@@ -94,6 +177,7 @@ public sealed class LlmWikiExtractorTests
         return new LlmWikiExtractor(
             client,
             wiki,
+            mapper,
             Options.Create(new LeanKernelConfig
             {
                 LiteLlm = new LiteLlmConfig

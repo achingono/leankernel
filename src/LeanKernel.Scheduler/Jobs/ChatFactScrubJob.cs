@@ -16,6 +16,8 @@ public sealed class ChatFactScrubJob
 
     private readonly ISessionStore _sessions;
     private readonly IWikiStore _wiki;
+    private readonly IWikiFactExtractor _extractor;
+    private readonly WikiFactMapper _mapper;
     private readonly ILogger<ChatFactScrubJob> _logger;
 
     /// <summary>
@@ -24,10 +26,14 @@ public sealed class ChatFactScrubJob
     public ChatFactScrubJob(
         ISessionStore sessions,
         IWikiStore wiki,
+        IWikiFactExtractor extractor,
+        WikiFactMapper mapper,
         ILogger<ChatFactScrubJob> logger)
     {
         _sessions = sessions;
         _wiki = wiki;
+        _extractor = extractor;
+        _mapper = mapper;
         _logger = logger;
     }
 
@@ -87,10 +93,12 @@ public sealed class ChatFactScrubJob
                     }
 
                     var sourceId = $"scrub:{sessionId}:{userTurn.Timestamp:O}";
-                    var facts = WikiExtractor.ExtractFacts(
+                    var extractedFacts = await _extractor.ExtractAsync(
                         userTurn.Content,
                         assistantTurn?.Content ?? string.Empty,
-                        sourceId);
+                        sourceId,
+                        ct);
+                    var facts = _mapper.Map(extractedFacts, sourceId);
 
                     if (facts.Count > 0)
                         extractedEntries.AddRange(facts);

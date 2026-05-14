@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Scheduler;
@@ -25,6 +26,8 @@ public class ProactiveTaskRunnerTests
         var scrubJob = new LeanKernel.Scheduler.Jobs.ChatFactScrubJob(
             Substitute.For<ISessionStore>(),
             Substitute.For<IWikiStore>(),
+            Substitute.For<IWikiFactExtractor>(),
+            new WikiFactMapper(),
             NullLogger<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>.Instance);
         var syncJob = new LeanKernel.Scheduler.Jobs.ModelLimitSyncJob(config, NullLogger<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>.Instance);
         var profileSyncJob = Substitute.For<IAsyncJob>();
@@ -63,6 +66,8 @@ public class ProactiveTaskRunnerTests
         var scrubJob = new LeanKernel.Scheduler.Jobs.ChatFactScrubJob(
             Substitute.For<ISessionStore>(),
             Substitute.For<IWikiStore>(),
+            Substitute.For<IWikiFactExtractor>(),
+            new WikiFactMapper(),
             NullLogger<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>.Instance);
         var syncJob = new LeanKernel.Scheduler.Jobs.ModelLimitSyncJob(config, NullLogger<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>.Instance);
         var profileSyncJob = Substitute.For<IAsyncJob>();
