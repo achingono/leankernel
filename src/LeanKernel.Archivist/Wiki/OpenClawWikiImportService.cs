@@ -106,7 +106,7 @@ public sealed class OpenClawWikiImportService : IWikiImportService
             var importedForEntry = 0;
             foreach (var candidate in group)
             {
-                var corroboration = Corroborate(candidate.Claim, sessionTexts);
+                var corroboration = await CorroborateAsync(candidate.Claim, sessionTexts, ct);
                 if (!corroboration.Corroborated)
                 {
                     quarantined.Add(new QuarantinedFact(
@@ -142,7 +142,7 @@ public sealed class OpenClawWikiImportService : IWikiImportService
                     NormalizedKey = normalizedKey,
                     Tags = candidate.Tags,
                     Confidence = Math.Clamp(0.65 + corroboration.MatchStrength, 0.0, 1.0),
-                    Source = $"openclaw:{candidate.SourcePath}",
+                    Source = $"openclaw:{candidate.SourcePath}#{corroboration.Source}",
                     LastConfirmed = DateTimeOffset.UtcNow,
                     EstimatedTokens = (int)Math.Ceiling(candidate.Claim.Length / 4.0)
                 });
@@ -247,7 +247,29 @@ public sealed class OpenClawWikiImportService : IWikiImportService
         return aSet.Count;
     }
 
-    private static CorroborationResult Corroborate(string claim, List<string> sessionTexts)
+    private async Task<CorroborationResult> CorroborateAsync(string claim, List<string> sessionTexts, CancellationToken ct)
+    {
+        var sessionCorroboration = CorroborateAgainstSessions(claim, sessionTexts);
+        if (sessionCorroboration.Corroborated)
+        {
+            return sessionCorroboration;
+        }
+
+        if (_ollamaExtractor is null)
+        {
+            return CorroborationResult.NotCorroborated;
+        }
+
+        var qdrantMatches = await _ollamaExtractor.QueryQdrantForCorroborationAsync(claim, ct);
+        if (qdrantMatches.Count == 0)
+        {
+            return CorroborationResult.NotCorroborated;
+        }
+
+        return new CorroborationResult(true, 0.20, qdrantMatches[0], "qdrant");
+    }
+
+    private static CorroborationResult CorroborateAgainstSessions(string claim, List<string> sessionTexts)
     {
         var normalizedClaim = WikiFactMapper.NormalizeClaim(claim);
         var claimTokens = normalizedClaim.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -268,7 +290,7 @@ public sealed class OpenClawWikiImportService : IWikiImportService
 
             if (normalizedText.Contains(normalizedClaim, StringComparison.OrdinalIgnoreCase))
             {
-                return new CorroborationResult(true, 0.35, text[..Math.Min(text.Length, 220)]);
+                return new CorroborationResult(true, 0.35, text[..Math.Min(text.Length, 220)], "session_log");
             }
 
             var overlap = TokenOverlap(normalizedClaim, normalizedText);
@@ -282,7 +304,7 @@ public sealed class OpenClawWikiImportService : IWikiImportService
         if (bestOverlap >= 4)
         {
             var strength = Math.Min(bestOverlap / 12.0, 0.30);
-            return new CorroborationResult(true, strength, bestSnippet);
+            return new CorroborationResult(true, strength, bestSnippet, "session_log");
         }
 
         return CorroborationResult.NotCorroborated;
@@ -821,9 +843,9 @@ public sealed class OpenClawWikiImportService : IWikiImportService
         public List<string> Aliases { get; init; } = [];
     }
 
-    private sealed record CorroborationResult(bool Corroborated, double MatchStrength, string? SourceSnippet)
+    private sealed record CorroborationResult(bool Corroborated, double MatchStrength, string? SourceSnippet, string Source)
     {
-        public static CorroborationResult NotCorroborated { get; } = new(false, 0.0, null);
+        public static CorroborationResult NotCorroborated { get; } = new(false, 0.0, null, "none");
     }
 
     private sealed record QuarantinedFact(string SourcePath, string EntryId, string Claim, string Reason);

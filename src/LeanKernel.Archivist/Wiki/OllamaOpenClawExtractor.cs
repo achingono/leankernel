@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Qdrant.Client;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
@@ -15,7 +16,10 @@ namespace LeanKernel.Archivist.Wiki;
 public sealed class OllamaOpenClawExtractor
 {
     private readonly HttpClient _httpClient;
+    private readonly QdrantClient _qdrantClient;
     private readonly OllamaConfig _config;
+    private readonly KnowledgeConfig _knowledgeConfig;
+    private readonly IEmbeddingService? _embeddingService;
     private readonly ILogger<OllamaOpenClawExtractor> _logger;
 
     private static readonly HashSet<string> GenericSubjects = new(StringComparer.OrdinalIgnoreCase)
@@ -26,10 +30,14 @@ public sealed class OllamaOpenClawExtractor
     public OllamaOpenClawExtractor(
         HttpClient httpClient,
         IOptions<LeanKernelConfig> config,
+        IEmbeddingService? embeddingService,
         ILogger<OllamaOpenClawExtractor> logger)
     {
         _httpClient = httpClient;
         _config = config.Value.Ollama;
+        _knowledgeConfig = config.Value.Knowledge;
+        _qdrantClient = new QdrantClient(config.Value.Qdrant.Host, config.Value.Qdrant.Port);
+        _embeddingService = embeddingService;
         _logger = logger;
     }
 
@@ -67,9 +75,73 @@ public sealed class OllamaOpenClawExtractor
         string claim,
         CancellationToken ct)
     {
-        // TODO: Implement Qdrant search for document sources when IQdrantClient is available
-        // For now, return empty list; this is a fallback mechanism
-        return await Task.FromResult(new List<string>());
+        if (string.IsNullOrWhiteSpace(claim) || _embeddingService is null || !_knowledgeConfig.Enabled)
+        {
+            return [];
+        }
+
+        try
+        {
+            var embedding = await _embeddingService.EmbedAsync(claim, ct);
+            if (embedding.Length == 0 || embedding.All(static value => Math.Abs(value) < float.Epsilon))
+            {
+                return [];
+            }
+
+            var collections = new[]
+            {
+                _knowledgeConfig.DocumentsCollectionName,
+                _knowledgeConfig.CollectionName
+            }
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+            var snippets = new List<string>();
+            foreach (var collection in collections)
+            {
+                var exists = await _qdrantClient.CollectionExistsAsync(collection, ct);
+                if (!exists)
+                {
+                    continue;
+                }
+
+                var results = await _qdrantClient.SearchAsync(
+                    collection,
+                    embedding,
+                    limit: 5,
+                    cancellationToken: ct);
+
+                foreach (var point in results.OrderByDescending(r => r.Score))
+                {
+                    var text = GetPayloadString(point.Payload, "text")
+                               ?? GetPayloadString(point.Payload, "content")
+                               ?? GetPayloadString(point.Payload, "chunk")
+                               ?? GetPayloadString(point.Payload, "source_text");
+                    if (string.IsNullOrWhiteSpace(text))
+                    {
+                        continue;
+                    }
+
+                    snippets.Add(text.Length <= 220 ? text : text[..220]);
+                }
+            }
+
+            return snippets
+                .Distinct(StringComparer.Ordinal)
+                .Take(5)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Qdrant corroboration lookup failed");
+            return [];
+        }
+    }
+
+    private static string? GetPayloadString(IReadOnlyDictionary<string, Qdrant.Client.Grpc.Value> payload, string key)
+    {
+        return payload.TryGetValue(key, out var value) ? value.StringValue : null;
     }
 
     private string BuildExtractionPrompt(
