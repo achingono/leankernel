@@ -52,12 +52,22 @@ class LiteLlmRouteMonitor:
         self.sync_status_path = Path(os.getenv("LITELLM_LIMIT_SYNC_STATUS_PATH", "/app/logs/litellm-limit-sync-status.json"))
         self.drift_report_path = Path(os.getenv("LITELLM_LIMIT_DRIFT_REPORT_PATH", "/app/logs/litellm-model-limit-drift.json"))
         self.sync_lock_path = Path(os.getenv("LITELLM_LIMIT_SYNC_LOCK_PATH", "/tmp/litellm-model-limit-sync.lock"))
-        self.spec_path = Path(os.getenv("LITELLM_SPEC_PATH", "/app/litellm_spec.yaml"))
+        self.spec_path = Path(os.getenv("LITELLM_SPEC_PATH", "/app/config/litellm/config.yaml"))
         self.render_script_path = Path(os.getenv("LITELLM_RENDER_SCRIPT_PATH", "/app/render_litellm_config.py"))
-        self.rendered_config_path = Path(os.getenv("LITELLM_RENDERED_CONFIG_PATH", "/app/litellm_config.yaml"))
+        self.rendered_config_path = Path(os.getenv("LITELLM_RENDERED_CONFIG_PATH", "/app/config/litellm/litellm_config.generated.yaml"))
         self.sync_script_path = Path(os.getenv("LITELLM_LIMIT_SYNC_SCRIPT_PATH", "/app/sync_litellm_model_limits.py"))
         self.sync_interval_seconds = env_int("LITELLM_LIMIT_SYNC_INTERVAL_SECONDS", 900, 60)
         self.sync_check_seconds = env_int("LITELLM_LIMIT_SYNC_CHECK_SECONDS", 15, 5)
+        self.off_hours_restart_enabled = os.getenv("LITELLM_OFF_HOURS_RESTART_ENABLED", "true").strip().lower() in {
+            "1", "true", "yes", "on"
+        }
+        self.off_hours_restart_check_seconds = env_int("LITELLM_OFF_HOURS_RESTART_CHECK_SECONDS", 300, 60)
+        self.off_hours_restart_window_start_hour = env_int("LITELLM_OFF_HOURS_RESTART_WINDOW_START_HOUR", 2, 0)
+        self.off_hours_restart_window_end_hour = env_int("LITELLM_OFF_HOURS_RESTART_WINDOW_END_HOUR", 5, 1)
+        self.off_hours_restart_state_path = Path(
+            os.getenv("LITELLM_OFF_HOURS_RESTART_STATE_PATH", "/app/logs/litellm-offhours-restart-state.json")
+        )
+        self._last_off_hours_restart_check = 0.0
         self._lock = threading.Lock()
         self._pending_providers: set[str] = set()
         self._last_sync_started_at = 0.0
@@ -98,10 +108,95 @@ class LiteLlmRouteMonitor:
     def _sync_worker(self) -> None:
         while True:
             time.sleep(self.sync_check_seconds)
+            self._check_off_hours_restart()
             providers = self._next_sync_batch()
             if not providers:
                 continue
             self._run_sync(providers)
+
+    def _check_off_hours_restart(self) -> None:
+        if not self.off_hours_restart_enabled:
+            return
+
+        now = time.time()
+        if now - self._last_off_hours_restart_check < self.off_hours_restart_check_seconds:
+            return
+        self._last_off_hours_restart_check = now
+
+        if not self.spec_path.exists():
+            return
+
+        spec_mtime = self.spec_path.stat().st_mtime
+        state = self._load_off_hours_restart_state(spec_mtime)
+        last_restarted_spec_mtime = float(state.get("last_restarted_spec_mtime", spec_mtime))
+
+        # No source-spec update since the last tracked restart checkpoint.
+        if spec_mtime <= last_restarted_spec_mtime:
+            return
+
+        hour = datetime.now().hour
+        if not self._is_off_hours_window(hour):
+            return
+
+        state["last_restarted_spec_mtime"] = spec_mtime
+        state["last_restart_at"] = utc_timestamp()
+        self._write_off_hours_restart_state(state)
+
+        print(
+            json.dumps(
+                {
+                    "event": "litellm_offhours_restart",
+                    "reason": "source_spec_updated",
+                    "spec_path": str(self.spec_path),
+                    "spec_mtime": spec_mtime,
+                    "window_start_hour": self.off_hours_restart_window_start_hour,
+                    "window_end_hour": self.off_hours_restart_window_end_hour,
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+        # Exit the process so Docker restart policy can restart the container cleanly.
+        os._exit(0)
+
+    def _is_off_hours_window(self, current_hour: int) -> bool:
+        start = self.off_hours_restart_window_start_hour % 24
+        end = self.off_hours_restart_window_end_hour % 24
+        if start == end:
+            return True
+        if start < end:
+            return start <= current_hour < end
+        return current_hour >= start or current_hour < end
+
+    def _load_off_hours_restart_state(self, spec_mtime: float) -> dict[str, Any]:
+        if not self.off_hours_restart_state_path.exists():
+            initial = {
+                "initialized_at": utc_timestamp(),
+                "last_restarted_spec_mtime": spec_mtime,
+                "last_restart_at": None,
+            }
+            self._write_off_hours_restart_state(initial)
+            return initial
+        try:
+            raw = self.off_hours_restart_state_path.read_text(encoding="utf-8")
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+        except (OSError, json.JSONDecodeError):
+            pass
+        fallback = {
+            "initialized_at": utc_timestamp(),
+            "last_restarted_spec_mtime": spec_mtime,
+            "last_restart_at": None,
+        }
+        self._write_off_hours_restart_state(fallback)
+        return fallback
+
+    def _write_off_hours_restart_state(self, state: dict[str, Any]) -> None:
+        self.off_hours_restart_state_path.parent.mkdir(parents=True, exist_ok=True)
+        self.off_hours_restart_state_path.write_text(
+            json.dumps(state, indent=2, sort_keys=True), encoding="utf-8"
+        )
 
     def _next_sync_batch(self) -> list[str]:
         with self._lock:

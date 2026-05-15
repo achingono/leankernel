@@ -5,19 +5,19 @@ At container startup, `config/litellm/render_litellm_config.py` compiles that sp
 
 ## Runtime Flow
 
-1. Load source spec (`/app/litellm_spec.yaml`)
+1. Load source spec (`/app/config/litellm/config.yaml`)
 2. Validate structure (providers, models, keys/base URLs, routes, aliases, router settings)
 3. Resolve enabled key slots from environment variables
 4. Expand routes into LiteLLM `model_list` deployments
 5. Emit aliases, router fallback policies, and LiteLLM callback settings
-6. Write rendered config (`/app/litellm_config.yaml`)
+6. Write rendered config (`/app/config/litellm/litellm_config.generated.yaml`)
 7. Start LiteLLM with rendered config
 
 `config/litellm/Dockerfile` command:
 
 ```bash
-python3 /app/render_litellm_config.py /app/litellm_spec.yaml /app/litellm_config.yaml \
-  && exec litellm --config /app/litellm_config.yaml --port 4000 --num_workers ${LITELLM_NUM_WORKERS:-2}
+python3 /app/render_litellm_config.py /app/config/litellm/config.yaml /app/config/litellm/litellm_config.generated.yaml \
+  && exec litellm --config /app/config/litellm/litellm_config.generated.yaml --port 4000 --num_workers ${LITELLM_NUM_WORKERS:-2}
 ```
 
 ## Source Spec Shape
@@ -51,6 +51,25 @@ Artifacts written by the callback inside the container:
 - drift report: `/app/logs/litellm-model-limit-drift.json`
 
 In compose, these are persisted through `./data/logs:/app/logs`.
+
+The LiteLLM auth/admin endpoints require a connected proxy DB in current LiteLLM builds. Compose now runs a dedicated Postgres sidecar (`litellm-db`) and sets:
+
+- `DATABASE_URL=postgresql://...@litellm-db:5432/litellm`
+- volume: `litellm-db-data:/var/lib/postgresql/data`
+
+so API-key auth checks and proxy state survive container restarts.
+
+## Off-Hours Restart Job
+
+The proxy callback worker includes a scheduled off-hours restart check. If the source spec mtime advances, the job waits for the off-hours window and then exits the process so Docker restarts the `litellm` container.
+
+Environment controls:
+
+- `LITELLM_OFF_HOURS_RESTART_ENABLED` (default `true`)
+- `LITELLM_OFF_HOURS_RESTART_CHECK_SECONDS` (default `300`)
+- `LITELLM_OFF_HOURS_RESTART_WINDOW_START_HOUR` (default `2`)
+- `LITELLM_OFF_HOURS_RESTART_WINDOW_END_HOUR` (default `5`)
+- `LITELLM_OFF_HOURS_RESTART_STATE_PATH` (default `/app/logs/litellm-offhours-restart-state.json`)
 
 ## Environment-Gated Deployments
 
