@@ -20,7 +20,8 @@ public sealed record OpenClawImportRequest(
     bool DryRun,
     bool SkipRemoteSync,
     WikiExtractionStrategy Strategy = WikiExtractionStrategy.Deterministic,
-    LLMExtractionConfig? LLMConfig = null);
+    LLMExtractionConfig? LLMConfig = null,
+    string? RunId = null);
 
 /// <summary>
 /// Result payload for OpenClaw wiki import runs.

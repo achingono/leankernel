@@ -60,7 +60,7 @@ public sealed class OpenClawWikiImportService : IWikiImportService
             throw new InvalidOperationException("OpenClaw wiki import is disabled in configuration.");
         }
 
-        var runId = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
+        var runId = request.RunId ?? DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
         var stagingRoot = Path.Combine(
             _config.Wiki.BasePath,
             _config.Wiki.MetaFolder,

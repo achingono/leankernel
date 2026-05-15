@@ -98,6 +98,7 @@ try
     // Web API services
     builder.Services.AddSingleton<LogReaderService>();
     builder.Services.AddSingleton<FileBrowserService>();
+    builder.Services.AddTransient<WikiReferenceFixerService>();
     builder.Services.AddHttpClient<IAttachmentTextExtractionService, AttachmentTextExtractionService>((sp, client) =>
     {
         var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;

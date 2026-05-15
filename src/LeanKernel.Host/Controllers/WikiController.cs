@@ -129,11 +129,25 @@ public sealed class WikiController : ControllerBase
         [FromQuery] bool dryRun = true,
         [FromQuery] bool skipRemoteSync = false,
         [FromQuery] WikiExtractionStrategy strategy = WikiExtractionStrategy.Deterministic,
+        [FromQuery] string? runId = null,
         CancellationToken ct = default)
     {
         var result = await _importService.ImportOpenClawAsync(
-            new OpenClawImportRequest(dryRun, skipRemoteSync, strategy),
+            new OpenClawImportRequest(dryRun, skipRemoteSync, strategy, null, runId),
             ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Fixes invalid wiki references (e.g., ../domain/page.md) by using LLM to suggest corrections.
+    /// </summary>
+    [HttpPost("fix-references")]
+    public async Task<IActionResult> FixReferences(
+        [FromQuery] bool dryRun = true,
+        CancellationToken ct = default)
+    {
+        var fixer = HttpContext.RequestServices.GetRequiredService<WikiReferenceFixerService>();
+        var result = await fixer.FixInvalidReferencesAsync(dryRun, ct);
         return Ok(result);
     }
 }
