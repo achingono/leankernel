@@ -68,8 +68,8 @@ services:
   # ── LiteLLM Proxy (Model Router) ─────────────────────────────
   litellm:
     build:
-      context: config/litellm
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: config/litellm/Dockerfile
     container_name: leankernel-litellm
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
@@ -89,8 +89,15 @@ services:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - GITHUB_COPILOT_OAUTH_TOKEN=${GITHUB_COPILOT_OAUTH_TOKEN:-}
       - GITHUB_COPILOT_API_BASE=${GITHUB_COPILOT_API_BASE:-}
+      - LITELLM_ROUTE_LOG_PATH=/app/logs/litellm-route-events.jsonl
+      - LITELLM_LIMIT_DRIFT_REPORT_PATH=/app/logs/litellm-model-limit-drift.json
+      - LITELLM_LIMIT_SYNC_STATUS_PATH=/app/logs/litellm-limit-sync-status.json
+      - LITELLM_LIMIT_SYNC_INTERVAL_SECONDS=${LITELLM_LIMIT_SYNC_INTERVAL_SECONDS:-900}
+      - LITELLM_LIMIT_SYNC_CHECK_SECONDS=${LITELLM_LIMIT_SYNC_CHECK_SECONDS:-15}
     ports:
       - "${LITELLM_PORT:-4000}:4000"
+    volumes:
+      - ./data/logs:/app/logs
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

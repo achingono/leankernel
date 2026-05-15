@@ -27,7 +27,7 @@ LeanKernel is a personal AI agent platform built on **.NET 10**. It combines:
 Default `docker-compose.yml` services:
 
 - `engine` (`leankernel-engine`) - .NET host + UI/API
-- `litellm` - model proxy
+- `litellm` - model proxy with proxy-layer route logging and in-container model-limit sync
 - `qdrant` - vector store
 - `unstructured` - document parsing API
 - `indexer` - sidecar index pipeline

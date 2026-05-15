@@ -3,9 +3,15 @@ FROM ghcr.io/berriai/litellm:main-latest
 # Install additional dependencies if needed
 RUN pip install --no-cache-dir psycopg2-binary redis httpx pyyaml
 
+ENV PYTHONPATH=/app
+
 # Copy source spec + compiler
-COPY config.yaml /app/litellm_spec.yaml
-COPY render_litellm_config.py /app/render_litellm_config.py
+COPY config/litellm/config.yaml /app/litellm_spec.yaml
+COPY config/litellm/render_litellm_config.py /app/render_litellm_config.py
+COPY config/litellm/leankernel_litellm_callbacks.py /app/leankernel_litellm_callbacks.py
+COPY scripts/sync_litellm_model_limits.py /app/sync_litellm_model_limits.py
+
+RUN mkdir -p /app/logs
 
 # Set working directory
 WORKDIR /app
@@ -19,4 +25,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 # Compile config from source spec and environment, then start LiteLLM proxy
 ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["python3 /app/render_litellm_config.py /app/litellm_spec.yaml /tmp/litellm_config.yaml && exec litellm --config /tmp/litellm_config.yaml --port 4000 --num_workers ${LITELLM_NUM_WORKERS:-2}"]
+CMD ["python3 /app/render_litellm_config.py /app/litellm_spec.yaml /app/litellm_config.yaml && exec litellm --config /app/litellm_config.yaml --port 4000 --num_workers ${LITELLM_NUM_WORKERS:-2}"]

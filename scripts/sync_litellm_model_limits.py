@@ -9,6 +9,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -277,7 +278,18 @@ def parse_args() -> argparse.Namespace:
 		metavar="FILE",
 		help="Write a JSON drift report to FILE (field-level diff per model)",
 	)
+	parser.add_argument(
+		"--providers",
+		help="Optional comma-separated provider allowlist (for example: groq,gemini,azure)",
+	)
 	return parser.parse_args()
+
+
+def selected_providers(raw: str | None) -> set[str] | None:
+	if raw is None:
+		return None
+	providers = {part.strip() for part in raw.split(",") if part.strip()}
+	return providers or None
 
 
 # ---------------------------------------------------------------------------
@@ -302,7 +314,7 @@ def record_drift(provider: str, model_id: str, model_name: str, field: str, old_
 
 def write_drift_report(path: str) -> None:
 	report = {
-		"generated_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+		"generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
 		"total_changes": len(_drift_entries),
 		"changes": _drift_entries,
 	}
@@ -314,6 +326,7 @@ def main() -> int:
 	args = parse_args()
 	config_path = Path(args.config)
 	env_path = Path(args.env_file)
+	providers = selected_providers(args.providers)
 
 	load_env_file(env_path)
 	if not config_path.exists():
@@ -326,9 +339,12 @@ def main() -> int:
 		return 1
 
 	changes = 0
-	changes += update_groq_limits(config)
-	changes += update_gemini_limits(config)
-	changes += update_azure_limits(config)
+	if providers is None or "groq" in providers:
+		changes += update_groq_limits(config)
+	if providers is None or "gemini" in providers:
+		changes += update_gemini_limits(config)
+	if providers is None or "azure" in providers:
+		changes += update_azure_limits(config)
 
 	if changes == 0:
 		print("No model limit updates found.")
