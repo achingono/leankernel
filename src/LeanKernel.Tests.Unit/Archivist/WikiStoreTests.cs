@@ -12,11 +12,13 @@ public class WikiStoreTests : IDisposable
 {
     private readonly string _tempDir;
     private readonly WikiStore _store;
+    private readonly WikiConfig _wikiConfig;
 
     public WikiStoreTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"LEANKERNEL_wiki_{Guid.NewGuid():N}");
-        var config = Options.Create(new LeanKernelConfig { Wiki = new WikiConfig { BasePath = _tempDir } });
+        _wikiConfig = new WikiConfig { BasePath = _tempDir };
+        var config = Options.Create(new LeanKernelConfig { Wiki = _wikiConfig });
         _store = new WikiStore(config, NullLogger<WikiStore>.Instance);
     }
 
@@ -186,7 +188,7 @@ public class WikiStoreTests : IDisposable
         var entry = MakeEntry("who-alice", WikiDimension.Who, "Alice", "Alice is a developer");
         await _store.UpsertAsync(entry, CancellationToken.None);
 
-        var indexPath = Path.Combine(_tempDir, ".meta", "index.json");
+        var indexPath = Path.Combine(_tempDir, _wikiConfig.MetaFolder, "index.json");
         Assert.True(File.Exists(indexPath));
     }
 
