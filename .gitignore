@@ -17,6 +17,7 @@ bld/
 *.user
 *.suo
 *.cache
+*.lscache
 *.docstates
 *.pidb
 *.svclog
