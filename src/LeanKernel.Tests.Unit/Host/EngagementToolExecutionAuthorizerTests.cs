@@ -112,6 +112,39 @@ public class EngagementToolExecutionAuthorizerTests
     }
 
     [Fact]
+    public async Task AuthorizeAsync_SearchWiki_UsesSearchWikiAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("SearchWiki", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "SearchWiki",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("search_wiki", """{"query":"Alice"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("SearchWiki", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("SearchWiki", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_WikiQuery_LegacyName_IsNotMapped()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+
+        var result = await authorizer.AuthorizeAsync("wiki_query", """{"query":"Alice"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Null(result.ActionType);
+        await actionAuthorizer.DidNotReceive().AuthorizeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AuthorizeAsync_UnknownTool_AllowsWithoutCallingActionAuthorizer()
     {
         var actionAuthorizer = Substitute.For<IActionAuthorizer>();
