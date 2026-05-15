@@ -241,6 +241,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<ITool, WikiQueryTool>();
         services.AddSingleton<ITool, DocumentSearchTool>();
         services.AddSingleton<ITool, KnowledgeSearchTool>();
+        services.AddSingleton<ITool, GetWikiEntryTool>();
         services.AddSingleton<ITool>(sp => new FileSystemReadTool(
             dataDirectory ?? "/app/data",
             sp.GetService<IAttachmentTextExtractionService>()));

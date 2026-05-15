@@ -11,7 +11,7 @@ namespace LeanKernel.Plugins.BuiltIn;
 /// </summary>
 [ToolMetadata(
     Name = "search_documents",
-    Description = "Search indexed reference documents and return relevant passages.",
+    Description = "Semantic search over indexed documents only (not wiki). Use for requests about uploaded files, books, papers, notes, references, and document passages.",
     Category = ToolCategory.Wiki)]
 public sealed class DocumentSearchTool : ITool
 {
@@ -25,7 +25,9 @@ public sealed class DocumentSearchTool : ITool
     }
 
     public string Name => "search_documents";
-    public string Description => "Search indexed documents (books, papers, notes) without wiki facts.";
+    public string Description =>
+        "Semantic documents-only search. Use for 'search documents', 'search files', 'find in uploaded docs', " +
+        "'books', 'papers', 'reference material', and 'notes' without wiki results.";
     public string Category => ToolCategory.Wiki.ToString().ToLowerInvariant();
     public string ParametersSchema => """
         {
@@ -136,4 +138,3 @@ public sealed class DocumentSearchTool : ITool
         }
     }
 }
-

@@ -406,7 +406,7 @@ public sealed class EngagementFileMaintenanceService : IEngagementFileMaintenanc
         {
             "USER.MD" => "# USER.md - User Profile & Preferences\n\n## Verified Preferences and Priorities\n\nNo verified facts yet.\n",
             "SELF.MD" => "# SELF.md - Agent Self-Definition\n\n## Operating Rules\n\nNo verified facts yet.\n",
-            "AGENTS.MD" => "# AGENTS.md - Rules of Engagement\n\n## Agent Personality\n\n**Tone:** direct, concise\n\n## Scope of Autonomy\n\n### Can Do Without Asking\n\n- ReadFile\n- ListFiles\n- SearchFiles\n- StatFile\n- SearchKnowledge\n- SearchWiki\n- WriteAgentsMd\n- WriteSelfMd\n- WriteUserMd\n\n### Must Ask Before\n\n- WriteFile\n- SendMessage\n- DeleteFile\n\n### Never Do\n\n- CommitSecrets\n- DeleteProductionData\n- ExposeSecret\n\n## Useful By Default\n\n- Verify source reads and post-write file state before claiming file update completion.\n",
+            "AGENTS.MD" => "# AGENTS.md - Rules of Engagement\n\n## Agent Personality\n\n**Tone:** direct, concise\n\n## Scope of Autonomy\n\n### Can Do Without Asking\n\n- ReadFile\n- ListFiles\n- SearchFiles\n- StatFile\n- SearchKnowledge\n- GetWikiEntry\n- WriteAgentsMd\n- WriteSelfMd\n- WriteUserMd\n\n### Must Ask Before\n\n- WriteFile\n- SendMessage\n- DeleteFile\n\n### Never Do\n\n- CommitSecrets\n- DeleteProductionData\n- ExposeSecret\n\n## Useful By Default\n\n- Verify source reads and post-write file state before claiming file update completion.\n",
             _ => ""
         };
     }

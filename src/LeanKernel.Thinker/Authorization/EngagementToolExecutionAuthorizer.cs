@@ -57,7 +57,8 @@ public sealed class EngagementToolExecutionAuthorizer : IToolExecutionAuthorizer
             "file_touch" => MapWriteAction(path) ?? "WriteFile",
             "search_knowledge" => "SearchKnowledge",
             "search_documents" => "SearchKnowledge",
-            "search_wiki" => "SearchWiki",
+            "search_wiki" => "GetWikiEntry",
+            "get_wiki_entry" => "GetWikiEntry",
             "web_search" => "SearchWeb",
             _ => null
         };

@@ -88,7 +88,7 @@ public sealed class AutonomyScope
         "SearchFiles",
         "StatFile",
         "SearchKnowledge",
-        "SearchWiki",
+        "GetWikiEntry",
         "SearchWeb",
         "AnalyzeCode", 
         "CreateNote",

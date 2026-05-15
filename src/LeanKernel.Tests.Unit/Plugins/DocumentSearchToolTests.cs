@@ -15,6 +15,7 @@ public class DocumentSearchToolTests
         var knowledge = Substitute.For<IKnowledgeSearchService>();
         var tool = new DocumentSearchTool(knowledge, Options.Create(new LeanKernelConfig()));
         Assert.Equal("search_documents", tool.Name);
+        Assert.Contains("documents-only", tool.Description, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("query", tool.ParametersSchema);
     }
 
@@ -46,4 +47,3 @@ public class DocumentSearchToolTests
             "document");
     }
 }
-

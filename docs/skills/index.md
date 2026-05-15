@@ -50,9 +50,10 @@ The following tools are always available without a `SKILL.md`:
 
 | Tool (Class/Model Name) | Capability |
 |------------------------|-----------|
-| `WikiQueryTool` / `search_wiki` | Query 5W1H wiki memory |
-| `DocumentSearchTool` / `search_documents` | Search indexed document corpus |
-| `KnowledgeSearchTool` / `search_knowledge` | Semantic search over Qdrant |
+| `KnowledgeSearchTool` / `search_knowledge` | Primary semantic search over unified memory (wiki + documents) |
+| `WikiQueryTool` / `search_wiki` | Semantic search narrowed to wiki content only |
+| `DocumentSearchTool` / `search_documents` | Semantic search narrowed to documents only |
+| `GetWikiEntryTool` / `get_wiki_entry` | Deterministic structured wiki lookup via `IWikiStore` |
 | `WebSearchTool` / `web_search` | Web search integration |
 | `FileSystem*`, `Directory*` tools | Read/search/mutate files under the configured data directory |
 

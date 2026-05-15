@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 using LeanKernel.Plugins.Sdk;
@@ -9,11 +11,12 @@ namespace LeanKernel.Plugins.BuiltIn;
 /// </summary>
 [ToolMetadata(
     Name = "search_wiki",
-    Description = "Search personal wiki facts about people, projects, preferences, and process context.",
+    Description = "Semantic search over wiki content only. Use for wiki-only requests like 'search the wiki', personal notes, profile facts, preferences, people, projects, and 5W1H memory.",
     Category = ToolCategory.Wiki)]
 public sealed class WikiQueryTool : ITool
 {
-    private readonly IWikiStore _wiki;
+    private readonly IKnowledgeSearchService _knowledge;
+    private readonly KnowledgeConfig _config;
 
     /// <summary>
     /// Gets or sets the name.
@@ -22,7 +25,10 @@ public sealed class WikiQueryTool : ITool
     /// <summary>
     /// Gets or sets the description.
     /// </summary>
-    public string Description => "Search the 5W1H knowledge wiki for stored facts.";
+    public string Description =>
+        "Semantic wiki-only search over indexed memory. Use for requests like " +
+        "'search the wiki', 'search your notes', 'what do you know about', 'do you remember', " +
+        "'look up in the wiki', and 'find wiki facts'.";
     /// <summary>
     /// Gets or sets the category.
     /// </summary>
@@ -35,8 +41,8 @@ public sealed class WikiQueryTool : ITool
           "type": "object",
           "properties": {
             "query": { "type": "string", "description": "Search text" },
-            "dimensions": { "type": "array", "items": { "type": "string", "enum": ["who","what","where","when","why","how"] } },
-            "maxResults": { "type": "integer", "default": 5 }
+            "maxResults": { "type": "integer", "default": 5, "minimum": 1, "maximum": 20 },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Optional additional tag filters" }
           },
           "required": ["query"]
         }
@@ -45,10 +51,12 @@ public sealed class WikiQueryTool : ITool
     /// <summary>
     /// Initializes a new instance of the <see cref="WikiQueryTool" /> class.
     /// </summary>
-    /// <param name="wiki">The wiki.</param>
-    public WikiQueryTool(IWikiStore wiki)
+    /// <param name="knowledge">The knowledge.</param>
+    /// <param name="config">The config.</param>
+    public WikiQueryTool(IKnowledgeSearchService knowledge, IOptions<LeanKernelConfig> config)
     {
-        _wiki = wiki;
+        _knowledge = knowledge;
+        _config = config.Value.Knowledge;
     }
 
     /// <summary>
@@ -63,7 +71,7 @@ public sealed class WikiQueryTool : ITool
 
         try
         {
-            if (!TryParseParameters(parametersJson, out var query, out var parseError))
+            if (!TryParseParameters(parametersJson, out var query, out var maxResults, out var tags, out var parseError))
             {
                 return new ToolResult
                 {
@@ -74,15 +82,23 @@ public sealed class WikiQueryTool : ITool
                 };
             }
 
-            var results = await _wiki.QueryAsync(query, ct);
-            var output = string.Join("\n", results.Select(r =>
-                $"[{r.Dimension}:{r.Subject}] {string.Join("; ", r.Facts.Select(f => f.Claim))}"));
+            var effectiveTags = tags.Count > 0 ? tags : _config.DefaultDocumentTags.ToList();
+            if (!effectiveTags.Contains("wiki", StringComparer.OrdinalIgnoreCase))
+            {
+                effectiveTags.Add("wiki");
+            }
+
+            var results = await _knowledge.SearchAsync(query, effectiveTags, maxResults, ct, sourceType: "wiki");
+            var output = results.Count > 0
+                ? string.Join("\n\n", results.Select((r, i) =>
+                    $"[{i + 1}] (score: {r.Score:F2}) {r.Content}"))
+                : "No matching wiki content found.";
 
             return new ToolResult
             {
                 ToolName = Name,
                 Success = true,
-                Output = results.Count > 0 ? output : "No matching wiki entries found.",
+                Output = output,
                 Duration = sw.Elapsed
             };
         }
@@ -98,11 +114,16 @@ public sealed class WikiQueryTool : ITool
         }
     }
 
-    private static bool TryParseParameters(string parametersJson, out WikiQuery query, out string error)
+    private static bool TryParseParameters(
+        string parametersJson,
+        out string query,
+        out int maxResults,
+        out List<string> tags,
+        out string error)
     {
-        var queryText = string.Empty;
-        var maxResults = 5;
-        var dimensions = new HashSet<Core.Enums.WikiDimension>();
+        query = string.Empty;
+        maxResults = 5;
+        tags = [];
         error = string.Empty;
 
         try
@@ -112,15 +133,13 @@ public sealed class WikiQueryTool : ITool
             if (!root.TryGetProperty("query", out var queryElement))
             {
                 error = "Missing required parameter: query";
-                query = new WikiQuery { TextQuery = string.Empty, MaxResults = 5 };
                 return false;
             }
 
-            queryText = queryElement.GetString() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(queryText))
+            query = queryElement.GetString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(query))
             {
                 error = "Parameter 'query' cannot be blank.";
-                query = new WikiQuery { TextQuery = string.Empty, MaxResults = 5 };
                 return false;
             }
 
@@ -130,30 +149,22 @@ public sealed class WikiQueryTool : ITool
                 maxResults = Math.Clamp(parsedMax, 1, 20);
             }
 
-            if (root.TryGetProperty("dimensions", out var dimensionsElement) &&
-                dimensionsElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            if (root.TryGetProperty("tags", out var tagsElement) &&
+                tagsElement.ValueKind == System.Text.Json.JsonValueKind.Array)
             {
-                foreach (var element in dimensionsElement.EnumerateArray())
-                {
-                    if (Enum.TryParse<Core.Enums.WikiDimension>(element.GetString(), true, out var dimension))
-                    {
-                        dimensions.Add(dimension);
-                    }
-                }
+                tags = tagsElement
+                    .EnumerateArray()
+                    .Select(element => element.GetString())
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value!)
+                    .ToList();
             }
 
-            query = new WikiQuery
-            {
-                TextQuery = queryText,
-                MaxResults = maxResults,
-                Dimensions = dimensions
-            };
             return true;
         }
         catch (System.Text.Json.JsonException)
         {
-            error = "Invalid parameters JSON. Expected {\"query\":\"...\",\"dimensions\":[...],\"maxResults\":N}.";
-            query = new WikiQuery { TextQuery = string.Empty, MaxResults = 5 };
+            error = "Invalid parameters JSON. Expected {\"query\":\"...\",\"maxResults\":N,\"tags\":[...]}.";
             return false;
         }
     }

@@ -316,10 +316,10 @@ public sealed class AgentsConfigurationStep : IOnboardingStep
         {
             "autonomous" => ReplaceSection(template,
                 "CanDoWithoutAsking",
-                new[] { "ViewRepositoryStructure", "ReadPublicDocumentation", "SearchCodebase", "ReadFile", "ListFiles", "SearchFiles", "StatFile", "ViewConfiguration", "ViewErrorLogs", "SearchKnowledge", "SearchWiki", "SearchWeb", "CreateBranch", "CreateTestCommits", "ViewDeploymentStatus", "RunTests", "ViewBuildLogs", "ViewAnalytics", "CheckSystemHealth", "UpdateDocumentation", "CommentOnPRs", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
+                new[] { "ViewRepositoryStructure", "ReadPublicDocumentation", "SearchCodebase", "ReadFile", "ListFiles", "SearchFiles", "StatFile", "ViewConfiguration", "ViewErrorLogs", "SearchKnowledge", "GetWikiEntry", "SearchWeb", "CreateBranch", "CreateTestCommits", "ViewDeploymentStatus", "RunTests", "ViewBuildLogs", "ViewAnalytics", "CheckSystemHealth", "UpdateDocumentation", "CommentOnPRs", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
             "cautious" => ReplaceSection(template,
                 "CanDoWithoutAsking",
-                new[] { "ViewRepositoryStructure", "SearchCodebase", "ReadFile", "ListFiles", "SearchFiles", "StatFile", "SearchKnowledge", "SearchWiki", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
+                new[] { "ViewRepositoryStructure", "SearchCodebase", "ReadFile", "ListFiles", "SearchFiles", "StatFile", "SearchKnowledge", "GetWikiEntry", "WriteAgentsMd", "WriteSelfMd", "WriteUserMd" }),
             _ => template // basic preset (default)
         };
     }
@@ -371,7 +371,7 @@ created: 2024-01-01
 - SearchFiles
 - StatFile
 - SearchKnowledge
-- SearchWiki
+- GetWikiEntry
 - WriteAgentsMd
 - WriteSelfMd
 - WriteUserMd

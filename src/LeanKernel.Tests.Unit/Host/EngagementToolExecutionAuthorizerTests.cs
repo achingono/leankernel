@@ -112,14 +112,14 @@ public class EngagementToolExecutionAuthorizerTests
     }
 
     [Fact]
-    public async Task AuthorizeAsync_SearchWiki_UsesSearchWikiAction()
+    public async Task AuthorizeAsync_SearchWiki_UsesGetWikiEntryAction()
     {
         var actionAuthorizer = Substitute.For<IActionAuthorizer>();
-        actionAuthorizer.AuthorizeAsync("SearchWiki", Arg.Any<CancellationToken>())
+        actionAuthorizer.AuthorizeAsync("GetWikiEntry", Arg.Any<CancellationToken>())
             .Returns(new AuthorizationResult
             {
                 IsAuthorized = true,
-                ActionType = "SearchWiki",
+                ActionType = "GetWikiEntry",
                 Reason = "allowed"
             });
 
@@ -127,8 +127,28 @@ public class EngagementToolExecutionAuthorizerTests
         var result = await authorizer.AuthorizeAsync("search_wiki", """{"query":"Alice"}""", CancellationToken.None);
 
         Assert.True(result.IsAuthorized);
-        Assert.Equal("SearchWiki", result.ActionType);
-        await actionAuthorizer.Received(1).AuthorizeAsync("SearchWiki", Arg.Any<CancellationToken>());
+        Assert.Equal("GetWikiEntry", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("GetWikiEntry", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_GetWikiEntry_UsesGetWikiEntryAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("GetWikiEntry", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "GetWikiEntry",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("get_wiki_entry", """{"entryId":"who-alice"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("GetWikiEntry", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("GetWikiEntry", Arg.Any<CancellationToken>());
     }
 
     [Fact]
