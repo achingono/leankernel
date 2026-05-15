@@ -114,6 +114,7 @@ UNSTRUCTURED_EXTENSIONS = {
     ".eml", ".msg", ".rst", ".org",
     ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif",
 }
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
 
 # Text-based extensions that can be read directly
 TEXT_EXTENSIONS = {".md", ".txt", ".json", ".yaml", ".yml", ".xml", ".log"}
@@ -333,11 +334,12 @@ class UnstructuredClient:
     async def parse(self, file_path: str) -> list[dict]:
         """Parse a document file and return chunked elements."""
         last_error: Exception | None = None
+        ext = os.path.splitext(file_path)[1].lower()
 
         for attempt in range(1, UNSTRUCTURED_MAX_RETRIES + 1):
             try:
                 request_data: dict[str, Any] = {
-                    "strategy": UNSTRUCTURED_STRATEGY,
+                    "strategy": self._strategy_for_extension(ext),
                     "chunking_strategy": UNSTRUCTURED_CHUNKING_STRATEGY,
                     "max_characters": CHUNK_SIZE_TOKENS * 4,
                 }
@@ -396,6 +398,12 @@ class UnstructuredClient:
         if last_error is not None:
             raise last_error
         raise RuntimeError("Unstructured parse failed without an explicit exception")
+
+    @staticmethod
+    def _strategy_for_extension(ext: str) -> str:
+        if ext in IMAGE_EXTENSIONS and UNSTRUCTURED_STRATEGY == "fast":
+            return "auto"
+        return UNSTRUCTURED_STRATEGY
 
     async def close(self):
         await self.client.aclose()
@@ -739,6 +747,8 @@ class Indexer:
                 return
             if not chunks:
                 logger.warning(f"No content extracted from: {file_path}")
+                self._delete_existing_vectors_for_reindex(file_path)
+                self.state.upsert(file_path, file_hash, 0, tags)
                 return
 
             self._delete_existing_vectors_for_reindex(file_path)
@@ -950,6 +960,10 @@ class Indexer:
 
     async def _process_unstructured_file(self, file_path: str) -> list[str]:
         """Process a document through Unstructured API."""
+        if os.path.getsize(file_path) == 0:
+            logger.warning(f"Skipping empty file: {file_path}")
+            return []
+
         try:
             elements = await self.unstructured_client.parse(file_path)
             chunks = []
