@@ -52,9 +52,9 @@ Artifacts written by the callback inside the container:
 
 In compose, these are persisted through `./data/logs:/app/logs`.
 
-The LiteLLM auth/admin endpoints require a connected proxy DB in current LiteLLM builds. Compose now runs a dedicated Postgres sidecar (`litellm-db`) and sets:
+The LiteLLM auth/admin endpoints require a connected proxy DB in current LiteLLM builds. Compose now runs a dedicated Postgres sidecar (`database`, container `leankernel-database`) and sets:
 
-- `DATABASE_URL=postgresql://...@litellm-db:5432/litellm`
+- `DATABASE_URL=postgresql://...@database:5432/litellm`
 - volume: `litellm-db-data:/var/lib/postgresql/data`
 
 so API-key auth checks and proxy state survive container restarts.

@@ -132,6 +132,26 @@ public class EngagementToolExecutionAuthorizerTests
     }
 
     [Fact]
+    public async Task AuthorizeAsync_SearchDocuments_UsesSearchKnowledgeAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("SearchKnowledge", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "SearchKnowledge",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("search_documents", """{"query":"Atomic Habits"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("SearchKnowledge", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("SearchKnowledge", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AuthorizeAsync_WikiQuery_LegacyName_IsNotMapped()
     {
         var actionAuthorizer = Substitute.For<IActionAuthorizer>();

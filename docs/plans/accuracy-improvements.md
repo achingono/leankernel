@@ -46,7 +46,7 @@ data/wiki/
 ├── where/
 ├── why/
 ├── how/
-├── .LeanKernel/    # index.json, migration logs, quarantine/
+├── .meta/          # index.json, migration logs, quarantine/
 └── quarantine/ (optional visible fallback)
 ```
 
@@ -150,7 +150,7 @@ You are a precise and helpful assistant.
 - **WikiStore** → Indexed, file-backed (as in original).
 - **Python Indexer** → Handles both wiki markdown (fact-level) and documents (chunk-level).
 - **Qdrant Collections**:
-  - `wiki` (fact-level points).
+  - `LEANKERNEL_knowledge` for wiki facts (current default).
   - `documents` (chunk-level points).
 - **Reranker Service** → Pluggable `IReranker` (default: LocalLlmReranker).
 - **ContextCandidateRetriever** → Retrieval → Rerank → Render clean context.

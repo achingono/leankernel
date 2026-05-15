@@ -288,7 +288,7 @@ def parse_args() -> argparse.Namespace:
 def selected_providers(raw: str | None) -> set[str] | None:
 	if raw is None:
 		return None
-	providers = {part.strip() for part in raw.split(",") if part.strip()}
+	providers = {part.strip().lower() for part in raw.split(",") if part.strip()}
 	return providers or None
 
 

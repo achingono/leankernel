@@ -14,6 +14,9 @@ from litellm.integrations.custom_logger import CustomLogger
 
 
 SYNCABLE_PROVIDERS = {"azure", "gemini", "groq"}
+PROVIDER_ALIASES = {
+    "azure_ai": "azure",
+}
 
 
 def utc_timestamp() -> str:
@@ -49,10 +52,12 @@ def response_model_name(response: Any) -> str | None:
 class LiteLlmRouteMonitor:
     def __init__(self) -> None:
         self.route_log_path = Path(os.getenv("LITELLM_ROUTE_LOG_PATH", "/app/logs/litellm-route-events.jsonl"))
+        self.route_log_max_bytes = env_int("LITELLM_ROUTE_LOG_MAX_BYTES", 10 * 1024 * 1024, 1024)
+        self.route_log_backup_count = env_int("LITELLM_ROUTE_LOG_BACKUP_COUNT", 5, 1)
         self.sync_status_path = Path(os.getenv("LITELLM_LIMIT_SYNC_STATUS_PATH", "/app/logs/litellm-limit-sync-status.json"))
         self.drift_report_path = Path(os.getenv("LITELLM_LIMIT_DRIFT_REPORT_PATH", "/app/logs/litellm-model-limit-drift.json"))
         self.sync_lock_path = Path(os.getenv("LITELLM_LIMIT_SYNC_LOCK_PATH", "/tmp/litellm-model-limit-sync.lock"))
-        self.spec_path = Path(os.getenv("LITELLM_SPEC_PATH", "/app/config/litellm/config.yaml"))
+        self.spec_path = Path(os.getenv("LITELLM_SPEC_PATH", "/app/litellm_spec.yaml"))
         self.render_script_path = Path(os.getenv("LITELLM_RENDER_SCRIPT_PATH", "/app/render_litellm_config.py"))
         self.rendered_config_path = Path(os.getenv("LITELLM_RENDERED_CONFIG_PATH", "/app/config/litellm/litellm_config.generated.yaml"))
         self.sync_script_path = Path(os.getenv("LITELLM_LIMIT_SYNC_SCRIPT_PATH", "/app/sync_litellm_model_limits.py"))
@@ -82,20 +87,21 @@ class LiteLlmRouteMonitor:
             self._worker_started = True
 
     def record_route(self, request_data: dict[str, Any], response: Any, litellm_call_info: dict[str, Any] | None) -> None:
-        self.ensure_worker()
-
         info = litellm_call_info or {}
-        provider = info.get("custom_llm_provider")
+        raw_provider = info.get("custom_llm_provider")
+        provider = normalize_provider(raw_provider)
         event = {
             "timestamp": utc_timestamp(),
             "requested_model": request_data.get("model"),
             "provider": provider,
+            "provider_raw": raw_provider,
             "model_id": info.get("model_id"),
             "api_base": info.get("api_base"),
             "response_model": response_model_name(response),
         }
 
         self.route_log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._rotate_route_log_if_needed()
         with self.route_log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, sort_keys=True) + "\n")
 
@@ -104,6 +110,25 @@ class LiteLlmRouteMonitor:
         if isinstance(provider, str) and provider in SYNCABLE_PROVIDERS:
             with self._lock:
                 self._pending_providers.add(provider)
+
+    def _rotate_route_log_if_needed(self) -> None:
+        if not self.route_log_path.exists():
+            return
+
+        try:
+            if self.route_log_path.stat().st_size < self.route_log_max_bytes:
+                return
+        except OSError:
+            return
+
+        for idx in range(self.route_log_backup_count - 1, 0, -1):
+            src = self.route_log_path.with_name(f"{self.route_log_path.name}.{idx}")
+            dst = self.route_log_path.with_name(f"{self.route_log_path.name}.{idx + 1}")
+            if src.exists():
+                src.replace(dst)
+
+        first_backup = self.route_log_path.with_name(f"{self.route_log_path.name}.1")
+        self.route_log_path.replace(first_backup)
 
     def _sync_worker(self) -> None:
         while True:
@@ -302,6 +327,14 @@ class LiteLlmRouteMonitor:
 
 
 monitor = LiteLlmRouteMonitor()
+monitor.ensure_worker()
+
+
+def normalize_provider(provider: Any) -> str | None:
+    if not isinstance(provider, str):
+        return None
+    normalized = provider.strip().lower()
+    return PROVIDER_ALIASES.get(normalized, normalized)
 
 
 class LeanKernelLiteLlmCallbacks(CustomLogger):

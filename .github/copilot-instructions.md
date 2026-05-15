@@ -41,7 +41,7 @@ scripts/quality/sonarqube-scan.sh
 ## Configuration and Runtime Notes
 
 - Main app config is bound from `src/LeanKernel.Host/appsettings.json` + runtime overlay in data directory.
-- Docker compose stack includes: `engine`, `litellm`, `qdrant`, `unstructured`, `indexer`, `signal`.
+- Docker compose stack includes: `engine`, `database`, `litellm`, `qdrant`, `unstructured`, `indexer`, `signal`.
 - LiteLLM config is authored in `config/litellm/config.yaml` and compiled at startup by `config/litellm/render_litellm_config.py`.
 
 ## Skills and Tools

@@ -678,6 +678,7 @@ def chunk_payload(
         filename = os.path.basename(relative_path)
         file_type = os.path.splitext(filename)[1].lower().lstrip(".")
         payload["filename"] = filename
+        payload["file_type"] = file_type or "unknown"
         payload["fileType"] = file_type or "unknown"
     return payload
 

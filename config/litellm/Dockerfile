@@ -25,4 +25,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 # Compile config from source spec and environment, then start LiteLLM proxy
 ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["mkdir -p /app/data/litellm /app/config/litellm /app/logs && python3 ${LITELLM_RENDER_SCRIPT_PATH:-/app/render_litellm_config.py} ${LITELLM_SPEC_PATH:-/app/config/litellm/config.yaml} ${LITELLM_RENDERED_CONFIG_PATH:-/app/config/litellm/litellm_config.generated.yaml} && exec litellm --config ${LITELLM_RENDERED_CONFIG_PATH:-/app/config/litellm/litellm_config.generated.yaml} --port 4000 --num_workers ${LITELLM_NUM_WORKERS:-2}"]
+CMD ["mkdir -p /app/data/litellm /app/config/litellm /app/logs && python3 ${LITELLM_RENDER_SCRIPT_PATH:-/app/render_litellm_config.py} ${LITELLM_SPEC_PATH:-/app/litellm_spec.yaml} ${LITELLM_RENDERED_CONFIG_PATH:-/app/config/litellm/litellm_config.generated.yaml} && exec litellm --config ${LITELLM_RENDERED_CONFIG_PATH:-/app/config/litellm/litellm_config.generated.yaml} --port 4000 --num_workers ${LITELLM_NUM_WORKERS:-2}"]

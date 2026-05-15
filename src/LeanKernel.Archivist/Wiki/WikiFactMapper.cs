@@ -118,7 +118,10 @@ public sealed class WikiFactMapper
         var key = $"{dimensionKey}:{subjectSlug}";
         if (!slugSubjectsByDimension.TryGetValue(key, out var seenSubjects))
         {
-            slugSubjectsByDimension[key] = [subject];
+            slugSubjectsByDimension[key] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                subject
+            };
             return $"{dimensionKey}-{subjectSlug}";
         }
 

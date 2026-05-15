@@ -147,6 +147,13 @@ public sealed class WikiMigrationService : IWikiMigrationService
             var entries = await _wikiStore.ListByDimensionAsync(dimension, ct);
             foreach (var entry in entries)
             {
+                // ListByDimensionAsync may include cross-dimension entries via fact pointers.
+                // Canonical ownership must come from primary entry dimension only.
+                if (entry.Dimension != dimension)
+                {
+                    continue;
+                }
+
                 var subject = WikiFactMapper.Slugify(entry.Subject);
                 if (!string.IsNullOrWhiteSpace(subject))
                 {
@@ -229,10 +236,15 @@ public sealed class WikiMigrationService : IWikiMigrationService
             if (existingIndex >= 0)
             {
                 var current = mergedFacts[existingIndex];
-                mergedFacts[existingIndex] = fact with
+                mergedFacts[existingIndex] = current with
                 {
+                    Claim = PreferNonEmpty(current.Claim, fact.Claim),
+                    Context = MergeContext(current.Context, fact.Context),
+                    SourceQuote = PreferRicher(current.SourceQuote, fact.SourceQuote),
+                    NormalizedKey = PreferNonEmpty(current.NormalizedKey, fact.NormalizedKey),
                     Confidence = Math.Max(current.Confidence, fact.Confidence),
                     LastConfirmed = current.LastConfirmed > fact.LastConfirmed ? current.LastConfirmed : fact.LastConfirmed,
+                    Source = PreferNonEmpty(current.Source, fact.Source),
                     Tags = current.Tags.Union(fact.Tags, StringComparer.OrdinalIgnoreCase).ToList()
                 };
             }
@@ -249,6 +261,36 @@ public sealed class WikiMigrationService : IWikiMigrationService
             Aliases = existing.Aliases.Union(incoming.Aliases, StringComparer.OrdinalIgnoreCase).ToList(),
             Tags = existing.Tags.Union(incoming.Tags, StringComparer.OrdinalIgnoreCase).ToList(),
             Relations = existing.Relations.Union(incoming.Relations).ToList()
+        };
+    }
+
+    private static string? PreferNonEmpty(string? current, string? incoming)
+        => string.IsNullOrWhiteSpace(current) ? incoming : current;
+
+    private static string? PreferRicher(string? current, string? incoming)
+    {
+        if (string.IsNullOrWhiteSpace(current))
+            return incoming;
+        if (string.IsNullOrWhiteSpace(incoming))
+            return current;
+        return incoming.Length > current.Length ? incoming : current;
+    }
+
+    private static WikiFactContext? MergeContext(WikiFactContext? current, WikiFactContext? incoming)
+    {
+        if (current is null)
+            return incoming;
+        if (incoming is null)
+            return current;
+
+        return current with
+        {
+            Who = PreferNonEmpty(current.Who, incoming.Who),
+            What = PreferNonEmpty(current.What, incoming.What),
+            When = PreferNonEmpty(current.When, incoming.When),
+            Where = PreferNonEmpty(current.Where, incoming.Where),
+            Why = PreferNonEmpty(current.Why, incoming.Why),
+            How = PreferNonEmpty(current.How, incoming.How)
         };
     }
 

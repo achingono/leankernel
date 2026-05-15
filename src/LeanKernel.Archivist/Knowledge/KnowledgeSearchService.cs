@@ -98,7 +98,16 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
 
         try
         {
-            return await _qdrant.CollectionExistsAsync(_config.CollectionName, ct);
+            var collections = ResolveCollections(sourceType: null);
+            foreach (var collection in collections)
+            {
+                if (await _qdrant.CollectionExistsAsync(collection, ct))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         catch
         {

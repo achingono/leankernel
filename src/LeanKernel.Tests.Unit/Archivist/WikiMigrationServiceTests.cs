@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
@@ -70,6 +71,89 @@ public sealed class WikiMigrationServiceTests : IDisposable
         var quarantinedWhat = Path.Combine(_wikiPath, metaFolder, "quarantine", "llm", "what-assistant.md");
         var quarantinedWho = Path.Combine(_wikiPath, metaFolder, "quarantine", "llm", "who-assistant.md");
         Assert.True(File.Exists(quarantinedWhat) || File.Exists(quarantinedWho));
+    }
+
+    [Fact]
+    public async Task MigrateAsync_DoesNotQuarantinePrimaryMatchWhenCrossDimensionPointerExists()
+    {
+        var store = CreateStore();
+        await store.UpsertAsync(
+            new WikiEntry
+            {
+                Id = "who-ada",
+                Dimension = WikiDimension.Who,
+                Subject = "Ada",
+                Facts =
+                [
+                    new WikiFact
+                    {
+                        Claim = "Ada prefers concise responses.",
+                        Context = new WikiFactContext { Who = "Ada", Why = "Reduce noise" },
+                        Confidence = 0.9,
+                        Source = "conversation:test"
+                    }
+                ]
+            },
+            CancellationToken.None);
+
+        var llmDir = Path.Combine(_wikiPath, "llm");
+        Directory.CreateDirectory(llmDir);
+        var sourceFile = Path.Combine(llmDir, "who-ada.md");
+        await File.WriteAllTextAsync(sourceFile, LegacyMarkdown("who", "Ada", "Ada prefers concise responses."));
+
+        var service = new WikiMigrationService(store, Options.Create(_config), NullLogger<WikiMigrationService>.Instance);
+        var result = await service.MigrateAsync(CancellationToken.None);
+
+        Assert.Equal(1, result.Migrated);
+        Assert.Equal(0, result.Quarantined);
+    }
+
+    [Fact]
+    public async Task MigrateAsync_PreservesRicherExistingFactMetadataOnMerge()
+    {
+        var store = CreateStore();
+        await store.UpsertAsync(
+            new WikiEntry
+            {
+                Id = "who-ada",
+                Dimension = WikiDimension.Who,
+                Subject = "Ada",
+                Facts =
+                [
+                    new WikiFact
+                    {
+                        Claim = "Ada prefers concise responses.",
+                        Context = new WikiFactContext { Who = "Ada", Why = "Reduce noise" },
+                        SourceQuote = "I prefer concise responses because it reduces noise.",
+                        NormalizedKey = "who-ada|ada prefers concise responses",
+                        Confidence = 0.95,
+                        Source = "conversation:rich",
+                        Tags = ["style", "preferences"]
+                    }
+                ]
+            },
+            CancellationToken.None);
+
+        var llmDir = Path.Combine(_wikiPath, "llm");
+        Directory.CreateDirectory(llmDir);
+        var sourceFile = Path.Combine(llmDir, "who-ada.md");
+        await File.WriteAllTextAsync(sourceFile, LegacyMarkdown("who", "Ada", "Ada prefers concise responses."));
+
+        var service = new WikiMigrationService(store, Options.Create(_config), NullLogger<WikiMigrationService>.Instance);
+        var result = await service.MigrateAsync(CancellationToken.None);
+
+        Assert.Equal(1, result.Migrated);
+        var merged = await store.GetAsync("who-ada", CancellationToken.None);
+        Assert.NotNull(merged);
+
+        var fact = Assert.Single(merged.Facts);
+        Assert.NotNull(fact.Context);
+        Assert.Equal("Reduce noise", fact.Context!.Why);
+        Assert.Equal("I prefer concise responses because it reduces noise.", fact.SourceQuote);
+        Assert.Equal("who-ada|ada prefers concise responses", fact.NormalizedKey);
+        Assert.Equal("conversation:rich", fact.Source);
+        Assert.Contains("style", fact.Tags);
+        Assert.Contains("preferences", fact.Tags);
     }
 
     private IWikiStore CreateStore()

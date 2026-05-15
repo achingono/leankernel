@@ -23,6 +23,6 @@ flowchart LR
     Indexer[Indexer sidecar] --> LiteLLM
     Indexer --> Qdrant
     Indexer --> Unstructured[Unstructured]
+```
 
 > For a detailed view of LeanKernel’s internal modules (Commander, Thinker, Archivist, etc.), see the [architecture overview](architecture/index.md).
-```

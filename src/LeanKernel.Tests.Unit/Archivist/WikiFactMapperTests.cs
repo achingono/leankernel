@@ -89,4 +89,32 @@ public sealed class WikiFactMapperTests
         Assert.Contains(entries, e => e.Id == "who-alfero-chingono");
         Assert.Contains(entries, e => e.Id == "who-alfero-chingono-2");
     }
+
+    [Fact]
+    public void Map_TreatsSubjectCaseVariantsAsSameCanonicalEntry()
+    {
+        var extracted = new[]
+        {
+            new ExtractedWikiFact
+            {
+                Subject = "Ada",
+                PrimaryDimension = "who",
+                Claim = "Ada prefers concise responses.",
+                Who = "Ada"
+            },
+            new ExtractedWikiFact
+            {
+                Subject = "ada",
+                PrimaryDimension = "who",
+                Claim = "Ada uses direct language.",
+                Who = "Ada"
+            }
+        };
+
+        var entries = _mapper.Map(extracted, "conversation:test");
+
+        var entry = Assert.Single(entries);
+        Assert.Equal("who-ada", entry.Id);
+        Assert.Equal(2, entry.Facts.Count);
+    }
 }
