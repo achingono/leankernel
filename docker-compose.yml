@@ -37,6 +37,7 @@ services:
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data:/app/data
+      - ./scripts:/app/scripts:ro
       - ./config/litellm:/app/config/litellm
       - ./data/.signal-cli:/home/LeanKernel/.local/share/signal-cli
       - ./data/.ms-todo-cli:/home/LeanKernel/.ms-todo-cli
