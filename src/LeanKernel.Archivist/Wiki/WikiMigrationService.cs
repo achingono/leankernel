@@ -73,7 +73,7 @@ public sealed class WikiMigrationService : IWikiMigrationService
             var parsed = WikiStore.ParseMarkdown(await File.ReadAllTextAsync(sourceFile, ct), fallbackId);
             if (parsed is null || parsed.Facts.Count == 0)
             {
-                quarantined += await QuarantineAsync(sourceFile, relativeSource, "parse-or-empty", runRecords, ct);
+                quarantined += await QuarantineAsync(sourceFile, relativeSource, "parse-or-empty", runRecords);
                 continue;
             }
 
@@ -84,14 +84,14 @@ public sealed class WikiMigrationService : IWikiMigrationService
             var normalizedSubject = WikiFactMapper.Slugify(canonicalSubject);
             if (string.IsNullOrWhiteSpace(normalizedSubject))
             {
-                quarantined += await QuarantineAsync(sourceFile, relativeSource, "empty-subject", runRecords, ct);
+                quarantined += await QuarantineAsync(sourceFile, relativeSource, "empty-subject", runRecords);
                 continue;
             }
 
             if (preexistingSubjects.TryGetValue(normalizedSubject, out var existingDimension) &&
                 existingDimension != inferredDimension)
             {
-                quarantined += await QuarantineAsync(sourceFile, relativeSource, "cross-dimension-collision", runRecords, ct);
+                quarantined += await QuarantineAsync(sourceFile, relativeSource, "cross-dimension-collision", runRecords);
                 continue;
             }
 
@@ -169,8 +169,7 @@ public sealed class WikiMigrationService : IWikiMigrationService
         string sourceFile,
         string relativeSource,
         string reason,
-        List<MigrationRecord> runRecords,
-        CancellationToken ct)
+        List<MigrationRecord> runRecords)
     {
         var quarantineTarget = Path.Combine(_quarantinePath, relativeSource);
         Directory.CreateDirectory(Path.GetDirectoryName(quarantineTarget)!);
@@ -226,10 +225,10 @@ public sealed class WikiMigrationService : IWikiMigrationService
         var mergedFacts = existing.Facts.ToList();
         foreach (var fact in incoming.Facts)
         {
-            var incomingKey = fact.NormalizedKey ?? WikiFactMapper.NormalizeClaim(fact.Claim);
+            var incomingKey = BuildFactMatchKey(fact);
             var existingIndex = mergedFacts.FindIndex(existingFact =>
                 string.Equals(
-                    existingFact.NormalizedKey ?? WikiFactMapper.NormalizeClaim(existingFact.Claim),
+                    BuildFactMatchKey(existingFact),
                     incomingKey,
                     StringComparison.OrdinalIgnoreCase));
 
@@ -292,6 +291,23 @@ public sealed class WikiMigrationService : IWikiMigrationService
             Why = PreferNonEmpty(current.Why, incoming.Why),
             How = PreferNonEmpty(current.How, incoming.How)
         };
+    }
+
+    private static string BuildFactMatchKey(WikiFact fact)
+    {
+        var normalizedKey = fact.NormalizedKey;
+        if (!string.IsNullOrWhiteSpace(normalizedKey))
+        {
+            var separatorIndex = normalizedKey.LastIndexOf('|');
+            if (separatorIndex >= 0 && separatorIndex < normalizedKey.Length - 1)
+            {
+                return normalizedKey[(separatorIndex + 1)..];
+            }
+
+            return normalizedKey;
+        }
+
+        return WikiFactMapper.NormalizeClaim(fact.Claim);
     }
 
     private sealed record MigrationRecord
