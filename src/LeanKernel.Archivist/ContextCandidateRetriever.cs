@@ -64,11 +64,12 @@ public sealed class ContextCandidateRetriever
     public async Task<List<RelevanceScore>> RetrieveWikiLeanKernelsAsync(
         LeanKernelMessage query,
         HashSet<WikiDimension> dimensions,
+        IReadOnlyList<EntityHint> entityHints,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(query?.Content)) return [];
 
-        var entries = await _wiki.QueryAsync(new WikiQuery
+        var baseEntries = await _wiki.QueryAsync(new WikiQuery
         {
             TextQuery = query.Content,
             Dimensions = dimensions,
@@ -76,21 +77,96 @@ public sealed class ContextCandidateRetriever
             MinConfidence = _config.Wiki.MinConfidenceThreshold
         }, ct);
 
+        var expandedEntryIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var entriesById = baseEntries.ToDictionary(entry => entry.Id, StringComparer.OrdinalIgnoreCase);
+        await ExpandEntityRelationsAsync(baseEntries, entityHints, entriesById, expandedEntryIds, ct);
+
         // Pre-tokenize query once to avoid re-tokenizing the same query for every entry in the Select loop.
         // Keep this as HashSet to preserve O(1) membership checks in lexical overlap scoring.
         var queryTokens = Tokenize(query.Content);
         var queryTokenCount = queryTokens.Count;
 
-        return entries.Select(e => new RelevanceScore
+        return entriesById.Values.Select(e =>
         {
-            EntryId = e.Id,
-            Content = FormatWikiEntryCompact(e),
-            EstimatedTokens = e.Facts.Sum(f => f.EstimatedTokens),
-            SemanticSimilarity = ComputeLexicalSimilarityOptimized(queryTokens, queryTokenCount, e),
-            RecencyDecay = ComputeRecencyDecay(e.LastAccessed),
-            DimensionMatch = dimensions.Contains(e.Dimension) ? 1.0 : 0.2,
-            InteractionFrequency = Math.Clamp(e.AccessCount / 100.0, 0.0, 1.0),
-            Score = 0.0
+            var baseSimilarity = ComputeLexicalSimilarityOptimized(queryTokens, queryTokenCount, e);
+            var entityBoost = ComputeEntityBoost(e, entityHints);
+            var hasEntityPersonMatch = HasPersonEntityMatch(e, entityHints);
+            var hasEntityOrgMatch = HasOrganizationEntityMatch(e, entityHints) || expandedEntryIds.Contains(e.Id);
+            var priority = hasEntityPersonMatch
+                ? ContextPriority.High
+                : hasEntityOrgMatch
+                    ? ContextPriority.Low
+                    : ContextPriority.Medium;
+
+            return new RelevanceScore
+            {
+                EntryId = e.Id,
+                Content = FormatWikiEntryCompact(e),
+                EstimatedTokens = Math.Max(1, e.Facts.Sum(f => f.EstimatedTokens)),
+                SemanticSimilarity = Math.Clamp(baseSimilarity + entityBoost, 0.0, 1.0),
+                RecencyDecay = ComputeRecencyDecay(e.LastAccessed),
+                DimensionMatch = hasEntityPersonMatch && e.Dimension == WikiDimension.Who
+                    ? 1.0
+                    : dimensions.Contains(e.Dimension) ? 1.0 : 0.2,
+                InteractionFrequency = Math.Clamp(e.AccessCount / 100.0, 0.0, 1.0),
+                Priority = priority,
+                Score = 0.0
+            };
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Retrieves broader wiki candidates used as a second-pass fallback for unclear queries.
+    /// </summary>
+    public async Task<List<RelevanceScore>> RetrieveWikiFallbackLeanKernelsAsync(
+        LeanKernelMessage query,
+        IReadOnlyList<EntityHint> entityHints,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(query?.Content)) return [];
+
+        var allDimensions = Enum.GetValues<WikiDimension>().ToHashSet();
+        var baseEntries = await _wiki.QueryAsync(new WikiQuery
+        {
+            TextQuery = query.Content,
+            Dimensions = allDimensions,
+            MaxResults = Math.Max(20, _config.Context.DeprioritizedRecallMaxResults),
+            MinConfidence = Math.Max(0.0, _config.Wiki.MinConfidenceThreshold - 0.2)
+        }, ct);
+
+        var expandedEntryIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var entriesById = baseEntries.ToDictionary(entry => entry.Id, StringComparer.OrdinalIgnoreCase);
+        await ExpandEntityRelationsAsync(baseEntries, entityHints, entriesById, expandedEntryIds, ct);
+
+        var queryTokens = Tokenize(query.Content);
+        var queryTokenCount = queryTokens.Count;
+
+        return entriesById.Values.Select(e =>
+        {
+            var baseSimilarity = ComputeLexicalSimilarityOptimized(queryTokens, queryTokenCount, e);
+            var entityBoost = ComputeEntityBoost(e, entityHints);
+            var hasEntityPersonMatch = HasPersonEntityMatch(e, entityHints);
+            var hasEntityOrgMatch = HasOrganizationEntityMatch(e, entityHints) || expandedEntryIds.Contains(e.Id);
+            var priority = hasEntityPersonMatch
+                ? ContextPriority.High
+                : hasEntityOrgMatch
+                    ? ContextPriority.Low
+                    : ContextPriority.Medium;
+
+            return new RelevanceScore
+            {
+                EntryId = e.Id,
+                Content = FormatWikiEntryCompact(e),
+                EstimatedTokens = Math.Max(1, e.Facts.Sum(f => f.EstimatedTokens)),
+                SemanticSimilarity = Math.Clamp(baseSimilarity + entityBoost, 0.0, 1.0),
+                RecencyDecay = ComputeRecencyDecay(e.LastAccessed),
+                DimensionMatch = hasEntityPersonMatch && e.Dimension == WikiDimension.Who
+                    ? 1.0
+                    : allDimensions.Contains(e.Dimension) ? 1.0 : 0.2,
+                InteractionFrequency = Math.Clamp(e.AccessCount / 100.0, 0.0, 1.0),
+                Priority = priority,
+                Score = 0.0
+            };
         }).ToList();
     }
 
@@ -117,6 +193,32 @@ public sealed class ContextCandidateRetriever
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Knowledge search failed - falling back to wiki-only context");
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Retrieves broader vector candidates used as a second-pass fallback for unclear queries.
+    /// </summary>
+    public async Task<List<RelevanceScore>> RetrieveVectorFallbackLeanKernelsAsync(
+        LeanKernelMessage query,
+        IReadOnlyList<string> agentTags,
+        CancellationToken ct)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(query?.Content)) return [];
+
+            var limit = Math.Clamp(_config.Context.DeprioritizedRecallMaxResults, 10, 100);
+            var results = await _knowledgeSearch.SearchAsync(query.Content, agentTags, limit, ct);
+            return (results ?? [])
+                .OrderByDescending(c => c.SemanticSimilarity)
+                .ThenByDescending(c => c.Score)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fallback knowledge search failed");
             return [];
         }
     }
@@ -210,9 +312,7 @@ public sealed class ContextCandidateRetriever
     {
         if (queryTokenCount == 0) return 0.0;
 
-        // Combine subject and facts for context
-        var entryText = $"{entry.Subject} {string.Join(' ', entry.Facts.Select(f => f.Claim))}";
-        var entryTokens = Tokenize(entryText);
+        var entryTokens = Tokenize(BuildEntrySearchSurface(entry));
         
         if (entryTokens.Count == 0) return 0.0;
 
@@ -222,6 +322,99 @@ public sealed class ContextCandidateRetriever
         int overlap = CountTokenOverlap(iterateSet, lookupSet);
 
         return (double)overlap / queryTokenCount;
+    }
+
+    private async Task ExpandEntityRelationsAsync(
+        IReadOnlyList<WikiEntry> baseEntries,
+        IReadOnlyList<EntityHint> entityHints,
+        Dictionary<string, WikiEntry> entriesById,
+        HashSet<string> expandedEntryIds,
+        CancellationToken ct)
+    {
+        if (_config.Context.EntityExpansionDepth <= 0 || baseEntries.Count == 0)
+        {
+            return;
+        }
+
+        var frontier = baseEntries
+            .Where(entry => HasEntityMatch(entry, entityHints))
+            .ToList();
+
+        for (var depth = 0; depth < _config.Context.EntityExpansionDepth && frontier.Count > 0; depth++)
+        {
+            var nextFrontier = new List<WikiEntry>();
+
+            foreach (var seed in frontier)
+            {
+                foreach (var relationId in seed.Relations)
+                {
+                    if (string.IsNullOrWhiteSpace(relationId) || entriesById.ContainsKey(relationId))
+                    {
+                        continue;
+                    }
+
+                    var related = await _wiki.GetAsync(relationId, ct);
+                    if (related is null)
+                    {
+                        continue;
+                    }
+
+                    entriesById[related.Id] = related;
+                    expandedEntryIds.Add(related.Id);
+                    nextFrontier.Add(related);
+                }
+            }
+
+            frontier = nextFrontier;
+        }
+    }
+
+    private static double ComputeEntityBoost(WikiEntry entry, IReadOnlyList<EntityHint> entityHints)
+    {
+        if (entityHints.Count == 0)
+        {
+            return 0.0;
+        }
+
+        if (HasPersonEntityMatch(entry, entityHints))
+        {
+            return 0.55;
+        }
+
+        if (HasOrganizationEntityMatch(entry, entityHints))
+        {
+            return 0.30;
+        }
+
+        return 0.0;
+    }
+
+    private static bool HasPersonEntityMatch(WikiEntry entry, IReadOnlyList<EntityHint> entityHints)
+    {
+        var entryText = BuildEntrySearchSurface(entry);
+        var people = entityHints.Where(h => h.Type == EntityHintType.Person);
+        return people.Any(hint =>
+            entryText.Contains(hint.NormalizedName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasOrganizationEntityMatch(WikiEntry entry, IReadOnlyList<EntityHint> entityHints)
+    {
+        var entryText = BuildEntrySearchSurface(entry);
+        var organizations = entityHints.Where(h => h.Type == EntityHintType.Organization);
+        return organizations.Any(hint =>
+            entryText.Contains(hint.NormalizedName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasEntityMatch(WikiEntry entry, IReadOnlyList<EntityHint> entityHints)
+    {
+        return HasPersonEntityMatch(entry, entityHints) || HasOrganizationEntityMatch(entry, entityHints);
+    }
+
+    private static string BuildEntrySearchSurface(WikiEntry entry)
+    {
+        var factsText = string.Join(' ', entry.Facts.Select(f =>
+            $"{f.Claim} {f.Context?.Who} {f.Context?.What} {f.Context?.When} {f.Context?.Where} {f.Context?.Why} {f.Context?.How}"));
+        return $"{entry.Subject} {entry.Summary} {string.Join(' ', entry.Aliases)} {string.Join(' ', entry.Tags)} {factsText}";
     }
 
     private static HashSet<string> Tokenize(string text)

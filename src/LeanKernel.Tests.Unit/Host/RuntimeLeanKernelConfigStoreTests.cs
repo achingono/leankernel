@@ -84,7 +84,16 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
             },
             Agents = new AgentsConfig { BasePath = "/app/data/agents" },
             Wiki = new WikiConfig { BasePath = "/app/data/wiki" },
-            Context = new ContextConfig(),
+            Context = new ContextConfig
+            {
+                EntitySubjectBoost = 0.66,
+                SupportingEntityThreshold = 0.22,
+                EntityExpansionDepth = 2,
+                LowConfidenceFallbackThreshold = 0.7,
+                DeprioritizedRecallMaxResults = 32,
+                AmbiguityLowConfidenceThreshold = 0.8,
+                AmbiguityConfidenceGapThreshold = 0.11
+            },
             Scheduler = new SchedulerConfig(),
             Auth = new AuthConfig
             {
@@ -150,6 +159,20 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
             leanKernel.GetProperty("unstructured").GetProperty("supportedMimeTypes").GetArrayLength());
         Assert.Equal(2,
             leanKernel.GetProperty("unstructured").GetProperty("supportedExtensions").GetArrayLength());
+        Assert.Equal(0.66,
+            leanKernel.GetProperty("context").GetProperty("entitySubjectBoost").GetDouble());
+        Assert.Equal(0.22,
+            leanKernel.GetProperty("context").GetProperty("supportingEntityThreshold").GetDouble());
+        Assert.Equal(2,
+            leanKernel.GetProperty("context").GetProperty("entityExpansionDepth").GetInt32());
+        Assert.Equal(0.7,
+            leanKernel.GetProperty("context").GetProperty("lowConfidenceFallbackThreshold").GetDouble());
+        Assert.Equal(32,
+            leanKernel.GetProperty("context").GetProperty("deprioritizedRecallMaxResults").GetInt32());
+        Assert.Equal(0.8,
+            leanKernel.GetProperty("context").GetProperty("ambiguityLowConfidenceThreshold").GetDouble());
+        Assert.Equal(0.11,
+            leanKernel.GetProperty("context").GetProperty("ambiguityConfidenceGapThreshold").GetDouble());
         Assert.Equal("/app/data/agents",
             leanKernel.GetProperty("agents").GetProperty("basePath").GetString());
         Assert.True(leanKernel.GetProperty("routing").GetProperty("enabled").GetBoolean());
@@ -180,6 +203,16 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
                 SupportedMimeTypes = ["application/pdf", "image/png"],
                 SupportedExtensions = [".pdf", ".png"]
             },
+            Context = new ContextConfig
+            {
+                EntitySubjectBoost = 0.6,
+                SupportingEntityThreshold = 0.25,
+                EntityExpansionDepth = 2,
+                LowConfidenceFallbackThreshold = 0.65,
+                DeprioritizedRecallMaxResults = 28,
+                AmbiguityLowConfidenceThreshold = 0.77,
+                AmbiguityConfidenceGapThreshold = 0.09
+            },
             Agents = new AgentsConfig { BasePath = "/agents" },
             Routing = new RoutingConfig
             {
@@ -205,6 +238,13 @@ public class RuntimeLeanKernelConfigStoreTests : IDisposable
         Assert.Equal(["application/pdf", "image/png"], clone.Unstructured.SupportedMimeTypes);
         Assert.Equal([".pdf", ".png"], clone.Unstructured.SupportedExtensions);
         Assert.Equal("/agents", clone.Agents.BasePath);
+        Assert.Equal(0.6, clone.Context.EntitySubjectBoost);
+        Assert.Equal(0.25, clone.Context.SupportingEntityThreshold);
+        Assert.Equal(2, clone.Context.EntityExpansionDepth);
+        Assert.Equal(0.65, clone.Context.LowConfidenceFallbackThreshold);
+        Assert.Equal(28, clone.Context.DeprioritizedRecallMaxResults);
+        Assert.Equal(0.77, clone.Context.AmbiguityLowConfidenceThreshold);
+        Assert.Equal(0.09, clone.Context.AmbiguityConfidenceGapThreshold);
         Assert.True(clone.Routing.Enabled);
         Assert.Equal(50, clone.Routing.SpendGuard.DailyPaidRequestSoftLimit);
         Assert.Equal("+13339990000", clone.SignalPhoneNumber);

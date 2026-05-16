@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using LeanKernel.Archivist;
 using LeanKernel.Core.Configuration;
+using LeanKernel.Core.Enums;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 
@@ -84,5 +85,92 @@ public class ContextCandidateRetrieverTests
         Assert.Equal("doc-1", results[0].EntryId);
         Assert.Equal("doc-2", results[1].EntryId);
     }
-}
 
+    [Fact]
+    public async Task RetrieveWikiLeanKernelsAsync_RelationshipHintMatchesStructuredFactContext()
+    {
+        var wiki = Substitute.For<IWikiStore>();
+        var knowledge = Substitute.For<IKnowledgeSearchService>();
+
+        var family = new WikiEntry
+        {
+            Id = "who-family",
+            Dimension = WikiDimension.Who,
+            Subject = "Family",
+            Facts =
+            [
+                new WikiFact
+                {
+                    Claim = "Family remembrance guidance.",
+                    Confidence = 0.95,
+                    EstimatedTokens = 10,
+                    Context = new WikiFactContext
+                    {
+                        Who = "mother and brother remembrance",
+                        Why = "active grief support"
+                    }
+                }
+            ],
+            LastAccessed = DateTimeOffset.UtcNow
+        };
+
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([family]));
+        knowledge.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
+        var retriever = new ContextCandidateRetriever(
+            wiki,
+            knowledge,
+            Options.Create(new LeanKernelConfig()),
+            NullLogger<ContextCandidateRetriever>.Instance);
+
+        var query = new LeanKernelMessage
+        {
+            Id = "1",
+            ChannelId = "c",
+            SenderId = "u",
+            Content = "I'm thinking of my mother today"
+        };
+        var dimensions = new HashSet<WikiDimension> { WikiDimension.When };
+        var hints = new List<EntityHint>
+        {
+            new() { NormalizedName = "mother", Type = EntityHintType.Person, Confidence = 0.85 }
+        };
+
+        var results = await retriever.RetrieveWikiLeanKernelsAsync(query, dimensions, hints, CancellationToken.None);
+
+        Assert.Single(results);
+        Assert.Equal(ContextPriority.High, results[0].Priority);
+    }
+
+    [Fact]
+    public async Task RetrieveVectorFallbackLeanKernelsAsync_ReturnsBroaderSemanticOrder()
+    {
+        var wiki = Substitute.For<IWikiStore>();
+        var knowledge = Substitute.For<IKnowledgeSearchService>();
+
+        var candidates = new List<RelevanceScore>
+        {
+            new() { EntryId = "doc-2", Content = "b", SemanticSimilarity = 0.4, Score = 0.2, SourceType = RelevanceSourceType.Vector },
+            new() { EntryId = "doc-1", Content = "a", SemanticSimilarity = 0.9, Score = 0.1, SourceType = RelevanceSourceType.Vector },
+            new() { EntryId = "doc-3", Content = "c", SemanticSimilarity = 0.7, Score = 0.5, SourceType = RelevanceSourceType.Vector }
+        };
+        knowledge.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(candidates));
+
+        var retriever = new ContextCandidateRetriever(
+            wiki,
+            knowledge,
+            Options.Create(new LeanKernelConfig { Context = new ContextConfig { DeprioritizedRecallMaxResults = 50 } }),
+            NullLogger<ContextCandidateRetriever>.Instance);
+
+        var query = new LeanKernelMessage { Id = "1", ChannelId = "c", SenderId = "u", Content = "unclear reference" };
+        var results = await retriever.RetrieveVectorFallbackLeanKernelsAsync(query, ["*"], CancellationToken.None);
+
+        Assert.Equal(3, results.Count);
+        Assert.Equal("doc-1", results[0].EntryId);
+        Assert.Equal("doc-3", results[1].EntryId);
+        Assert.Equal("doc-2", results[2].EntryId);
+    }
+}

@@ -57,6 +57,20 @@ public class KnowledgeConfigTests
     }
 
     [Fact]
+    public void LeanKernelConfig_ContextDefaultsIncludeEntityTuning()
+    {
+        var config = new LeanKernelConfig();
+
+        Assert.Equal(0.45, config.Context.EntitySubjectBoost);
+        Assert.Equal(0.35, config.Context.SupportingEntityThreshold);
+        Assert.Equal(1, config.Context.EntityExpansionDepth);
+        Assert.Equal(0.72, config.Context.LowConfidenceFallbackThreshold);
+        Assert.Equal(40, config.Context.DeprioritizedRecallMaxResults);
+        Assert.Equal(0.78, config.Context.AmbiguityLowConfidenceThreshold);
+        Assert.Equal(0.10, config.Context.AmbiguityConfidenceGapThreshold);
+    }
+
+    [Fact]
     public void WildcardScope_Representation()
     {
         var scope = new AgentScopeConfig { Tags = ["*"] };

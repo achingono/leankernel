@@ -14,6 +14,7 @@ This section contains execution-ready product requirements documents (PRDs) for 
 | [wiki-extraction-store-prd.md](wiki-extraction-store-prd.md) | Replace deterministic wiki extraction and add indexed wiki storage | Human-readable wiki facts with indexed and Qdrant-ready retrieval |
 | [benchmark-scenarios-prd.md](benchmark-scenarios-prd.md) | Publish benchmark scenarios with reproducible metrics | Clear ROI and objective quality tracking |
 | [wiki-knowledge-tool-unification.md](wiki-knowledge-tool-unification.md) | Unify free-text wiki retrieval on Qdrant and add exact wiki entry lookup | Consistent semantic discovery plus deterministic wiki hydration |
+| [entity-discovery-useful-by-default-prd.md](entity-discovery-useful-by-default-prd.md) | Improve gatekeeper entity discovery and contextual linking for people/org references | Useful-by-default responses with richer person + organization grounding |
 
 ## Planning Conventions
 

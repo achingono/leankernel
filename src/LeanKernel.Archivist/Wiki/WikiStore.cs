@@ -17,6 +17,15 @@ namespace LeanKernel.Archivist.Wiki;
 public sealed class WikiStore : IWikiStore
 {
     private const int IndexVersion = 2;
+    private static readonly HashSet<string> PlaceholderClaims = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "not specified",
+        "unknown",
+        "n/a",
+        "na",
+        "none",
+        "unspecified"
+    };
 
     private static readonly Regex FactLineRegex = new(
         @"^-\s+(?<claim>.+?)(?:\s*<!--\{(?<meta>[^}]*)\}-->)?$",
@@ -181,15 +190,23 @@ public sealed class WikiStore : IWikiStore
     {
         foreach (var entry in entries)
         {
-            var existing = await GetAsync(entry.Id, ct);
+            var sanitized = SanitizeIncomingEntry(entry);
+            if (sanitized.Facts.Count == 0)
+            {
+                _logger.LogDebug("Skipping wiki ingestion for {EntryId}: all facts were low-signal placeholders", entry.Id);
+                continue;
+            }
+
+            var existing = await GetAsync(sanitized.Id, ct)
+                ?? await FindCanonicalMatchAsync(sanitized, ct);
             if (existing is not null)
             {
-                var merged = MergeFacts(existing, entry);
+                var merged = MergeFacts(existing, sanitized);
                 await UpsertAsync(merged, ct);
             }
             else
             {
-                await UpsertAsync(entry, ct);
+                await UpsertAsync(sanitized, ct);
             }
         }
     }
@@ -769,15 +786,70 @@ public sealed class WikiStore : IWikiStore
             }
         }
 
+        var incomingAliases = incoming.Aliases.ToList();
+        if (!string.Equals(existing.Subject, incoming.Subject, StringComparison.OrdinalIgnoreCase))
+        {
+            incomingAliases.Add(incoming.Subject);
+        }
+
         return existing with
         {
             Facts = mergedFacts,
             Summary = string.IsNullOrWhiteSpace(existing.Summary) ? incoming.Summary : existing.Summary,
-            Aliases = existing.Aliases.Union(incoming.Aliases, StringComparer.OrdinalIgnoreCase).ToList(),
+            Aliases = existing.Aliases.Union(incomingAliases, StringComparer.OrdinalIgnoreCase).ToList(),
             Tags = existing.Tags.Union(incoming.Tags, StringComparer.OrdinalIgnoreCase).ToList(),
             LastAccessed = DateTimeOffset.UtcNow,
             Relations = existing.Relations.Union(incoming.Relations).Distinct().ToList()
         };
+    }
+
+    private async Task<WikiEntry?> FindCanonicalMatchAsync(WikiEntry incoming, CancellationToken ct)
+    {
+        var candidates = await ListByDimensionAsync(incoming.Dimension, ct);
+        foreach (var candidate in candidates)
+        {
+            if (string.Equals(candidate.Subject.Trim(), incoming.Subject.Trim(), StringComparison.OrdinalIgnoreCase))
+                return candidate;
+
+            if (candidate.Aliases.Any(alias => string.Equals(alias.Trim(), incoming.Subject.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return candidate;
+
+            if (incoming.Aliases.Any(alias => string.Equals(alias.Trim(), candidate.Subject.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return candidate;
+
+            if (candidate.Aliases.Intersect(incoming.Aliases, StringComparer.OrdinalIgnoreCase).Any())
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private static WikiEntry SanitizeIncomingEntry(WikiEntry entry)
+    {
+        var facts = entry.Facts
+            .Where(IsMeaningfulFact)
+            .ToList();
+
+        return entry with { Facts = facts };
+    }
+
+    private static bool IsMeaningfulFact(WikiFact fact)
+    {
+        if (string.IsNullOrWhiteSpace(fact.Claim))
+            return false;
+
+        var claim = fact.Claim.Trim();
+        if (PlaceholderClaims.Contains(claim))
+            return false;
+
+        var normalized = WikiFactMapper.NormalizeClaim(claim);
+        if (string.IsNullOrWhiteSpace(normalized))
+            return false;
+        if (PlaceholderClaims.Contains(normalized))
+            return false;
+
+        var tokenCount = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        return tokenCount > 1;
     }
 
     private static string ComputeMergeClaimKey(WikiFact fact)

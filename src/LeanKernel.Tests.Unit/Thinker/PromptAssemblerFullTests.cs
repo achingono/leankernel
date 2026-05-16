@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using LeanKernel.Core.Enums;
 using LeanKernel.Core.Models;
 using LeanKernel.Thinker;
 using Xunit;
@@ -106,6 +107,52 @@ public class PromptAssemblerFullTests
         Assert.Contains("## Available Tools", result);
         Assert.Contains("search_wiki", result);
         Assert.Contains("web_search", result);
+    }
+
+    [Fact]
+    public void AssembleSystemMessage_WithDisambiguationHints_IncludesSection()
+    {
+        var ctx = MakeContext("System");
+        ctx = ctx with
+        {
+            DisambiguationHints = ["I found 2 people named 'terry'. Ask which one they mean."]
+        };
+
+        var result = _assembler.AssembleSystemMessage(ctx);
+
+        Assert.Contains("## Disambiguation", result);
+        Assert.Contains("2 people named 'terry'", result);
+    }
+
+    [Fact]
+    public void AssembleSystemMessage_HighPriorityWikiComesBeforeMedium()
+    {
+        var ctx = MakeContext("System", wikiLeanKernels:
+        [
+            new RelevanceScore
+            {
+                EntryId = "medium",
+                Content = "Medium priority wiki fact",
+                EstimatedTokens = 4,
+                Priority = ContextPriority.Medium,
+                Score = 0.9
+            },
+            new RelevanceScore
+            {
+                EntryId = "high",
+                Content = "High priority wiki fact",
+                EstimatedTokens = 4,
+                Priority = ContextPriority.High,
+                Score = 0.1
+            }
+        ]);
+
+        var result = _assembler.AssembleSystemMessage(ctx);
+        var highIndex = result.IndexOf("High priority wiki fact", StringComparison.Ordinal);
+        var mediumIndex = result.IndexOf("Medium priority wiki fact", StringComparison.Ordinal);
+
+        Assert.True(highIndex >= 0 && mediumIndex >= 0);
+        Assert.True(highIndex < mediumIndex);
     }
 
     [Fact]

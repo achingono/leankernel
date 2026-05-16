@@ -183,6 +183,37 @@ public class WikiStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task IngestFactsAsync_AliasMatch_MergesIntoCanonicalEntry()
+    {
+        var canonical = MakeEntry("who-john-smith", WikiDimension.Who, "John Smith", "John Smith is CTO at Teachers");
+        canonical = canonical with { Aliases = ["John"] };
+        await _store.UpsertAsync(canonical, CancellationToken.None);
+
+        var incoming = MakeEntry("who-john", WikiDimension.Who, "John", "John is open to meeting via EA");
+        incoming = incoming with { Aliases = ["John Smith"] };
+
+        await _store.IngestFactsAsync([incoming], CancellationToken.None);
+
+        var merged = await _store.GetAsync("who-john-smith", CancellationToken.None);
+        var duplicate = await _store.GetAsync("who-john", CancellationToken.None);
+        Assert.NotNull(merged);
+        Assert.Equal(2, merged.Facts.Count);
+        Assert.Contains("John", merged.Aliases, StringComparer.OrdinalIgnoreCase);
+        Assert.Null(duplicate);
+    }
+
+    [Fact]
+    public async Task IngestFactsAsync_SkipsPlaceholderFacts()
+    {
+        var incoming = MakeEntry("who-placeholder", WikiDimension.Who, "Placeholder", "not specified");
+
+        await _store.IngestFactsAsync([incoming], CancellationToken.None);
+
+        var result = await _store.GetAsync("who-placeholder", CancellationToken.None);
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task UpsertAsync_WritesIndexFile()
     {
         var entry = MakeEntry("who-alice", WikiDimension.Who, "Alice", "Alice is a developer");

@@ -14,6 +14,16 @@ public sealed class WikiFactMapper
         "a", "an", "the", "is", "are", "was", "were", "to", "of", "and", "or", "in", "on", "for", "with", "by", "at"
     };
 
+    private static readonly HashSet<string> PlaceholderClaims = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "not specified",
+        "unknown",
+        "n/a",
+        "na",
+        "none",
+        "unspecified"
+    };
+
     /// <summary>
     /// Maps extracted facts into canonical wiki entries grouped by entry id.
     /// </summary>
@@ -43,6 +53,8 @@ public sealed class WikiFactMapper
 
             var normalizedClaim = NormalizeClaim(extracted.Claim);
             if (string.IsNullOrWhiteSpace(normalizedClaim))
+                continue;
+            if (IsLowSignalClaim(extracted.Claim, normalizedClaim))
                 continue;
 
             var fact = new WikiFact
@@ -177,7 +189,11 @@ public sealed class WikiFactMapper
     }
 
     private static string? NormalizeOptional(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        string.IsNullOrWhiteSpace(value)
+            ? null
+            : IsPlaceholderText(value)
+                ? null
+                : value.Trim();
 
     private static double ComputeConfidence(string sourceId, ExtractedWikiFact fact)
     {
@@ -193,5 +209,26 @@ public sealed class WikiFactMapper
             baseScore -= 0.08;
 
         return Math.Clamp(baseScore, 0.0, 1.0);
+    }
+
+    private static bool IsLowSignalClaim(string rawClaim, string normalizedClaim)
+    {
+        if (string.IsNullOrWhiteSpace(rawClaim) || string.IsNullOrWhiteSpace(normalizedClaim))
+            return true;
+
+        if (PlaceholderClaims.Contains(rawClaim.Trim()) || PlaceholderClaims.Contains(normalizedClaim.Trim()))
+            return true;
+
+        var tokenCount = normalizedClaim.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        return tokenCount <= 1 && !normalizedClaim.Contains('-', StringComparison.Ordinal);
+    }
+
+    private static bool IsPlaceholderText(string value)
+    {
+        var normalized = value.Trim();
+        if (normalized.Length == 0)
+            return true;
+
+        return PlaceholderClaims.Contains(normalized);
     }
 }

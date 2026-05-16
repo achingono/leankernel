@@ -117,4 +117,32 @@ public sealed class WikiFactMapperTests
         Assert.Equal("who-ada", entry.Id);
         Assert.Equal(2, entry.Facts.Count);
     }
+
+    [Fact]
+    public void Map_SkipsLowSignalPlaceholderClaims()
+    {
+        var extracted = new[]
+        {
+            new ExtractedWikiFact
+            {
+                Subject = "John Smith",
+                PrimaryDimension = "who",
+                Claim = "not specified",
+                Who = "John Smith"
+            },
+            new ExtractedWikiFact
+            {
+                Subject = "John Smith",
+                PrimaryDimension = "who",
+                Claim = "John Smith is CTO at Teachers",
+                Who = "John Smith"
+            }
+        };
+
+        var entries = _mapper.Map(extracted, "conversation:test");
+
+        var entry = Assert.Single(entries);
+        var fact = Assert.Single(entry.Facts);
+        Assert.Equal("John Smith is CTO at Teachers", fact.Claim);
+    }
 }

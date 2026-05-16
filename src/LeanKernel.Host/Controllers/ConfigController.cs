@@ -108,7 +108,14 @@ public sealed class ConfigController : ControllerBase
                 DimensionMatchWeight = Field(cfg.Context.DimensionMatchWeight, description: "Weight for dimension matching in context scoring"),
                 InteractionFrequencyWeight = Field(cfg.Context.InteractionFrequencyWeight, description: "Weight for interaction frequency in context scoring"),
                 MinRelevanceThreshold = Field(cfg.Context.MinRelevanceThreshold, description: "Minimum relevance score for context inclusion"),
-                MaxConversationTurns = Field(cfg.Context.MaxConversationTurns, description: "Maximum conversation turns retained in context window")
+                MaxConversationTurns = Field(cfg.Context.MaxConversationTurns, description: "Maximum conversation turns retained in context window"),
+                EntitySubjectBoost = Field(cfg.Context.EntitySubjectBoost, description: "Additive score boost for high-priority entity matches"),
+                SupportingEntityThreshold = Field(cfg.Context.SupportingEntityThreshold, description: "Minimum threshold for supporting entity context"),
+                EntityExpansionDepth = Field(cfg.Context.EntityExpansionDepth, description: "Maximum relation expansion depth for entity neighborhood context"),
+                LowConfidenceFallbackThreshold = Field(cfg.Context.LowConfidenceFallbackThreshold, description: "Confidence threshold that triggers fallback discovery"),
+                DeprioritizedRecallMaxResults = Field(cfg.Context.DeprioritizedRecallMaxResults, description: "Maximum fallback results for deprioritized recall"),
+                AmbiguityLowConfidenceThreshold = Field(cfg.Context.AmbiguityLowConfidenceThreshold, description: "Top-score threshold below which disambiguation is required"),
+                AmbiguityConfidenceGapThreshold = Field(cfg.Context.AmbiguityConfidenceGapThreshold, description: "Minimum score gap required to suppress disambiguation")
             },
             Scheduler = new SchedulerConfigSection
             {
@@ -392,7 +399,14 @@ public sealed class ConfigController : ControllerBase
                 DimensionMatchWeight = ApplyDouble(context.DimensionMatchWeight, cp.DimensionMatchWeight, "Context", "DimensionMatchWeight", changes),
                 InteractionFrequencyWeight = ApplyDouble(context.InteractionFrequencyWeight, cp.InteractionFrequencyWeight, "Context", "InteractionFrequencyWeight", changes),
                 MinRelevanceThreshold = ApplyDouble(context.MinRelevanceThreshold, cp.MinRelevanceThreshold, "Context", "MinRelevanceThreshold", changes),
-                MaxConversationTurns = ApplyInt(context.MaxConversationTurns, cp.MaxConversationTurns, "Context", "MaxConversationTurns", changes)
+                MaxConversationTurns = ApplyInt(context.MaxConversationTurns, cp.MaxConversationTurns, "Context", "MaxConversationTurns", changes),
+                EntitySubjectBoost = ApplyDouble(context.EntitySubjectBoost, cp.EntitySubjectBoost, "Context", "EntitySubjectBoost", changes),
+                SupportingEntityThreshold = ApplyDouble(context.SupportingEntityThreshold, cp.SupportingEntityThreshold, "Context", "SupportingEntityThreshold", changes),
+                EntityExpansionDepth = ApplyInt(context.EntityExpansionDepth, cp.EntityExpansionDepth, "Context", "EntityExpansionDepth", changes),
+                LowConfidenceFallbackThreshold = ApplyDouble(context.LowConfidenceFallbackThreshold, cp.LowConfidenceFallbackThreshold, "Context", "LowConfidenceFallbackThreshold", changes),
+                DeprioritizedRecallMaxResults = ApplyInt(context.DeprioritizedRecallMaxResults, cp.DeprioritizedRecallMaxResults, "Context", "DeprioritizedRecallMaxResults", changes),
+                AmbiguityLowConfidenceThreshold = ApplyDouble(context.AmbiguityLowConfidenceThreshold, cp.AmbiguityLowConfidenceThreshold, "Context", "AmbiguityLowConfidenceThreshold", changes),
+                AmbiguityConfidenceGapThreshold = ApplyDouble(context.AmbiguityConfidenceGapThreshold, cp.AmbiguityConfidenceGapThreshold, "Context", "AmbiguityConfidenceGapThreshold", changes)
             };
         }
 

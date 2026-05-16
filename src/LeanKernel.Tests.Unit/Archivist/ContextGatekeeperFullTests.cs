@@ -245,7 +245,7 @@ public class ContextGatekeeperFullTests
 
         await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
 
-        await wiki.Received(1).QueryAsync(
+        await wiki.Received().QueryAsync(
             Arg.Is<WikiQuery>(q => q.TextQuery == "what is my name"
                 && q.Dimensions.Contains(WikiDimension.Who)
                 && q.Dimensions.Contains(WikiDimension.What)),
@@ -276,7 +276,7 @@ public class ContextGatekeeperFullTests
 
         await gatekeeper.GateContextAsync(msg, budget, "s1", tags, CancellationToken.None);
 
-        await knowledgeSearch.Received(1).SearchAsync(
+        await knowledgeSearch.Received().SearchAsync(
             Arg.Any<string>(),
             Arg.Is<IReadOnlyList<string>>(t => t.Contains("technical") && t.Contains("wiki")),
             Arg.Any<int>(),
@@ -319,5 +319,218 @@ public class ContextGatekeeperFullTests
 
         Assert.NotEmpty(ctx.RetrievedLeanKernels);
         Assert.Equal("doc-1", ctx.RetrievedLeanKernels[0].EntryId);
+    }
+
+    [Fact]
+    public async Task GateContextAsync_EntityMention_AddsWhoDimensionForSchedulingQuery()
+    {
+        var wiki = Substitute.For<IWikiStore>();
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([]));
+
+        var sessions = Substitute.For<ISessionStore>();
+        sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<ConversationTurn>()));
+
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
+        var config = Options.Create(new LeanKernelConfig());
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
+        var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "I was thinking of scheduling a 1-1 with John" };
+        var budget = ContextBudget.FromModelWindow(128_000);
+
+        await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
+
+        await wiki.Received().QueryAsync(
+            Arg.Is<WikiQuery>(q => q.Dimensions.Contains(WikiDimension.Who)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GateContextAsync_PinnedEntityCandidate_BypassesDefaultThreshold()
+    {
+        var johnEntry = new WikiEntry
+        {
+            Id = "who-john-smith",
+            Dimension = WikiDimension.Who,
+            Subject = "John Smith",
+            Aliases = ["John"],
+            Facts = [new WikiFact { Claim = "not specified", Confidence = 0.9, EstimatedTokens = 3 }],
+            LastAccessed = DateTimeOffset.UtcNow,
+            AccessCount = 0
+        };
+
+        var wiki = Substitute.For<IWikiStore>();
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([johnEntry]));
+
+        var sessions = Substitute.For<ISessionStore>();
+        sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<ConversationTurn>()));
+
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
+        var config = Options.Create(new LeanKernelConfig
+        {
+            Context = new ContextConfig
+            {
+                MinRelevanceThreshold = 0.95
+            }
+        });
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
+        var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "I was thinking of scheduling a 1-1 with John" };
+        var budget = ContextBudget.FromModelWindow(128_000);
+
+        var ctx = await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
+
+        Assert.Contains(ctx.WikiLeanKernels, k => k.EntryId == "who-john-smith");
+    }
+
+    [Fact]
+    public async Task GateContextAsync_AmbiguousEntityName_AddsDisambiguationHints()
+    {
+        var johnSmith = new WikiEntry
+        {
+            Id = "who-john-smith",
+            Dimension = WikiDimension.Who,
+            Subject = "John Smith",
+            Aliases = ["John"],
+            Facts = [new WikiFact { Claim = "John Smith is CTO at Teachers", Confidence = 0.9, EstimatedTokens = 8 }],
+            LastAccessed = DateTimeOffset.UtcNow,
+            AccessCount = 5
+        };
+        var johnWoo = new WikiEntry
+        {
+            Id = "who-john-woo",
+            Dimension = WikiDimension.Who,
+            Subject = "John Woo",
+            Aliases = ["John"],
+            Facts = [new WikiFact { Claim = "John Woo is CIO", Confidence = 0.8, EstimatedTokens = 6 }],
+            LastAccessed = DateTimeOffset.UtcNow,
+            AccessCount = 3
+        };
+
+        var wiki = Substitute.For<IWikiStore>();
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([johnSmith, johnWoo]));
+
+        var sessions = Substitute.For<ISessionStore>();
+        sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<ConversationTurn>()));
+
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
+        var config = Options.Create(new LeanKernelConfig
+        {
+            Context = new ContextConfig
+            {
+                MinRelevanceThreshold = 0.0
+            }
+        });
+
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
+        var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "Should I schedule a meeting with John?" };
+        var budget = ContextBudget.FromModelWindow(128_000);
+
+        var ctx = await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
+
+        Assert.NotEmpty(ctx.DisambiguationHints);
+        Assert.Contains("plausible references", ctx.DisambiguationHints[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GateContextAsync_UnclearLowConfidenceQuery_RunsFallbackDiscoveryAcrossWikiAndDocuments()
+    {
+        var wiki = Substitute.For<IWikiStore>();
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([]));
+
+        var sessions = Substitute.For<ISessionStore>();
+        sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<ConversationTurn>()));
+
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
+        var gatekeeper = new ContextGatekeeper(
+            wiki,
+            sessions,
+            knowledgeSearch,
+            Options.Create(new LeanKernelConfig()),
+            NullLogger<ContextGatekeeper>.Instance);
+
+        var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "It's him" };
+        var budget = ContextBudget.FromModelWindow(128_000);
+
+        await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
+
+        await wiki.Received(2).QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>());
+        await knowledgeSearch.Received(2).SearchAsync(
+            Arg.Any<string>(),
+            Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GateContextAsync_AmbiguousNameWithClearHighConfidenceWinner_SkipsDisambiguation()
+    {
+        var strong = new WikiEntry
+        {
+            Id = "who-john-smith",
+            Dimension = WikiDimension.Who,
+            Subject = "John Smith",
+            Aliases = ["John"],
+            Facts = [new WikiFact { Claim = "John Smith is CTO and owns platform strategy leadership roadmap", Confidence = 0.95, EstimatedTokens = 10 }],
+            LastAccessed = DateTimeOffset.UtcNow,
+            AccessCount = 25
+        };
+        var weak = new WikiEntry
+        {
+            Id = "who-john-archived",
+            Dimension = WikiDimension.Who,
+            Subject = "John Archived",
+            Aliases = ["John"],
+            Facts = [new WikiFact { Claim = "John", Confidence = 0.7, EstimatedTokens = 3 }],
+            LastAccessed = DateTimeOffset.UtcNow.AddDays(-120),
+            AccessCount = 0
+        };
+
+        var wiki = Substitute.For<IWikiStore>();
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([strong, weak]));
+
+        var sessions = Substitute.For<ISessionStore>();
+        sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<ConversationTurn>()));
+
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
+        var config = Options.Create(new LeanKernelConfig
+        {
+            Context = new ContextConfig
+            {
+                MinRelevanceThreshold = 0.0,
+                AmbiguityLowConfidenceThreshold = 0.0,
+                AmbiguityConfidenceGapThreshold = 0.0
+            }
+        });
+
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
+        var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "Tell me about John leadership strategy" };
+        var budget = ContextBudget.FromModelWindow(128_000);
+
+        var ctx = await gatekeeper.GateContextAsync(msg, budget, "s1", CancellationToken.None);
+
+        Assert.Empty(ctx.DisambiguationHints);
     }
 }

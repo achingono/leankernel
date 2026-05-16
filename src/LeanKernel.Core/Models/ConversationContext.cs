@@ -41,6 +41,12 @@ public sealed record ConversationContext
     /// when SELF.md or USER.md have gaps. Appended to the system prompt.
     /// </summary>
     public string? OnboardingInstruction { get; init; }
+
+    /// <summary>
+    /// Optional disambiguation hints (for ambiguous entity names) that are appended
+    /// to the system instructions during prompt assembly.
+    /// </summary>
+    public List<string> DisambiguationHints { get; init; } = [];
 }
 
 /// <summary>

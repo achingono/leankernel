@@ -511,6 +511,41 @@ public sealed class ContextConfig
     public int MaxConversationTurns { get; set; } = 15;
 
     /// <summary>
+    /// Gets or sets an additive boost applied to high-priority entity candidates.
+    /// </summary>
+    public double EntitySubjectBoost { get; set; } = 0.45;
+
+    /// <summary>
+    /// Gets or sets the minimum threshold for supporting entity context.
+    /// </summary>
+    public double SupportingEntityThreshold { get; set; } = 0.35;
+
+    /// <summary>
+    /// Gets or sets the maximum relation-expansion depth for entity neighborhood discovery.
+    /// </summary>
+    public int EntityExpansionDepth { get; set; } = 1;
+
+    /// <summary>
+    /// Gets or sets the confidence threshold that triggers deprioritized fallback discovery.
+    /// </summary>
+    public double LowConfidenceFallbackThreshold { get; set; } = 0.72;
+
+    /// <summary>
+    /// Gets or sets the maximum result count for deprioritized fallback discovery passes.
+    /// </summary>
+    public int DeprioritizedRecallMaxResults { get; set; } = 40;
+
+    /// <summary>
+    /// Gets or sets the minimum top score considered "confident enough" to avoid ambiguity prompting.
+    /// </summary>
+    public double AmbiguityLowConfidenceThreshold { get; set; } = 0.78;
+
+    /// <summary>
+    /// Gets or sets the minimum score gap between top candidates to suppress disambiguation prompts.
+    /// </summary>
+    public double AmbiguityConfidenceGapThreshold { get; set; } = 0.10;
+
+    /// <summary>
     /// Gets or sets the reranker configuration used between retrieval and context assembly.
     /// </summary>
     public RerankerConfig Reranker { get; set; } = new();

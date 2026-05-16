@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using LeanKernel.Core.Enums;
 using LeanKernel.Core.Models;
 
 namespace LeanKernel.Thinker;
@@ -64,6 +65,15 @@ public sealed class PromptAssembler
             parts.Add($"\n## Onboarding Directive\n{context.OnboardingInstruction}");
         }
 
+        if (context.DisambiguationHints.Count > 0)
+        {
+            parts.Add("\n## Disambiguation");
+            foreach (var hint in context.DisambiguationHints)
+            {
+                parts.Add($"- {hint}");
+            }
+        }
+
         return string.Join("\n", parts);
     }
 
@@ -75,6 +85,8 @@ public sealed class PromptAssembler
     {
         var wiki = wikiCandidates
             .Concat(retrievedCandidates.Where(x => x.KnowledgeSource == KnowledgeSourceType.Wiki))
+            .OrderByDescending(entry => GetPriorityRank(entry.Priority))
+            .ThenByDescending(entry => entry.Score)
             .ToList();
         var documents = retrievedCandidates
             .Where(x => x.KnowledgeSource != KnowledgeSourceType.Wiki)
@@ -116,4 +128,13 @@ public sealed class PromptAssembler
             .Replace("data/wiki/", "wiki/", StringComparison.OrdinalIgnoreCase)
             .Replace("data/documents/", "documents/", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static int GetPriorityRank(ContextPriority priority) => priority switch
+    {
+        ContextPriority.Critical => 4,
+        ContextPriority.High => 3,
+        ContextPriority.Medium => 2,
+        ContextPriority.Low => 1,
+        _ => 0
+    };
 }
