@@ -196,4 +196,44 @@ public class EngagementToolExecutionAuthorizerTests
         Assert.Null(result.ActionType);
         await actionAuthorizer.DidNotReceive().AuthorizeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task AuthorizeAsync_ScheduledJobsList_UsesListScheduledJobsAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("ListScheduledJobs", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "ListScheduledJobs",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("scheduled_jobs__list_jobs", """{"operation":"list_jobs"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("ListScheduledJobs", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("ListScheduledJobs", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_ScheduledJobsCreate_UsesManageScheduledJobsAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("ManageScheduledJobs", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "ManageScheduledJobs",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("scheduled_jobs__create_job", """{"operation":"create_job"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("ManageScheduledJobs", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("ManageScheduledJobs", Arg.Any<CancellationToken>());
+    }
 }

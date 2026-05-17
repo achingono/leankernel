@@ -51,6 +51,8 @@ These actions are pre-approved and need no permission:
 - WriteAgentsMd
 - WriteSelfMd
 - WriteUserMd
+- ListScheduledJobs
+- ManageScheduledJobs
 
 ### Must Ask Before
 

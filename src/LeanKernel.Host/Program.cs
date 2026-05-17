@@ -93,7 +93,7 @@ try
         .AddThinker()
         .AddCommander(configuredDataDir)
         .AddPlugins(skillDirs, configuredDataDir)
-        .AddScheduler();
+        .AddScheduler(configuredDataDir);
 
     // Web API services
     builder.Services.AddSingleton<LogReaderService>();

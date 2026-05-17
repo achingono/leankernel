@@ -24,6 +24,7 @@ public sealed class ThinkerService : IThinkerService
     private readonly IAgentStrategy _fallbackStrategy;
     private readonly IResponseEnhancer? _responseEnhancer;
     private readonly PostTurnPipeline? _postTurnPipeline;
+    private readonly IChatExecutionContextAccessor? _chatExecutionContextAccessor;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -47,6 +48,7 @@ public sealed class ThinkerService : IThinkerService
         _responseEnhancer = dependencies.ResponseEnhancer;
         _postTurnPipeline = dependencies.PostTurnPipeline
             ?? new PostTurnPipeline(_sessions, NullLogger<PostTurnPipeline>.Instance);
+        _chatExecutionContextAccessor = dependencies.ChatExecutionContextAccessor;
         _config = config.Value;
         _logger = logger;
     }
@@ -56,6 +58,14 @@ public sealed class ThinkerService : IThinkerService
     {
         var sessionId = await _sessions.GetOrCreateSessionIdAsync(
             message.ChannelId, message.SenderId, ct);
+
+        using var chatExecutionScope = _chatExecutionContextAccessor?.BeginScope(new ChatExecutionContext
+        {
+            UserId = message.SenderId,
+            ChannelId = message.ChannelId,
+            SessionId = sessionId,
+            IsAdmin = IsAdminMessage(message)
+        });
 
         await _sessions.AppendTurnAsync(sessionId, new ConversationTurn
         {
@@ -115,6 +125,29 @@ public sealed class ThinkerService : IThinkerService
         }
 
         return response;
+    }
+
+    private static bool IsAdminMessage(LeanKernelMessage message)
+    {
+        if (message.Metadata.TryGetValue("is_admin", out var isAdminRaw) &&
+            bool.TryParse(isAdminRaw, out var isAdmin))
+        {
+            return isAdmin;
+        }
+
+        if (message.Metadata.TryGetValue("isAdmin", out var isAdminAlt) &&
+            bool.TryParse(isAdminAlt, out var parsed))
+        {
+            return parsed;
+        }
+
+        if (message.Metadata.TryGetValue("role", out var role) &&
+            string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>

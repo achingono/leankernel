@@ -21,6 +21,18 @@ These instructions are for contributors and coding agents working in this reposi
 - Preserve existing naming patterns and configuration binding style (`LeanKernel:*`).
 - Avoid broad exception swallowing; log and surface actionable errors.
 
+## Mandatory Issue/Bug/Change Workflow
+
+When a user highlights an issue, bug, or requested change in the system, the agent **must** follow this process in order:
+
+1. Create a concrete implementation plan.
+2. Review that plan using a different model than the one doing implementation.
+3. Save the reviewed plan as a PRD under `docs/plans` before any code changes.
+4. Implement the change, run tests, and run Sonar scans.
+5. Iterate on fixes until all quality gates pass.
+
+Do not skip, reorder, or partially apply these steps.
+
 ## Build, Test, and Quality Commands
 
 Run from repo root unless noted:

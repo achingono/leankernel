@@ -53,7 +53,7 @@ Add Core contracts for durable job definitions and state:
 - `ScheduledJobDefinition`
   - identity: `Id`, `Name`, `Enabled`
   - schedule: `ScheduleKind` (`Cron`/`At`), `CronExpression` or `RunAtUtc`, `TimeZoneId`
-  - execution: `ExecutionTimeoutSeconds`, `OverlapPolicy`
+  - execution: `ExecutionTimeoutSeconds`, `OverlapPolicy`, `RetryPolicy` (`MaxRetries`, `BackoffMode`), `RetentionPolicy` (`DeleteAfterCompleted`, `KeepHistoryDays`)
   - routing: `AgentId`, `SessionKey`, `SessionTarget`, `WakeMode`
   - delivery: `Channel`, `Recipient`, `Mode`
   - ownership/scope: `OwnerUserId`, `OwnerChannelId`, `Scope` (`Scoped`, `Global`)
@@ -61,7 +61,7 @@ Add Core contracts for durable job definitions and state:
 - `ScheduledJobState`
   - `NextRunAtUtc`, `LastRunAtUtc`, `LastStatus`, `LastDurationMs`
   - `LastDeliveryStatus`, `LastError`, `LastErrorReason`
-  - `ConsecutiveErrors`, `ConsecutiveSkips`
+  - `ConsecutiveErrors`, `ConsecutiveSkips`, `LifecycleState` (`Active`, `Completed`, `Failed`, `Archived`)
 
 ### FR-2 Scheduler Management Service
 
@@ -80,9 +80,10 @@ Persist jobs and state in writable runtime directory (e.g. `/app/data/scheduler`
 
 - `jobs.json` definitions
 - `jobs-state.json` state
-- schema versioning
-- atomic writes
+- `schema versioning`
+- atomic writes (write to temp file and swap, or use file system locking to prevent concurrent write corruption)
 - restart-safe reload
+- optimistic concurrency control (eTag or version fields) to prevent data loss during simultaneous chat updates.
 
 ### FR-4 Built-in Chat CRUD Tool
 
@@ -109,13 +110,15 @@ Add per-turn execution context accessor so tools can infer:
 
 On `create_job`, default owner and target routing to current chat context unless explicitly overridden and authorized.
 
-### FR-6 Authorization and Scope Rules
+### FR-6 Authorization, Scope, and Quota Rules
 
 - Non-admin users:
   - can list/manage only own scoped jobs
   - cannot elevate to global scope unless policy allows explicit elevation path
+  - subject to **Resource Quotas** (e.g., maximum of N jobs per user/channel) to prevent DoS/spam via chat tools.
 - Admin users:
   - can manage all jobs, scoped and global
+  - bypass resource quotas.
 
 Map scheduler tool operations to explicit engagement action types (do not rely on unknown-tool allow behavior).
 
@@ -124,7 +127,9 @@ Map scheduler tool operations to explicit engagement action types (do not rely o
 - timezone-aware cron support
 - one-time `at` support
 - overlap handling
-- timeout handling
+- explicit retry evaluation (linear/exponential backoff when `LastError` occurs, up to `MaxRetries`)
+- cancellation token isolation for `ExecutionTimeoutSeconds` to guarantee hung jobs are safely aborted
+- automatic cleanup: garbage collect or archive completed one-time jobs based on `RetentionPolicy`
 - explicit reason-coded failures
 
 ### FR-8 OpenClaw Compatibility and Migration
@@ -142,10 +147,10 @@ Import is a compatibility feature, not the primary framing of this PRD.
 Expose operational surfaces (API/UI and logs):
 
 - job list + state
-- recent run outcomes/errors
 - manual trigger
 - enable/disable and updates
 - structured telemetry for run lifecycle and delivery outcome
+- **Historical Run Logs:** maintain a rotating local log or limited history queue of past runs per job (avoiding single-value overwrite in `jobs-state.json`), enabling retroactive debugging of missed or failed deliveries.
 
 ## Architecture Mapping
 

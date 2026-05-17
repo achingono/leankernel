@@ -95,7 +95,9 @@ public sealed class AutonomyScope
         "UpdateWiki",
         "WriteAgentsMd",
         "WriteSelfMd",
-        "WriteUserMd"
+        "WriteUserMd",
+        "ListScheduledJobs",
+        "ManageScheduledJobs"
     ];
     
     /// <summary>

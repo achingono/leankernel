@@ -16,6 +16,7 @@ This section contains execution-ready product requirements documents (PRDs) for 
 | [wiki-knowledge-tool-unification.md](wiki-knowledge-tool-unification.md) | Unify free-text wiki retrieval on Qdrant and add exact wiki entry lookup | Consistent semantic discovery plus deterministic wiki hydration |
 | [entity-discovery-useful-by-default-prd.md](entity-discovery-useful-by-default-prd.md) | Improve gatekeeper entity discovery and contextual linking for people/org references | Useful-by-default responses with richer person + organization grounding |
 | [ambiguity-reference-resolution-prd.md](ambiguity-reference-resolution-prd.md) | Expand ambiguity handling across relation/pronoun and cross-source collisions | Safer identity grounding with clarify-first behavior under low confidence |
+| [scheduled-jobs-management-prd.md](scheduled-jobs-management-prd.md) | Implement runtime scheduler management and chat CRUD tooling with OpenClaw-compatible capabilities | Scoped-by-default scheduled job management with admin governance and durable runtime state |
 
 ## Planning Conventions
 

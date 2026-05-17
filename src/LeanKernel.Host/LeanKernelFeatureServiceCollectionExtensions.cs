@@ -98,6 +98,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddThinker(this IServiceCollection services)
     {
+        services.AddSingleton<IChatExecutionContextAccessor, ChatExecutionContextAccessor>();
         services.AddSingleton<LeanKernel.Thinker.Middleware.FunctionLoggingMiddleware>();
         services.AddSingleton<LeanKernel.Thinker.Middleware.DiagnosticsMiddleware>();
         services.AddSingleton<LeanKernel.Thinker.Middleware.ContextGatingMiddleware>();
@@ -145,10 +146,11 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             var strategySelector = sp.GetService<AgentStrategySelector>();
             var responseEnhancer = sp.GetService<IResponseEnhancer>();
             var postTurnPipeline = sp.GetService<PostTurnPipeline>();
+            var chatExecutionContextAccessor = sp.GetService<IChatExecutionContextAccessor>();
 
             return new ThinkerServiceDependencies(
                 gatekeeper, sessions, wiki, agentFactory, toolAdapter, promptAssembler,
-                strategySelector, responseEnhancer, postTurnPipeline);
+                strategySelector, responseEnhancer, postTurnPipeline, chatExecutionContextAccessor);
         });
 
         services.AddSingleton<TaskComplexityScorer>();
@@ -242,6 +244,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<ITool, DocumentSearchTool>();
         services.AddSingleton<ITool, KnowledgeSearchTool>();
         services.AddSingleton<ITool, GetWikiEntryTool>();
+        services.AddSingleton<ITool, ScheduledJobsTool>();
         services.AddSingleton<ITool>(sp => new FileSystemReadTool(
             dataDirectory ?? "/app/data",
             sp.GetService<IAttachmentTextExtractionService>()));
@@ -296,9 +299,14 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection to update.</param>
     /// <returns>The updated service collection.</returns>
-    public static IServiceCollection AddScheduler(this IServiceCollection services)
+    public static IServiceCollection AddScheduler(this IServiceCollection services, string dataDirectory)
     {
         services.AddSingleton<IScheduler, CronScheduler>();
+        services.AddSingleton<IScheduledJobStore>(sp =>
+            new FileScheduledJobStore(dataDirectory, sp.GetRequiredService<ILogger<FileScheduledJobStore>>()));
+        services.AddSingleton<IProactiveJobExecutor, Services.ScheduledJobExecutor>();
+        services.AddSingleton<IScheduledJobManager, ScheduledJobManager>();
+        services.AddHostedService<ScheduledJobBackgroundService>();
         services.AddSingleton<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>();
         services.AddSingleton<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>();
         services.AddSingleton<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>();
