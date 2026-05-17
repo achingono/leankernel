@@ -1,7 +1,7 @@
 services:
   sonarqube:
     image: sonarqube:lts-community
-    container_name: LeanKernel-sonarqube
+    container_name: leankernel-sonarqube
     environment:
       - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
     ports:

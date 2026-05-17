@@ -10,6 +10,7 @@ This section covers the structural design of LeanKernel — its solution compone
 | [overview.md](overview.md) | High-level component map, runtime topology diagram, and data store summary. |
 | [key-flows.md](key-flows.md) | Sequence diagrams and step-by-step descriptions of the inbound chat, knowledge indexing, and outbound message flows. |
 | [gaps-and-roadmap.md](gaps-and-roadmap.md) | Current architectural gaps, the target architecture with service topology, and the incremental implementation phase plan. |
+| [diagrams/index.html](diagrams/index.html) | Multi-level architecture image set (system context, component flow, request/response sequence). |
 
 ## Quick Reference
 
