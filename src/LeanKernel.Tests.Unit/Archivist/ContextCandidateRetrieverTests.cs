@@ -145,6 +145,64 @@ public class ContextCandidateRetrieverTests
     }
 
     [Fact]
+    public async Task RetrieveWikiLeanKernelsAsync_CompactContentIncludesContextDetails()
+    {
+        var wiki = Substitute.For<IWikiStore>();
+        var knowledge = Substitute.For<IKnowledgeSearchService>();
+
+        var family = new WikiEntry
+        {
+            Id = "who-family",
+            Dimension = WikiDimension.Who,
+            Subject = "Family",
+            Facts =
+            [
+                new WikiFact
+                {
+                    Claim = "Family remembrance guidance.",
+                    Confidence = 0.95,
+                    EstimatedTokens = 10,
+                    Context = new WikiFactContext
+                    {
+                        What = "Parents include Winnie Chingono (mother) and Jacob Chingono (father)."
+                    }
+                }
+            ],
+            LastAccessed = DateTimeOffset.UtcNow
+        };
+
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([family]));
+        knowledge.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<RelevanceScore>()));
+
+        var retriever = new ContextCandidateRetriever(
+            wiki,
+            knowledge,
+            Options.Create(new LeanKernelConfig()),
+            NullLogger<ContextCandidateRetriever>.Instance);
+
+        var query = new LeanKernelMessage
+        {
+            Id = "1",
+            ChannelId = "c",
+            SenderId = "u",
+            Content = "What do you know about my mother?"
+        };
+        var dimensions = new HashSet<WikiDimension> { WikiDimension.Who };
+        var hints = new List<EntityHint>
+        {
+            new() { NormalizedName = "mother", Type = EntityHintType.Relationship, Confidence = 0.85 }
+        };
+
+        var results = await retriever.RetrieveWikiLeanKernelsAsync(query, dimensions, hints, CancellationToken.None);
+
+        Assert.Single(results);
+        Assert.Contains("Winnie", results[0].Content, StringComparison.OrdinalIgnoreCase);
+        Assert.True(results[0].EstimatedTokens > 10);
+    }
+
+    [Fact]
     public async Task RetrieveVectorFallbackLeanKernelsAsync_ReturnsBroaderSemanticOrder()
     {
         var wiki = Substitute.For<IWikiStore>();

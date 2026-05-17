@@ -99,12 +99,13 @@ public sealed class ContextCandidateRetriever
                 : hasEntityOrgMatch
                     ? ContextPriority.Low
                     : ContextPriority.Medium;
+            var formattedContent = FormatWikiEntryCompact(e);
 
             return new RelevanceScore
             {
                 EntryId = e.Id,
-                Content = FormatWikiEntryCompact(e),
-                EstimatedTokens = Math.Max(1, e.Facts.Sum(f => f.EstimatedTokens)),
+                Content = formattedContent,
+                EstimatedTokens = Math.Max(1, (int)Math.Ceiling(formattedContent.Length / 4.0)),
                 SemanticSimilarity = Math.Clamp(baseSimilarity + entityBoost, 0.0, 1.0),
                 RecencyDecay = ComputeRecencyDecay(e.LastAccessed),
                 DimensionMatch = hasEntityPersonMatch && e.Dimension == WikiDimension.Who
@@ -157,12 +158,13 @@ public sealed class ContextCandidateRetriever
                 : hasEntityOrgMatch
                     ? ContextPriority.Low
                     : ContextPriority.Medium;
+            var formattedContent = FormatWikiEntryCompact(e);
 
             return new RelevanceScore
             {
                 EntryId = e.Id,
-                Content = FormatWikiEntryCompact(e),
-                EstimatedTokens = Math.Max(1, e.Facts.Sum(f => f.EstimatedTokens)),
+                Content = formattedContent,
+                EstimatedTokens = Math.Max(1, (int)Math.Ceiling(formattedContent.Length / 4.0)),
                 SemanticSimilarity = Math.Clamp(baseSimilarity + entityBoost, 0.0, 1.0),
                 RecencyDecay = ComputeRecencyDecay(e.LastAccessed),
                 DimensionMatch = hasEntityPersonMatch && e.Dimension == WikiDimension.Who
@@ -308,8 +310,37 @@ public sealed class ContextCandidateRetriever
     private static HashSet<WikiDimension> GetDefaultDimensions() => 
         [WikiDimension.Who, WikiDimension.What];
 
-    private static string FormatWikiEntryCompact(WikiEntry entry) =>
-        $"[{entry.Dimension}:{entry.Subject}] {string.Join("; ", entry.Facts.Select(f => f.Claim))}";
+    private static string FormatWikiEntryCompact(WikiEntry entry)
+    {
+        var factSummaries = entry.Facts.Select(FormatFactCompact);
+        return $"[{entry.Dimension}:{entry.Subject}] {string.Join("; ", factSummaries)}";
+    }
+
+    private static string FormatFactCompact(WikiFact fact)
+    {
+        var parts = new List<string> { fact.Claim };
+        AppendContext(parts, "who", fact.Context?.Who, 140);
+        AppendContext(parts, "what", fact.Context?.What, 220);
+        AppendContext(parts, "when", fact.Context?.When, 180);
+        return string.Join(" | ", parts);
+    }
+
+    private static void AppendContext(List<string> parts, string label, string? raw, int maxLen)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        var normalized = string.Join(' ',
+            raw.Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();
+        if (normalized.Length > maxLen)
+        {
+            normalized = normalized[..maxLen].TrimEnd() + "...";
+        }
+
+        parts.Add($"{label}: {normalized}");
+    }
 
     private static double ComputeLexicalSimilarityOptimized(
         HashSet<string> queryTokens,
