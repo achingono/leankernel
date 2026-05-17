@@ -115,13 +115,13 @@ public class PromptAssemblerFullTests
         var ctx = MakeContext("System");
         ctx = ctx with
         {
-            DisambiguationHints = ["I found 2 people named 'terry'. Ask which one they mean."]
+            DisambiguationHints = ["I found 2 people named 'john'. Ask which one they mean."]
         };
 
         var result = _assembler.AssembleSystemMessage(ctx);
 
         Assert.Contains("## Disambiguation", result);
-        Assert.Contains("2 people named 'terry'", result);
+        Assert.Contains("2 people named 'john'", result);
     }
 
     [Fact]

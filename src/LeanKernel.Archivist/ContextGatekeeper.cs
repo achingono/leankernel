@@ -103,7 +103,7 @@ public sealed class ContextGatekeeper : IContextGatekeeper
 
         // Classify intent to determine the active 5W1H dimensions.
         var activeDimensions = ClassifyDimensions(query.Content);
-        if (entityHints.Any(h => h.Type == EntityHintType.Person))
+        if (entityHints.Any(h => h.Type is EntityHintType.Person or EntityHintType.Relationship or EntityHintType.Pronoun))
         {
             activeDimensions.Add(WikiDimension.Who);
         }
@@ -184,40 +184,122 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         IReadOnlyList<RelevanceScore> rankedRetrieval)
     {
         var hints = new List<string>();
-        var people = entityHints.Where(h => h.Type == EntityHintType.Person).ToList();
-        if (people.Count == 0 || (rankedWiki.Count == 0 && rankedRetrieval.Count == 0))
+        if (entityHints.Count == 0 || (rankedWiki.Count == 0 && rankedRetrieval.Count == 0))
         {
             return hints;
         }
 
-        var candidates = rankedWiki.Concat(rankedRetrieval).ToList();
-        foreach (var person in people)
+        var candidates = rankedWiki
+            .Concat(rankedRetrieval)
+            .OrderByDescending(c => c.Score)
+            .ToList();
+        var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var signal in entityHints
+                     .GroupBy(h => $"{h.Type}:{h.NormalizedName}", StringComparer.OrdinalIgnoreCase)
+                     .Select(g => g.OrderByDescending(x => x.Confidence).First()))
         {
             var matches = candidates
-                .Where(w => w.Content.Contains(person.NormalizedName, StringComparison.OrdinalIgnoreCase))
+                .Where(candidate => CandidateMatchesHint(candidate, signal))
                 .OrderByDescending(w => w.Score)
                 .ToList();
 
-            if (matches.Count <= 1)
+            if (matches.Count == 0)
             {
                 continue;
             }
 
-            var topScore = matches[0].Score;
-            var secondScore = matches[1].Score;
-            var confidenceGap = topScore - secondScore;
-            if (topScore >= _config.Context.AmbiguityLowConfidenceThreshold
-                && confidenceGap >= _config.Context.AmbiguityConfidenceGapThreshold)
+            var top = matches[0];
+            var second = matches.Count > 1 ? matches[1] : null;
+            var lowConfidence = top.Score < _config.Context.AmbiguityLowConfidenceThreshold;
+            var confidenceGap = second is null ? 1.0 : top.Score - second.Score;
+            var weakGap = second is not null && confidenceGap < _config.Context.AmbiguityConfidenceGapThreshold;
+            var sourceDisagreement = second is not null
+                && IsCrossSourceConflict(top, second)
+                && confidenceGap < (_config.Context.AmbiguityConfidenceGapThreshold + 0.05);
+            var relationOrPronoun = signal.Type is EntityHintType.Relationship or EntityHintType.Pronoun;
+
+            var shouldClarify = matches.Count > 1
+                ? lowConfidence || weakGap || sourceDisagreement || relationOrPronoun
+                : lowConfidence;
+
+            if (!shouldClarify)
             {
                 continue;
             }
 
-            var top = matches[0].EntryId;
-            hints.Add(
-                $"I found {matches.Count} plausible references for '{person.NormalizedName}' and confidence is not high enough. Ground on '{top}' as best guess and ask the user to confirm.");
+            var dedupeKey = $"{signal.Type}:{signal.NormalizedName}:{top.EntryId}:{matches.Count}";
+            if (!emitted.Add(dedupeKey))
+            {
+                continue;
+            }
+
+            hints.Add(BuildClarificationHint(signal, matches, top, lowConfidence, weakGap, sourceDisagreement));
         }
 
         return hints;
+    }
+
+    private static bool CandidateMatchesHint(RelevanceScore candidate, EntityHint hint)
+    {
+        if (string.IsNullOrWhiteSpace(hint.NormalizedName))
+        {
+            return false;
+        }
+
+        if (candidate.Content.Contains(hint.NormalizedName, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var slug = hint.NormalizedName.Replace(' ', '-');
+        return candidate.EntryId.Contains(slug, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCrossSourceConflict(RelevanceScore top, RelevanceScore second)
+    {
+        if (top.KnowledgeSource == KnowledgeSourceType.Unknown || second.KnowledgeSource == KnowledgeSourceType.Unknown)
+        {
+            return false;
+        }
+
+        return top.KnowledgeSource != second.KnowledgeSource;
+    }
+
+    private static string BuildClarificationHint(
+        EntityHint signal,
+        IReadOnlyList<RelevanceScore> matches,
+        RelevanceScore top,
+        bool lowConfidence,
+        bool weakGap,
+        bool sourceDisagreement)
+    {
+        if (matches.Count == 1)
+        {
+            return
+                $"I found one plausible reference for '{signal.NormalizedName}' ('{top.EntryId}'), but confidence is low. Ask the user to confirm before asserting identity.";
+        }
+
+        var reasons = new List<string>();
+        if (lowConfidence)
+        {
+            reasons.Add("low top confidence");
+        }
+        if (weakGap)
+        {
+            reasons.Add("weak score gap");
+        }
+        if (sourceDisagreement)
+        {
+            reasons.Add("cross-source disagreement");
+        }
+        if (reasons.Count == 0)
+        {
+            reasons.Add("ambiguous references");
+        }
+
+        return
+            $"I found {matches.Count} plausible references for '{signal.NormalizedName}'. Best guess is '{top.EntryId}', but confidence is not high enough ({string.Join(", ", reasons)}). Ask the user to confirm before asserting identity.";
     }
 
     private bool ShouldRunDeprioritizedRecall(

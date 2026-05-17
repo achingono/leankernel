@@ -135,7 +135,7 @@ public class ContextCandidateRetrieverTests
         var dimensions = new HashSet<WikiDimension> { WikiDimension.When };
         var hints = new List<EntityHint>
         {
-            new() { NormalizedName = "mother", Type = EntityHintType.Person, Confidence = 0.85 }
+            new() { NormalizedName = "mother", Type = EntityHintType.Relationship, Confidence = 0.85 }
         };
 
         var results = await retriever.RetrieveWikiLeanKernelsAsync(query, dimensions, hints, CancellationToken.None);

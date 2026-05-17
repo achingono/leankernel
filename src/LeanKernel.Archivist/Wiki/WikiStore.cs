@@ -916,9 +916,15 @@ public sealed class WikiStore : IWikiStore
 
             if (!string.IsNullOrWhiteSpace(textQuery))
             {
-                var haystack =
-                    $"{entry.Subject} {entry.Summary} {string.Join(' ', entry.Aliases)} {string.Join(' ', entry.Tags)} {string.Join(' ', entry.FactKeys)}";
-                var textScore = ComputeTextMatchScore(haystack, terms);
+                var descriptorHaystack =
+                    $"{entry.Subject} {entry.Summary} {string.Join(' ', entry.Aliases)} {string.Join(' ', entry.Tags)}";
+                var descriptorScore = ComputeTextMatchScore(descriptorHaystack, terms);
+                var factKeyScore = ComputeTextMatchScore(string.Join(' ', entry.FactKeys), terms);
+                var textScore = Math.Clamp((descriptorScore * 0.80) + (factKeyScore * 0.20), 0.0, 1.0);
+                if (descriptorScore <= 0.0 && factKeyScore > 0.0)
+                {
+                    textScore *= 0.60;
+                }
                 if (textScore <= 0)
                     continue;
 

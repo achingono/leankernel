@@ -90,7 +90,9 @@ public sealed class ContextCandidateRetriever
         {
             var baseSimilarity = ComputeLexicalSimilarityOptimized(queryTokens, queryTokenCount, e);
             var entityBoost = ComputeEntityBoost(e, entityHints);
-            var hasEntityPersonMatch = HasPersonEntityMatch(e, entityHints);
+            var hasEntityPersonMatch = HasPersonEntityMatch(e, entityHints)
+                || HasRelationshipEntityMatch(e, entityHints)
+                || HasPronounEntityMatch(e, entityHints);
             var hasEntityOrgMatch = HasOrganizationEntityMatch(e, entityHints) || expandedEntryIds.Contains(e.Id);
             var priority = hasEntityPersonMatch
                 ? ContextPriority.High
@@ -110,6 +112,7 @@ public sealed class ContextCandidateRetriever
                     : dimensions.Contains(e.Dimension) ? 1.0 : 0.2,
                 InteractionFrequency = Math.Clamp(e.AccessCount / 100.0, 0.0, 1.0),
                 Priority = priority,
+                KnowledgeSource = KnowledgeSourceType.Wiki,
                 Score = 0.0
             };
         }).ToList();
@@ -145,7 +148,9 @@ public sealed class ContextCandidateRetriever
         {
             var baseSimilarity = ComputeLexicalSimilarityOptimized(queryTokens, queryTokenCount, e);
             var entityBoost = ComputeEntityBoost(e, entityHints);
-            var hasEntityPersonMatch = HasPersonEntityMatch(e, entityHints);
+            var hasEntityPersonMatch = HasPersonEntityMatch(e, entityHints)
+                || HasRelationshipEntityMatch(e, entityHints)
+                || HasPronounEntityMatch(e, entityHints);
             var hasEntityOrgMatch = HasOrganizationEntityMatch(e, entityHints) || expandedEntryIds.Contains(e.Id);
             var priority = hasEntityPersonMatch
                 ? ContextPriority.High
@@ -165,6 +170,7 @@ public sealed class ContextCandidateRetriever
                     : allDimensions.Contains(e.Dimension) ? 1.0 : 0.2,
                 InteractionFrequency = Math.Clamp(e.AccessCount / 100.0, 0.0, 1.0),
                 Priority = priority,
+                KnowledgeSource = KnowledgeSourceType.Wiki,
                 Score = 0.0
             };
         }).ToList();
@@ -381,6 +387,11 @@ public sealed class ContextCandidateRetriever
             return 0.55;
         }
 
+        if (HasRelationshipEntityMatch(entry, entityHints) || HasPronounEntityMatch(entry, entityHints))
+        {
+            return 0.45;
+        }
+
         if (HasOrganizationEntityMatch(entry, entityHints))
         {
             return 0.30;
@@ -405,9 +416,28 @@ public sealed class ContextCandidateRetriever
             entryText.Contains(hint.NormalizedName, StringComparison.OrdinalIgnoreCase));
     }
 
+    private static bool HasRelationshipEntityMatch(WikiEntry entry, IReadOnlyList<EntityHint> entityHints)
+    {
+        var entryText = BuildEntrySearchSurface(entry);
+        var relationships = entityHints.Where(h => h.Type == EntityHintType.Relationship);
+        return relationships.Any(hint =>
+            entryText.Contains(hint.NormalizedName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasPronounEntityMatch(WikiEntry entry, IReadOnlyList<EntityHint> entityHints)
+    {
+        var entryText = BuildEntrySearchSurface(entry);
+        var pronouns = entityHints.Where(h => h.Type == EntityHintType.Pronoun);
+        return pronouns.Any(hint =>
+            entryText.Contains(hint.NormalizedName, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static bool HasEntityMatch(WikiEntry entry, IReadOnlyList<EntityHint> entityHints)
     {
-        return HasPersonEntityMatch(entry, entityHints) || HasOrganizationEntityMatch(entry, entityHints);
+        return HasPersonEntityMatch(entry, entityHints)
+            || HasRelationshipEntityMatch(entry, entityHints)
+            || HasPronounEntityMatch(entry, entityHints)
+            || HasOrganizationEntityMatch(entry, entityHints);
     }
 
     private static string BuildEntrySearchSurface(WikiEntry entry)

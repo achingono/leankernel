@@ -528,7 +528,7 @@ public sealed class ContextConfig
     /// <summary>
     /// Gets or sets the confidence threshold that triggers deprioritized fallback discovery.
     /// </summary>
-    public double LowConfidenceFallbackThreshold { get; set; } = 0.72;
+    public double LowConfidenceFallbackThreshold { get; set; } = 0.80;
 
     /// <summary>
     /// Gets or sets the maximum result count for deprioritized fallback discovery passes.
@@ -538,12 +538,12 @@ public sealed class ContextConfig
     /// <summary>
     /// Gets or sets the minimum top score considered "confident enough" to avoid ambiguity prompting.
     /// </summary>
-    public double AmbiguityLowConfidenceThreshold { get; set; } = 0.78;
+    public double AmbiguityLowConfidenceThreshold { get; set; } = 0.85;
 
     /// <summary>
     /// Gets or sets the minimum score gap between top candidates to suppress disambiguation prompts.
     /// </summary>
-    public double AmbiguityConfidenceGapThreshold { get; set; } = 0.10;
+    public double AmbiguityConfidenceGapThreshold { get; set; } = 0.15;
 
     /// <summary>
     /// Gets or sets the reranker configuration used between retrieval and context assembly.

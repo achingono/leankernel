@@ -93,6 +93,27 @@ public class WikiStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task QueryAsync_DescriptorMatch_OutranksFactKeyOnlyMatch()
+    {
+        await _store.UpsertAsync(
+            MakeEntry(
+                "who-family",
+                WikiDimension.Who,
+                "Family",
+                "Death-anniversary tracking matters in this family: Peter, Jane, and Scott."),
+            CancellationToken.None);
+        await _store.UpsertAsync(
+            MakeEntry("who-jane", WikiDimension.Who, "Jane", "Jane remembrance details"),
+            CancellationToken.None);
+
+        var query = new WikiQuery { TextQuery = "jane", MaxResults = 10 };
+        var results = await _store.QueryAsync(query, CancellationToken.None);
+
+        Assert.True(results.Count >= 2);
+        Assert.Equal("who-jane", results[0].Id);
+    }
+
+    [Fact]
     public async Task QueryAsync_NaturalLanguageQuery_MatchesByTokens()
     {
         await _store.UpsertAsync(

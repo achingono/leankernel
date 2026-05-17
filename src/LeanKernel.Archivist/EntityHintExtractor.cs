@@ -6,7 +6,9 @@ namespace LeanKernel.Archivist;
 public enum EntityHintType
 {
     Person,
-    Organization
+    Organization,
+    Relationship,
+    Pronoun
 }
 
 public sealed record EntityHint
@@ -88,21 +90,20 @@ internal sealed partial class EntityHintExtractor
             hints.Add(new EntityHint
             {
                 NormalizedName = relationship,
-                Type = EntityHintType.Person,
+                Type = EntityHintType.Relationship,
                 Confidence = 0.85
             });
         }
 
-        if (!hints.Any(h => h.Type == EntityHintType.Person) && ContainsPronoun(lowered))
+        if (ContainsPronoun(lowered))
         {
-            var historicalPerson = ResolveRecentPerson(recentHistory);
-            if (!string.IsNullOrWhiteSpace(historicalPerson))
+            foreach (var candidate in ResolveRecentReferenceCandidates(recentHistory))
             {
                 hints.Add(new EntityHint
                 {
-                    NormalizedName = historicalPerson,
-                    Type = EntityHintType.Person,
-                    Confidence = 0.7
+                    NormalizedName = candidate.NormalizedName,
+                    Type = EntityHintType.Pronoun,
+                    Confidence = candidate.Confidence
                 });
             }
         }
@@ -171,17 +172,56 @@ internal sealed partial class EntityHintExtractor
         return tokens.Any(token => Pronouns.Contains(token));
     }
 
-    private static string? ResolveRecentPerson(IReadOnlyList<ConversationTurn> recentHistory)
+    private static IReadOnlyList<EntityHint> ResolveRecentReferenceCandidates(IReadOnlyList<ConversationTurn> recentHistory)
     {
-        foreach (var turn in recentHistory.Reverse())
+        if (recentHistory.Count == 0)
         {
-            var people = ExtractPeople(turn.Content).ToList();
-            if (people.Count > 0)
+            return [];
+        }
+
+        var candidates = new Dictionary<string, EntityHint>(StringComparer.OrdinalIgnoreCase);
+        var scopedHistory = recentHistory
+            .TakeLast(6)
+            .Reverse()
+            .ToList();
+
+        for (var index = 0; index < scopedHistory.Count; index++)
+        {
+            var turn = scopedHistory[index];
+            var baseConfidence = Math.Max(0.45, 0.80 - (index * 0.10));
+
+            foreach (var person in ExtractPeople(turn.Content))
             {
-                return people[0];
+                UpsertCandidate(candidates, person, baseConfidence);
+            }
+
+            foreach (var relationship in ExtractRelationshipHints(turn.Content.ToLowerInvariant()))
+            {
+                UpsertCandidate(candidates, relationship, Math.Max(0.40, baseConfidence - 0.10));
             }
         }
 
-        return null;
+        return candidates.Values
+            .OrderByDescending(c => c.Confidence)
+            .Take(5)
+            .ToList();
+    }
+
+    private static void UpsertCandidate(IDictionary<string, EntityHint> candidates, string normalizedName, double confidence)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedName))
+        {
+            return;
+        }
+
+        if (!candidates.TryGetValue(normalizedName, out var existing) || confidence > existing.Confidence)
+        {
+            candidates[normalizedName] = new EntityHint
+            {
+                NormalizedName = normalizedName,
+                Type = EntityHintType.Pronoun,
+                Confidence = confidence
+            };
+        }
     }
 }
