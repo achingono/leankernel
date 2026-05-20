@@ -18,6 +18,7 @@ This section contains execution-ready product requirements documents (PRDs) for 
 | [ambiguity-reference-resolution-prd.md](ambiguity-reference-resolution-prd.md) | Expand ambiguity handling across relation/pronoun and cross-source collisions | Safer identity grounding with clarify-first behavior under low confidence |
 | [scheduled-jobs-management-prd.md](scheduled-jobs-management-prd.md) | Implement runtime scheduler management and chat CRUD tooling with OpenClaw-compatible capabilities | Scoped-by-default scheduled job management with admin governance and durable runtime state |
 | [architecture-split-prd.md](architecture-split-prd.md) | Architecture split decision: modular monolith vs microservices with phased migration plan | Pragmatic split decision with explicit trigger conditions, communication model invariants, and rollback strategy |
+| [signal-contextgatekeeper-duplicate-merge-prd.md](signal-contextgatekeeper-duplicate-merge-prd.md) | Fix Signal dropped replies caused by duplicate retrieval merge keys | No dropped replies when fallback recall returns duplicate candidate IDs |
 
 ## Planning Conventions
 

@@ -338,18 +338,15 @@ public sealed class ContextGatekeeper : IContextGatekeeper
         IReadOnlyList<RelevanceScore> primary,
         IReadOnlyList<RelevanceScore> fallback)
     {
-        var merged = primary.ToDictionary(
-            candidate => $"{candidate.SourceType}:{candidate.EntryId}",
-            candidate => candidate,
-            StringComparer.OrdinalIgnoreCase);
+        var merged = new Dictionary<string, RelevanceScore>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var candidate in fallback)
+        static void UpsertCandidate(Dictionary<string, RelevanceScore> merged, RelevanceScore candidate)
         {
             var key = $"{candidate.SourceType}:{candidate.EntryId}";
             if (!merged.TryGetValue(key, out var existing))
             {
                 merged[key] = candidate;
-                continue;
+                return;
             }
 
             var keepFallback =
@@ -359,6 +356,16 @@ public sealed class ContextGatekeeper : IContextGatekeeper
             {
                 merged[key] = candidate;
             }
+        }
+
+        foreach (var candidate in primary)
+        {
+            UpsertCandidate(merged, candidate);
+        }
+
+        foreach (var candidate in fallback)
+        {
+            UpsertCandidate(merged, candidate);
         }
 
         return merged.Values.ToList();

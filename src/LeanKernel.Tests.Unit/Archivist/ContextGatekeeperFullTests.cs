@@ -951,4 +951,69 @@ public class ContextGatekeeperFullTests
         Assert.NotEmpty(ctx.DisambiguationHints);
         Assert.Contains("confirm before asserting identity", ctx.DisambiguationHints[0], StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task GateContextAsync_FallbackMergeWithDuplicateVectorIds_DedupesWithoutThrowing()
+    {
+        var wiki = Substitute.For<IWikiStore>();
+        wiki.QueryAsync(Arg.Any<WikiQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WikiEntry>>([]));
+
+        var sessions = Substitute.For<ISessionStore>();
+        sessions.GetHistoryAsync("s1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<ConversationTurn>()));
+
+        var duplicateVectorA = new RelevanceScore
+        {
+            EntryId = "who-karen-leung",
+            Content = "Karen Leung profile from documents.",
+            EstimatedTokens = 20,
+            SemanticSimilarity = 0.40,
+            Score = 0.40,
+            SourceType = RelevanceSourceType.Vector
+        };
+        var duplicateVectorB = new RelevanceScore
+        {
+            EntryId = "who-karen-leung",
+            Content = "Karen Leung profile from documents (refined).",
+            EstimatedTokens = 18,
+            SemanticSimilarity = 0.46,
+            Score = 0.46,
+            SourceType = RelevanceSourceType.Vector
+        };
+        var duplicateVectorDifferentSource = new RelevanceScore
+        {
+            EntryId = "who-karen-leung",
+            Content = "Karen Leung wiki note.",
+            EstimatedTokens = 10,
+            SemanticSimilarity = 0.44,
+            Score = 0.44,
+            SourceType = RelevanceSourceType.Wiki
+        };
+
+        var knowledgeSearch = Substitute.For<IKnowledgeSearchService>();
+        knowledgeSearch.SearchAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new List<RelevanceScore> { duplicateVectorA, duplicateVectorB, duplicateVectorDifferentSource }),
+                Task.FromResult(new List<RelevanceScore> { duplicateVectorA, duplicateVectorB }));
+
+        var config = Options.Create(new LeanKernelConfig
+        {
+            Context = new ContextConfig
+            {
+                MinRelevanceThreshold = 0.0
+            }
+        });
+        var gatekeeper = new ContextGatekeeper(wiki, sessions, knowledgeSearch, config, NullLogger<ContextGatekeeper>.Instance);
+
+        var msg = new LeanKernelMessage { Id = "m1", ChannelId = "test", SenderId = "u1", Content = "is it true?" };
+        var ctx = await gatekeeper.GateContextAsync(msg, ContextBudget.FromModelWindow(128_000), "s1", CancellationToken.None);
+
+        Assert.Single(ctx.RetrievedLeanKernels.Where(r =>
+            r.SourceType == RelevanceSourceType.Vector &&
+            string.Equals(r.EntryId, "who-karen-leung", StringComparison.OrdinalIgnoreCase)));
+        Assert.Contains(ctx.RetrievedLeanKernels, r =>
+            r.SourceType == RelevanceSourceType.Wiki &&
+            string.Equals(r.EntryId, "who-karen-leung", StringComparison.OrdinalIgnoreCase));
+    }
 }

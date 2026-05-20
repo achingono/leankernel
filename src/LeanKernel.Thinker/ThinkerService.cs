@@ -75,12 +75,14 @@ public sealed class ThinkerService : IThinkerService
         }, ct);
 
         var budget = ContextBudget.FromModelWindow(_config.LiteLlm.ContextWindowTokens);
-        var context = await _gatekeeper.GateContextAsync(message, budget, sessionId, ct);
-
-        _logger.LogInformation(
-            ResourceText.Log("ContextAssembled"),
-            context.EstimatedTotalTokens, context.WikiLeanKernels.Count,
-            context.History.Count, context.ExclusionLog.Count);
+        var context = new ConversationContext
+        {
+            SystemPrompt = string.Empty,
+            History = [],
+            WikiLeanKernels = [],
+            RetrievedLeanKernels = [],
+            ActiveToolNames = []
+        };
 
         string response;
         Exception? captureException = null;
@@ -89,6 +91,13 @@ public sealed class ThinkerService : IThinkerService
 
         try
         {
+            context = await _gatekeeper.GateContextAsync(message, budget, sessionId, ct);
+
+            _logger.LogInformation(
+                ResourceText.Log("ContextAssembled"),
+                context.EstimatedTotalTokens, context.WikiLeanKernels.Count,
+                context.History.Count, context.ExclusionLog.Count);
+
             var instructions = _promptAssembler.AssembleSystemMessage(context);
             var tools = _toolAdapter.BuildTools();
 
@@ -96,6 +105,10 @@ public sealed class ThinkerService : IThinkerService
             response = await strategy.InvokeAsync(
                 new AgentStrategyContext(message, context, instructions, tools, sessionId),
                 ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
