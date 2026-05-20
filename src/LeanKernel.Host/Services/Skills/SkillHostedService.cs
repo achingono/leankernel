@@ -20,7 +20,13 @@ public sealed class SkillHostedService : IHostedService
     private CancellationTokenSource? _watcherCts;
     private readonly Dictionary<string, FileSystemWatcher> _watchers = [];
     private readonly Dictionary<string, System.Timers.Timer> _debounceTimers = [];
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
+    private CancellationTokenSource? _initializationCts;
+    private Task? _initializationTask;
+    private volatile bool _skillsReady;
     private const int DEBOUNCE_DELAY_MS = 250;
+
+    internal bool SkillsReady => _skillsReady;
 
     /// <summary>
     /// Represents the skill hosted service.
@@ -48,8 +54,9 @@ public sealed class SkillHostedService : IHostedService
     {
         _logger.LogInformation("Starting Skill Hosted Service");
 
-        // Synchronously initialize skills
-        await InitializeSkillsAsync(cancellationToken);
+        // Start initialization in the background so host startup cannot be blocked by skill loading.
+        _initializationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _initializationTask = InitializeSkillsAsync(_initializationCts.Token);
 
         // Set up watchers for each skill directory
         _watcherCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -70,6 +77,24 @@ public sealed class SkillHostedService : IHostedService
     {
         _logger.LogInformation("Stopping Skill Hosted Service");
 
+        _initializationCts?.Cancel();
+        if (_initializationTask is not null)
+        {
+            try
+            {
+                var shutdownWaitTask = Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                var completed = await Task.WhenAny(_initializationTask, shutdownWaitTask);
+                if (completed != _initializationTask)
+                {
+                    _logger.LogWarning("Skill initialization did not complete before shutdown timeout");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Host shutdown cancellation - no action needed.
+            }
+        }
+
         // Cancel watchers
         _watcherCts?.Cancel();
         
@@ -89,21 +114,28 @@ public sealed class SkillHostedService : IHostedService
         _debounceTimers.Clear();
 
         _watcherCts?.Dispose();
+        _initializationCts?.Dispose();
+
+        _refreshLock.Dispose();
 
         await Task.CompletedTask;
     }
 
     private async Task InitializeSkillsAsync(CancellationToken ct)
     {
+        _skillsReady = false;
+
         try
         {
             _logger.LogInformation("Initializing skills from {Count} directories", _skillDirectories.Length);
 
             // Seed runtime registry with configured directories before loading dynamic tools.
             await _skillRegistry.InitializeAsync(_skillDirectories);
+            _logger.LogInformation("Skill registry initialization completed");
             
             // Initialize the plugin host (synchronously load all skills)
             await _pluginHost.InitializeAsync();
+            _logger.LogInformation("Dynamic plugin host initialization completed");
             
             _logger.LogInformation("Skills initialized successfully");
             
@@ -121,11 +153,12 @@ public sealed class SkillHostedService : IHostedService
                     await NotifySkillUnavailableAsync(skillName, skill.UnavailableReason ?? "Unknown reason", ct);
                 }
             }
+
+            _skillsReady = true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to initialize skills");
-            throw;
         }
     }
 
@@ -195,6 +228,13 @@ public sealed class SkillHostedService : IHostedService
 
     private async Task HandleSkillRefreshAsync(CancellationToken ct)
     {
+        if (!_skillsReady)
+        {
+            _logger.LogDebug("Skipping skill refresh while initial load is still running");
+            return;
+        }
+
+        await _refreshLock.WaitAsync(ct);
         try
         {
             // Refresh the skill registry cache
@@ -214,6 +254,10 @@ public sealed class SkillHostedService : IHostedService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to refresh skills");
+        }
+        finally
+        {
+            _refreshLock.Release();
         }
     }
 

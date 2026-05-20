@@ -269,10 +269,9 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton(sp =>
         {
             var factory = sp.GetRequiredService<DynamicSkillToolFactory>();
-            var builtInTools = sp.GetServices<ITool>();
             var logger = sp.GetRequiredService<ILogger<DynamicPluginHost>>();
 
-            return new DynamicPluginHost(factory, builtInTools, logger);
+            return new DynamicPluginHost(factory, () => sp.GetServices<ITool>().ToList(), logger);
         });
         services.AddSingleton<IToolRegistry>(sp => sp.GetRequiredService<DynamicPluginHost>());
         services.AddSingleton(sp =>
