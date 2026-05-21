@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
+using LeanKernel.Thinker.Enhancement;
 using LeanKernel.Thinker.Resources;
 using LeanKernel.Thinker.Strategies;
 
@@ -119,11 +120,23 @@ public sealed class ThinkerService : IThinkerService
             response = ResourceText.Error("LlmInvocationFallbackResponse");
         }
 
+        var rawResponse = response;
         if (_responseEnhancer is not null)
         {
             response = await _responseEnhancer.EnhanceResponseAsync(
                 message.Content, response, context, ct);
         }
+
+        _logger.LogInformation(
+            "Response diagnostics [{MessageId}] session={SessionId} raw_contains_boxed_math={RawBoxedMath} raw_contains_exam_wrapper={RawExamWrapper} final_contains_boxed_math={FinalBoxedMath} final_contains_exam_wrapper={FinalExamWrapper} response_mutated={ResponseMutated} active_tools={ActiveTools}",
+            message.Id,
+            sessionId,
+            ResponseFormatHeuristics.ContainsBoxedMath(rawResponse),
+            ResponseFormatHeuristics.ContainsExamWrapper(rawResponse),
+            ResponseFormatHeuristics.ContainsBoxedMath(response),
+            ResponseFormatHeuristics.ContainsExamWrapper(response),
+            !string.Equals(rawResponse, response, StringComparison.Ordinal),
+            string.Join(",", context.ActiveToolNames));
 
         if (_postTurnPipeline is not null)
         {

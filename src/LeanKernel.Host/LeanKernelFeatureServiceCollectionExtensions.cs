@@ -107,6 +107,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<PromptAssembler>();
 
         services.AddSingleton<KnowledgeEnhancementService>();
+        services.AddSingleton<ResponseFormatGuardEnhancer>();
         services.AddSingleton<IEngagementFileMaintenanceService>(sp =>
             new EngagementFileMaintenanceService(
                 sp.GetRequiredService<IOptions<LeanKernelConfig>>(),
@@ -122,8 +123,13 @@ public static class LeanKernelFeatureServiceCollectionExtensions
                 sp.GetRequiredService<IEngagementFileMaintenanceService>(),
                 sp.GetRequiredService<ILogger<EngagementFileMaintenanceResponseEnhancer>>());
             var knowledgeEnhancer = sp.GetRequiredService<KnowledgeEnhancementService>();
+            var responseFormatGuard = sp.GetRequiredService<ResponseFormatGuardEnhancer>();
             
-            return new ChainedResponseEnhancer(refusalInterceptor, engagementMaintenance, knowledgeEnhancer);
+            return new ChainedResponseEnhancer(
+                refusalInterceptor,
+                engagementMaintenance,
+                knowledgeEnhancer,
+                responseFormatGuard);
         });
         services.AddSingleton<IIdentityFileUpdateService, IdentityFileUpdateService>();
         services.AddSingleton<RequestFailureHandler>();

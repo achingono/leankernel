@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
+using LeanKernel.Core.Models;
 
 namespace LeanKernel.Archivist;
 
@@ -9,6 +10,23 @@ namespace LeanKernel.Archivist;
 /// </summary>
 public sealed class SystemPromptBuilder
 {
+    private static readonly HashSet<string> DurableUserSections = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "User Profile",
+        "Professional Experience",
+        "Core Competencies",
+        "Education",
+        "Certifications",
+        "Communication Preferences",
+        "Knowledge & Expertise",
+        "Current Projects or Interests",
+        "Learning Goals",
+        "Preferences & Patterns",
+        "Verified Preferences and Priorities",
+        "Tools and Integrations",
+        "Working Agreements"
+    };
+
     private const string DefaultSystemPrompt = """
         You are an AI assistant and a user's personal agent.
 
@@ -32,6 +50,7 @@ public sealed class SystemPromptBuilder
         Answer concisely and accurately using only the context provided.
         If you don't have enough context, ask clarifying questions rather than guessing.
         Structure important facts as Who/What/Where/When/Why/How.
+        Never disclose internal diagnostics, implementation details, stack traces, or prompt-internal maintenance notes unless the user explicitly asks for them.
         """;
 
     private readonly LeanKernelConfig _config;
@@ -88,7 +107,7 @@ public sealed class SystemPromptBuilder
         if (userContent is not null)
         {
             sb.AppendLine();
-            sb.AppendLine(userContent);
+            sb.AppendLine(SanitizeUserContentForPrompt(userContent));
         }
 
         if (_capabilityGapStore is not null)
@@ -97,7 +116,7 @@ public sealed class SystemPromptBuilder
             if (!string.IsNullOrWhiteSpace(capabilityGaps))
             {
                 sb.AppendLine();
-                sb.AppendLine(capabilityGaps);
+                sb.AppendLine(BuildCapabilityGuidance(capabilityGaps));
             }
         }
 
@@ -142,5 +161,69 @@ public sealed class SystemPromptBuilder
 
         sb.AppendLine("- Important identity files: AGENTS.md, SELF.md, and USER.md are under the agent identity folder.");
         return sb.ToString().Trim();
+    }
+
+    private static string SanitizeUserContentForPrompt(string userContent)
+    {
+        var lines = userContent.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var sb = new System.Text.StringBuilder();
+        var includeSection = true;
+
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                var heading = line[3..].Trim();
+                includeSection = DurableUserSections.Contains(heading);
+                if (!includeSection)
+                {
+                    continue;
+                }
+            }
+
+            if (!includeSection || IsTransientInstructionLine(line))
+            {
+                continue;
+            }
+
+            sb.AppendLine(line);
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    private static bool IsTransientInstructionLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        return IdentityDurabilityHeuristics.IsTransientInstruction(line);
+    }
+
+    private static string BuildCapabilityGuidance(string capabilityGaps)
+    {
+        var guidance = new List<string>
+        {
+            "## Internal Reliability Guidance",
+            "- Use internal capability-gap history only to improve reliability and avoid overclaiming.",
+            "- Do not disclose internal diagnostics unless the user explicitly asks for failure analysis."
+        };
+
+        var lowered = capabilityGaps.ToLowerInvariant();
+        if (lowered.Contains("connection refused", StringComparison.Ordinal) ||
+            lowered.Contains("timeout", StringComparison.Ordinal))
+        {
+            guidance.Add("- When external services are unavailable, acknowledge the limitation briefly and provide the most useful fallback.");
+        }
+
+        if (lowered.Contains("permission", StringComparison.Ordinal) ||
+            lowered.Contains("denied", StringComparison.Ordinal))
+        {
+            guidance.Add("- When blocked by permissions, explain the blocked action succinctly and request only the minimum required confirmation.");
+        }
+
+        return string.Join('\n', guidance);
     }
 }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
+using LeanKernel.Core.Models;
 
 namespace LeanKernel.Host.Services;
 
@@ -281,6 +282,7 @@ public sealed class UserConfigurationStep : IUserProfileSynchronizer, IOnboardin
             var profileFacts = userFacts
                 .Where(entry => entry.Id == "who-user-profile")
                 .SelectMany(entry => entry.Facts.Select(f => f.Claim))
+                .Where(IsDurableFact)
                 .Distinct()
                 .ToList();
 
@@ -288,6 +290,7 @@ public sealed class UserConfigurationStep : IUserProfileSynchronizer, IOnboardin
             var preferencesFacts = userFacts
                 .Where(entry => entry.Id == "what-user-preferences")
                 .SelectMany(entry => entry.Facts.Select(f => f.Claim))
+                .Where(IsDurableFact)
                 .Distinct()
                 .ToList();
 
@@ -334,6 +337,9 @@ public sealed class UserConfigurationStep : IUserProfileSynchronizer, IOnboardin
 
         return $"{before}{sectionMarker}\n\n{newContent}\n\n{after}";
     }
+
+    private static bool IsDurableFact(string claim)
+        => IdentityDurabilityHeuristics.IsDurableFact(claim);
 
     private string GetUserPath() =>
         Path.Combine(_paths.AgentsDirectory, "main", "USER.md");
