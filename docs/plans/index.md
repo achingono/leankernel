@@ -11,7 +11,14 @@ This section contains execution-ready product requirements documents (PRDs) for 
 | [run-replay-provenance-prd.md](run-replay-provenance-prd.md) | Ship run replay, cost timeline, and context provenance views | Faster debugging and higher operator trust |
 | [budget-guardrails-fallback-prd.md](budget-guardrails-fallback-prd.md) | Implement budget enforcement with graceful fallback routing | Predictable spend with resilient answer quality |
 | [memory-hygiene-quality-prd.md](memory-hygiene-quality-prd.md) | Add memory hygiene and quality scoring pipelines | Higher retrieval accuracy and lower context pollution |
+| [wiki-extraction-store-prd.md](wiki-extraction-store-prd.md) | Replace deterministic wiki extraction and add indexed wiki storage | Human-readable wiki facts with indexed and Qdrant-ready retrieval |
 | [benchmark-scenarios-prd.md](benchmark-scenarios-prd.md) | Publish benchmark scenarios with reproducible metrics | Clear ROI and objective quality tracking |
+| [wiki-knowledge-tool-unification.md](wiki-knowledge-tool-unification.md) | Unify free-text wiki retrieval on Qdrant and add exact wiki entry lookup | Consistent semantic discovery plus deterministic wiki hydration |
+| [entity-discovery-useful-by-default-prd.md](entity-discovery-useful-by-default-prd.md) | Improve gatekeeper entity discovery and contextual linking for people/org references | Useful-by-default responses with richer person + organization grounding |
+| [ambiguity-reference-resolution-prd.md](ambiguity-reference-resolution-prd.md) | Expand ambiguity handling across relation/pronoun and cross-source collisions | Safer identity grounding with clarify-first behavior under low confidence |
+| [scheduled-jobs-management-prd.md](scheduled-jobs-management-prd.md) | Implement runtime scheduler management and chat CRUD tooling with OpenClaw-compatible capabilities | Scoped-by-default scheduled job management with admin governance and durable runtime state |
+| [architecture-split-prd.md](architecture-split-prd.md) | Architecture split decision: modular monolith vs microservices with phased migration plan | Pragmatic split decision with explicit trigger conditions, communication model invariants, and rollback strategy |
+| [signal-contextgatekeeper-duplicate-merge-prd.md](signal-contextgatekeeper-duplicate-merge-prd.md) | Fix Signal dropped replies caused by duplicate retrieval merge keys | No dropped replies when fallback recall returns duplicate candidate IDs |
 
 ## Planning Conventions
 
@@ -36,6 +43,7 @@ Recommended implementation order:
 2. `run-replay-provenance-prd.md`
 3. `budget-guardrails-fallback-prd.md`
 4. `memory-hygiene-quality-prd.md`
-5. `benchmark-scenarios-prd.md`
+5. `wiki-extraction-store-prd.md`
+6. `benchmark-scenarios-prd.md`
 
 This order reduces operational risk by adding control and observability before increasing automation breadth.

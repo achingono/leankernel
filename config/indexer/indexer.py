@@ -17,6 +17,7 @@ import random
 import re
 import sqlite3
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -45,7 +46,8 @@ LITELLM_URL = os.getenv("LITELLM_URL", "http://litellm:4000")
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "sk-LeanKernel-local")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6334"))
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "LEANKERNEL_knowledge")
+WIKI_COLLECTION_NAME = os.getenv("WIKI_COLLECTION_NAME", os.getenv("COLLECTION_NAME", "LEANKERNEL_knowledge"))
+DOCUMENTS_COLLECTION_NAME = os.getenv("DOCUMENTS_COLLECTION_NAME", "documents")
 WIKI_PATH = os.getenv("WIKI_PATH", "/app/data/wiki")
 DOCUMENTS_PATH = os.getenv("DOCUMENTS_PATH", "/app/data/documents")
 DOCUMENTS_PATHS = [
@@ -112,9 +114,11 @@ UNSTRUCTURED_EXTENSIONS = {
     ".eml", ".msg", ".rst", ".org",
     ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif",
 }
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
 
 # Text-based extensions that can be read directly
 TEXT_EXTENSIONS = {".md", ".txt", ".json", ".yaml", ".yml", ".xml", ".log"}
+NAMESPACE_LK_WIKI = uuid.UUID("9d6fbf4f-c744-4fa5-9f0f-05e9e9b8f5bf")
 
 
 def _retry_delay(
@@ -330,11 +334,12 @@ class UnstructuredClient:
     async def parse(self, file_path: str) -> list[dict]:
         """Parse a document file and return chunked elements."""
         last_error: Exception | None = None
+        ext = os.path.splitext(file_path)[1].lower()
 
         for attempt in range(1, UNSTRUCTURED_MAX_RETRIES + 1):
             try:
                 request_data: dict[str, Any] = {
-                    "strategy": UNSTRUCTURED_STRATEGY,
+                    "strategy": self._strategy_for_extension(ext),
                     "chunking_strategy": UNSTRUCTURED_CHUNKING_STRATEGY,
                     "max_characters": CHUNK_SIZE_TOKENS * 4,
                 }
@@ -394,6 +399,12 @@ class UnstructuredClient:
             raise last_error
         raise RuntimeError("Unstructured parse failed without an explicit exception")
 
+    @staticmethod
+    def _strategy_for_extension(ext: str) -> str:
+        if ext in IMAGE_EXTENSIONS and UNSTRUCTURED_STRATEGY == "fast":
+            return "auto"
+        return UNSTRUCTURED_STRATEGY
+
     async def close(self):
         await self.client.aclose()
 
@@ -418,13 +429,18 @@ def parse_wiki_markdown(file_path: str) -> dict | None:
     body_lines = lines[end_idx + 1:]
     body = "\n".join(body_lines).strip()
     facts = extract_wiki_facts(body_lines)
+    structured_facts = extract_lk_facts(body_lines)
+    subject = frontmatter.get("subject", "")
+    subject_slug = re.sub(r"[^a-z0-9]+", "-", subject.lower()).strip("-")
 
     return {
         "id": frontmatter.get("id", ""),
         "dimension": frontmatter.get("dimension", ""),
-        "subject": frontmatter.get("subject", ""),
+        "subject": subject,
+        "subject_slug": subject_slug,
         "body": body,
         "facts": facts,
+        "structured_facts": structured_facts,
         "text_for_embedding": text_for_wiki_embedding(frontmatter, facts, body),
     }
 
@@ -456,6 +472,100 @@ def extract_wiki_facts(body_lines: list[str]) -> list[str]:
             if claim:
                 facts.append(claim)
     return facts
+
+
+def extract_lk_facts(body_lines: list[str]) -> list[dict[str, Any]]:
+    """Extract structured facts from fenced ```yaml lk-facts block."""
+    start_idx = None
+    for i, line in enumerate(body_lines):
+        if line.strip().lower() == "```yaml lk-facts":
+            start_idx = i
+            break
+    if start_idx is None:
+        return []
+
+    end_idx = None
+    for i in range(start_idx + 1, len(body_lines)):
+        if body_lines[i].strip() == "```":
+            end_idx = i
+            break
+    if end_idx is None:
+        return []
+
+    return parse_lk_facts_yaml(body_lines[start_idx + 1:end_idx])
+
+
+def parse_lk_facts_yaml(lines: list[str]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    in_context = False
+    in_tags = False
+
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+
+        if stripped.startswith("- claim:"):
+            if current is not None:
+                facts.append(current)
+            current = {
+                "claim": unquote_yaml(stripped[len("- claim:"):].strip()),
+                "context": {},
+                "tags": [],
+            }
+            in_context = False
+            in_tags = False
+            continue
+
+        if current is None:
+            continue
+
+        if stripped == "context:":
+            in_context = True
+            in_tags = False
+            continue
+        if stripped == "tags:":
+            in_tags = True
+            in_context = False
+            continue
+
+        if in_tags and stripped.startswith("- "):
+            current["tags"].append(unquote_yaml(stripped[2:].strip()) or "")
+            continue
+
+        if in_context:
+            if ":" not in stripped:
+                continue
+            key, value = stripped.split(":", 1)
+            current["context"][key.strip()] = unquote_yaml(value.strip())
+            continue
+
+        if ":" not in stripped:
+            continue
+        key, value = stripped.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if key == "confidence":
+            try:
+                current[key] = float(value)
+            except ValueError:
+                current[key] = 0.0
+        else:
+            current[key] = unquote_yaml(value)
+
+    if current is not None:
+        facts.append(current)
+
+    return facts
+
+
+def unquote_yaml(value: str) -> str | None:
+    if value == "''" or value == "":
+        return None
+    if len(value) >= 2 and value[0] == "'" and value[-1] == "'":
+        return value[1:-1].replace("''", "'")
+    return value
 
 
 def text_for_wiki_embedding(frontmatter: dict[str, str], facts: list[str], body: str) -> str:
@@ -554,14 +664,22 @@ def chunk_payload(
         "source_type": source_type,
         "source_file": relative_path,
         "chunk_index": chunk_index,
+        "chunkIndex": chunk_index,
         "text": chunk_text_content,
         "tags": tags,
         "indexed_at": int(time.time()),
+        "indexedAt": int(time.time()),
     }
     if source_type == "wiki" and wiki_data:
         payload["entry_id"] = wiki_data["id"]
         payload["dimension"] = wiki_data["dimension"]
         payload["subject"] = wiki_data["subject"]
+    else:
+        filename = os.path.basename(relative_path)
+        file_type = os.path.splitext(filename)[1].lower().lstrip(".")
+        payload["filename"] = filename
+        payload["file_type"] = file_type or "unknown"
+        payload["fileType"] = file_type or "unknown"
     return payload
 
 
@@ -580,22 +698,23 @@ class Indexer:
         )
         self.unstructured_client = UnstructuredClient(UNSTRUCTURED_API_URL)
         self.qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, prefer_grpc=True)
-        self._ensure_collection()
+        self._ensure_collection(WIKI_COLLECTION_NAME)
+        self._ensure_collection(DOCUMENTS_COLLECTION_NAME)
 
-    def _ensure_collection(self):
+    def _ensure_collection(self, collection_name: str):
         """Create Qdrant collection if it doesn't exist."""
         try:
-            if not self.qdrant.collection_exists(COLLECTION_NAME):
+            if not self.qdrant.collection_exists(collection_name):
                 self.qdrant.create_collection(
-                    collection_name=COLLECTION_NAME,
+                    collection_name=collection_name,
                     vectors_config=VectorParams(
                         size=EMBEDDING_DIMENSION,
                         distance=Distance.COSINE,
                     ),
                 )
-                logger.info(f"Created Qdrant collection: {COLLECTION_NAME}")
+                logger.info(f"Created Qdrant collection: {collection_name}")
             else:
-                logger.info(f"Qdrant collection exists: {COLLECTION_NAME}")
+                logger.info(f"Qdrant collection exists: {collection_name}")
         except Exception as e:
             logger.error(f"Failed to connect to Qdrant: {e}")
             raise
@@ -629,6 +748,8 @@ class Indexer:
                 return
             if not chunks:
                 logger.warning(f"No content extracted from: {file_path}")
+                self._delete_existing_vectors_for_reindex(file_path)
+                self.state.upsert(file_path, file_hash, 0, tags)
                 return
 
             self._delete_existing_vectors_for_reindex(file_path)
@@ -646,7 +767,10 @@ class Indexer:
                 return
 
             if points:
-                self.qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
+                self.qdrant.upsert(
+                    collection_name=self._collection_for_source_type(source_type),
+                    points=points,
+                )
                 logger.info(f"Indexed {len(points)}/{expected_chunks} chunks from: {relative_path}")
 
             if failed_chunks > 0:
@@ -687,6 +811,9 @@ class Indexer:
         failed_chunks = 0
         wiki_data = parse_wiki_markdown(file_path) if source_type == "wiki" else None
 
+        if source_type == "wiki" and wiki_data and wiki_data.get("structured_facts"):
+            return await self._build_wiki_fact_points(file_path, relative_path, tags, wiki_data)
+
         for i, chunk_text_content in enumerate(chunks):
             point = await self._build_point(
                 file_path,
@@ -703,6 +830,96 @@ class Indexer:
                 failed_chunks += 1
 
         return points, failed_chunks
+
+    async def _build_wiki_fact_points(
+        self,
+        file_path: str,
+        relative_path: str,
+        tags: list[str],
+        wiki_data: dict[str, Any],
+    ) -> tuple[list[PointStruct], int]:
+        points: list[PointStruct] = []
+        failed_chunks = 0
+        for fact in wiki_data.get("structured_facts", []):
+            claim_point = await self._build_wiki_fact_point(
+                fact,
+                "claim",
+                fact.get("claim") or "",
+                relative_path,
+                tags,
+                wiki_data,
+                file_path,
+            )
+            if claim_point:
+                points.append(claim_point)
+            else:
+                failed_chunks += 1
+
+            source_quote = fact.get("sourceQuote") or ""
+            if source_quote.strip():
+                quote_point = await self._build_wiki_fact_point(
+                    fact,
+                    "quote",
+                    source_quote,
+                    relative_path,
+                    tags,
+                    wiki_data,
+                    file_path,
+                )
+                if quote_point:
+                    points.append(quote_point)
+                else:
+                    failed_chunks += 1
+
+        return points, failed_chunks
+
+    async def _build_wiki_fact_point(
+        self,
+        fact: dict[str, Any],
+        vector_type: str,
+        text_for_embedding: str,
+        relative_path: str,
+        tags: list[str],
+        wiki_data: dict[str, Any],
+        file_path: str,
+    ) -> PointStruct | None:
+        if not text_for_embedding.strip():
+            return None
+
+        try:
+            embedding = await self.embedding_client.embed(text_for_embedding)
+        except Exception as e:
+            logger.error(f"Embedding failed for wiki fact point in {file_path}: {e!r}")
+            return None
+
+        normalized_fallback = re.sub(r"[^a-z0-9 ]+", " ", (fact.get("claim") or "").lower()).strip()
+        fact_key = fact.get("normalizedKey") or f"{wiki_data.get('id','')}|{normalized_fallback}"
+        point_id = str(uuid.uuid5(NAMESPACE_LK_WIKI, f"{fact_key}:{vector_type}"))
+        payload = {
+            "source_type": "wiki",
+            "source_file": relative_path,
+            "entryId": wiki_data.get("id", ""),
+            "entry_id": wiki_data.get("id", ""),
+            "factKey": fact_key,
+            "vectorType": vector_type,
+            "dimension": wiki_data.get("dimension", ""),
+            "subject": wiki_data.get("subject", ""),
+            "subjectSlug": wiki_data.get("subject_slug", ""),
+            "subject_slug": wiki_data.get("subject_slug", ""),
+            "claim": fact.get("claim", ""),
+            "sourceQuote": fact.get("sourceQuote"),
+            "confidence": fact.get("confidence", 0.0),
+            "lastConfirmed": fact.get("lastConfirmed"),
+            "source": fact.get("source"),
+            "tags": sorted(set((fact.get("tags") or []) + tags)),
+            "indexed_at": int(time.time()),
+            "text": text_for_embedding,
+        }
+        return PointStruct(
+            id=point_id,
+            vector=embedding,
+            payload=payload,
+        )
 
     async def _build_point(
         self,
@@ -744,6 +961,10 @@ class Indexer:
 
     async def _process_unstructured_file(self, file_path: str) -> list[str]:
         """Process a document through Unstructured API."""
+        if os.path.getsize(file_path) == 0:
+            logger.warning(f"Skipping empty file: {file_path}")
+            return []
+
         try:
             elements = await self.unstructured_client.parse(file_path)
             chunks = []
@@ -802,19 +1023,21 @@ class Indexer:
             return
 
         try:
-            self._delete_file_vectors(file_path)
+            _, source_type = source_metadata(file_path)
+            self._delete_file_vectors(file_path, source_type)
             self.state.remove(file_path)
             logger.info(f"Removed vectors for: {file_path}")
         except Exception as e:
             logger.error(f"Failed to delete vectors for {file_path}: {e} — state retained for retry")
 
-    def _delete_file_vectors(self, file_path: str):
+    def _delete_file_vectors(self, file_path: str, source_type: str | None = None):
         """Delete all vectors associated with a file path. Raises on failure."""
-        relative_path, _ = source_metadata(file_path)
+        relative_path, inferred_source_type = source_metadata(file_path)
+        resolved_source_type = source_type or inferred_source_type
 
         try:
             self.qdrant.delete(
-                collection_name=COLLECTION_NAME,
+                collection_name=self._collection_for_source_type(resolved_source_type),
                 points_selector=Filter(
                     must=[
                         FieldCondition(
@@ -827,6 +1050,10 @@ class Indexer:
         except Exception as e:
             logger.error(f"Delete vectors failed for {relative_path}: {e}")
             raise
+
+    @staticmethod
+    def _collection_for_source_type(source_type: str) -> str:
+        return WIKI_COLLECTION_NAME if source_type == "wiki" else DOCUMENTS_COLLECTION_NAME
 
     @staticmethod
     def _generate_point_id(file_path: str, chunk_index: int) -> int:
@@ -923,7 +1150,8 @@ async def main():
     logger.info("LeanKernel Knowledge Indexer starting...")
     logger.info(f"  Wiki path: {WIKI_PATH}")
     logger.info(f"  Documents paths: {DOCUMENTS_PATHS}")
-    logger.info(f"  Qdrant: {QDRANT_HOST}:{QDRANT_PORT}/{COLLECTION_NAME}")
+    logger.info(f"  Qdrant wiki collection: {QDRANT_HOST}:{QDRANT_PORT}/{WIKI_COLLECTION_NAME}")
+    logger.info(f"  Qdrant documents collection: {QDRANT_HOST}:{QDRANT_PORT}/{DOCUMENTS_COLLECTION_NAME}")
     logger.info(f"  Embedding model: {EMBEDDING_MODEL}")
     logger.info(f"  Rescan interval: {RESCAN_INTERVAL}s")
 

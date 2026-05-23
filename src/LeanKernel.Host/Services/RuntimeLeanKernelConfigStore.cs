@@ -115,7 +115,14 @@ public sealed class RuntimeLeanKernelConfigStore : IRuntimeLeanKernelConfigStore
             DimensionMatchWeight = source.Context.DimensionMatchWeight,
             InteractionFrequencyWeight = source.Context.InteractionFrequencyWeight,
             MinRelevanceThreshold = source.Context.MinRelevanceThreshold,
-            MaxConversationTurns = source.Context.MaxConversationTurns
+            MaxConversationTurns = source.Context.MaxConversationTurns,
+            EntitySubjectBoost = source.Context.EntitySubjectBoost,
+            SupportingEntityThreshold = source.Context.SupportingEntityThreshold,
+            EntityExpansionDepth = source.Context.EntityExpansionDepth,
+            LowConfidenceFallbackThreshold = source.Context.LowConfidenceFallbackThreshold,
+            DeprioritizedRecallMaxResults = source.Context.DeprioritizedRecallMaxResults,
+            AmbiguityLowConfidenceThreshold = source.Context.AmbiguityLowConfidenceThreshold,
+            AmbiguityConfidenceGapThreshold = source.Context.AmbiguityConfidenceGapThreshold
         },
         Scheduler = new SchedulerConfig
         {

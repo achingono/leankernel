@@ -712,7 +712,7 @@ public sealed class IdentityFileUpdateService : IIdentityFileUpdateService
         - SearchFiles
         - StatFile
         - SearchKnowledge
-        - SearchWiki
+        - GetWikiEntry
         - WriteAgentsMd
         - WriteSelfMd
         - WriteUserMd

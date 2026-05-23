@@ -12,11 +12,13 @@ public class WikiStoreTests : IDisposable
 {
     private readonly string _tempDir;
     private readonly WikiStore _store;
+    private readonly WikiConfig _wikiConfig;
 
     public WikiStoreTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"LEANKERNEL_wiki_{Guid.NewGuid():N}");
-        var config = Options.Create(new LeanKernelConfig { Wiki = new WikiConfig { BasePath = _tempDir } });
+        _wikiConfig = new WikiConfig { BasePath = _tempDir };
+        var config = Options.Create(new LeanKernelConfig { Wiki = _wikiConfig });
         _store = new WikiStore(config, NullLogger<WikiStore>.Instance);
     }
 
@@ -88,6 +90,27 @@ public class WikiStoreTests : IDisposable
 
         Assert.Single(results);
         Assert.Equal("Alice", results[0].Subject);
+    }
+
+    [Fact]
+    public async Task QueryAsync_DescriptorMatch_OutranksFactKeyOnlyMatch()
+    {
+        await _store.UpsertAsync(
+            MakeEntry(
+                "who-family",
+                WikiDimension.Who,
+                "Family",
+                "Death-anniversary tracking matters in this family: Peter, Jane, and Scott."),
+            CancellationToken.None);
+        await _store.UpsertAsync(
+            MakeEntry("who-jane", WikiDimension.Who, "Jane", "Jane remembrance details"),
+            CancellationToken.None);
+
+        var query = new WikiQuery { TextQuery = "jane", MaxResults = 10 };
+        var results = await _store.QueryAsync(query, CancellationToken.None);
+
+        Assert.True(results.Count >= 2);
+        Assert.Equal("who-jane", results[0].Id);
     }
 
     [Fact]
@@ -178,6 +201,92 @@ public class WikiStoreTests : IDisposable
         Assert.NotNull(result);
         Assert.Single(result.Facts);
         Assert.Equal(0.9, result.Facts[0].Confidence);
+    }
+
+    [Fact]
+    public async Task IngestFactsAsync_AliasMatch_MergesIntoCanonicalEntry()
+    {
+        var canonical = MakeEntry("who-john-smith", WikiDimension.Who, "John Smith", "John Smith is CTO at Teachers");
+        canonical = canonical with { Aliases = ["John"] };
+        await _store.UpsertAsync(canonical, CancellationToken.None);
+
+        var incoming = MakeEntry("who-john", WikiDimension.Who, "John", "John is open to meeting via EA");
+        incoming = incoming with { Aliases = ["John Smith"] };
+
+        await _store.IngestFactsAsync([incoming], CancellationToken.None);
+
+        var merged = await _store.GetAsync("who-john-smith", CancellationToken.None);
+        var duplicate = await _store.GetAsync("who-john", CancellationToken.None);
+        Assert.NotNull(merged);
+        Assert.Equal(2, merged.Facts.Count);
+        Assert.Contains("John", merged.Aliases, StringComparer.OrdinalIgnoreCase);
+        Assert.Null(duplicate);
+    }
+
+    [Fact]
+    public async Task IngestFactsAsync_SkipsPlaceholderFacts()
+    {
+        var incoming = MakeEntry("who-placeholder", WikiDimension.Who, "Placeholder", "not specified");
+
+        await _store.IngestFactsAsync([incoming], CancellationToken.None);
+
+        var result = await _store.GetAsync("who-placeholder", CancellationToken.None);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task UpsertAsync_WritesIndexFile()
+    {
+        var entry = MakeEntry("who-alice", WikiDimension.Who, "Alice", "Alice is a developer");
+        await _store.UpsertAsync(entry, CancellationToken.None);
+
+        var indexPath = Path.Combine(_tempDir, _wikiConfig.MetaFolder, "index.json");
+        Assert.True(File.Exists(indexPath));
+    }
+
+    [Fact]
+    public async Task UpsertAsync_RejectsDimensionIdConflict()
+    {
+        var entry = MakeEntry("what-alice", WikiDimension.Who, "Alice", "Alice is a developer");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _store.UpsertAsync(entry, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ListByDimensionAsync_UsesFactPointersForCrossDimensionLookup()
+    {
+        var entry = new WikiEntry
+        {
+            Id = "who-ada",
+            Dimension = WikiDimension.Who,
+            Subject = "Ada",
+            Facts =
+            [
+                new WikiFact
+                {
+                    Claim = "Ada prefers concise responses because it reduces noise.",
+                    Confidence = 0.9,
+                    Context = new WikiFactContext { Who = "Ada", Why = "Reduce response noise" },
+                    EstimatedTokens = 8
+                }
+            ]
+        };
+        await _store.UpsertAsync(entry, CancellationToken.None);
+
+        var whyEntries = await _store.ListByDimensionAsync(WikiDimension.Why, CancellationToken.None);
+
+        Assert.Contains(whyEntries, e => e.Id == "who-ada");
+    }
+
+    [Fact]
+    public async Task UpsertAsync_DoesNotMisresolveSubjectWithDimensionTokenPrefix()
+    {
+        var entry = MakeEntry("who-what-if-analysis", WikiDimension.Who, "what if analysis", "A strategy note");
+        await _store.UpsertAsync(entry, CancellationToken.None);
+
+        var expectedPath = Path.Combine(_tempDir, "who", "what-if-analysis.md");
+        var wrongPath = Path.Combine(_tempDir, "what", "if-analysis.md");
+        Assert.True(File.Exists(expectedPath));
+        Assert.False(File.Exists(wrongPath));
     }
 
     private static WikiEntry MakeEntry(string id, WikiDimension dim, string subject, string claim) =>

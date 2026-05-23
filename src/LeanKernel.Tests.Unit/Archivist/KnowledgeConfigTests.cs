@@ -12,6 +12,8 @@ public class KnowledgeConfigTests
 
         Assert.True(config.Enabled);
         Assert.Equal("LEANKERNEL_knowledge", config.CollectionName);
+        Assert.Equal("LEANKERNEL_knowledge", config.WikiCollectionName);
+        Assert.Equal("documents", config.DocumentsCollectionName);
         Assert.Equal(1536, config.EmbeddingDimension);
         Assert.Equal("/app/data/agents/main/documents", config.DocumentsPath);
         Assert.Equal(["general"], config.DefaultDocumentTags);
@@ -52,6 +54,20 @@ public class KnowledgeConfigTests
         var config = new LeanKernelConfig();
         Assert.NotNull(config.Knowledge);
         Assert.True(config.Knowledge.Enabled);
+    }
+
+    [Fact]
+    public void LeanKernelConfig_ContextDefaultsIncludeEntityTuning()
+    {
+        var config = new LeanKernelConfig();
+
+        Assert.Equal(0.45, config.Context.EntitySubjectBoost);
+        Assert.Equal(0.35, config.Context.SupportingEntityThreshold);
+        Assert.Equal(1, config.Context.EntityExpansionDepth);
+        Assert.Equal(0.80, config.Context.LowConfidenceFallbackThreshold);
+        Assert.Equal(40, config.Context.DeprioritizedRecallMaxResults);
+        Assert.Equal(0.85, config.Context.AmbiguityLowConfidenceThreshold);
+        Assert.Equal(0.15, config.Context.AmbiguityConfidenceGapThreshold);
     }
 
     [Fact]

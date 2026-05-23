@@ -231,6 +231,34 @@ public sealed class ContextPatch
     /// Gets or sets the max conversation turns.
     /// </summary>
     public int? MaxConversationTurns { get; set; }
+    /// <summary>
+    /// Gets or sets the entity subject boost.
+    /// </summary>
+    public double? EntitySubjectBoost { get; set; }
+    /// <summary>
+    /// Gets or sets the supporting entity threshold.
+    /// </summary>
+    public double? SupportingEntityThreshold { get; set; }
+    /// <summary>
+    /// Gets or sets the entity expansion depth.
+    /// </summary>
+    public int? EntityExpansionDepth { get; set; }
+    /// <summary>
+    /// Gets or sets the low-confidence fallback threshold.
+    /// </summary>
+    public double? LowConfidenceFallbackThreshold { get; set; }
+    /// <summary>
+    /// Gets or sets deprioritized recall max results.
+    /// </summary>
+    public int? DeprioritizedRecallMaxResults { get; set; }
+    /// <summary>
+    /// Gets or sets ambiguity low-confidence threshold.
+    /// </summary>
+    public double? AmbiguityLowConfidenceThreshold { get; set; }
+    /// <summary>
+    /// Gets or sets ambiguity confidence gap threshold.
+    /// </summary>
+    public double? AmbiguityConfidenceGapThreshold { get; set; }
 }
 
 /// <summary>

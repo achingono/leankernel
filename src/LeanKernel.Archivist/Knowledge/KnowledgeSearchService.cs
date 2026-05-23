@@ -42,7 +42,8 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
         string query,
         IReadOnlyList<string> agentTags,
         int limit,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? sourceType = null)
     {
         if (!_config.Enabled) return [];
 
@@ -50,28 +51,34 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
 
         try
         {
-            var exists = await _qdrant.CollectionExistsAsync(_config.CollectionName, ct);
-            if (!exists) return [];
-
             var embedding = await _embeddings.EmbedAsync(query, ct);
-            var filter = BuildScopeFilter(agentTags);
+            var collections = ResolveCollections(sourceType);
+            var filter = BuildScopeFilter(agentTags, sourceType);
+            var aggregate = new List<RelevanceScore>();
 
-            var results = await _qdrant.SearchAsync(
-                _config.CollectionName,
-                embedding,
-                filter: filter,
-                limit: (ulong)limit,
-                cancellationToken: ct);
-
-            return results.Select(r => new RelevanceScore
+            foreach (var collection in collections)
             {
-                EntryId = GetPayloadString(r, "entry_id") ?? GetPayloadString(r, "source_file") ?? "",
-                Content = GetPayloadString(r, "text") ?? "",
-                EstimatedTokens = (int)Math.Ceiling((GetPayloadString(r, "text") ?? "").Length / 4.0),
-                SemanticSimilarity = r.Score,
-                Score = r.Score,
-                SourceType = RelevanceSourceType.Vector
-            }).ToList();
+                var exists = await _qdrant.CollectionExistsAsync(collection, ct);
+                if (!exists)
+                {
+                    continue;
+                }
+
+                var results = await _qdrant.SearchAsync(
+                    collection,
+                    embedding,
+                    filter: filter,
+                    limit: (ulong)limit,
+                    cancellationToken: ct);
+
+                aggregate.AddRange(results.Select(r => ToRelevanceScore(r, sourceType)));
+            }
+
+            return aggregate
+                .OrderByDescending(r => r.Score)
+                .ThenByDescending(r => r.SemanticSimilarity)
+                .Take(limit)
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -91,7 +98,16 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
 
         try
         {
-            return await _qdrant.CollectionExistsAsync(_config.CollectionName, ct);
+            var collections = ResolveCollections(sourceType: null);
+            foreach (var collection in collections)
+            {
+                if (await _qdrant.CollectionExistsAsync(collection, ct))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         catch
         {
@@ -99,14 +115,43 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
         }
     }
 
-    private static Filter? BuildScopeFilter(IReadOnlyList<string> agentTags)
+    private List<string> ResolveCollections(string? sourceType)
     {
+        if (string.Equals(sourceType, "wiki", StringComparison.OrdinalIgnoreCase))
+        {
+            return [_config.WikiCollectionName];
+        }
+
+        if (string.Equals(sourceType, "document", StringComparison.OrdinalIgnoreCase))
+        {
+            return [_config.DocumentsCollectionName];
+        }
+
+        return new List<string>
+        {
+            _config.WikiCollectionName,
+            _config.DocumentsCollectionName
+        }
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    }
+
+    private static Filter? BuildScopeFilter(IReadOnlyList<string> agentTags, string? sourceType)
+    {
+        var hasWildcard = agentTags.Count == 0 || agentTags.Contains("*");
+        var sourceCondition = BuildSourceCondition(sourceType);
+
         // Wildcard means no filter — agent sees everything
-        if (agentTags.Count == 0 || agentTags.Contains("*"))
+        if (hasWildcard && sourceCondition is null)
             return null;
 
+        if (hasWildcard)
+        {
+            return new Filter { Must = { sourceCondition! } };
+        }
+
         // Filter: at least one of the agent's tags must match the document's tags
-        return new Filter
+        var filter = new Filter
         {
             Should =
             {
@@ -120,10 +165,65 @@ public sealed class KnowledgeSearchService : IKnowledgeSearchService
                 })
             }
         };
+
+        if (sourceCondition is not null)
+        {
+            filter.Must.Add(sourceCondition);
+        }
+
+        return filter;
+    }
+
+    private static Condition? BuildSourceCondition(string? sourceType)
+    {
+        if (string.IsNullOrWhiteSpace(sourceType))
+        {
+            return null;
+        }
+
+        var normalized = sourceType.Equals("document", StringComparison.OrdinalIgnoreCase)
+            ? "document"
+            : sourceType.Equals("wiki", StringComparison.OrdinalIgnoreCase)
+                ? "wiki"
+                : null;
+
+        return normalized is null
+            ? null
+            : new Condition
+            {
+                Field = new FieldCondition
+                {
+                    Key = "source_type",
+                    Match = new Match { Keyword = normalized }
+                }
+            };
     }
 
     private static string? GetPayloadString(ScoredPoint point, string key)
     {
         return point.Payload.TryGetValue(key, out var value) ? value.StringValue : null;
+    }
+
+    private static RelevanceScore ToRelevanceScore(ScoredPoint point, string? requestedSourceType)
+    {
+        var payloadSource = GetPayloadString(point, "source_type");
+        var effectiveSource = requestedSourceType ?? payloadSource;
+        return new RelevanceScore
+        {
+            EntryId = GetPayloadString(point, "entry_id")
+                ?? GetPayloadString(point, "entryId")
+                ?? GetPayloadString(point, "source_file")
+                ?? "",
+            Content = GetPayloadString(point, "text") ?? "",
+            EstimatedTokens = (int)Math.Ceiling((GetPayloadString(point, "text") ?? "").Length / 4.0),
+            SemanticSimilarity = point.Score,
+            Score = point.Score,
+            SourceType = RelevanceSourceType.Vector,
+            KnowledgeSource = effectiveSource?.Equals("wiki", StringComparison.OrdinalIgnoreCase) == true
+                ? KnowledgeSourceType.Wiki
+                : effectiveSource?.Equals("document", StringComparison.OrdinalIgnoreCase) == true
+                    ? KnowledgeSourceType.Document
+                    : KnowledgeSourceType.Unknown
+        };
     }
 }

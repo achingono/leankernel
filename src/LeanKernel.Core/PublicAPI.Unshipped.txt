@@ -1,1 +1,10 @@
-# New public API added during the active refactor goes here until released.
+﻿# New public API added during the active refactor goes here until released.
+LeanKernel.Core.Interfaces.IWikiFactExtractor
+LeanKernel.Core.Interfaces.IReranker
+LeanKernel.Core.Interfaces.IWikiMigrationService
+LeanKernel.Core.Models.ExtractedWikiFact
+LeanKernel.Core.Models.KnowledgeSourceType
+LeanKernel.Core.Interfaces.WikiMigrationResult
+LeanKernel.Core.Models.WikiExtractionResponse
+LeanKernel.Core.Models.WikiFactContext
+LeanKernel.Core.Configuration.RerankerConfig

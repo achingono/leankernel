@@ -32,7 +32,7 @@ public class PromptAssemblerTests
 
         var result = assembler.Assemble(context);
         Assert.Contains("[Who:Alice] Project manager", result);
-        Assert.Contains("Relevant Knowledge", result);
+        Assert.Contains("Wiki", result);
     }
 
     [Fact]

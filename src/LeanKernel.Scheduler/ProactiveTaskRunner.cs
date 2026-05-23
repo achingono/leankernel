@@ -93,6 +93,10 @@ public sealed class ProactiveTaskRunner
                 _syncJob.ExecuteAsync,
                 ct);
         }
+        else
+        {
+            _logger.LogInformation("Model limit sync job not registered: routing is disabled");
+        }
 
         _logger.LogInformation("Proactive tasks registered: {Jobs}",
             string.Join(", ", _scheduler.ListScheduledJobs()));

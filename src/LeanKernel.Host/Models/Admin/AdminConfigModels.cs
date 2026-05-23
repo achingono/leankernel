@@ -354,6 +354,34 @@ public sealed record ContextConfigSection
     /// Gets or sets the max conversation turns.
     /// </summary>
     public ConfigField MaxConversationTurns { get; init; } = new();
+    /// <summary>
+    /// Gets or sets the entity subject boost.
+    /// </summary>
+    public ConfigField EntitySubjectBoost { get; init; } = new();
+    /// <summary>
+    /// Gets or sets the supporting entity threshold.
+    /// </summary>
+    public ConfigField SupportingEntityThreshold { get; init; } = new();
+    /// <summary>
+    /// Gets or sets the entity expansion depth.
+    /// </summary>
+    public ConfigField EntityExpansionDepth { get; init; } = new();
+    /// <summary>
+    /// Gets or sets the low-confidence fallback threshold.
+    /// </summary>
+    public ConfigField LowConfidenceFallbackThreshold { get; init; } = new();
+    /// <summary>
+    /// Gets or sets deprioritized recall max results.
+    /// </summary>
+    public ConfigField DeprioritizedRecallMaxResults { get; init; } = new();
+    /// <summary>
+    /// Gets or sets ambiguity low-confidence threshold.
+    /// </summary>
+    public ConfigField AmbiguityLowConfidenceThreshold { get; init; } = new();
+    /// <summary>
+    /// Gets or sets ambiguity confidence gap threshold.
+    /// </summary>
+    public ConfigField AmbiguityConfidenceGapThreshold { get; init; } = new();
 }
 
 /// <summary>

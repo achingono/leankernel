@@ -284,7 +284,14 @@ public class ConfigControllerTests
                 SemanticSimilarityWeight = 0.5,
                 RecencyDecayWeight = 0.3,
                 MinRelevanceThreshold = 0.7,
-                MaxConversationTurns = 20
+                MaxConversationTurns = 20,
+                EntitySubjectBoost = 0.6,
+                SupportingEntityThreshold = 0.4,
+                EntityExpansionDepth = 2,
+                LowConfidenceFallbackThreshold = 0.7,
+                DeprioritizedRecallMaxResults = 30,
+                AmbiguityLowConfidenceThreshold = 0.75,
+                AmbiguityConfidenceGapThreshold = 0.12
             }
         };
         var response = ConfigController.BuildResponse(cfg);
@@ -293,6 +300,13 @@ public class ConfigControllerTests
         Assert.Equal(0.3, response.Context.RecencyDecayWeight.Value);
         Assert.Equal(0.7, response.Context.MinRelevanceThreshold.Value);
         Assert.Equal(20, response.Context.MaxConversationTurns.Value);
+        Assert.Equal(0.6, response.Context.EntitySubjectBoost.Value);
+        Assert.Equal(0.4, response.Context.SupportingEntityThreshold.Value);
+        Assert.Equal(2, response.Context.EntityExpansionDepth.Value);
+        Assert.Equal(0.7, response.Context.LowConfidenceFallbackThreshold.Value);
+        Assert.Equal(30, response.Context.DeprioritizedRecallMaxResults.Value);
+        Assert.Equal(0.75, response.Context.AmbiguityLowConfidenceThreshold.Value);
+        Assert.Equal(0.12, response.Context.AmbiguityConfidenceGapThreshold.Value);
     }
 
     [Fact]
@@ -482,12 +496,24 @@ public class ConfigControllerTests
     public void ApplyPatch_ContextWeights_AppliesChanges()
     {
         var current = new LeanKernelConfig { Context = new ContextConfig { SemanticSimilarityWeight = 0.4 } };
-        var patch = new AdminConfigPatchRequest { Context = new ContextPatch { SemanticSimilarityWeight = 0.6 } };
+        var patch = new AdminConfigPatchRequest
+        {
+            Context = new ContextPatch
+            {
+                SemanticSimilarityWeight = 0.6,
+                EntitySubjectBoost = 0.7,
+                EntityExpansionDepth = 2,
+                LowConfidenceFallbackThreshold = 0.66
+            }
+        };
 
         var (updated, changes) = ConfigController.ApplyPatch(current, patch);
 
         Assert.Equal(0.6, updated.Context.SemanticSimilarityWeight);
-        Assert.Single(changes);
+        Assert.Equal(0.7, updated.Context.EntitySubjectBoost);
+        Assert.Equal(2, updated.Context.EntityExpansionDepth);
+        Assert.Equal(0.66, updated.Context.LowConfidenceFallbackThreshold);
+        Assert.Equal(4, changes.Count);
         Assert.Equal("Context", changes[0].Section);
     }
 
@@ -585,4 +611,3 @@ public class ConfigControllerTests
         Assert.NotNull(response.UpdatedConfig);
     }
 }
-

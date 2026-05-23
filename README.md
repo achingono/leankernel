@@ -1,6 +1,6 @@
 # LeanKernel — Lean Personal AI Agent
 
-![LeanKernel logo](docs/assets/brand/logo.svg)
+![LeanKernel logo](docs/assets/brand/logo.png)
 
 LeanKernel is the personal AI agent for builders who want **reliable output, lower token spend, and full control of context**. Instead of bloated chat history and unpredictable behavior, LeanKernel gives you a lean, observable agent runtime that helps you ship more with less friction.
 
@@ -38,11 +38,11 @@ LeanKernel helps you turn AI from "interesting demos" into repeatable output wit
 
 Recurring issues in production agent deployments map directly to the problems LeanKernel is designed to solve:
 
-- **Complexity creep**: teams overbuild multi-agent flows where simpler patterns would work, increasing latency and cost ([Microsoft guidance](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)).
-- **Compounding errors and loop risk**: autonomous systems can stall, bounce, or loop without strong iteration limits and checkpoints ([Anthropic](https://www.anthropic.com/engineering/building-effective-agents), [Microsoft guidance](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)).
-- **Weak observability**: abstraction-heavy stacks make failures hard to trace and fix, reducing trust ([Anthropic](https://www.anthropic.com/engineering/building-effective-agents), [IBM](https://www.ibm.com/think/topics/ai-agents)).
-- **Cost unpredictability**: orchestration multiplies model calls and token usage without tight budgeting and compaction ([Microsoft guidance](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)).
-- **Governance and privacy concerns**: agents need stronger guardrails, least-privilege access, and auditable action trails ([IBM](https://www.ibm.com/think/topics/ai-agents), [PwC](https://www.pwc.com/us/en/tech-effect/ai-analytics/ai-predictions.html)).
+- **Complexity creep**: teams overbuild multi-agent flows where simpler patterns would work, increasing latency and cost ([Microsoft guidance](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)). LeanKernel counters this with focused coordinator-worker orchestration so you get dependable execution without architecture bloat.
+- **Compounding errors and loop risk**: autonomous systems can stall, bounce, or loop without strong iteration limits and checkpoints ([Anthropic](https://www.anthropic.com/engineering/building-effective-agents), [Microsoft guidance](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)). LeanKernel reduces this risk through explicit middleware boundaries and source-aware retrieval that keep runs on track.
+- **Weak observability**: abstraction-heavy stacks make failures hard to trace and fix, reducing trust ([Anthropic](https://www.anthropic.com/engineering/building-effective-agents), [IBM](https://www.ibm.com/think/topics/ai-agents)). LeanKernel addresses this with structured diagnostics and tool-level traces so troubleshooting is faster and clearer.
+- **Cost unpredictability**: orchestration multiplies model calls and token usage without tight budgeting and compaction ([Microsoft guidance](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)). LeanKernel's deny-by-default context gating and model routing strategy help keep spend predictable.
+- **Governance and privacy concerns**: agents need stronger guardrails, least-privilege access, and auditable action trails ([IBM](https://www.ibm.com/think/topics/ai-agents), [PwC](https://www.pwc.com/us/en/tech-effect/ai-analytics/ai-predictions.html)). LeanKernel reinforces this with local data ownership patterns and auditable runtime behavior.
 
 ## Architecture
 
@@ -188,7 +188,7 @@ To add documents, drop files into `./data/documents/`. The indexer automatically
 
 ## Quick Start (First Value in Minutes)
 
-Spin up LeanKernel, complete guided onboarding, and run your first production-style agent flow from a single local stack.
+Spin up LeanKernel, complete guided onboarding, and run your first production-style agent flow from a single local stack. Your first measurable win should be lower prompt bloat, clearer execution traces, and faster recovery when something fails.
 
 ```bash
 # 1) Configure environment
@@ -239,7 +239,7 @@ scripts/quality/test-coverage.sh
 scripts/quality/sonarqube-scan.sh
 ```
 
-See [docs/QUALITY.md](docs/QUALITY.md) for details and environment variables.
+See [docs/development/quality.md](docs/development/quality.md) for details and environment variables.
 
 ## Project Structure
 
@@ -335,7 +335,7 @@ LEANKERNEL__Auth__Oidc__AdminSubjectClaim=user@example.com
 LEANKERNEL__Auth__Oidc__AdminClaimType=email
 ```
 
-See `docs/prd-authentication.md` for the full authentication PRD.
+See [docs/features/authentication.md](docs/features/authentication.md) for the full authentication PRD.
 
 ### LiteLLM Dynamic Routing
 
@@ -590,4 +590,4 @@ The following enhancements are prioritized to overcome common buyer objections a
 
 ## License
 
-Private — All rights reserved.
+MIT License. See [LICENSE](LICENSE).

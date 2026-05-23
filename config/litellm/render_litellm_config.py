@@ -28,6 +28,7 @@ LITELLM_SETTINGS_DEFAULT = {
     "drop_params": True,
     "set_verbose": False,
     "cache": False,
+    "callbacks": ["leankernel_litellm_callbacks.proxy_handler_instance"],
 }
 
 ROUTER_SETTINGS_DEFAULT = {
@@ -78,6 +79,38 @@ def ensure_string_list(value: Any, path: str) -> list[str]:
     for idx, item in enumerate(values):
         output.append(ensure_string(item, f"{path}[{idx}]"))
     return output
+
+
+def merge_settings(defaults: dict[str, Any], overrides: Any, path: str) -> dict[str, Any]:
+    merged = copy.deepcopy(defaults)
+    if overrides is None:
+        return merged
+
+    override_mapping = ensure_mapping(overrides, path)
+    for key, value in override_mapping.items():
+        merged[key] = copy.deepcopy(value)
+
+    return merged
+
+
+def merge_callbacks(defaults: list[str], overrides: Any, path: str) -> list[str]:
+    callbacks: list[str] = []
+    seen: set[str] = set()
+
+    for callback in defaults:
+        if callback not in seen:
+            callbacks.append(callback)
+            seen.add(callback)
+
+    if overrides is None:
+        return callbacks
+
+    for callback in ensure_string_list(overrides, path):
+        if callback not in seen:
+            callbacks.append(callback)
+            seen.add(callback)
+
+    return callbacks
 
 
 def parse_env_ref(value: Any, path: str) -> str:
@@ -442,16 +475,26 @@ def build_router_settings(
     return router_settings
 
 
-def build_general_settings(router: dict[str, Any]) -> dict[str, Any]:
-    general_settings = copy.deepcopy(GENERAL_SETTINGS_DEFAULT)
+def build_general_settings(router: dict[str, Any], spec_general_settings: Any) -> dict[str, Any]:
+    general_settings = merge_settings(GENERAL_SETTINGS_DEFAULT, spec_general_settings, "general_settings")
     if "fallback_on_status_codes" in router:
         general_settings["fallback_on_status_codes"] = ensure_list(
             router["fallback_on_status_codes"], "router.fallback_on_status_codes"
         )
-    else:
+    elif "fallback_on_status_codes" not in general_settings:
         general_settings["fallback_on_status_codes"] = [429, 500, 502, 503, 504]
 
     return general_settings
+
+
+def build_litellm_settings(spec_litellm_settings: Any) -> dict[str, Any]:
+    litellm_settings = merge_settings(LITELLM_SETTINGS_DEFAULT, spec_litellm_settings, "litellm_settings")
+    litellm_settings["callbacks"] = merge_callbacks(
+        LITELLM_SETTINGS_DEFAULT.get("callbacks", []),
+        litellm_settings.get("callbacks"),
+        "litellm_settings.callbacks",
+    )
+    return litellm_settings
 
 
 def build_output(spec: dict[str, Any]) -> dict[str, Any]:
@@ -459,6 +502,8 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
     routes = ensure_mapping(spec.get("routes"), "routes")
     aliases = ensure_mapping(spec.get("aliases", {}), "aliases")
     router = ensure_mapping(spec.get("router", {}), "router")
+    general_settings_spec = spec.get("general_settings")
+    litellm_settings_spec = spec.get("litellm_settings")
 
     provider_models, provider_keys, provider_route_keys, provider_prefixes = parse_providers(providers)
     route_deployments, model_list = build_route_deployments(
@@ -479,8 +524,8 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
             set(alias_map.keys()),
             alias_map,
         ),
-        "general_settings": build_general_settings(router),
-        "litellm_settings": copy.deepcopy(LITELLM_SETTINGS_DEFAULT),
+        "general_settings": build_general_settings(router, general_settings_spec),
+        "litellm_settings": build_litellm_settings(litellm_settings_spec),
     }
 
 

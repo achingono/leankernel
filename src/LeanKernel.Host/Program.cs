@@ -93,7 +93,7 @@ try
         .AddThinker()
         .AddCommander(configuredDataDir)
         .AddPlugins(skillDirs, configuredDataDir)
-        .AddScheduler();
+        .AddScheduler(configuredDataDir);
 
     // Web API services
     builder.Services.AddSingleton<LogReaderService>();
@@ -116,8 +116,15 @@ try
     builder.Services.AddSingleton<IModelLimitDriftService>(sp =>
     {
         var paths = sp.GetRequiredService<LeanKernelHostPaths>();
-        var scriptPath = builder.Configuration["LeanKernel:LiteLlm:DriftScriptPath"]
-            ?? Path.Combine(AppContext.BaseDirectory, "scripts", "sync_litellm_model_limits.py");
+        var configuredScriptPath = builder.Configuration["LeanKernel:LiteLlm:DriftScriptPath"];
+        var scriptPath = configuredScriptPath;
+        if (string.IsNullOrWhiteSpace(scriptPath))
+        {
+            var containerScriptPath = "/app/scripts/sync_litellm_model_limits.py";
+            scriptPath = File.Exists(containerScriptPath)
+                ? containerScriptPath
+                : Path.Combine(AppContext.BaseDirectory, "scripts", "sync_litellm_model_limits.py");
+        }
         return new ModelLimitDriftService(scriptPath, paths.LiteLlmConfigPath);
     });
 

@@ -1,246 +1,297 @@
 providers:
   groq:
     keys:
-      - source: env
-        name: GROQ_API_KEY
-      - source: env
-        name: GROQ_API_KEY_2
+    - source: env
+      name: GROQ_API_KEY
+    - source: env
+      name: GROQ_API_KEY_2
     models:
-      - id: scout
-        name: meta-llama/llama-4-scout-17b-16e-instruct
-        max_tokens: 8192
+    - id: scout
+      name: meta-llama/llama-4-scout-17b-16e-instruct
+      max_tokens: 8192
   gemini:
     keys:
-      - source: env
-        name: GEMINI_API_KEY
-      - source: env
-        name: GEMINI_API_KEY_2
-      - source: env
-        name: GEMINI_API_KEY_3
+    - source: env
+      name: GEMINI_API_KEY
+    - source: env
+      name: GEMINI_API_KEY_2
+    - source: env
+      name: GEMINI_API_KEY_3
     models:
-      - id: flash
-        name: gemini-2.5-flash
-        max_tokens: 8192
-      - id: embedding_2
-        name: gemini-embedding-2
-        mode: embedding
-        dimensions: 1536
+    - id: flash
+      name: gemini-2.5-flash
+      max_tokens: 65536
+      context_window: 1048576
+    - id: embedding_2
+      name: gemini-embedding-2
+      mode: embedding
+      dimensions: 1536
   azure:
     keys:
-      - source: env
-        name: AZURE_AI_API_KEY
-        api_base_env: AZURE_AI_API_BASE
-      - source: env
-        name: AZURE_AI_API_KEY_2
-        api_base_env: AZURE_AI_API_BASE_2
-        enabled: false  # alfer-mkokmbre-eastus2 currently unavailable
+    - source: env
+      name: AZURE_AI_API_KEY
+      api_base_env: AZURE_AI_API_BASE
+    - source: env
+      name: AZURE_AI_API_KEY_2
+      api_base_env: AZURE_AI_API_BASE_2
+      enabled: false
     models:
-      - id: kimi_k2_6
-        name: kimi-k2.6
-        max_tokens: 8192
-      - id: deepseek_v3_2
-        name: DeepSeek-V3.2
-        max_tokens: 8192
-      - id: gpt_5_4_1
-        name: gpt-5.4-1
-        max_tokens: 32768
-        use_responses_api: true
-      - id: gpt_5_4_mini_1
-        name: gpt-5.4-mini-1
-        max_tokens: 32768
-        use_responses_api: true
-      - id: gpt_5_4_nano_1
-        name: gpt-5.4-nano-1
-        max_tokens: 32768
-        use_responses_api: true
-      - id: embedding_3_large
-        name: text-embedding-3-large-1
-        mode: embedding
-        dimensions: 1536
+    - id: kimi_k2_6
+      name: kimi-k2.6
+      max_tokens: 8192
+    - id: deepseek_v3_2
+      name: DeepSeek-V3.2
+      max_tokens: 8192
+    - id: gpt_5_4_1
+      name: gpt-5.4-1
+      max_tokens: 32768
+      use_responses_api: true
+    - id: gpt_5_4_mini_1
+      name: gpt-5.4-mini-1
+      max_tokens: 32768
+      use_responses_api: true
+    - id: gpt_5_4_nano_1
+      name: gpt-5.4-nano-1
+      max_tokens: 32768
+      use_responses_api: true
+    - id: embedding_3_large
+      name: text-embedding-3-large-1
+      mode: embedding
+      dimensions: 1536
   github_copilot:
     keys:
-      - source: env
-        name: GITHUB_COPILOT_OAUTH_TOKEN
-        api_base_env: GITHUB_COPILOT_API_BASE
+    - source: env
+      name: GITHUB_COPILOT_OAUTH_TOKEN
+      api_base_env: GITHUB_COPILOT_API_BASE
     models:
-      - id: gpt_4o
-        name: gpt-4o
-        max_tokens: 32768
+    - id: gpt_4o
+      name: gpt-4o
+      max_tokens: 32768
   ollama:
     base_url:
-      - source: env
-        name: OLLAMA_BASE_URL
+    - source: env
+      name: OLLAMA_BASE_URL
     models:
-      - id: gemma4_26b
-        name: gemma4:26b
-        max_tokens: 32768
-      - id: qwen3_embedding_4b
-        name: qwen3-embedding:4b
-        mode: embedding
-        dimensions: 2560
-      - id: qwen3_embedding_8b
-        name: qwen3-embedding:8b
-        mode: embedding
-        dimensions: 4096
+    - id: gemma4_26b
+      name: gemma4:26b
+      max_tokens: 32768
+    - id: qwen3_embedding_4b
+      name: qwen3-embedding:4b
+      mode: embedding
+      dimensions: 2560
+    - id: qwen3_embedding_8b
+      name: qwen3-embedding:8b
+      mode: embedding
+      dimensions: 4096
   nvidia:
     litellm_provider: openai
     keys:
-      - source: env
-        name: NVIDIA_API_KEY
-        api_base_env: NVIDIA_API_BASE
+    - source: env
+      name: NVIDIA_API_KEY
+      api_base_env: NVIDIA_API_BASE
     models:
-      - id: llama_3_2_3b
-        name: meta/llama-3.2-3b-instruct
-        max_tokens: 8192
-      - id: llama_4_maverick
-        name: meta/llama-4-maverick-17b-128e-instruct
-        max_tokens: 32768
-      - id: mistral_small_4
-        name: mistralai/mistral-small-4-119b-2603
-        max_tokens: 32768
-      - id: nemotron_super_49b
-        name: nvidia/llama-3.3-nemotron-super-49b-v1.5
-        max_tokens: 32768
-      - id: llama_3_3_70b
-        name: meta/llama-3.3-70b-instruct
-        max_tokens: 32768
+    - id: llama_3_2_3b
+      name: meta/llama-3.2-3b-instruct
+      max_tokens: 8192
+    - id: llama_4_maverick
+      name: meta/llama-4-maverick-17b-128e-instruct
+      max_tokens: 32768
+    - id: mistral_small_4
+      name: mistralai/mistral-small-4-119b-2603
+      max_tokens: 32768
+    - id: nemotron_super_49b
+      name: nvidia/llama-3.3-nemotron-super-49b-v1.5
+      max_tokens: 32768
+    - id: llama_3_3_70b
+      name: meta/llama-3.3-70b-instruct
+      max_tokens: 32768
   openai:
     keys:
-      - source: env
-        name: OPENAI_API_KEY
+    - source: env
+      name: OPENAI_API_KEY
     models:
-      - id: text_embedding_3_small
-        name: text-embedding-3-small
-        mode: embedding
-        dimensions: 1536
-
+    - id: text_embedding_3_small
+      name: text-embedding-3-small
+      mode: embedding
+      dimensions: 1536
 routes:
   small:
-    - provider: azure
-      model: gpt_5_4_nano_1
-      keys: [azure1, azure2]
-      order: 1
-    - provider: groq
-      model: scout
-      keys: [groq1, groq2]
-      order: 2
-    - provider: nvidia
-      model: llama_3_2_3b
-      keys: [nvidia1]
-      order: 3
-    - provider: gemini
-      model: flash
-      keys: [gemini1, gemini2, gemini3]
-      order: 4
-    - provider: azure
-      model: kimi_k2_6
-      keys: [azure1, azure2]
-      order: 5
-    - provider: azure
-      model: deepseek_v3_2
-      keys: [azure1, azure2]
-      order: 6
-    - provider: ollama
-      model: gemma4_26b
-      keys: [ollama1]
-      order: 8
-    - provider: github_copilot
-      model: gpt_4o
-      keys: [github_copilot1]
-      order: 9
+  - provider: azure
+    model: gpt_5_4_nano_1
+    keys:
+    - azure1
+    - azure2
+    order: 1
+  - provider: groq
+    model: scout
+    keys:
+    - groq1
+    - groq2
+    order: 2
+  - provider: nvidia
+    model: llama_3_2_3b
+    keys:
+    - nvidia1
+    order: 3
+  - provider: gemini
+    model: flash
+    keys:
+    - gemini1
+    - gemini2
+    - gemini3
+    order: 4
+  - provider: azure
+    model: kimi_k2_6
+    keys:
+    - azure1
+    - azure2
+    order: 5
+  - provider: azure
+    model: deepseek_v3_2
+    keys:
+    - azure1
+    - azure2
+    order: 6
+  - provider: ollama
+    model: gemma4_26b
+    keys:
+    - ollama1
+    order: 8
+  - provider: github_copilot
+    model: gpt_4o
+    keys:
+    - github_copilot1
+    order: 9
   medium:
-    - provider: nvidia
-      model: llama_4_maverick
-      keys: [nvidia1]
-      order: 1
-    - provider: nvidia
-      model: mistral_small_4
-      keys: [nvidia1]
-      order: 1
-    - provider: azure
-      model: gpt_5_4_mini_1
-      keys: [azure1, azure2]
-      order: 2
-    - provider: gemini
-      model: flash
-      keys: [gemini1, gemini2, gemini3]
-      order: 3
-    - provider: azure
-      model: deepseek_v3_2
-      keys: [azure1, azure2]
-      order: 4
-    - provider: azure
-      model: kimi_k2_6
-      keys: [azure1, azure2]
-      order: 5
-    - provider: groq
-      model: scout
-      keys: [groq1, groq2]
-      order: 6
-    - provider: ollama
-      model: gemma4_26b
-      keys: [ollama1]
-      order: 8
-    - provider: github_copilot
-      model: gpt_4o
-      keys: [github_copilot1]
-      order: 9
+  - provider: nvidia
+    model: llama_4_maverick
+    keys:
+    - nvidia1
+    order: 1
+  - provider: nvidia
+    model: mistral_small_4
+    keys:
+    - nvidia1
+    order: 1
+  - provider: azure
+    model: gpt_5_4_mini_1
+    keys:
+    - azure1
+    - azure2
+    order: 2
+  - provider: gemini
+    model: flash
+    keys:
+    - gemini1
+    - gemini2
+    - gemini3
+    order: 3
+  - provider: azure
+    model: deepseek_v3_2
+    keys:
+    - azure1
+    - azure2
+    order: 4
+  - provider: azure
+    model: kimi_k2_6
+    keys:
+    - azure1
+    - azure2
+    order: 5
+  - provider: groq
+    model: scout
+    keys:
+    - groq1
+    - groq2
+    order: 6
+  - provider: ollama
+    model: gemma4_26b
+    keys:
+    - ollama1
+    order: 8
+  - provider: github_copilot
+    model: gpt_4o
+    keys:
+    - github_copilot1
+    order: 9
   large:
-    - provider: azure
-      model: gpt_5_4_1
-      keys: [azure1, azure2]
-      order: 1
-    - provider: nvidia
-      model: llama_3_3_70b
-      keys: [nvidia1]
-      order: 2
-    - provider: nvidia
-      model: nemotron_super_49b
-      keys: [nvidia1]
-      order: 2
-    - provider: azure
-      model: deepseek_v3_2
-      keys: [azure1, azure2]
-      order: 3
-    - provider: azure
-      model: kimi_k2_6
-      keys: [azure1, azure2]
-      order: 4
-    - provider: gemini
-      model: flash
-      keys: [gemini1, gemini2, gemini3]
-      order: 5
-    - provider: groq
-      model: scout
-      keys: [groq1, groq2]
-      order: 6
-    - provider: ollama
-      model: gemma4_26b
-      keys: [ollama1]
-      order: 8
-    - provider: github_copilot
-      model: gpt_4o
-      keys: [github_copilot1]
-      order: 9
+  - provider: azure
+    model: gpt_5_4_1
+    keys:
+    - azure1
+    - azure2
+    order: 1
+  - provider: nvidia
+    model: llama_3_3_70b
+    keys:
+    - nvidia1
+    order: 2
+  - provider: nvidia
+    model: nemotron_super_49b
+    keys:
+    - nvidia1
+    order: 2
+  - provider: azure
+    model: deepseek_v3_2
+    keys:
+    - azure1
+    - azure2
+    order: 3
+  - provider: azure
+    model: kimi_k2_6
+    keys:
+    - azure1
+    - azure2
+    order: 4
+  - provider: gemini
+    model: flash
+    keys:
+    - gemini1
+    - gemini2
+    - gemini3
+    order: 5
+  - provider: groq
+    model: scout
+    keys:
+    - groq1
+    - groq2
+    order: 6
+  - provider: ollama
+    model: gemma4_26b
+    keys:
+    - ollama1
+    order: 8
+  - provider: github_copilot
+    model: gpt_4o
+    keys:
+    - github_copilot1
+    order: 9
   embedding-small:
-    - provider: gemini
-      model: embedding_2
-      keys: [gemini1, gemini2, gemini3]
-      order: 1
-    - provider: ollama
-      model: qwen3_embedding_8b
-      keys: [ollama1]
-      order: 2
+  - provider: gemini
+    model: embedding_2
+    keys:
+    - gemini1
+    - gemini2
+    - gemini3
+    order: 1
+  - provider: ollama
+    model: qwen3_embedding_8b
+    keys:
+    - ollama1
+    order: 2
   embedding-large:
-    - provider: azure
-      model: embedding_3_large
-      keys: [azure2]
-      order: 1
-    - provider: gemini
-      model: embedding_2
-      keys: [gemini1, gemini2, gemini3]
-      order: 2
-
+  - provider: azure
+    model: embedding_3_large
+    keys:
+    - azure2
+    order: 1
+  - provider: gemini
+    model: embedding_2
+    keys:
+    - gemini1
+    - gemini2
+    - gemini3
+    order: 2
 aliases:
   gpt-4o-mini: small
   gpt-4o: medium
@@ -249,7 +300,6 @@ aliases:
   gpt-5.4-nano: small
   gpt-5-nano: small
   gpt-5-mini: medium
-
 router:
   routing_strategy: least-busy
   enable_pre_call_checks: true
@@ -257,17 +307,44 @@ router:
   retry_after: 5
   timeout: 120
   cooldown_time: 300
-  fallback_on_status_codes: [404, 429, 500, 502, 503, 504]
+  fallback_on_status_codes:
+  - 404
+  - 429
+  - 500
+  - 502
+  - 503
+  - 504
   route_fallbacks:
-    small: [medium, large]
-    medium: [small, large]
-    large: [medium, small]
-    embedding-small: [embedding-large]
+    small:
+    - medium
+    - large
+    medium:
+    - small
+    - large
+    large:
+    - medium
+    - small
+    embedding-small:
+    - embedding-large
   alias_fallbacks:
-    gpt-4o-mini: [medium, large]
-    gpt-4o: [small, large]
-    gpt-5.4: [medium, small]
-    gpt-5.4-mini: [small, large]
-    gpt-5.4-nano: [medium, large]
-    gpt-5-nano: [medium, large]
-    gpt-5-mini: [small, large]
+    gpt-4o-mini:
+    - medium
+    - large
+    gpt-4o:
+    - small
+    - large
+    gpt-5.4:
+    - medium
+    - small
+    gpt-5.4-mini:
+    - small
+    - large
+    gpt-5.4-nano:
+    - medium
+    - large
+    gpt-5-nano:
+    - medium
+    - large
+    gpt-5-mini:
+    - small
+    - large

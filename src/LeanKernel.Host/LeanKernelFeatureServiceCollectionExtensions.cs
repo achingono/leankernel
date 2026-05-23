@@ -7,6 +7,7 @@ using LeanKernel.Archivist.Identity;
 using LeanKernel.Plugins.Attachments;
 using LeanKernel.Archivist.Embedding;
 using LeanKernel.Archivist.Knowledge;
+using LeanKernel.Archivist.Reranking;
 using LeanKernel.Archivist.Sessions;
 using LeanKernel.Archivist.Wiki;
 using LeanKernel.Commander;
@@ -42,6 +43,8 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     public static IServiceCollection AddArchivist(this IServiceCollection services)
     {
         services.AddSingleton<IWikiStore, WikiStore>();
+        services.AddSingleton<IWikiMigrationService, WikiMigrationService>();
+        services.AddSingleton<WikiFactMapper>();
         services.AddSingleton<ISessionStore>(sp =>
         {
             var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
@@ -58,6 +61,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {config.LiteLlm.ApiKey}");
         });
         services.AddSingleton<IKnowledgeSearchService, KnowledgeSearchService>();
+        services.AddSingleton<IReranker, LocalLlmReranker>();
         services.AddSingleton<WikiCompiler>();
         services.AddSingleton<ConversationCompactor>();
         services.AddSingleton<ICapabilityGapStore, MarkdownCapabilityGapStore>();
@@ -82,6 +86,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             client.BaseAddress = new Uri(config.LiteLlm.BaseUrl);
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {config.LiteLlm.ApiKey}");
         });
+        services.AddSingleton<IWikiFactExtractor>(sp => sp.GetRequiredService<LlmWikiExtractor>());
 
         return services;
     }
@@ -93,6 +98,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddThinker(this IServiceCollection services)
     {
+        services.AddSingleton<IChatExecutionContextAccessor, ChatExecutionContextAccessor>();
         services.AddSingleton<LeanKernel.Thinker.Middleware.FunctionLoggingMiddleware>();
         services.AddSingleton<LeanKernel.Thinker.Middleware.DiagnosticsMiddleware>();
         services.AddSingleton<LeanKernel.Thinker.Middleware.ContextGatingMiddleware>();
@@ -101,6 +107,7 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton<PromptAssembler>();
 
         services.AddSingleton<KnowledgeEnhancementService>();
+        services.AddSingleton<ResponseFormatGuardEnhancer>();
         services.AddSingleton<IEngagementFileMaintenanceService>(sp =>
             new EngagementFileMaintenanceService(
                 sp.GetRequiredService<IOptions<LeanKernelConfig>>(),
@@ -116,8 +123,13 @@ public static class LeanKernelFeatureServiceCollectionExtensions
                 sp.GetRequiredService<IEngagementFileMaintenanceService>(),
                 sp.GetRequiredService<ILogger<EngagementFileMaintenanceResponseEnhancer>>());
             var knowledgeEnhancer = sp.GetRequiredService<KnowledgeEnhancementService>();
+            var responseFormatGuard = sp.GetRequiredService<ResponseFormatGuardEnhancer>();
             
-            return new ChainedResponseEnhancer(refusalInterceptor, engagementMaintenance, knowledgeEnhancer);
+            return new ChainedResponseEnhancer(
+                refusalInterceptor,
+                engagementMaintenance,
+                knowledgeEnhancer,
+                responseFormatGuard);
         });
         services.AddSingleton<IIdentityFileUpdateService, IdentityFileUpdateService>();
         services.AddSingleton<RequestFailureHandler>();
@@ -140,10 +152,11 @@ public static class LeanKernelFeatureServiceCollectionExtensions
             var strategySelector = sp.GetService<AgentStrategySelector>();
             var responseEnhancer = sp.GetService<IResponseEnhancer>();
             var postTurnPipeline = sp.GetService<PostTurnPipeline>();
+            var chatExecutionContextAccessor = sp.GetService<IChatExecutionContextAccessor>();
 
             return new ThinkerServiceDependencies(
                 gatekeeper, sessions, wiki, agentFactory, toolAdapter, promptAssembler,
-                strategySelector, responseEnhancer, postTurnPipeline);
+                strategySelector, responseEnhancer, postTurnPipeline, chatExecutionContextAccessor);
         });
 
         services.AddSingleton<TaskComplexityScorer>();
@@ -234,7 +247,10 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         string? dataDirectory = null)
     {
         services.AddSingleton<ITool, WikiQueryTool>();
+        services.AddSingleton<ITool, DocumentSearchTool>();
         services.AddSingleton<ITool, KnowledgeSearchTool>();
+        services.AddSingleton<ITool, GetWikiEntryTool>();
+        services.AddSingleton<ITool, ScheduledJobsTool>();
         services.AddSingleton<ITool>(sp => new FileSystemReadTool(
             dataDirectory ?? "/app/data",
             sp.GetService<IAttachmentTextExtractionService>()));
@@ -259,10 +275,9 @@ public static class LeanKernelFeatureServiceCollectionExtensions
         services.AddSingleton(sp =>
         {
             var factory = sp.GetRequiredService<DynamicSkillToolFactory>();
-            var builtInTools = sp.GetServices<ITool>();
             var logger = sp.GetRequiredService<ILogger<DynamicPluginHost>>();
 
-            return new DynamicPluginHost(factory, builtInTools, logger);
+            return new DynamicPluginHost(factory, () => sp.GetServices<ITool>().ToList(), logger);
         });
         services.AddSingleton<IToolRegistry>(sp => sp.GetRequiredService<DynamicPluginHost>());
         services.AddSingleton(sp =>
@@ -289,9 +304,14 @@ public static class LeanKernelFeatureServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection to update.</param>
     /// <returns>The updated service collection.</returns>
-    public static IServiceCollection AddScheduler(this IServiceCollection services)
+    public static IServiceCollection AddScheduler(this IServiceCollection services, string dataDirectory)
     {
         services.AddSingleton<IScheduler, CronScheduler>();
+        services.AddSingleton<IScheduledJobStore>(sp =>
+            new FileScheduledJobStore(dataDirectory, sp.GetRequiredService<ILogger<FileScheduledJobStore>>()));
+        services.AddSingleton<IProactiveJobExecutor, Services.ScheduledJobExecutor>();
+        services.AddSingleton<IScheduledJobManager, ScheduledJobManager>();
+        services.AddHostedService<ScheduledJobBackgroundService>();
         services.AddSingleton<LeanKernel.Scheduler.Jobs.WikiMaintenanceJob>();
         services.AddSingleton<LeanKernel.Scheduler.Jobs.ChatFactScrubJob>();
         services.AddSingleton<LeanKernel.Scheduler.Jobs.ModelLimitSyncJob>();

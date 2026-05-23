@@ -1252,6 +1252,7 @@ h3 {
 }
 
 /* ── LeanKernel Table ───────────────────────────────────────── */
+.LeanKernel-table {
     width: 100%;
     border-collapse: collapse;
 }

@@ -1,37 +1,37 @@
-# Channel Consolidation
+# Channel Model
 
-This reference explains the target channel architecture used during the Phase 2 refactor.
+This document describes the current channel abstraction used by `LeanKernel.Commander`.
 
-## Goal
+`LeanKernel.Core.Interfaces.IChannel` is the canonical contract for:
 
-LeanKernel should have one channel abstraction. `LeanKernel.Core.Interfaces.IChannel` is the canonical contract for inbound messages, outbound delivery, lifecycle management, sender authorization, and delivery diagnostics.
+- Inbound lifecycle (`StartAsync`, `StopAsync`, `OnMessageReceived`)
+- Sender authorization (`IsAuthorizedSender`)
+- Direct send (`SendAsync`)
+- Delivery with status (`DeliverAsync` -> `ChannelDeliveryResult`)
+- Identity metadata (`ChannelId`, `Name`, `IsConfigured`)
 
-## Canonical contract
+`DeliverAsync` has a default behavior that calls `SendAsync`, and adapters can override it for richer retry/diagnostic behavior.
 
-`IChannel` now covers both older channel shapes:
+## Registered Adapters
 
-| Capability | Canonical member |
-| --- | --- |
-| Stable channel identifier | `ChannelId` |
-| Display name for queue lookup and diagnostics | `Name` |
-| Configuration readiness | `IsConfigured` |
-| Inbound lifecycle | `StartAsync`, `StopAsync`, `OnMessageReceived` |
-| Sender authorization | `IsAuthorizedSender` |
-| Fire-and-forget response send | `SendAsync` |
-| Delivery with status and retry metadata | `DeliverAsync` returning `ChannelDeliveryResult` |
+Current Commander registrations:
 
-`DeliverAsync` has a default implementation that calls `SendAsync` and returns success. Adapters that can report richer delivery state should override it.
+| Adapter | Channel ID | Notes |
+| --- | --- | --- |
+| `SignalChannel` | `signal` | Supports signal-cli local mode or HTTP daemon mode based on `Signal.DaemonBaseUrl` |
+| `DiscordChannelAdapter` | `discord` | Outbound adapter using Discord REST API |
 
-## Migration path
+## Routing and Delivery
 
-1. Move Host-only channel adapters into `LeanKernel.Commander.Adapters`.
-2. Make every adapter implement `IChannel` directly.
-3. Replace `ChannelRegistry` lookups with `ChannelRouter` channel resolution.
-4. Remove `Host.Services.Channels.IMessageChannel` after all queued delivery callers use `IChannel.DeliverAsync`.
-5. Remove the temporary `LeanKernel:Channels:UseUnifiedStack` feature flag after one stable release.
+- `ChannelRouter` subscribes to each configured channel’s inbound events.
+- Inbound messages are normalized, passed to `IThinkerService`, then sent back through the originating channel.
+- Direct response sends have a timeout (`35s` default).
+- On direct-send failure, `ChannelRouter` can enqueue urgent retries into `IMessageQueue` when available.
 
-## Non-goals
+## Durable Queue Integration
 
-- This refactor does not change channel protocols.
-- This refactor does not add new providers.
-- This refactor does not change sender authorization rules.
+Commander uses:
+
+- `MessageQueueService` (in-memory queue)
+- `PersistentMessageQueueService` (SQLite-backed durability via `messagequeue.db`)
+- `MessageProcessingBackgroundService` for queued delivery processing

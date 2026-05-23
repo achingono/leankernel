@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using LeanKernel.Core.Configuration;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
+using LeanKernel.Thinker.Enhancement;
 using LeanKernel.Thinker.Resources;
 using LeanKernel.Thinker.Strategies;
 
@@ -24,6 +25,7 @@ public sealed class ThinkerService : IThinkerService
     private readonly IAgentStrategy _fallbackStrategy;
     private readonly IResponseEnhancer? _responseEnhancer;
     private readonly PostTurnPipeline? _postTurnPipeline;
+    private readonly IChatExecutionContextAccessor? _chatExecutionContextAccessor;
     private readonly LeanKernelConfig _config;
     private readonly ILogger<ThinkerService> _logger;
 
@@ -47,6 +49,7 @@ public sealed class ThinkerService : IThinkerService
         _responseEnhancer = dependencies.ResponseEnhancer;
         _postTurnPipeline = dependencies.PostTurnPipeline
             ?? new PostTurnPipeline(_sessions, NullLogger<PostTurnPipeline>.Instance);
+        _chatExecutionContextAccessor = dependencies.ChatExecutionContextAccessor;
         _config = config.Value;
         _logger = logger;
     }
@@ -57,6 +60,14 @@ public sealed class ThinkerService : IThinkerService
         var sessionId = await _sessions.GetOrCreateSessionIdAsync(
             message.ChannelId, message.SenderId, ct);
 
+        using var chatExecutionScope = _chatExecutionContextAccessor?.BeginScope(new ChatExecutionContext
+        {
+            UserId = message.SenderId,
+            ChannelId = message.ChannelId,
+            SessionId = sessionId,
+            IsAdmin = IsAdminMessage(message)
+        });
+
         await _sessions.AppendTurnAsync(sessionId, new ConversationTurn
         {
             Role = "user",
@@ -65,12 +76,14 @@ public sealed class ThinkerService : IThinkerService
         }, ct);
 
         var budget = ContextBudget.FromModelWindow(_config.LiteLlm.ContextWindowTokens);
-        var context = await _gatekeeper.GateContextAsync(message, budget, sessionId, ct);
-
-        _logger.LogInformation(
-            ResourceText.Log("ContextAssembled"),
-            context.EstimatedTotalTokens, context.WikiLeanKernels.Count,
-            context.History.Count, context.ExclusionLog.Count);
+        var context = new ConversationContext
+        {
+            SystemPrompt = string.Empty,
+            History = [],
+            WikiLeanKernels = [],
+            RetrievedLeanKernels = [],
+            ActiveToolNames = []
+        };
 
         string response;
         Exception? captureException = null;
@@ -79,6 +92,13 @@ public sealed class ThinkerService : IThinkerService
 
         try
         {
+            context = await _gatekeeper.GateContextAsync(message, budget, sessionId, ct);
+
+            _logger.LogInformation(
+                ResourceText.Log("ContextAssembled"),
+                context.EstimatedTotalTokens, context.WikiLeanKernels.Count,
+                context.History.Count, context.ExclusionLog.Count);
+
             var instructions = _promptAssembler.AssembleSystemMessage(context);
             var tools = _toolAdapter.BuildTools();
 
@@ -86,6 +106,10 @@ public sealed class ThinkerService : IThinkerService
             response = await strategy.InvokeAsync(
                 new AgentStrategyContext(message, context, instructions, tools, sessionId),
                 ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -96,11 +120,23 @@ public sealed class ThinkerService : IThinkerService
             response = ResourceText.Error("LlmInvocationFallbackResponse");
         }
 
+        var rawResponse = response;
         if (_responseEnhancer is not null)
         {
             response = await _responseEnhancer.EnhanceResponseAsync(
                 message.Content, response, context, ct);
         }
+
+        _logger.LogInformation(
+            "Response diagnostics [{MessageId}] session={SessionId} raw_contains_boxed_math={RawBoxedMath} raw_contains_exam_wrapper={RawExamWrapper} final_contains_boxed_math={FinalBoxedMath} final_contains_exam_wrapper={FinalExamWrapper} response_mutated={ResponseMutated} active_tools={ActiveTools}",
+            message.Id,
+            sessionId,
+            ResponseFormatHeuristics.ContainsBoxedMath(rawResponse),
+            ResponseFormatHeuristics.ContainsExamWrapper(rawResponse),
+            ResponseFormatHeuristics.ContainsBoxedMath(response),
+            ResponseFormatHeuristics.ContainsExamWrapper(response),
+            !string.Equals(rawResponse, response, StringComparison.Ordinal),
+            string.Join(",", context.ActiveToolNames));
 
         if (_postTurnPipeline is not null)
         {
@@ -115,6 +151,29 @@ public sealed class ThinkerService : IThinkerService
         }
 
         return response;
+    }
+
+    private static bool IsAdminMessage(LeanKernelMessage message)
+    {
+        if (message.Metadata.TryGetValue("is_admin", out var isAdminRaw) &&
+            bool.TryParse(isAdminRaw, out var isAdmin))
+        {
+            return isAdmin;
+        }
+
+        if (message.Metadata.TryGetValue("isAdmin", out var isAdminAlt) &&
+            bool.TryParse(isAdminAlt, out var parsed))
+        {
+            return parsed;
+        }
+
+        if (message.Metadata.TryGetValue("role", out var role) &&
+            string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>

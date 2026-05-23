@@ -1,25 +1,13 @@
 # Features
 
-This section contains product requirements documents (PRDs) and feature design specifications for LeanKernel.
+This section documents major LeanKernel feature implementations.
 
 ## Contents
 
 | Document | Description |
 |----------|-------------|
-| [authentication.md](authentication.md) | Authentication and authorization model: local passcode, OIDC, API tokens, endpoint policies, and migration path. |
-| [intelligent-model-routing.md](intelligent-model-routing.md) | Intelligent cost-quality model routing: task complexity scoring, free-first policy, quality gates, and spend guardrails. |
+| [authentication.md](authentication.md) | Implemented auth model: local passcode, OIDC, bearer tokens, policies, and endpoint protection behavior. |
+| [intelligent-model-routing.md](intelligent-model-routing.md) | Implemented routing pipeline: complexity scoring, candidate selection, quality escalation, cooldowns, and spend guard. |
+| [scheduled-jobs-management.md](scheduled-jobs-management.md) | Runtime scheduler management with chat CRUD tooling, scoped defaults, and durable job/state storage. |
 
-## Feature Status
-
-```mermaid
-quadrantChart
-    title Feature Completeness vs Priority
-    x-axis Low Priority --> High Priority
-    y-axis Not Started --> Complete
-    quadrant-1 Ship Soon
-    quadrant-2 Maintain
-    quadrant-3 Deprioritize
-    quadrant-4 Invest
-    Authentication: [0.8, 0.6]
-    Model Routing: [0.9, 0.5]
-```
+Roadmap and planned enhancements live under [docs/plans/](../plans/index.md).

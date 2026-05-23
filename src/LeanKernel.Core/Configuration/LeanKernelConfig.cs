@@ -458,14 +458,22 @@ public sealed class WikiConfig
     /// Gets or sets the base path.
     /// </summary>
     public string BasePath { get; set; } = "/app/data/wiki";
+
+    /// <summary>
+    /// Gets or sets the name of the metadata folder (default: ".meta").
+    /// </summary>
+    public string MetaFolder { get; set; } = ".meta";
+
     /// <summary>
     /// Gets or sets the max facts per entry.
     /// </summary>
     public int MaxFactsPerEntry { get; set; } = 20;
+
     /// <summary>
     /// Gets or sets the stale fact days.
     /// </summary>
     public int StaleFactDays { get; set; } = 30;
+
     /// <summary>
     /// Gets or sets the min confidence threshold.
     /// </summary>
@@ -501,6 +509,77 @@ public sealed class ContextConfig
     /// Gets or sets the max conversation turns.
     /// </summary>
     public int MaxConversationTurns { get; set; } = 15;
+
+    /// <summary>
+    /// Gets or sets an additive boost applied to high-priority entity candidates.
+    /// </summary>
+    public double EntitySubjectBoost { get; set; } = 0.45;
+
+    /// <summary>
+    /// Gets or sets the minimum threshold for supporting entity context.
+    /// </summary>
+    public double SupportingEntityThreshold { get; set; } = 0.35;
+
+    /// <summary>
+    /// Gets or sets the maximum relation-expansion depth for entity neighborhood discovery.
+    /// </summary>
+    public int EntityExpansionDepth { get; set; } = 1;
+
+    /// <summary>
+    /// Gets or sets the confidence threshold that triggers deprioritized fallback discovery.
+    /// </summary>
+    public double LowConfidenceFallbackThreshold { get; set; } = 0.80;
+
+    /// <summary>
+    /// Gets or sets the maximum result count for deprioritized fallback discovery passes.
+    /// </summary>
+    public int DeprioritizedRecallMaxResults { get; set; } = 40;
+
+    /// <summary>
+    /// Gets or sets the minimum top score considered "confident enough" to avoid ambiguity prompting.
+    /// </summary>
+    public double AmbiguityLowConfidenceThreshold { get; set; } = 0.85;
+
+    /// <summary>
+    /// Gets or sets the minimum score gap between top candidates to suppress disambiguation prompts.
+    /// </summary>
+    public double AmbiguityConfidenceGapThreshold { get; set; } = 0.15;
+
+    /// <summary>
+    /// Gets or sets the reranker configuration used between retrieval and context assembly.
+    /// </summary>
+    public RerankerConfig Reranker { get; set; } = new();
+}
+
+/// <summary>
+/// Configuration for retrieval reranking.
+/// </summary>
+public sealed class RerankerConfig
+{
+    /// <summary>
+    /// Gets or sets whether reranking is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the number of top candidates to rerank.
+    /// </summary>
+    public int TopN { get; set; } = 12;
+
+    /// <summary>
+    /// Gets or sets the number of reranked candidates to keep.
+    /// </summary>
+    public int TopK { get; set; } = 6;
+
+    /// <summary>
+    /// Gets or sets the reranker timeout in milliseconds.
+    /// </summary>
+    public int TimeoutMs { get; set; } = 1200;
+
+    /// <summary>
+    /// Gets or sets the minimum acceptance score after reranking.
+    /// </summary>
+    public double MinAcceptanceScore { get; set; } = 0.0;
 }
 
 /// <summary>
@@ -516,6 +595,14 @@ public sealed class KnowledgeConfig
     /// Gets or sets the collection name.
     /// </summary>
     public string CollectionName { get; set; } = "LEANKERNEL_knowledge";
+    /// <summary>
+    /// Gets or sets the wiki collection name.
+    /// </summary>
+    public string WikiCollectionName { get; set; } = "LEANKERNEL_knowledge";
+    /// <summary>
+    /// Gets or sets the documents collection name.
+    /// </summary>
+    public string DocumentsCollectionName { get; set; } = "documents";
     /// <summary>
     /// Gets or sets the embedding dimension.
     /// </summary>

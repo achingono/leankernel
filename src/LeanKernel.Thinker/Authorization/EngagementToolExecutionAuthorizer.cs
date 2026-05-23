@@ -56,8 +56,18 @@ public sealed class EngagementToolExecutionAuthorizer : IToolExecutionAuthorizer
             "file_edit" => MapWriteAction(path) ?? "WriteFile",
             "file_touch" => MapWriteAction(path) ?? "WriteFile",
             "search_knowledge" => "SearchKnowledge",
-            "wiki_query" => "SearchWiki",
+            "search_documents" => "SearchKnowledge",
+            "search_wiki" => "GetWikiEntry",
+            "get_wiki_entry" => "GetWikiEntry",
             "web_search" => "SearchWeb",
+            "scheduled_jobs__list_jobs" => "ListScheduledJobs",
+            "scheduled_jobs__get_job" => "ListScheduledJobs",
+            "scheduled_jobs__create_job" => "ManageScheduledJobs",
+            "scheduled_jobs__update_job" => "ManageScheduledJobs",
+            "scheduled_jobs__delete_job" => "ManageScheduledJobs",
+            "scheduled_jobs__enable_job" => "ManageScheduledJobs",
+            "scheduled_jobs__disable_job" => "ManageScheduledJobs",
+            "scheduled_jobs__trigger_job" => "ManageScheduledJobs",
             _ => null
         };
     }

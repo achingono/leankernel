@@ -11,7 +11,7 @@ namespace LeanKernel.Plugins.BuiltIn;
 /// </summary>
 [ToolMetadata(
     Name = "search_knowledge",
-    Description = "Search the knowledge base for relevant documents, wiki facts, and indexed content. Results are scoped to the agent's configured access.",
+    Description = "Primary semantic memory search across wiki + documents. Use for intents like: search the wiki, search your memory, search your knowledge, look up, look it up, what do you know about, do you remember, find information about, search notes, search docs.",
     Category = ToolCategory.Wiki)]
 public sealed class KnowledgeSearchTool : ITool
 {
@@ -25,7 +25,10 @@ public sealed class KnowledgeSearchTool : ITool
     /// <summary>
     /// Gets or sets the description.
     /// </summary>
-    public string Description => "Search the unified knowledge base (wiki + documents) for relevant content.";
+    public string Description =>
+        "Primary semantic search over unified memory (wiki + documents). " +
+        "Use for 'search the wiki', 'search your memory', 'search your knowledge', 'look up', " +
+        "'what do you know about', 'do you remember', 'find information about', 'check your notes', and related discovery intents.";
     /// <summary>
     /// Gets or sets the category.
     /// </summary>

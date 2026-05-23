@@ -15,14 +15,17 @@ namespace LeanKernel.Host.Controllers;
 public sealed class WikiController : ControllerBase
 {
     private readonly IWikiStore _wiki;
+    private readonly IWikiMigrationService _migration;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WikiController" /> class.
     /// </summary>
     /// <param name="wiki">The wiki.</param>
-    public WikiController(IWikiStore wiki)
+    /// <param name="migration">The wiki migration service.</param>
+    public WikiController(IWikiStore wiki, IWikiMigrationService migration)
     {
         _wiki = wiki;
+        _migration = migration;
     }
 
     /// <summary>
@@ -100,5 +103,15 @@ public sealed class WikiController : ControllerBase
         var entry = await _wiki.GetAsync(entryId, ct);
         if (entry is null) return NotFound();
         return Ok(entry);
+    }
+
+    /// <summary>
+    /// Runs the one-shot migration from legacy data/wiki/llm content.
+    /// </summary>
+    [HttpPost("migrate")]
+    public async Task<IActionResult> Migrate(CancellationToken ct)
+    {
+        var result = await _migration.MigrateAsync(ct);
+        return Ok(result);
     }
 }

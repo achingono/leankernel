@@ -166,6 +166,40 @@ public class ThinkerServiceTests
     }
 
     [Fact]
+    public async Task ProcessAsync_WhenGateContextFails_ReturnsFallbackAndRecordsAssistantTurn()
+    {
+        _sessions.GetOrCreateSessionIdAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("sess1");
+        _gatekeeper.GateContextAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<ContextBudget>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<ConversationContext>>(_ => throw new ArgumentException("duplicate key"));
+
+        var svc = CreateService();
+        var result = await svc.ProcessAsync(CreateMessage("Is it true?"), CancellationToken.None);
+
+        Assert.Contains("encountered an error processing your request", result, StringComparison.OrdinalIgnoreCase);
+        await _sessions.Received().AppendTurnAsync(
+            "sess1",
+            Arg.Is<ConversationTurn>(t =>
+                t.Role == "assistant"
+                && t.Content.Contains("encountered an error processing your request", StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WhenGateContextCancelled_PropagatesCancellation()
+    {
+        _sessions.GetOrCreateSessionIdAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("sess1");
+        _gatekeeper.GateContextAsync(Arg.Any<LeanKernelMessage>(), Arg.Any<ContextBudget>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<ConversationContext>>(_ => throw new OperationCanceledException());
+
+        var svc = CreateService();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            svc.ProcessAsync(CreateMessage("Is it true?"), CancellationToken.None));
+    }
+
+    [Fact]
     public void BuildMessages_ConvertsHistoryAndAddsCurrentQuery()
     {
         var history = new List<ConversationTurn>

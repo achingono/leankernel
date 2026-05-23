@@ -14,9 +14,15 @@ public interface IKnowledgeSearchService
     /// <param name="query">Search text to embed and match against.</param>
     /// <param name="agentTags">Tags the agent is allowed to access. Use ["*"] for unrestricted.</param>
     /// <param name="limit">Maximum results to return.</param>
+    /// <param name="sourceType">Optional source filter ("wiki" | "document").</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Ranked list of matching knowledge chunks.</returns>
-    Task<List<RelevanceScore>> SearchAsync(string query, IReadOnlyList<string> agentTags, int limit, CancellationToken ct);
+    Task<List<RelevanceScore>> SearchAsync(
+        string query,
+        IReadOnlyList<string> agentTags,
+        int limit,
+        CancellationToken ct,
+        string? sourceType = null);
 
     /// <summary>
     /// Check if the knowledge index is available and ready.

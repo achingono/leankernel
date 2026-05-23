@@ -16,7 +16,10 @@ namespace LeanKernel.Core.Configuration;
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(WikiEntry))]
 [JsonSerializable(typeof(WikiFact))]
+[JsonSerializable(typeof(WikiFactContext))]
 [JsonSerializable(typeof(WikiQuery))]
+[JsonSerializable(typeof(WikiExtractionResponse))]
+[JsonSerializable(typeof(ExtractedWikiFact))]
 [JsonSerializable(typeof(LeanKernelMessage))]
 [JsonSerializable(typeof(ContextBudget))]
 [JsonSerializable(typeof(RelevanceScore))]
@@ -24,6 +27,7 @@ namespace LeanKernel.Core.Configuration;
 [JsonSerializable(typeof(ConversationContext))]
 [JsonSerializable(typeof(ConversationTurn))]
 [JsonSerializable(typeof(List<WikiEntry>))]
+[JsonSerializable(typeof(List<ExtractedWikiFact>))]
 [JsonSerializable(typeof(List<ConversationTurn>))]
 [JsonSerializable(typeof(Dictionary<string, string>))]
 public partial class LeanKernelJsonContext : JsonSerializerContext;

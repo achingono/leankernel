@@ -17,6 +17,8 @@ public class KnowledgeSearchToolTests
         var tool = new KnowledgeSearchTool(knowledge, Options.Create(new LeanKernelConfig()));
 
         Assert.Equal("search_knowledge", tool.Name);
+        Assert.Contains("search your memory", tool.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("search the wiki", tool.Description, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("query", tool.ParametersSchema);
         Assert.Contains("limit", tool.ParametersSchema);
         Assert.Contains("tags", tool.ParametersSchema);

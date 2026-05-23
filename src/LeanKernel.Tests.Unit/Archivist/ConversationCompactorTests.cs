@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using LeanKernel.Archivist.Wiki;
 using LeanKernel.Archivist.Sessions;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
@@ -22,7 +23,13 @@ public class ConversationCompactorTests : IDisposable
     public async Task CompactSessionAsync_FewTurns_NoOp()
     {
         var wiki = Substitute.For<IWikiStore>();
-        var compactor = new ConversationCompactor(_sessionStore, wiki, NullLogger<ConversationCompactor>.Instance);
+        var extractor = Substitute.For<IWikiFactExtractor>();
+        var compactor = new ConversationCompactor(
+            _sessionStore,
+            wiki,
+            extractor,
+            new WikiFactMapper(),
+            NullLogger<ConversationCompactor>.Instance);
 
         // Add 10 turns (< 16, no compaction needed)
         for (int i = 0; i < 10; i++)
@@ -38,7 +45,24 @@ public class ConversationCompactorTests : IDisposable
     public async Task CompactSessionAsync_ManyTurns_ExtractsFactsAndCompacts()
     {
         var wiki = Substitute.For<IWikiStore>();
-        var compactor = new ConversationCompactor(_sessionStore, wiki, NullLogger<ConversationCompactor>.Instance);
+        var extractor = Substitute.For<IWikiFactExtractor>();
+        extractor.ExtractAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<ExtractedWikiFact>>([
+                new ExtractedWikiFact
+                {
+                    PrimaryDimension = "who",
+                    Subject = "Person",
+                    Claim = "Person stated a profile fact",
+                    Who = "Person",
+                    SourceQuote = "my name is Person"
+                }
+            ]));
+        var compactor = new ConversationCompactor(
+            _sessionStore,
+            wiki,
+            extractor,
+            new WikiFactMapper(),
+            NullLogger<ConversationCompactor>.Instance);
 
         // Add 20 turns (pairs of user + assistant)
         for (int i = 0; i < 20; i++)
@@ -59,7 +83,13 @@ public class ConversationCompactorTests : IDisposable
     public async Task CompactSessionAsync_EmptySession_NoOp()
     {
         var wiki = Substitute.For<IWikiStore>();
-        var compactor = new ConversationCompactor(_sessionStore, wiki, NullLogger<ConversationCompactor>.Instance);
+        var extractor = Substitute.For<IWikiFactExtractor>();
+        var compactor = new ConversationCompactor(
+            _sessionStore,
+            wiki,
+            extractor,
+            new WikiFactMapper(),
+            NullLogger<ConversationCompactor>.Instance);
 
         await compactor.CompactSessionAsync("empty", CancellationToken.None);
         await wiki.DidNotReceive().UpsertAsync(Arg.Any<WikiEntry>(), Arg.Any<CancellationToken>());

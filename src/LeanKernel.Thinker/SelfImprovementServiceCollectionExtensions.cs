@@ -24,10 +24,6 @@ public static class SelfImprovementServiceCollectionExtensions
         services.AddSingleton<ISelfImprovementPipeline, SelfImprovementPipeline>();
 
         services.AddSingleton<ILearningStep>(sp =>
-            IsEnabled(sp, c => c.RegexExtractionEnabled)
-                ? ActivatorUtilities.CreateInstance<RegexFactExtractionStep>(sp)
-                : new NullLearningStep("regex-fact-extraction"));
-        services.AddSingleton<ILearningStep>(sp =>
             IsEnabled(sp, c => c.LlmExtractionEnabled) && sp.GetService<LlmWikiExtractor>() is not null
                 ? ActivatorUtilities.CreateInstance<LlmFactExtractionStep>(sp)
                 : new NullLearningStep("llm-fact-extraction"));

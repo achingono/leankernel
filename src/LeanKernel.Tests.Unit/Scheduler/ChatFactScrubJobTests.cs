@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using LeanKernel.Archivist.Wiki;
 using LeanKernel.Core.Interfaces;
 using LeanKernel.Core.Models;
 using LeanKernel.Scheduler.Jobs;
@@ -14,7 +15,24 @@ public class ChatFactScrubJobTests
     {
         var sessions = Substitute.For<ISessionStore>();
         var wiki = Substitute.For<IWikiStore>();
-        var job = new ChatFactScrubJob(sessions, wiki, NullLogger<ChatFactScrubJob>.Instance);
+        var extractor = Substitute.For<IWikiFactExtractor>();
+        extractor.ExtractAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<ExtractedWikiFact>>([
+                new ExtractedWikiFact
+                {
+                    PrimaryDimension = "who",
+                    Subject = "User",
+                    Claim = "User name is Ada Lovelace",
+                    Who = "Ada Lovelace",
+                    SourceQuote = "my name is Ada Lovelace"
+                }
+            ]));
+        var job = new ChatFactScrubJob(
+            sessions,
+            wiki,
+            extractor,
+            new WikiFactMapper(),
+            NullLogger<ChatFactScrubJob>.Instance);
 
         sessions.ListSessionsAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<string>>(["s1"]));
@@ -35,7 +53,7 @@ public class ChatFactScrubJobTests
         await job.ExecuteAsync(CancellationToken.None);
 
         await wiki.Received(1).IngestFactsAsync(
-            Arg.Is<IEnumerable<WikiEntry>>(entries => entries.Any(e => e.Id == "who-user-profile")),
+            Arg.Is<IEnumerable<WikiEntry>>(entries => entries.Any(e => e.Id == "who-user")),
             Arg.Any<CancellationToken>());
 
         await sessions.Received(1).SetMetadataAsync(
@@ -56,7 +74,13 @@ public class ChatFactScrubJobTests
     {
         var sessions = Substitute.For<ISessionStore>();
         var wiki = Substitute.For<IWikiStore>();
-        var job = new ChatFactScrubJob(sessions, wiki, NullLogger<ChatFactScrubJob>.Instance);
+        var extractor = Substitute.For<IWikiFactExtractor>();
+        var job = new ChatFactScrubJob(
+            sessions,
+            wiki,
+            extractor,
+            new WikiFactMapper(),
+            NullLogger<ChatFactScrubJob>.Instance);
 
         sessions.ListSessionsAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<string>>(["s1"]));

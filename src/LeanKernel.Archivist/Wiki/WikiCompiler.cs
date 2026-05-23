@@ -35,6 +35,11 @@ public sealed class WikiCompiler
     public async Task CompileAsync(CancellationToken ct)
     {
         _logger.LogInformation("Wiki compilation starting...");
+        var migrationSentinelPath = Path.Combine(_config.Wiki.BasePath, _config.Wiki.MetaFolder, "migration.completed");
+        if (File.Exists(migrationSentinelPath))
+        {
+            _logger.LogDebug("Migration sentinel present; skipping migration probe.");
+        }
 
         var totalPruned = 0;
         var totalDeduped = 0;

@@ -86,6 +86,14 @@ flowchart LR
 
 This keeps model input small, auditable, and easier to tune. Selection weights live in configuration so future optimization can change relevance behavior without editing orchestration code.
 
+Entity-aware context tuning is configured under `LeanKernel:Context`:
+
+- `EntitySubjectBoost` increases score for high-priority entity matches (for example, direct person-name hits like "John").
+- `SupportingEntityThreshold` allows related support context (for example, associated organizations such as Microsoft) to pass with a lower threshold than generic context.
+- `EntityExpansionDepth` controls how far relation expansion can walk from a top entity entry when collecting neighboring context.
+
+When multiple same-name entities are present, the gatekeeper keeps all ranked candidates and emits disambiguation hints so the prompt can ask a focused follow-up question while still grounding the response in the top-ranked candidate.
+
 ## Dependency rules
 
 - Feature projects may depend on `LeanKernel.Core`.

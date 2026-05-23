@@ -14,7 +14,7 @@ namespace LeanKernel.Archivist.Wiki;
 /// Semantic extraction using LiteLLM's OpenAI-compatible chat completions API.
 /// Exposes both awaited extraction for the self-improvement pipeline and a compatibility wrapper for callers that do not await results.
 /// </summary>
-public sealed class LlmWikiExtractor
+public sealed class LlmWikiExtractor : IWikiFactExtractor
 {
     private const int MaxExchangeCharacters = 4_000;
 
@@ -22,16 +22,40 @@ public sealed class LlmWikiExtractor
 
     private readonly HttpClient _liteLlmClient;
     private readonly IWikiStore _wiki;
+    private readonly WikiFactMapper _mapper;
     private readonly ILogger<LlmWikiExtractor> _logger;
     private readonly string _model;
     private readonly double _temperature;
 
     private const string ExtractionInstructions = """
-        Extract factual claims from this conversation exchange as structured 5W1H facts.
-        Return ONLY a valid JSON array. Each item has: dimension (who/what/when/where/why/how), subject, claims (string array).
-
-        Return empty array [] if no facts are present.
+        Extract grounded facts from this conversation exchange as structured 5W1H records.
+        Return ONLY a valid JSON object with this shape:
+        {
+          "facts": [
+            {
+              "who": "...",
+              "what": "...",
+              "when": "...",
+              "where": "...",
+              "why": "...",
+              "how": "...",
+              "claim": "...",
+              "subject": "...",
+              "primaryDimension": "who|what|when|where|why|how",
+              "sourceQuote": "...",
+              "summaryHint": "...",
+              "aliases": ["..."],
+              "tags": ["..."]
+            }
+          ]
+        }
+        If no valid fact exists, return {"facts":[]}.
         """;
+
+    private static readonly HashSet<string> GenericSubjects = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "unknown", "action", "information", "document", "file", "files", "item", "thing"
+    };
 
     /// <summary>
     /// Represents the llm wiki extractor.
@@ -39,11 +63,13 @@ public sealed class LlmWikiExtractor
     public LlmWikiExtractor(
         HttpClient liteLlmClient,
         IWikiStore wiki,
+        WikiFactMapper mapper,
         IOptions<LeanKernelConfig> config,
         ILogger<LlmWikiExtractor> logger)
     {
         _liteLlmClient = liteLlmClient;
         _wiki = wiki;
+        _mapper = mapper;
         _logger = logger;
         _model = config.Value.LiteLlm.DefaultModel;
         _temperature = config.Value.Ollama.Temperature;
@@ -80,23 +106,33 @@ public sealed class LlmWikiExtractor
     /// <param name="ct">A token used to cancel extraction.</param>
     public async Task ExtractAndIngestAsync(string userMessage, string assistantResponse, string sourceId, CancellationToken ct)
     {
-        var response = await CallLiteLlmAsync(userMessage, assistantResponse, ct);
-
-        if (string.IsNullOrWhiteSpace(response))
-        {
-            _logger.LogDebug("LiteLLM returned empty response for extraction");
-            return;
-        }
-
-        var entries = ParseExtractedFacts(response, sourceId);
+        var extractedFacts = await ExtractAsync(userMessage, assistantResponse, sourceId, ct);
+        var entries = _mapper.Map(extractedFacts, sourceId);
         if (entries.Count == 0)
         {
-            _logger.LogDebug("No facts parsed from LiteLLM response");
+            _logger.LogDebug("No valid mapped facts from source {SourceId}", sourceId);
             return;
         }
 
         await _wiki.IngestFactsAsync(entries, ct);
         _logger.LogDebug("LLM extraction: ingested {Count} entries from {SourceId}", entries.Count, sourceId);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ExtractedWikiFact>> ExtractAsync(
+        string userMessage,
+        string assistantResponse,
+        string sourceId,
+        CancellationToken ct)
+    {
+        var response = await CallLiteLlmAsync(userMessage, assistantResponse, ct);
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            _logger.LogDebug("LiteLLM returned empty response for extraction source {SourceId}", sourceId);
+            return [];
+        }
+
+        return ParseExtractedFacts(response, sourceId, _logger);
     }
 
     private async Task<string> CallLiteLlmAsync(string userMessage, string assistantResponse, CancellationToken ct)
@@ -106,6 +142,10 @@ public sealed class LlmWikiExtractor
         {
             model = _model,
             temperature = _temperature,
+            response_format = new
+            {
+                type = "json_object"
+            },
             messages = new object[]
             {
                 new { role = "system", content = ExtractionInstructions },
@@ -156,58 +196,92 @@ public sealed class LlmWikiExtractor
         return text[..MaxExchangeCharacters] + "\n...[truncated for extraction]";
     }
 
-    private static List<WikiEntry> ParseExtractedFacts(string jsonResponse, string sourceId)
+    internal static IReadOnlyList<ExtractedWikiFact> ParseExtractedFacts(
+        string jsonResponse,
+        string sourceId,
+        ILogger logger)
     {
-        var entries = new List<WikiEntry>();
+        if (string.IsNullOrWhiteSpace(jsonResponse))
+            return [];
+
+        var normalized = NormalizeJsonBlock(jsonResponse);
 
         try
         {
-            var jsonStart = jsonResponse.IndexOf('[');
-            var jsonEnd = jsonResponse.LastIndexOf(']');
-            if (jsonStart < 0 || jsonEnd < 0) return entries;
+            var response = JsonSerializer.Deserialize(normalized, LeanKernelJsonContext.Default.WikiExtractionResponse);
+            if (response?.Facts is null || response.Facts.Count == 0)
+                return [];
 
-            var jsonStr = jsonResponse[jsonStart..(jsonEnd + 1)];
-            using var doc = JsonDocument.Parse(jsonStr);
-
-            foreach (var item in doc.RootElement.EnumerateArray())
+            var validFacts = new List<ExtractedWikiFact>(response.Facts.Count);
+            foreach (var fact in response.Facts)
             {
-                var dimensionStr = item.GetProperty("dimension").GetString() ?? "what";
-                var subject = item.GetProperty("subject").GetString() ?? "Unknown";
-                var claims = item.GetProperty("claims").EnumerateArray()
-                    .Select(c => c.GetString() ?? string.Empty)
-                    .Where(c => !string.IsNullOrWhiteSpace(c))
-                    .ToList();
-
-                if (claims.Count == 0) continue;
-
-                if (!Enum.TryParse<WikiDimension>(dimensionStr, ignoreCase: true, out var dimension))
-                    dimension = WikiDimension.What;
-
-                var id = $"llm-{Slugify(subject)}-{DateTimeOffset.UtcNow:yyyyMMdd}";
-                entries.Add(new WikiEntry
+                var validationFailure = ValidateFact(fact);
+                if (validationFailure is not null)
                 {
-                    Id = id,
-                    Dimension = dimension,
-                    Subject = subject,
-                    Facts = claims.Select(claim => new WikiFact
-                    {
-                        Claim = claim,
-                        Confidence = 0.85,
-                        Source = sourceId,
-                        LastConfirmed = DateTimeOffset.UtcNow,
-                        EstimatedTokens = (int)Math.Ceiling(claim.Length / 4.0)
-                    }).ToList()
-                });
-            }
-        }
-        catch (JsonException)
-        {
-        }
+                    logger.LogWarning(
+                        "LLM extraction rejected fact for source {SourceId}: {Reason}",
+                        sourceId,
+                        validationFailure);
+                    continue;
+                }
 
-        return entries;
+                validFacts.Add(fact);
+            }
+
+            return validFacts;
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(ex, "LLM extraction parse failure for source {SourceId}", sourceId);
+            return [];
+        }
     }
 
-    private static string Slugify(string text) =>
-        System.Text.RegularExpressions.Regex.Replace(
-            text.ToLowerInvariant().Trim(), @"[^a-z0-9]+", "-").Trim('-');
+    private static string? ValidateFact(ExtractedWikiFact fact)
+    {
+        if (!Enum.TryParse<WikiDimension>(fact.PrimaryDimension, ignoreCase: true, out _))
+            return $"invalid primaryDimension '{fact.PrimaryDimension}'";
+        if (string.IsNullOrWhiteSpace(fact.Claim))
+            return "blank claim";
+        if (string.IsNullOrWhiteSpace(fact.Subject))
+            return "blank subject";
+        if (GenericSubjects.Contains(fact.Subject.Trim()))
+            return $"generic subject '{fact.Subject}'";
+
+        var hasContext =
+            !string.IsNullOrWhiteSpace(fact.Who) ||
+            !string.IsNullOrWhiteSpace(fact.What) ||
+            !string.IsNullOrWhiteSpace(fact.When) ||
+            !string.IsNullOrWhiteSpace(fact.Where) ||
+            !string.IsNullOrWhiteSpace(fact.Why) ||
+            !string.IsNullOrWhiteSpace(fact.How);
+
+        if (!hasContext)
+            return "no 5W1H context populated";
+        if (string.IsNullOrWhiteSpace(fact.SourceQuote) && fact.Claim.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 4)
+            return "ungrounded short claim";
+
+        return null;
+    }
+
+    private static string NormalizeJsonBlock(string text)
+    {
+        var trimmed = text.Trim();
+        if (trimmed.StartsWith("```", StringComparison.Ordinal))
+        {
+            var lines = trimmed.Split('\n');
+            if (lines.Length >= 3)
+            {
+                var contentLines = lines.Skip(1).Take(lines.Length - 2);
+                return string.Join('\n', contentLines).Trim();
+            }
+        }
+
+        var objectStart = trimmed.IndexOf('{');
+        var objectEnd = trimmed.LastIndexOf('}');
+        if (objectStart >= 0 && objectEnd >= objectStart)
+            return trimmed[objectStart..(objectEnd + 1)];
+
+        return trimmed;
+    }
 }

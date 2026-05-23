@@ -89,7 +89,7 @@ public sealed class SignalRestApiAdapter : ISignalAdapter
                 throw new InvalidOperationException(
                     $"signal-daemon send returned {(int)response.StatusCode}: {body}");
             }
-            _logger.LogDebug("Signal message sent to {Recipient} via daemon", recipient);
+            _logger.LogInformation("Signal message sent to {Recipient} via daemon", recipient);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested && timeoutCts.IsCancellationRequested)
         {

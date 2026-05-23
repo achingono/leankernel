@@ -22,6 +22,7 @@ public sealed class ThinkerServiceDependencies
     /// <param name="strategySelector">The optional selector that chooses the model invocation strategy.</param>
     /// <param name="responseEnhancer">The optional synchronous response enhancer.</param>
     /// <param name="postTurnPipeline">The optional pipeline that persists assistant output and publishes learning events.</param>
+    /// <param name="chatExecutionContextAccessor">The optional chat execution context accessor for tool default scoping.</param>
     public ThinkerServiceDependencies(
         IContextGatekeeper gatekeeper,
         ISessionStore sessions,
@@ -31,7 +32,8 @@ public sealed class ThinkerServiceDependencies
         PromptAssembler promptAssembler,
         AgentStrategySelector? strategySelector = null,
         IResponseEnhancer? responseEnhancer = null,
-        PostTurnPipeline? postTurnPipeline = null)
+        PostTurnPipeline? postTurnPipeline = null,
+        IChatExecutionContextAccessor? chatExecutionContextAccessor = null)
     {
         Gatekeeper = gatekeeper;
         Sessions = sessions;
@@ -42,6 +44,7 @@ public sealed class ThinkerServiceDependencies
         StrategySelector = strategySelector;
         ResponseEnhancer = responseEnhancer;
         PostTurnPipeline = postTurnPipeline;
+        ChatExecutionContextAccessor = chatExecutionContextAccessor;
     }
 
     /// <summary>
@@ -88,4 +91,9 @@ public sealed class ThinkerServiceDependencies
     /// Gets the optional post-turn persistence and self-improvement pipeline.
     /// </summary>
     public PostTurnPipeline? PostTurnPipeline { get; }
+
+    /// <summary>
+    /// Gets the optional chat execution context accessor.
+    /// </summary>
+    public IChatExecutionContextAccessor? ChatExecutionContextAccessor { get; }
 }

@@ -17,6 +17,7 @@ bld/
 *.user
 *.suo
 *.cache
+*.lscache
 *.docstates
 *.pidb
 *.svclog
@@ -77,6 +78,7 @@ __pycache__/
 # Local configuration files
 /data/
 !data/skills/
+config/litellm/litellm_config.generated.yaml
 
 #Playwright
 .playwright/

@@ -44,13 +44,15 @@ These actions are pre-approved and need no permission:
 - ViewConfiguration
 - ViewErrorLogs
 - SearchKnowledge
-- SearchWiki
+- GetWikiEntry
 - SearchWeb
 - CreateBranch
 - CreateTestCommits
 - WriteAgentsMd
 - WriteSelfMd
 - WriteUserMd
+- ListScheduledJobs
+- ManageScheduledJobs
 
 ### Must Ask Before
 

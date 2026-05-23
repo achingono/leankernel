@@ -112,6 +112,79 @@ public class EngagementToolExecutionAuthorizerTests
     }
 
     [Fact]
+    public async Task AuthorizeAsync_SearchWiki_UsesGetWikiEntryAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("GetWikiEntry", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "GetWikiEntry",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("search_wiki", """{"query":"Alice"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("GetWikiEntry", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("GetWikiEntry", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_GetWikiEntry_UsesGetWikiEntryAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("GetWikiEntry", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "GetWikiEntry",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("get_wiki_entry", """{"entryId":"who-alice"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("GetWikiEntry", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("GetWikiEntry", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_SearchDocuments_UsesSearchKnowledgeAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("SearchKnowledge", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "SearchKnowledge",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("search_documents", """{"query":"Atomic Habits"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("SearchKnowledge", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("SearchKnowledge", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_WikiQuery_LegacyName_IsNotMapped()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+
+        var result = await authorizer.AuthorizeAsync("wiki_query", """{"query":"Alice"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Null(result.ActionType);
+        await actionAuthorizer.DidNotReceive().AuthorizeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AuthorizeAsync_UnknownTool_AllowsWithoutCallingActionAuthorizer()
     {
         var actionAuthorizer = Substitute.For<IActionAuthorizer>();
@@ -122,5 +195,45 @@ public class EngagementToolExecutionAuthorizerTests
         Assert.True(result.IsAuthorized);
         Assert.Null(result.ActionType);
         await actionAuthorizer.DidNotReceive().AuthorizeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_ScheduledJobsList_UsesListScheduledJobsAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("ListScheduledJobs", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "ListScheduledJobs",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("scheduled_jobs__list_jobs", """{"operation":"list_jobs"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("ListScheduledJobs", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("ListScheduledJobs", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_ScheduledJobsCreate_UsesManageScheduledJobsAction()
+    {
+        var actionAuthorizer = Substitute.For<IActionAuthorizer>();
+        actionAuthorizer.AuthorizeAsync("ManageScheduledJobs", Arg.Any<CancellationToken>())
+            .Returns(new AuthorizationResult
+            {
+                IsAuthorized = true,
+                ActionType = "ManageScheduledJobs",
+                Reason = "allowed"
+            });
+
+        var authorizer = new EngagementToolExecutionAuthorizer(actionAuthorizer);
+        var result = await authorizer.AuthorizeAsync("scheduled_jobs__create_job", """{"operation":"create_job"}""", CancellationToken.None);
+
+        Assert.True(result.IsAuthorized);
+        Assert.Equal("ManageScheduledJobs", result.ActionType);
+        await actionAuthorizer.Received(1).AuthorizeAsync("ManageScheduledJobs", Arg.Any<CancellationToken>());
     }
 }

@@ -34,7 +34,7 @@ sequenceDiagram
 1. A channel adapter receives a message.
 2. Commander normalizes the payload into `LeanKernelMessage`.
 3. `ThinkerService` resolves the session and appends the user turn.
-4. Archivist builds a deny-by-default context budget from relevant wiki facts, conversation history, and knowledge search results.
+4. Archivist builds a deny-by-default context budget from relevant wiki facts, conversation history, and knowledge search results, applying entity hints, relation expansion, and ambiguity hints when named entities are unclear.
 5. Thinker assembles the system prompt, tools, and messages.
 6. The model call is sent through LiteLLM directly or through the routing pipeline.
 7. The assistant response is persisted to the session.

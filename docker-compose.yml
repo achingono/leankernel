@@ -3,6 +3,24 @@
 #           Unstructured (document parser), Indexer (knowledge pipeline)
 
 services:
+  # ── LiteLLM Postgres (Proxy Auth/State DB) ─────────────────────
+  database:
+    image: postgres:16-alpine
+    container_name: leankernel-database
+    environment:
+      - POSTGRES_DB=${LITELLM_DB_NAME:-litellm}
+      - POSTGRES_USER=${LITELLM_DB_USER:-litellm}
+      - POSTGRES_PASSWORD=${LITELLM_DB_PASSWORD:-litellm-dev-password-change-me}
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LITELLM_DB_USER:-litellm} -d ${LITELLM_DB_NAME:-litellm}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   # ── LeanKernel Engine (Core Application) ───────────────────────────
   engine:
     build:
@@ -37,6 +55,7 @@ services:
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data:/app/data
+      - ./scripts:/app/scripts:ro
       - ./config/litellm:/app/config/litellm
       - ./data/.signal-cli:/home/LeanKernel/.local/share/signal-cli
       - ./data/.ms-todo-cli:/home/LeanKernel/.ms-todo-cli
@@ -67,13 +86,18 @@ services:
   # ── LiteLLM Proxy (Model Router) ─────────────────────────────
   litellm:
     build:
-      context: config/litellm
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: config/litellm/Dockerfile
     container_name: leankernel-litellm
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-LeanKernel-local}
       - LITELLM_SALT_KEY=${LITELLM_SALT_KEY:-LeanKernel-salt-change-me}
+      - DATABASE_URL=${LITELLM_DATABASE_URL:-postgresql://${LITELLM_DB_USER:-litellm}:${LITELLM_DB_PASSWORD:-litellm-dev-password-change-me}@database:5432/${LITELLM_DB_NAME:-litellm}}
       - LITELLM_NUM_WORKERS=${LITELLM_NUM_WORKERS:-2}
+      - LITELLM_SPEC_PATH=/app/config/litellm/config.yaml
+      - LITELLM_RENDERED_CONFIG_PATH=/app/config/litellm/litellm_config.generated.yaml
+      - LITELLM_RENDER_SCRIPT_PATH=/app/render_litellm_config.py
+      - LITELLM_LIMIT_SYNC_SCRIPT_PATH=/app/sync_litellm_model_limits.py
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
@@ -88,8 +112,24 @@ services:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - GITHUB_COPILOT_OAUTH_TOKEN=${GITHUB_COPILOT_OAUTH_TOKEN:-}
       - GITHUB_COPILOT_API_BASE=${GITHUB_COPILOT_API_BASE:-}
+      - LITELLM_ROUTE_LOG_PATH=/app/logs/litellm-route-events.jsonl
+      - LITELLM_LIMIT_DRIFT_REPORT_PATH=/app/logs/litellm-model-limit-drift.json
+      - LITELLM_LIMIT_SYNC_STATUS_PATH=/app/logs/litellm-limit-sync-status.json
+      - LITELLM_LIMIT_SYNC_INTERVAL_SECONDS=${LITELLM_LIMIT_SYNC_INTERVAL_SECONDS:-900}
+      - LITELLM_LIMIT_SYNC_CHECK_SECONDS=${LITELLM_LIMIT_SYNC_CHECK_SECONDS:-15}
+      - LITELLM_OFF_HOURS_RESTART_ENABLED=${LITELLM_OFF_HOURS_RESTART_ENABLED:-true}
+      - LITELLM_OFF_HOURS_RESTART_CHECK_SECONDS=${LITELLM_OFF_HOURS_RESTART_CHECK_SECONDS:-300}
+      - LITELLM_OFF_HOURS_RESTART_WINDOW_START_HOUR=${LITELLM_OFF_HOURS_RESTART_WINDOW_START_HOUR:-2}
+      - LITELLM_OFF_HOURS_RESTART_WINDOW_END_HOUR=${LITELLM_OFF_HOURS_RESTART_WINDOW_END_HOUR:-5}
+      - LITELLM_OFF_HOURS_RESTART_STATE_PATH=/app/logs/litellm-offhours-restart-state.json
     ports:
       - "${LITELLM_PORT:-4000}:4000"
+    volumes:
+      - ./data/logs:/app/logs
+      - ./config/litellm:/app/config/litellm
+    depends_on:
+      database:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -232,6 +272,8 @@ services:
 
 volumes:
   qdrant-data:
+    driver: local
+  database-data:
     driver: local
   indexer-state:
     driver: local
