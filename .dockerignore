@@ -1,3 +1,11 @@
-.git
+# .dockerignore
+**/.git
+**/.vs
 **/bin
 **/obj
+**/node_modules
+**/.env
+**/data
+**/*.user
+**/*.suo
+**/TestResults
