@@ -130,8 +130,8 @@ Coverage threshold, SonarQube scan scripts, repeatable test commands. ✅
 - Add OpenTelemetry SDK to LeanKernel.Host; propagate trace context through Commander → Thinker → Archivist call chain.
 - Add correlation ID to every `LeanKernelMessage` and log context.
 - Emit metrics: turn latency p50/p95, model call latency, queue depth, tool call count/latency, context token count.
-- Add Docker Compose service: `otel-collector` (OpenTelemetry Collector in gateway mode, exporting to Prometheus + local Jaeger for development).
-- Add `/api/metrics` Prometheus scrape endpoint.
+- Add Docker Compose service: `jaeger-all-in-one`. Export traces directly from the .NET SDK to Jaeger to save the memory overhead of an intermediate OTel Collector.
+- Add `/api/metrics` Prometheus scrape endpoint directly to the .NET app.
 - Add per-component health probes (Qdrant reachability, LiteLLM reachability, queue saturation).
 
 **Memory budget check:** Baseline engine RSS must be re-measured after OTel SDK integration. If RSS exceeds 400 MB under normal load, increase the engine memory limit before continuing.
@@ -150,7 +150,7 @@ Coverage threshold, SonarQube scan scripts, repeatable test commands. ✅
 
 **Scope:**
 - Define `ISessionStore`, `IWikiStore`, `IRuntimeConfigStore`, `IOutboundQueueStore` in `LeanKernel.Core.Interfaces`.
-- Refactor Archivist and Commander to use these interfaces (current file/SQLite implementations become the "local" adapters).
+- Refactor Archivist and Commander to use these interfaces (current file/SQLite implementations become the "local" adapters). Explicitly mandate that SQLite providers must be configured with **WAL (Write-Ahead Logging) mode** and `SYNCHRONOUS=NORMAL` to handle concurrent reads/writes efficiently.
 - Do **not** add PostgreSQL providers in this phase. The adapter interfaces are the deliverable.
 - Add unit tests that verify the adapter contracts.
 
@@ -205,19 +205,20 @@ Coverage threshold, SonarQube scan scripts, repeatable test commands. ✅
 **Rationale:** Skills/tools run in the engine process today. Arbitrary SKILL.md tools represent an untrusted code surface. Isolation is achievable without a microservice.
 
 **Scope:**
-- Subprocess-based runner: each SKILL.md tool invocation forks a subprocess under a restricted user, with CPU/memory limits via cgroups or Docker `--cpus`/`--memory` flags.
-- Timeout enforcement and hard kill path.
+- WebAssembly (WASM) based runner: evaluate and implement a WASM runtime (e.g., Extism or Wasmtime) to execute untrusted SKILL.md tools. This avoids the brittle nature of OS-level `cgroups` or user-forking across different host environments.
+- WASM provides a pristine, cross-platform sandbox with strict memory limits, CPU time constraints, and zero default network/file-system access out-of-the-box.
+- Timeout enforcement and hard kill path within the WASM host.
 - Stdout/stderr capture with size limits and redaction of secrets.
-- FS boundary: subprocess sees only a scoped scratch directory; no access to wiki, sessions, or config.
-- Network egress policy: subprocess has no network access unless the skill manifest explicitly declares `network: true`.
+- FS boundary: WASM runtime exposes only a scoped scratch directory via WASI; no access to wiki, sessions, or config.
+- Network egress policy: WASM guest has no network access unless the skill manifest explicitly declares `network: true` and the host grants the WASI capability.
 - Preserve in-process path for built-in tools (these are trusted, compiled code).
 - Resource accounting: emit `skill_execution_duration_seconds` and `skill_execution_memory_bytes` metrics.
 
 **Skill Runner as a separate service is explicitly deferred until:** skill execution volume requires horizontal scaling, or multiple independent skill trust boundaries are required (e.g., untrusted user-uploaded skills vs. curated library skills).
 
 **Exit gate:**
-- Subprocess isolation smoke-tested with a malicious SKILL.md that attempts to read wiki files (must be blocked).
-- Resource limit timeout test: skill that runs indefinitely is killed within configured timeout.
+- WASM isolation smoke-tested with a malicious SKILL.md that attempts to read wiki files (must be blocked by WASI capability restrictions).
+- Resource limit timeout test: skill that runs indefinitely is killed within configured host timeout.
 - Existing built-in tools unchanged and passing.
 
 ---
@@ -330,12 +331,12 @@ The existing architecture is correct for single-tenant self-hosted deployment. T
 
 | Risk | Fix (in-process) |
 |------|-----------------|
-| Channel adapter crash affects reasoning queue | Phase 6: subprocess isolation for skill runner; Phase 7 (conditional): channel gateway extraction |
+| Channel adapter crash affects reasoning queue | Phase 6: WASM isolation for skill runner; Phase 7 (conditional): channel gateway extraction |
 | No observability for cross-module performance regression | Phase 2 (OTel) |
 | State stores not testable in isolation | Phase 3 (repository interfaces) |
 | Queue failure modes untested | Phase 4 (idempotency + dead-letter) |
 | No audit trail for admin ops | Phase 5 (audit log) |
-| Untrusted skill code runs in engine process | Phase 6 (subprocess isolation) |
+| Untrusted skill code runs in engine process | Phase 6 (WASM isolation) |
 
 ---
 
@@ -347,7 +348,7 @@ The existing architecture is correct for single-tenant self-hosted deployment. T
 | Memory pressure from OTel + security + sandboxing exceeds 512 MB limit | Medium | Medium | Measure RSS after each phase gate; increase limit proactively; profile allocations |
 | SQLite queue loses messages on hard crash of the engine container | Low | High | Phase 4 ensures WAL mode, forced checkpoint, and dead-letter; test recovery in CI |
 | Contract drift between channel-extracted (Phase 7) and engine if maintained independently | Medium | High | Consumer-driven contract tests before Phase 7; never silently change the inbound HTTP schema |
-| Skill subprocess isolation is bypassed by a crafted SKILL.md | Medium | Medium | Explicit FS/network policy; seccomp profile; red-team test in Phase 6 exit gate |
+| Skill WASM isolation is bypassed by a crafted SKILL.md | Low | Medium | Restrict WASI capabilities (FS/network); red-team test in Phase 6 exit gate |
 | Observability data volume fills disk on self-hosted host | Low | Medium | Rolling retention on OTel collector; log volume limits; document pruning runbook |
 | Phase 7 dual-run period introduces duplicate message delivery | Medium | High | Idempotency key (Phase 4) is a prerequisite; verify dedup in contract tests |
 
@@ -374,7 +375,7 @@ If trigger conditions are met:
 | 3 (State abstraction) | Revert interface wiring; delete unused interfaces | None — JSON/SQLite adapters unchanged |
 | 4 (Queue resilience) | Revert idempotency key addition (backward compatible if consumers ignore new field) | None — SQLite schema additions are backward compatible |
 | 5 (Security) | Revert token scope enforcement (can be feature-flagged) | Audit log files remain; they are append-only |
-| 6 (Skill isolation) | Toggle subprocess runner back to in-process | None |
+| 6 (Skill isolation) | Toggle WASM runner back to in-process | None |
 | 7 (Channel extraction) | Set `LEANKERNEL_COMMANDER_MODE=InProcess` | None — SQLite queue is shared via volume |
 
 ---
@@ -435,7 +436,7 @@ This section addresses concerns raised in the architectural review.
 - [ ] `OBS-03` Instrument Commander queue enqueue/dequeue with spans and queue depth gauge.
 - [ ] `OBS-04` Instrument Thinker: turn latency histogram, model call span, tool call span, context token count gauge.
 - [ ] `OBS-05` Instrument Archivist: wiki query span, Qdrant search span, context gate selection duration.
-- [ ] `OBS-06` Add `otel-collector` service to Docker Compose (gateway mode → Prometheus + Jaeger); add `/api/metrics` endpoint.
+- [ ] `OBS-06` Add `jaeger-all-in-one` service to Docker Compose (direct trace export); add `/api/metrics` endpoint for direct Prometheus scraping.
 - [ ] `OBS-07` Add structured health probes for Qdrant, LiteLLM, queue saturation; expose via `/api/health` detailed response.
 - [ ] `OBS-08` Validate full turn trace is visible end-to-end in Jaeger; add regression test asserting `TraceId` is present in response headers.
 
@@ -464,11 +465,11 @@ This section addresses concerns raised in the architectural review.
 
 ### Phase 6 — Skill Isolation
 
-- [ ] `SKILL-01` Implement `SubprocessSkillRunner` that forks a restricted process, enforces FS boundary, captures stdout/stderr with size limit, and hard-kills on timeout.
+- [ ] `SKILL-01` Implement `WasmSkillRunner` (via Extism/Wasmtime) that provides a pristine sandbox, enforces FS boundary via WASI, captures stdout/stderr with size limit, and hard-kills on timeout.
 - [ ] `SKILL-02` Add `network: bool` and `filesystem_access: bool` to SKILL.md manifest; enforce defaults (both false).
 - [ ] `SKILL-03` Emit `skill_execution_duration_seconds` and `skill_execution_memory_bytes` metrics.
 - [ ] `SKILL-04` Add security smoke test: SKILL.md that attempts to read a wiki file is blocked; SKILL.md that runs indefinitely is killed within timeout.
-- [ ] `SKILL-05` Preserve in-process execution path for compiled built-in tools; apply subprocess path only to SKILL.md runtime skills.
+- [ ] `SKILL-05` Preserve in-process execution path for compiled built-in tools; apply WASM isolation path only to SKILL.md runtime skills.
 
 ---
 
@@ -482,7 +483,7 @@ This section addresses concerns raised in the architectural review.
 
 ## Open Questions
 
-1. Is RabbitMQ or NATS preferred if a broker ever becomes necessary, or should a self-hosted-friendly embedded broker (e.g., SQLite + polling, or NATS Embedded) be considered?
-2. Should the OTel backend be Grafana Cloud (lightweight SaaS) or fully self-hosted Grafana + Prometheus + Tempo? The answer affects Phase 2 Docker Compose design.
+1. **Broker Selection (Answered):** RabbitMQ is explicitly ruled out due to operational complexity and memory footprint (Erlang VM). If a broker becomes necessary, use a lightweight binary like **NATS** (or NATS Embedded). Otherwise, continue to use SQLite + polling for self-hosted instances.
+2. **OTel Backend (Answered):** A self-hosted personal agent should not rely on SaaS (Grafana Cloud) for basic telemetry, as it breaks offline capability and introduces privacy concerns. Stick to a lightweight local setup (e.g., direct export to Jaeger All-in-One for traces and direct Prometheus scraping for metrics).
 3. If a second active user is anticipated within 12 months, Phase 8 planning should begin in parallel with Phase 6—should this be tracked?
 4. What is the accepted RTO (recovery time objective) for a full `docker compose down/up` cycle? This determines whether Phase 4 dead-letter handling needs a notification hook.
