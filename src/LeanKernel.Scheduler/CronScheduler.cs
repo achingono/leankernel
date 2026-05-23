@@ -89,9 +89,9 @@ public sealed class CronScheduler : IScheduler
 
                 try
                 {
-                    _logger.LogDebug("Executing job {JobId}", job.Id);
+                    _logger.LogInformation("Executing scheduled job {JobId}", job.Id);
                     await job.Action(ct);
-                    _logger.LogDebug("Job {JobId} completed", job.Id);
+                    _logger.LogInformation("Scheduled job {JobId} completed successfully", job.Id);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
