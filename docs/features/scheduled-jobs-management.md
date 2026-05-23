@@ -1,44 +1,66 @@
 # Scheduled Jobs Management
 
-LeanKernel now supports runtime-managed scheduled jobs through a built-in `scheduled_jobs` tool.
+LeanKernel now supports disabled-by-default scheduled jobs through the `LeanKernel.Scheduler` runtime package.
 
 ## Highlights
 
-- Chat-driven operations: create, get, list, update, delete, enable, disable, and trigger.
-- Scope defaults: jobs created from chat default to the current user/channel.
-- Admin governance: admin actors can manage all jobs and create global jobs.
-- Durable runtime storage under the writable data directory:
-  - `scheduler/jobs.json`
-  - `scheduler/jobs-state.json`
-- Runtime execution includes:
-  - cron and one-time (`at`) schedules
-  - timezone-aware cron evaluation
-  - timeout and overlap handling
-  - execution/delivery status tracking
+- Cronos-based cron evaluation from `LeanKernel:Scheduler:Jobs`.
+- Proactive `agent-prompt` jobs run through the same `IAgentRuntime` path used for user turns.
+- `knowledge-refresh` jobs can rehydrate knowledge pages by key or refresh search matches.
+- `maintenance` jobs can clean old diagnostics and compaction markers.
+- Bounded concurrency via `MaxConcurrentJobs`.
+- Durable execution history persisted to the `ScheduledJobExecutions` table.
+- Graceful shutdown that stops accepting new jobs and waits for active jobs to finish.
 
-## Built-in Tool
+## Configuration
 
-- Tool name: `scheduled_jobs`
-- Type: built-in `IOperationsTool`
-- Operations:
-  - `create_job`
-  - `get_job`
-  - `list_jobs`
-  - `update_job`
-  - `delete_job`
-  - `enable_job`
-  - `disable_job`
-  - `trigger_job`
+Configure the scheduler in `src/LeanKernel.Gateway/appsettings.json` under `LeanKernel:Scheduler`:
 
-## Authorization Mapping
+- `Enabled`
+- `TickIntervalSeconds`
+- `MaxConcurrentJobs`
+- `DefaultTimezone`
+- `Jobs[]`
 
-Scheduler operations are mapped to engagement action types:
+Each job supports:
 
-- `ListScheduledJobs` for read/list operations
-- `ManageScheduledJobs` for mutating operations
+- `Name`
+- `CronExpression`
+- `JobType` (`agent-prompt`, `knowledge-refresh`, `maintenance`)
+- `Prompt`
+- `ChannelId`
+- `UserId`
+- `Enabled`
+- `Parameters`
 
-These action types are enforced through the existing tool execution authorizer pipeline.
+## Supported Parameters
 
-## Context and Defaults
+Common parameters include:
 
-The scheduler tool reads ambient chat execution context (user/channel/session) populated during `ThinkerService.ProcessAsync`, and uses that context for ownership and delivery defaults unless explicitly overridden and authorized.
+- `timezone` — override the default timezone for cron evaluation.
+- `required_boundary` or `time_boundary` — only execute when the local day boundary matches `Morning`, `Afternoon`, `Evening`, or `Night`.
+
+Maintenance-specific parameters:
+
+- `task` — `cleanup-old-diagnostics`, `cleanup-compaction-markers`, or `cleanup-all`.
+- `retention_days` — retention window for cleanup.
+
+Knowledge-refresh-specific parameters:
+
+- `key` — refresh one page by key.
+- `query` — search for pages to refresh.
+- `max_results` — cap the number of search matches refreshed.
+
+## Persistence and Reliability
+
+The scheduler keeps lightweight runtime state in memory to avoid double-firing within a process lifetime and also checks persisted execution history so a restart does not replay the same scheduled occurrence. Every attempt records:
+
+- scheduled time,
+- start/completion timestamps,
+- success/failure,
+- result text,
+- error text.
+
+## Execution Model
+
+`SchedulerHostedService` ticks on the configured interval, evaluates all enabled jobs, and creates a new DI scope for each execution. That keeps scheduled work aligned with existing scoped services such as the agent runtime and persistence abstractions.

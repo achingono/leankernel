@@ -1,0 +1,100 @@
+# Tool Governance
+Tool governance controls which tools are visible to the agent for a given turn. In Phase 1, this is a visibility problem before it is an execution problem: the runtime first decides which tools are exposed, and only then can any caller execute one by name.
+LeanKernel keeps governance simple and explicit. The system does not rely on hidden per-tool checks during execution. Instead, it resolves a visible tool set up front and passes that smaller surface into the turn flow.
+## Core components
+| Component | Responsibility |
+| --- | --- |
+| `ToolGovernancePolicy` | Applies visibility rules for one `ToolVisibilityContext`. |
+| `ToolRegistry` | Stores tool definitions and returns the visible subset. |
+| `ToolExecutor` | Executes a resolved tool handler by name and arguments. |
+| Built-in wiki tools | Provide the initial Phase 1 tool surface. |
+```mermaid
+flowchart LR
+    C[ToolVisibilityContext] --> P[ToolGovernancePolicy]
+    T[Registered ToolDefinition items] --> R[ToolRegistry]
+    P --> R
+    R --> V[Visible tools]
+    V --> X[Prompt or caller]
+    X --> E[ToolExecutor]
+```
+## Governance versus execution
+A governance policy answers, "Which tools should this caller be able to see?" An executor answers, "What happens when a caller invokes this tool?"
+Phase 1 keeps those concerns separate:
+- `ToolRegistry` plus `ToolGovernancePolicy` determine visibility
+- `ToolExecutor` runs the selected handler and converts failures into `ToolResult`
+The executor does **not** perform a second governance pass. If a deployment needs stricter enforcement, callers should execute only tools that were made visible through the registry path.
+## How tools are registered
+`AddLeanKernelTools` registers:
+- a singleton `ToolGovernancePolicy`
+- a singleton `IToolRegistry`
+- a singleton `IToolExecutor`
+The built-in registry is created from three tool definitions:
+- `wiki_search`
+- `wiki_read`
+- `wiki_write`
+All three are currently categorized as `knowledge`. The underlying `ToolRegistry` accepts `IEnumerable<ToolDefinition>`, so the runtime can be extended with more tool definitions without changing the policy class itself.
+## Visibility rules
+`ToolGovernancePolicy` uses three rules.
+| Rule | Effect |
+| --- | --- |
+| `AllowedToolNames` has values | Only those exact tool names are visible. |
+| Otherwise `AllowedCategories` has values | Only tools in those categories are visible. |
+| Otherwise | All registered tools are visible. |
+Explicit tool-name allow lists take precedence over category filters.
+### Open by default
+If neither allow list is set, Phase 1 leaves all registered tools visible. That open-default behavior is intentional at this stage because the built-in tool set is small and well understood.
+### Case-insensitive matching
+Tool lookup and visibility matching are case-insensitive. The registry stores tools in a `StringComparer.OrdinalIgnoreCase` dictionary, and the policy checks names and categories with the same intent.
+## Visibility context
+The policy evaluates one `ToolVisibilityContext` at a time.
+| Property | Purpose |
+| --- | --- |
+| `AgentRole` | Future-facing role hint for governance decisions. |
+| `UserId` | Caller identity passed from the turn pipeline. |
+| `AllowedCategories` | Optional category allow list. |
+| `AllowedToolNames` | Optional exact-name allow list. |
+In the current `TurnPipeline`, the runtime passes only `UserId`, so the default open-visibility path is used unless a caller builds a narrower context elsewhere.
+## Built-in tools
+Phase 1 ships with wiki-oriented tools only.
+| Tool | Category | What it does |
+| --- | --- | --- |
+| `wiki_search` | `knowledge` | Searches the knowledge wiki through `IKnowledgeService.SearchAsync`. |
+| `wiki_read` | `knowledge` | Reads a specific page through `IKnowledgeService.GetPageAsync`. |
+| `wiki_write` | `knowledge` | Creates or updates a page through `IKnowledgeService.PutPageAsync`. |
+These tools resolve `IKnowledgeService` through `IServiceScopeFactory` during execution. That avoids holding a transient knowledge service instance for the full process lifetime.
+## How the turn pipeline uses governance
+`TurnPipeline` asks the registry for visible tools using a `ToolVisibilityContext` that includes the sender id:
+```csharp
+_toolRegistry.GetVisibleTools(new ToolVisibilityContext
+{
+    UserId = message.SenderId
+});
+```
+The returned tool names are merged into the `ConversationContext` and surfaced in the assembled system message. Tool governance therefore already affects the model through visibility and prompt shaping, even before model-native tool invocation is implemented.
+## Execution behavior
+`ToolExecutor` is intentionally small. It:
+1. looks up a tool by name
+2. returns a failed `ToolResult` when the tool does not exist
+3. returns a failed `ToolResult` when the tool has no handler
+4. executes the handler when present
+5. converts unexpected exceptions into failed `ToolResult` values
+It preserves `OperationCanceledException`, which allows cancellation to flow correctly.
+## What Phase 1 does not do yet
+Tool governance is not a full authorization system. It does not currently:
+- persist per-user tool policies
+- audit every allowed or denied execution attempt
+- inject approval workflows
+- bind directly to configuration models
+- enforce a second execution-time allow-list check inside `ToolExecutor`
+That narrower design keeps the initial runtime simple while still making tool exposure explicit.
+## Extensibility
+The design scales by adding more `ToolDefinition` instances rather than rewriting the policy engine. Typical extension points are:
+- add more built-in or custom tool definitions to the registry
+- set `Category` consistently on new tools
+- provide narrower `ToolVisibilityContext` values from a caller or higher-level runtime path
+- replace or extend the policy if a later phase needs richer rules
+## Related documentation
+- [Knowledge Retrieval](knowledge-retrieval.md)
+- [Turn Pipeline](turn-pipeline.md)
+- [Context Gating](context-gating.md)
+- [Phase 1 Configuration](../configuration/phase-1-config.md)

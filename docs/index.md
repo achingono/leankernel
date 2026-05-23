@@ -6,11 +6,13 @@ LeanKernel is a .NET 10 personal agent platform with a modular monolith architec
 
 | Section | Description |
 | --- | --- |
+| [CONTRIBUTING-DOCS.md](CONTRIBUTING-DOCS.md) | Documentation contribution guide and per-phase documentation requirements for the rearchitecture. |
 | [architecture/](architecture/index.md) | Current architecture, ownership boundaries, runtime topology, and key request flows. |
-| [features/](features/index.md) | Implementation-focused docs for authentication/authorization and intelligent model routing. |
+| [features/](features/index.md) | Feature documentation organized by implementation phase. |
+| [configuration/](configuration/index.md) | Phase-by-phase configuration reference for new settings and defaults. |
 | [skills/](skills/index.md) | Runtime skill loading model, `SKILL.md` contract, and security/runtime behavior. |
 | [development/](development/index.md) | Build/test quality gates and LiteLLM spec compiler details. |
-| [plans/](plans/index.md) | Forward-looking roadmap PRDs (not all implemented). |
+| [plans/](plans/index.md) | Forward-looking roadmap PRDs and planning artifacts. |
 
 ## Runtime Summary
 

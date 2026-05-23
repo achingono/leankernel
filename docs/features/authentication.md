@@ -1,92 +1,49 @@
 # Authentication and Authorization
 
-This document reflects the current auth implementation in `LeanKernel.Host`.
+This document reflects the current authentication behavior implemented in `LeanKernel.Gateway`.
 
-## Auth Modes
+## Current auth model
 
-Configured via `LeanKernel:Auth:Mode`:
+Phase 1 currently uses a simple API-key check for the protected Gateway endpoints.
 
-| Mode | Behavior |
-| --- | --- |
-| `LocalPasscode` | Passcode login creates cookie session; API tokens support bearer auth |
-| `Oidc` | OIDC challenge/callback with mapped admin identity |
-| `Disabled` | Development-only bypass; outside Development the app logs and falls back to enforced auth |
+- `GET /api/health` is anonymous so container and orchestration probes can succeed without credentials.
+- `POST /api/chat` requires `X-Api-Key` when a gateway key is configured.
+- `GET /api/diagnostics/{sessionId}` requires `X-Api-Key` when a gateway key is configured.
+- `GET /api/diagnostics/{sessionId}/context`, `/budget`, and `/history` use the same API-key requirement.
+- If no gateway key is configured, chat and diagnostics stay open for local development.
 
-## Credential Storage
+## Configuration
 
-- Passcode hashing: **PBKDF2-SHA512**, 200,000 iterations, random salt, fixed-time compare (`PasscodeService`)
+Gateway reads these settings:
 
-> **Note:** PBKDF2-SHA512 is used for compatibility and broad platform support. Argon2id is a modern alternative, but this implementation uses PBKDF2-SHA512 by design for simplicity and to avoid additional dependencies. .NET-compatible Argon2 libraries are available if future migration is desired.
-- Session invalidation: security stamp claim (`LeanKernel:stamp`) checked on cookie validation
-- API tokens:
-  - Generated with prefix `sk-LeanKernel-`
-  - Raw token shown once at create time
-  - SHA-256 hash persisted in auth state
-  - Revocation and expiration enforced in bearer handler
-
-## Schemes and Policies
-
-Schemes (`AuthConstants`):
-
-- Cookie: `LeanKernelCookie`
-- Bearer: `LeanKernelBearer`
-
-Policies:
-
-| Policy | Requirements |
-| --- | --- |
-| `UiAuthenticated` | Cookie auth + `admin` role |
-| `AdminOnly` | Cookie or bearer auth + `admin` role |
-| `ApiAccess` | Bearer auth + `api_client` or `admin` role |
-
-## Endpoint Protection (Current)
-
-Anonymous:
-
-- `GET /api/health`
-- `POST /api/auth/login`
-- `POST /api/auth/login-form`
-- `GET /api/auth/status`
-- `POST /api/auth/bootstrap` (only until passcode is configured)
-- `GET /api/onboarding/status`
-- `GET /api/onboarding/agents/presets`
-
-Admin policy (`AdminOnly` and/or onboarding-conditional admin checks):
-
-- `/api/config` (`GET`, `PATCH`)
-- `/api/files/*`, `/api/logs*`, `/api/stats`
-- `/api/wiki/*`
-- `/api/chat/*`
-- `/api/routing-config*`
-- `/api/model-limit-drift`
-- most onboarding mutation routes after onboarding is complete
-
-Bearer API policy (`ApiAccess`):
-
-- `POST /v1/chat/completions`
-- `GET /v1/models`
-
-## Key API Endpoints
-
-| Endpoint | Method | Description |
+| Key | Type | Description |
 | --- | --- | --- |
-| `/api/auth/login` | POST | Passcode login |
-| `/api/auth/logout` | POST | Sign out cookie session |
-| `/api/auth/me` | GET | Current principal summary |
-| `/api/auth/passcode` | POST | Change passcode |
-| `/api/auth/tokens` | GET/POST | List/create API tokens |
-| `/api/auth/tokens/{id}` | DELETE | Revoke token |
-| `/api/auth/revoke-sessions` | POST | Rotate security stamp and invalidate sessions |
-| `/api/auth/bootstrap` | POST | One-time initial passcode setup |
+| `LeanKernel:Gateway:ApiKey` | string | Single accepted API key. Empty means no auth enforcement. |
+| `LeanKernel:Gateway:ApiKeys` | string array | Optional array form for multi-value overrides. Any listed key is accepted. |
 
-## Config Fields (Auth)
+## Client behavior
 
-`LeanKernel:Auth` supports:
+When auth is enabled, clients must send:
 
-- `Mode`
-- `SessionDurationMinutes`
-- `TokenDefaultExpirationDays`
-- `AllowedOrigins`
-- `Local` (`MinLength`, `MaxFailedAttempts`, `LockoutMinutes`)
-- `Oidc` (`Authority`, `ClientId`, `ClientSecret`, `CallbackPath`, `Scopes`, `AdminSubjectClaim`, `AdminClaimType`)
-- `RateLimit` (`LoginPerMinutePerIp`, `LoginPerHourPerIp`, `LoginPerMinuteGlobal`, `TokenCreationPerHour`)
+```http
+X-Api-Key: <configured-key>
+```
+
+Example:
+
+```bash
+curl http://localhost:5080/api/chat \
+  -H "X-Api-Key: replace-me" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Hello from LeanKernel"}'
+```
+
+## Planned expansion
+
+Broader auth flows such as admin UI auth, bearer-token APIs, and OIDC are still planned rearchitecture work and are not implemented in the current Gateway slice.
+
+## Related documentation
+
+- [Gateway API](gateway-api.md)
+- [Context Diagnostics API](context-diagnostics-api.md)
+- [Phase 1 Configuration](../configuration/phase-1-config.md)

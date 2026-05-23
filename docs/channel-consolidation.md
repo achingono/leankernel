@@ -1,37 +1,38 @@
 # Channel Model
 
-This document describes the current channel abstraction used by `LeanKernel.Commander`.
+This document describes the current Phase 2 channel abstraction used by `LeanKernel.Channels`.
 
-`LeanKernel.Core.Interfaces.IChannel` is the canonical contract for:
+`LeanKernel.Abstractions.Interfaces.IChannel` is the canonical contract for:
 
-- Inbound lifecycle (`StartAsync`, `StopAsync`, `OnMessageReceived`)
-- Sender authorization (`IsAuthorizedSender`)
-- Direct send (`SendAsync`)
-- Delivery with status (`DeliverAsync` -> `ChannelDeliveryResult`)
-- Identity metadata (`ChannelId`, `Name`, `IsConfigured`)
+- inbound lifecycle (`StartAsync`, `StopAsync`)
+- connectivity state (`IsConnected`)
+- direct outbound send (`SendAsync`)
+- inbound message delivery via `MessageReceived`
+- stable channel identity through `ChannelId`
 
-`DeliverAsync` has a default behavior that calls `SendAsync`, and adapters can override it for richer retry/diagnostic behavior.
+`ChannelMessage` is the normalized inbound payload shared by all channel adapters. `ChannelRouter` converts it to `LeanKernelMessage`, enforces per-channel auth from configuration, calls `IAgentRuntime.RunTurnAsync`, and sends the response through the originating adapter.
 
-## Registered Adapters
-
-Current Commander registrations:
+## Registered adapters
 
 | Adapter | Channel ID | Notes |
 | --- | --- | --- |
-| `SignalChannel` | `signal` | Supports signal-cli local mode or HTTP daemon mode based on `Signal.DaemonBaseUrl` |
-| `DiscordChannelAdapter` | `discord` | Outbound adapter using Discord REST API |
+| `SignalChannel` | `signal` | Disabled by default. Polls the Signal HTTP daemon at `/v1/receive/{account}` and sends replies through `/v2/send`. |
 
-## Routing and Delivery
+## Routing model
 
-- `ChannelRouter` subscribes to each configured channel’s inbound events.
-- Inbound messages are normalized, passed to `IThinkerService`, then sent back through the originating channel.
-- Direct response sends have a timeout (`35s` default).
-- On direct-send failure, `ChannelRouter` can enqueue urgent retries into `IMessageQueue` when available.
+- `ChannelHostedService` subscribes to each registered adapter's `MessageReceived` event.
+- `ChannelAuthenticator` fail-closes when no auth config exists for a channel.
+- Authorized inbound messages reuse the same runtime path as the HTTP gateway.
+- Channel-specific reasoning logic stays out of adapters and out of `LeanKernel.Gateway`.
 
-## Durable Queue Integration
+## Current limitations
 
-Commander uses:
+- Signal support currently uses polling rather than streaming/websockets.
+- Sender authorization is allowlist-based in this slice (`AllowedSenders` + `RequireAuth`).
+- Durable outbound queue behavior remains outside this Phase 2 implementation.
 
-- `MessageQueueService` (in-memory queue)
-- `PersistentMessageQueueService` (SQLite-backed durability via `messagequeue.db`)
-- `MessageProcessingBackgroundService` for queued delivery processing
+## Related documentation
+
+- [Channels](features/channels.md)
+- [Phase 2 Configuration](configuration/phase-2-config.md)
+- [Solution Structure](architecture/solution-structure.md)

@@ -40,7 +40,7 @@ Coverage excludes the following categories because they are integration surfaces
 
 ## Local SonarQube Scan
 
-Run a local SonarQube Community Edition server in Docker and execute the .NET scanner from a .NET SDK container:
+Run a local SonarQube Community Edition server from the standalone `docker-compose.sonar.yml` file and execute the .NET scanner from a .NET SDK container:
 
 ```bash
 scripts/quality/sonarqube-scan.sh
@@ -59,18 +59,19 @@ scripts/quality/sonarqube-scan.sh
 
 The scan uses OpenCover output from Coverlet and waits for the SonarQube quality gate.
 
-## Docker Image Validation
+## Docker Validation
 
-Build the runtime image after quality gates pass:
+Validate the rearchitected local stack definition before publishing images:
 
 ```bash
-docker build -t LeanKernel-engine:local .
+docker compose config
+docker build -t leankernel-engine:local .
 ```
 
 If an image scanner such as Trivy is installed, scan the image before publishing:
 
 ```bash
-trivy image LeanKernel-engine:local
+trivy image leankernel-engine:local
 ```
 
 ## Quality Gate Summary
@@ -81,7 +82,7 @@ flowchart TD
     B --> C[dotnet test]
     C --> D[Coverage gate ≥80%]
     D --> E[SonarQube scan]
-    E --> F[docker build]
+    E --> F[docker compose config + build]
     F --> G{Image scanner available?}
     G -- Yes --> H[trivy image scan]
     G -- No --> I[Done]

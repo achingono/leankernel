@@ -20,10 +20,11 @@ dotnet test src/LeanKernel.sln --no-build -v minimal
 # Coverage gate
 scripts/quality/test-coverage.sh
 
-# Local SonarQube scan
+# Local SonarQube scan (uses docker-compose.sonar.yml)
 scripts/quality/sonarqube-scan.sh
 
-# Docker build
-docker compose build
+# Docker validation / startup
+docker compose config
+docker build -t leankernel-engine:local .
 docker compose up -d
 ```

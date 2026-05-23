@@ -23,16 +23,17 @@ LeanKernel helps you turn AI from "interesting demos" into repeatable output wit
 |-----------------------------|----------------|
 | Context bloat drives rising token costs and weaker answers | Context gatekeeper injects only high-value memory to improve relevance and reduce waste |
 | Hard to debug agent failures across tools and model hops | Structured middleware logs and diagnostics make runs observable and fixable |
-| Knowledge is fragmented across chat history, docs, and ad hoc notes | Unified 5W1H wiki + vector index keeps memory queryable and reusable |
+| Knowledge is fragmented across chat history, docs, and ad hoc notes | Unified 5W1H wiki + durable memory services keep facts queryable and reusable |
 | Switching models/providers requires code churn and config drift | LiteLLM routing centralizes model strategy and allows provider changes with minimal disruption |
 
 ### Benefit Stack (Feature -> Tangible Outcome -> Emotional Win)
 
 - **Deny-by-default context gating** -> fewer irrelevant tokens and tighter prompts -> more confidence that answers stay on target.
-- **5W1H structured memory + vector retrieval** -> faster recall of past facts and decisions -> less repeated explaining and lower frustration.
+- **Deterministic history shaping** -> recent turns stay verbatim while older turns compact into traceable summaries -> lower context spend without losing critical decisions.
+- **5W1H structured memory + durable retrieval** -> faster recall of past facts and decisions -> less repeated explaining and lower frustration.
 - **MAF multi-agent orchestration** -> specialized workers handle complex requests predictably -> more done per day with less manual juggling.
-- **Dockerized sidecars (LiteLLM, Qdrant, indexer)** -> reproducible runtime on constrained hardware -> lower ops anxiety and easier recovery.
-- **Built-in web UI + API compatibility** -> one place for chat, logs, files, and configuration -> faster troubleshooting and smoother handoffs.
+- **Dockerized core stack (Gateway, LiteLLM, Postgres, GBrain, optional Signal)** -> reproducible local runtime with fewer moving parts -> lower ops anxiety and easier recovery.
+- **Thin Gateway API + shared channel routing** -> API and Signal messages reuse one runtime path -> faster integration and clearer transport behavior during the rearchitecture.
 
 ## Main Pain Points with Existing AI Agents (Online Signals)
 
@@ -51,37 +52,33 @@ LeanKernel is organized around a single agent runtime and feature-owned subsyste
 | Component | Role |
 |-----------|------|
 | **Agent Runtime** | Canonical entry point for each turn via `IAgentRuntime`. |
-| **Commander** | Channel adapters, channel routing, and durable outbound message queue. |
+| **Channels** | Channel adapters, per-channel auth, and inbound/outbound transport routing. |
 | **Thinker** | Turn orchestration, prompt assembly, tool dispatch, model invocation strategies, and post-turn event publication. |
 | **Archivist** | Sessions, identity/profile artifacts, engagement policy, 5W1H wiki, vector search, capability gaps, and deny-by-default context gating. |
 | **Scheduler** | Cron jobs and proactive maintenance. |
 | **Plugins** | Built-in tools, attachment extraction, and runtime skill loading. |
-| **Host** | ASP.NET Core API, Blazor UI, authentication, onboarding UI, and composition. |
+| **Gateway** | ASP.NET Core composition root for the Minimal API surface plus the Phase 4 Blazor Server chat and onboarding UI, health/chat/diagnostics endpoints, and runtime wiring. |
 
 ### Component Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Docker Compose Network                        │
-│                                                                  │
-│  ┌────────────┐   ┌──────────────────────────────────────────┐  │
-│  │ signal-cli  │◄─►│         LeanKernel-engine (.NET 10)           │  │
-│  │ (JSON-RPC)  │   │                                          │  │
-│  └────────────┘   │  Channels/UI/API ──► IAgentRuntime        │  │
-│                    │       │                   │                │  │
-│  ┌────────────┐   │       ▼                   ▼                │  │
-│  │  LiteLLM   │◄─►│  Commander ──► Thinker ──► Archivist      │  │
-│  │  (proxy)   │   │       │            │           │           │  │
-│  └────────────┘   │       │            │      5W1H Wiki       │  │
-│                    │       │            │      Qdrant Search   │  │
-│  ┌────────────┐   │       │            ▼                       │  │
-│  │  Qdrant    │◄─►│       │     Agent Strategies               │  │
-│  │  (vectors) │   │       │     ├── ResearchWorker             │  │
-│  │            │   │       │     ├── CodeWorker                 │  │
-│  │            │   │       │     └── ScheduleWorker             │  │
-│  └────────────┘   │       ▼                                    │  │
-│                    │  Scheduler · Plugins · Source Generators   │  │
-│                    └──────────────────────────────────────────┘  │
+│                    Docker Compose Network                       │
+│                                                                 │
+│  ┌──────────────┐   ┌───────────────────────────────────────┐  │
+│  │ PostgreSQL   │◄─►│       LeanKernel-engine (.NET 10)     │  │
+│  │ + pgvector   │   │  Gateway/Channels → Agent Runtime     │  │
+│  └──────────────┘   │       │                    │           │  │
+│                     │       ▼                    ▼           │  │
+│  ┌──────────────┐   │  Agents/Tools        Diagnostics       │  │
+│  │  LiteLLM     │◄─►│       │                    │           │  │
+│  │  (proxy)     │   │       ▼                    ▼           │  │
+│  └──────────────┘   │   Knowledge         Persistence        │  │
+│                     │       │                                │  │
+│  ┌──────────────┐   │       ▼                                │  │
+│  │   GBrain     │◄─►│   Wiki + Memory MCP                    │  │
+│  │   (MCP)      │   │                                        │  │
+│  └──────────────┘   └───────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -97,7 +94,37 @@ Unlike typical agents that send full conversation history to the LLM, LeanKernel
 
 **Token budget allocation:** System Prompt 15% · Wiki Facts 20% · History 40% · RAG LeanKernels 20% · Tools 5%
 
+History shaping is configurable under `LeanKernel:History`. By default LeanKernel keeps the newest six turns verbatim, compacts the next ten turns through LiteLLM, summarizes the next twenty turns, and persists compaction markers for auditability.
+
 **Scoring formula:** `(semantic_similarity × 0.40) + (recency_decay × 0.20) + (dimension_match × 0.25) + (interaction_frequency × 0.15)`
+
+### Scoped Retrieval Policies
+
+Phase 2 adds `LeanKernel:Retrieval` for deterministic scope enforcement, bounded entity expansion, and per-candidate retrieval diagnostics. Configure named scope policies in `src/LeanKernel.Gateway/appsettings.json` and optionally pass request metadata such as `retrieval_scope`, `task_scope`, or `agent_scope` to choose the effective policy without silently widening retrieval.
+
+### Intelligent Model Routing
+
+Phase 3 adds an optional routed execution path under `LeanKernel:Routing`. When enabled, LeanKernel scores task complexity, selects an economy/standard/premium model tier, and can escalate to a higher tier when deterministic quality gates fail. The same config block also carries deterministic response quality settings such as minimum output length, constraint coverage thresholds, and simple refusal-pattern matching. When `ShadowRoutingEnabled=true` and `ShadowModel` is configured, LeanKernel also invokes a non-authoritative shadow model in parallel, records both outputs for diagnostics, and still returns only the primary response. When disabled, the runtime keeps using the existing single-model `StaticAgentStrategy` path.
+
+### Response Enhancement
+
+Phase 3 also adds a synchronous response enhancement stage under `LeanKernel:Enhancement`. When enabled, LeanKernel runs deterministic post-model steps before delivery so it can append compact source notes, soften benign false refusals, and optionally inject inline citations. Enhancement is timeout-bounded, side-effect-free, and falls back to the original response if the enhancement pipeline fails or exceeds its budget.
+
+### Post-Turn Learning
+
+Phase 3 also adds an asynchronous post-turn learning stage under `LeanKernel:Learning`. Completed assistant turns can be published to a bounded background queue, then processed by ordered `ILearningStep` implementations for fact extraction, capability-gap tracking, and engagement metrics. Learning never blocks delivery: when the queue is full, LeanKernel drops the oldest queued learning event instead of backpressuring the user-facing turn path.
+
+### Scheduled Jobs and Proactive Tasks
+
+Phase 3 also adds a disabled-by-default scheduler under `LeanKernel:Scheduler`. The Gateway can evaluate Cronos-based cron jobs on a bounded background loop, run proactive `agent-prompt` turns through the same `IAgentRuntime` used for user messages, execute `knowledge-refresh` and `maintenance` jobs, and persist every execution to PostgreSQL for audit/history. Scheduler shutdown stops accepting new work and waits for in-flight jobs to finish.
+
+### Coordinator-Worker Orchestration
+
+Phase 3 also adds disabled-by-default coordinator-worker orchestration under `LeanKernel:Orchestration`. When enabled, LeanKernel can expose specialized workers as tools to a coordinator, scope each worker to specific tool names or categories, enforce per-worker timeout/depth/concurrency limits, and emit structured worker contribution traces for diagnostics and replay.
+
+### Production Hardening
+
+Phase 3 also adds an independently configurable hardening layer under `LeanKernel:Hardening`. The Gateway now supports correlation IDs, per-caller rate limiting, provider health tracking for PostgreSQL/LiteLLM/GBrain, node-local spend guardrails, graceful degradation when providers fail, fuller OpenTelemetry wiring, and Docker/container health checks that use `/api/health`.
 
 ### 5W1H Wiki System
 
@@ -116,7 +143,7 @@ Each fact carries confidence scores, source citations, and is automatically extr
 
 ### Self-Improvement by Default
 
-Every successful turn can emit a durable `TurnEvent` after the response is returned. A background `SelfImprovementWorker` drains the queue through configured `ILearningStep` implementations for fact extraction, identity refresh, and failure recovery. This keeps the user-facing path fast while ensuring learning is enabled by explicit configuration rather than fragile optional service wiring.
+Every successful turn can emit a durable `TurnEvent` after the response is returned. A background learning worker drains a bounded queue through configured `ILearningStep` implementations for LiteLLM-backed fact extraction, deterministic capability-gap detection, and engagement metrics updates. This keeps the user-facing path fast while making post-turn learning explicit, observable, and bounded by configuration.
 
 Wiki entries are stored as **markdown files** with YAML frontmatter — human-readable, editable, and git-friendly:
 
@@ -139,36 +166,17 @@ accessCount: 12
 - [Project Atlas](../what/project-atlas.md)
 ```
 
-### Knowledge Indexing
+### Shared Persistence and Memory Services
 
-LeanKernel uses a **sidecar indexer** to unify wiki facts and document search into a single vector index:
+The rearchitected local stack centers on a shared PostgreSQL instance for LeanKernel and LiteLLM plus a dedicated GBrain MCP service with its own embedded PGLite state instead of separate Qdrant, Unstructured, and indexer sidecars.
 
 | Service | Role |
 |---------|------|
-| **LeanKernel-indexer** | Python sidecar: watches wiki + documents, generates embeddings, stores in Qdrant |
-| **unstructured** | Parses complex documents (PDF, DOCX, EPUB) into structured chunks |
-| **Qdrant** (`LEANKERNEL_knowledge`) | Unified vector collection for wiki + documents |
+| **PostgreSQL + pgvector** | Primary persistence for LeanKernel and LiteLLM plus vector-capable database extensions |
+| **GBrain** | Bun-hosted `garrytan/gbrain` wiki and memory MCP server, persisting its embedded PGLite brain in the `gbrain-data` Docker volume and serving HTTP MCP from the root endpoint |
+| **LiteLLM** | Model proxy and routing surface for the engine |
 
-**Agent-scoped search**: Each agent sees only knowledge matching its configured tags. Configure in `appsettings.json`:
-
-```json
-{
-  "LeanKernel": {
-    "Knowledge": {
-      "AgentScopes": {
-        "research": { "tags": ["*"] },
-        "code": { "tags": ["wiki", "technical"] }
-      },
-      "TagRules": [
-        { "pathPattern": "wiki/**", "tags": ["wiki"] },
-        { "pathPattern": "documents/technical/**", "tags": ["technical"] }
-      ]
-    }
-  }
-}
-```
-
-To add documents, drop files into `./data/documents/`. The indexer automatically detects, parses, embeds, and indexes them.
+The engine connects to LiteLLM through `LEANKERNEL__LITELLM__BASEURL`, to GBrain through `LEANKERNEL__GBRAIN__BASEURL`, and to PostgreSQL through `LEANKERNEL__DATABASE__CONNECTIONSTRING`.
 
 ## Stack
 
@@ -178,11 +186,9 @@ To add documents, drop files into `./data/documents/`. The indexer automatically
 | Orchestration | Microsoft Agent Framework | 1.3.0 |
 | AI Abstractions | Microsoft.Extensions.AI | 10.5.0 |
 | OpenAI SDK | OpenAI | 2.10.0 |
-| LLM Proxy | LiteLLM | v1.83.7-stable |
-| Vector DB | Qdrant | v1.17.1 |
-| Document Parser | Unstructured.io | latest |
-| Knowledge Indexer | Python 3.12 (sidecar) | custom |
-| Messaging | signal-cli | latest |
+| LLM Proxy | LiteLLM | `main-latest` |
+| Persistence | PostgreSQL + pgvector | 16 |
+| Wiki/Memory MCP | GBrain | `garrytan/gbrain` via Bun |
 | Logging | Serilog | 9.0.0 |
 | Containers | Docker Compose | v2 |
 
@@ -193,24 +199,34 @@ Spin up LeanKernel, complete guided onboarding, and run your first production-st
 ```bash
 # 1) Configure environment
 cp .env.example .env
-# Add provider keys in .env (Signal is optional)
+# Add provider keys in .env as needed (ZEROENTROPY_API_KEY or OPENAI_API_KEY recommended for GBrain)
 
-# 2) Start the full stack
+# 2) Start the supporting services
+# (Signal is optional and commented out by default in docker-compose.yml)
 docker compose up -d
 
-# 3) Open the web app
-open http://localhost:5080
-
-# 4) Complete one-shot onboarding in the UI
-# - Configure LiteLLM, Qdrant, wiki, scheduler, and Signal (optional)
-# - Run built-in validation probes
-# - Click Complete Onboarding
-
-# 5) Verify health
+# 3) Verify health
 curl http://localhost:5080/api/health
+
+# 4) Run a chat turn (X-Api-Key only needed when configured)
+curl http://localhost:5080/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Hello from LeanKernel","metadata":{"retrieval_scope":"personal"}}'
+
+# 5) Open the Blazor workspace
+# http://localhost:5080/          (chat)
+# http://localhost:5080/onboarding (guided setup)
 ```
 
-If health returns successfully, proceed to `/chat` to run your first task and verify tool execution traces in the diagnostics panel.
+In Development, the generated OpenAPI document is available at `/openapi/v1.json`, and the Gateway also serves the interactive Blazor workspace from `/` plus the onboarding wizard at `/onboarding`.
+
+## User Interface
+
+- **Chat (`/`, `/chat`, `/chat/{sessionId}`):** The Chat page is the main Blazor workspace for day-to-day conversations. It supports creating and resuming sessions, renders persisted history with best-effort compaction badges, and shows a live loading state while the runtime completes a turn.
+- **Diagnostics (`/diagnostics`):** The Diagnostics page loads persisted session diagnostics and turns them into context, budget, history, routing, and quality panels. It is the operator view for answering what the runtime admitted, excluded, selected, and evaluated for a given session.
+- **Admin (`/admin`):** The Admin page is a mock-backed governance preview for provider health, routing tables, tool governance, spend summaries, and scheduled jobs. It validates the UI surface and interaction model, but the current implementation does not persist real admin changes.
+- **Knowledge (`/knowledge`):** The Knowledge page is a wiki browser for GBrain-backed pages with debounced search, paged browsing, detail views, inline editing, and page creation. It can enrich page details and browsing with GBrain MCP tools when those capabilities are available.
+- **Onboarding (`/onboarding`):** The Onboarding page is a five-step guided setup flow for identity, domains, and goals. It stores the resulting profile in GBrain wiki pages so personalization stays durable and inspectable.
 
 ### Local Development
 
@@ -219,7 +235,7 @@ If health returns successfully, proceed to `/chat` to run your first task and ve
 cd src
 dotnet build LeanKernel.sln
 dotnet test LeanKernel.sln
-dotnet run --project LeanKernel.Host
+dotnet run --project LeanKernel.Gateway
 ```
 
 ### Running Tests
@@ -245,43 +261,38 @@ See [docs/development/quality.md](docs/development/quality.md) for details and e
 
 ```
 LeanKernel/
-├── docker-compose.yml          # 5 services: engine, litellm, qdrant, unstructured, indexer
-├── Dockerfile                  # Multi-stage .NET 10 build
-├── .env.example                # Environment variables template
+├── docker-compose.yml          # 4 core services plus optional commented Signal daemon
+├── docker-compose.sonar.yml    # Standalone local SonarQube service
+├── Dockerfile                  # Multi-stage .NET 10 build for LeanKernel.Gateway
+├── .env.example                # Local infrastructure environment template
 ├── config/
-│   ├── render_litellm_config.py # Dynamic LiteLLM config renderer
-│   └── litellm/
-│       ├── Dockerfile          # LiteLLM container image (dynamic config startup)
-│       └── config.yaml         # Multi-provider/multi-tier routing template
+│   ├── gbrain/
+│   │   ├── Dockerfile          # Bun-based garrytan/gbrain image
+│   │   └── install-gbrain.sh   # Local Bun installer helper
+│   ├── litellm/
+│   │   ├── config.yaml         # LiteLLM routing/config source file
+│   │   └── render_litellm_config.py
+│   └── signal/
+│       ├── daemon.py           # Signal HTTP bridge contract used by SignalChannel
+│       └── README.md           # Registration/daemon notes for optional Signal support
 ├── data/
-│   ├── wiki/                   # 5W1H knowledge filesystem (.md files)
-│   │   ├── who/ what/ where/ when/ why/ how/
-│   │   └── .LeanKernel/             # Internal metadata
-│   ├── documents/              # Drop PDFs, ebooks, articles here
-│   ├── sessions/               # Conversation history
-│   ├── qdrant/                 # Vector DB storage
-│   └── logs/                   # Rolling application logs
+│   └── wiki/                   # Optional local wiki content; Compose runtime state now persists in the gbrain-data volume
 ├── scripts/
-│   ├── indexer/                # Knowledge indexer sidecar (Python)
-│   │   ├── Dockerfile
-│   │   ├── indexer.py
-│   │   └── requirements.txt
-│   ├── setup-signal.sh         # Signal registration helper
-│   └── wiki-backup.sh          # Wiki backup/restore
+│   ├── db/
+│   │   └── init.sql            # Postgres extension bootstrap
+│   └── quality/                # Coverage + Sonar validation helpers
 └── src/
-    ├── LeanKernel.Core/             # Interfaces, models, configuration
-    ├── LeanKernel.Commander/        # Channel adapters + durable message queue
-    ├── LeanKernel.Thinker/          # Agent runtime, model strategies, learning pipeline
-    ├── LeanKernel.Archivist/        # Memory, context gatekeeper, wiki, identity/policy
-    ├── LeanKernel.Scheduler/        # Cron-based proactive tasks
-    ├── LeanKernel.Plugins/          # Tool/plugin system
-    ├── LeanKernel.Generators/       # Roslyn source generators
-    ├── LeanKernel.Host/             # Web app: API controllers + Blazor UI
-    │   ├── Controllers/        #   REST API + OpenAI-compatible endpoints
-    │   ├── Services/           #   LogReader, FileBrowser
-    │   ├── Components/         #   Blazor pages + layout
-    │   └── wwwroot/css/        #   Cyber/Technical premium theme
-    └── LeanKernel.Tests.Unit/       # Unit tests
+    ├── LeanKernel.Abstractions/     # Shared contracts, models, and configuration
+    ├── LeanKernel.Agents/           # Agent runtime and turn orchestration
+    ├── LeanKernel.Channels/         # Channel adapters, auth, routing, and hosted lifecycle
+    ├── LeanKernel.Context/          # Context gating and prompt assembly
+    ├── LeanKernel.Diagnostics/      # Logging, metrics, and diagnostics primitives
+    ├── LeanKernel.Gateway/          # ASP.NET Core Minimal API composition root
+    ├── LeanKernel.Knowledge/        # GBrain-backed knowledge access
+    ├── LeanKernel.Persistence/      # Postgres-backed sessions and diagnostics
+    ├── LeanKernel.Tools/            # Tool registry and execution
+    ├── LeanKernel.Tests.Unit/       # Unit tests
+    └── LeanKernel.Tests.Integration/ # Integration tests
 ```
 
 ## Configuration
@@ -290,141 +301,58 @@ All configuration is via `appsettings.json` or environment variables (using `__`
 
 ```bash
 # Override via environment
-LEANKERNEL__LiteLlm__BaseUrl=http://litellm:4000
-LEANKERNEL__LiteLlm__DefaultModel=small
-LEANKERNEL__Qdrant__Host=localhost
-LEANKERNEL__Signal__Enabled=false
-LEANKERNEL__Signal__AllowedSenders__0=+15551234567
+LEANKERNEL__LITELLM__BASEURL=http://litellm:4000
+LEANKERNEL__LITELLM__DEFAULTMODEL=gpt-4o-mini
+LEANKERNEL__GBRAIN__BASEURL=http://gbrain:8789
+LEANKERNEL__IDENTITY__USERPREFERENCEPAGEKEY=identity-user-default
+LEANKERNEL__IDENTITY__ENABLEIDENTITYEXTRACTION=true
+LEANKERNEL__DATABASE__CONNECTIONSTRING=Host=database;Database=leankernel;Username=leankernel;Password=leankernel-dev-password
+LEANKERNEL__GATEWAY__APIKEY=replace-me
 ```
 
-### Authentication
+### Identity and onboarding
 
-LeanKernel requires authentication by default. During onboarding, you set an admin passcode.
+`LeanKernel:Identity` configures the GBrain-backed agent profile page, user preference page, onboarding threshold/question limits, and whether post-turn identity extraction writes allowlisted preference updates back to GBrain.
+
+### Gateway API key
+
+The current `LeanKernel.Gateway` slice uses a simple API-key check for `POST /api/chat` and the diagnostics routes under `/api/diagnostics/*`.
 
 ```bash
-# Auth modes (set via config or environment)
-LEANKERNEL__Auth__Mode=LocalPasscode    # Default: passcode + API tokens
-LEANKERNEL__Auth__Mode=Oidc             # OpenID Connect (external IdP)
-LEANKERNEL__Auth__Mode=Disabled         # Dev only (ASPNETCORE_ENVIRONMENT=Development)
+# Leave empty for local development without auth
+LEANKERNEL__GATEWAY__APIKEY=
+
+# Or require a key on chat + diagnostics requests
+LEANKERNEL__GATEWAY__APIKEY=replace-me
 ```
 
-**API Token Usage** (for programmatic access to `/v1/*` endpoints):
+When a key is configured, send it with `X-Api-Key`:
 
 ```bash
-# Create a token via the web UI or API
-curl -X POST http://localhost:5080/api/auth/tokens \
-  -H "Cookie: LEANKERNEL_session=..." \
+curl http://localhost:5080/api/chat \
+  -H "X-Api-Key: replace-me" \
   -H "Content-Type: application/json" \
-  -d '{"name": "CI Pipeline"}'
-
-# Use the token for API access
-curl http://localhost:5080/v1/chat/completions \
-  -H "Authorization: Bearer sk-LeanKernel-<your-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "LeanKernel", "messages": [{"role": "user", "content": "Hello"}]}'
-```
-
-**OIDC Configuration** (for enterprise SSO):
-
-```bash
-LEANKERNEL__Auth__Mode=Oidc
-LEANKERNEL__Auth__Oidc__Authority=https://your-idp.example.com
-LEANKERNEL__Auth__Oidc__ClientId=LeanKernel-app
-LEANKERNEL__Auth__Oidc__ClientSecret=your-secret
-LEANKERNEL__Auth__Oidc__AdminSubjectClaim=user@example.com
-LEANKERNEL__Auth__Oidc__AdminClaimType=email
+  -d '{"message": "Hello from LeanKernel"}'
 ```
 
 See [docs/features/authentication.md](docs/features/authentication.md) for the full authentication PRD.
 
-### LiteLLM Dynamic Routing
+### LiteLLM Configuration
 
-LiteLLM runs from a dedicated container image built from `config/litellm/Dockerfile`.
-At startup, it compiles the single-file source spec using `config/render_litellm_config.py`:
+`config/litellm/config.yaml` remains the local LiteLLM source spec. The rearchitected Compose stack mounts `./config/litellm` into the LiteLLM container, renders the runtime config with `render_litellm_config.py`, and then starts LiteLLM with the generated file.
 
-```bash
-python3 /app/render_litellm_config.py /app/litellm_spec.yaml /tmp/litellm_config.yaml
-```
-
-This keeps `config/litellm/config.yaml` as a declarative source spec while
-automatically excluding provider-key deployments that are missing required env vars.
-
-Local preview command:
+At minimum, configure the environment expected by the local stack:
 
 ```bash
-python3 config/render_litellm_config.py config/litellm/config.yaml /tmp/litellm_config.yaml
-```
-
-Sync model limits from live provider/deployment metadata:
-
-```bash
-# dry-run
-python3 scripts/sync_litellm_model_limits.py
-
-# write updates to config/litellm/config.yaml
-python3 scripts/sync_litellm_model_limits.py --write
-```
-
-### LiteLLM Provider Environment Variables
-
-Configure these in `.env` (or your secret manager):
-
-```bash
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-GROQ_API_KEY=
-GROQ_API_KEY_2=
-GEMINI_API_KEY=
-GEMINI_API_KEY_2=
-GEMINI_API_KEY_3=
-AZURE_AI_API_KEY=
-AZURE_AI_API_BASE=
-AZURE_AI_API_KEY_2=
-AZURE_AI_API_BASE_2=
+LITELLM_MASTER_KEY=sk-leankernel-local
+DEFAULT_MODEL=gpt-4o-mini
+CONTEXT_WINDOW_TOKENS=128000
 OLLAMA_BASE_URL=http://host.docker.internal:11434
-LITELLM_MASTER_KEY=sk-LeanKernel-local
-LITELLM_SALT_KEY=change-me-to-random-string
+# Or provide hosted-provider keys such as OPENAI_API_KEY
 ```
 
-### LiteLLM Model Routing Template
+You can keep extending `config/litellm/config.yaml` with additional providers, aliases, and routing policies as needed.
 
-`config/litellm/config.yaml` is the only authoring file. It defines:
-
-- `providers`: provider credentials + model catalog
-- `routes`: route names mapped to provider/model selections
-- `aliases`: optional OpenAI-compatible aliases mapped to route names
-- `router`: retries, cooldown, and fallback policies
-
-Example shape:
-
-```yaml
-providers:
-  groq:
-    keys:
-      - source: env
-        name: GROQ_API_KEY
-    models:
-      - id: scout
-        name: meta-llama/llama-4-scout-17b-16e-instruct
-        max_tokens: 8192
-
-routes:
-  small:
-    - provider: groq
-      model: scout
-      order: 1
-  embedding-small:
-    - provider: openai
-      model: text_embedding_3_small
-      order: 1
-
-aliases:
-  gpt-4o-mini: small
-
-# App model selection uses route names
-# LEANKERNEL__LiteLlm__DefaultModel=small
-# LEANKERNEL__LiteLlm__EmbeddingModel=embedding-small
-```
 ## Multi-Agent System
 
 LeanKernel uses the **MAF Agent-as-Tool** pattern — specialized worker agents are exposed as `AIFunction` tools on a coordinator agent. The LLM natively decides which specialists to invoke:
@@ -443,70 +371,30 @@ LeanKernel uses the **MAF Agent-as-Tool** pattern — specialized worker agents 
 | IChatClient | `FunctionLoggingMiddleware` | Logs tool invocations and results |
 | Agent Run | `DiagnosticsMiddleware` | Timing, token counts, tool call stats → StateBag |
 
-## Web UI
+## Gateway API
 
-LeanKernel includes a **Blazor Server** web interface with a premium **Cyber/Technical** aesthetic. Access at `http://localhost:5080`.
-
-| Page | Purpose |
-|------|---------|
-| **Login** (`/login`) | Passcode authentication gate |
-| **Onboarding** (`/onboarding`) | First-run blocking setup wizard with dependency validation and go-live completion |
-| **Dashboard** (`/`) | Health cards, uptime, wiki stats, system overview |
-| **Chat** (`/chat`) | Interactive chat with expandable tool diagnostics & thinking traces |
-| **Wiki** (`/wiki`) | 5W1H dimension tabs, search, entry detail with confidence bars |
-| **Logs** (`/logs`) | Real-time log viewer with level/search filters |
-| **Files** (`/files`) | Sandboxed data directory browser with file preview |
-| **Settings** (`/settings`) | Configuration viewer per section |
-
-### Design Theme
-- Dark base (`#0a0a0f`), neon primary (`#00ff88`), secondary (`#00d4ff`)
-- Glassmorphism panels with backdrop blur, noise overlay grain
-- Staggered entrance animations, respects `prefers-reduced-motion`
-- Full keyboard navigation + ARIA labels
-
-## API
-
-### Internal API (used by Web UI)
+`LeanKernel.Gateway` currently exposes the thin HTTP surface over the composed runtime, while `LeanKernel.Channels` adds optional Phase 2 inbound channel routing through the same runtime entry point.
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/api/health` | GET | Anonymous | Health check |
-| `/api/auth/status` | GET | Anonymous | Auth mode and state |
-| `/api/auth/login` | POST | Anonymous | Passcode login |
-| `/api/auth/bootstrap` | POST | Anonymous* | Initial passcode setup (one-time) |
-| `/api/auth/logout` | POST | Cookie | End session |
-| `/api/auth/me` | GET | Admin | Current principal info |
-| `/api/auth/passcode` | POST | Admin | Change passcode |
-| `/api/auth/tokens` | GET/POST | Admin | List/create API tokens |
-| `/api/auth/tokens/{id}` | DELETE | Admin | Revoke token |
-| `/api/auth/revoke-sessions` | POST | Admin | Invalidate all sessions |
-| `/api/stats` | GET | Admin | System statistics |
-| `/api/config` | GET | Admin | Configuration (secrets masked) |
-| `/api/chat/sessions` | GET | Admin | List chat sessions |
-| `/api/chat/sessions/{id}` | GET | Admin | Session message history |
-| `/api/chat/message` | POST | Admin | Send a message |
-| `/api/wiki/dimensions` | GET | Admin | Wiki dimension counts |
-| `/api/wiki/entries?dimension=` | GET | Admin | List wiki entries |
-| `/api/wiki/search?q=` | GET | Admin | Search wiki |
-| `/api/logs?level=&q=` | GET | Admin | Search logs |
-| `/api/files/browse?path=` | GET | Admin | Browse data directory |
-| `/api/files/read?path=` | GET | Admin | Read file contents |
+| `/api/health` | GET | Anonymous | Health check plus core DI service status. |
+| `/api/chat` | POST | `X-Api-Key` when configured | Run one turn through `IAgentRuntime` and return the response with a session id. |
+| `/api/diagnostics/{sessionId}` | GET | `X-Api-Key` when configured | Retrieve persisted diagnostics for a session. |
+| `/api/diagnostics/{sessionId}/context` | GET | `X-Api-Key` when configured | Return the latest or requested per-turn context admission audit. |
+| `/api/diagnostics/{sessionId}/budget` | GET | `X-Api-Key` when configured | Return per-category context budget allocation and usage for a turn. |
+| `/api/diagnostics/{sessionId}/history` | GET | `X-Api-Key` when configured | Return persisted history shaping diagnostics for a turn. |
 
-### OpenAI-Compatible API
+### OpenAPI
 
-Connect any OpenAI SDK client to LeanKernel (requires API token):
+In Development, Gateway exposes its generated OpenAPI document at `/openapi/v1.json`.
 
-```bash
-# Chat completion (routes through LeanKernel's full pipeline)
-curl http://localhost:5080/v1/chat/completions \
-  -H "Authorization: Bearer sk-LeanKernel-<your-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "LeanKernel", "messages": [{"role": "user", "content": "Hello"}]}'
+### Optional channel ingress
 
-# List models
-curl http://localhost:5080/v1/models \
-  -H "Authorization: Bearer sk-LeanKernel-<your-token>"
-```
+Phase 2 adds a shared channel abstraction plus a disabled-by-default Signal adapter. Channel messages are authenticated per channel, normalized, then routed through the same `IAgentRuntime` entry point used by `/api/chat`.
+
+### Planned UI and compatibility endpoints
+
+The rearchitecture plans additional UI, auth, and OpenAI-compatible surfaces, but they are not implemented in the current `LeanKernel.Gateway` slice yet.
 
 ## Plugin System
 
@@ -538,16 +426,14 @@ Built-in tools: `wiki_query`, `web_search`, `reminder`, `file_system`
 ./scripts/wiki-backup.sh restore data/backups/LeanKernel-wiki-20260429.tar.gz
 ```
 
-## Resource Requirements
+## Local Service Ports
 
-Designed for constrained hardware (4GB+ mini PC / NAS):
-
-| Service | Memory Limit | Memory Reserved |
-|---------|-------------|-----------------|
-| LeanKernel Engine | 512 MB | 256 MB |
-| Qdrant | 512 MB | 128 MB |
-| LiteLLM | 256 MB | — |
-| **Total** | **~1.3 GB** | |
+| Service | Default port | Purpose |
+|---------|--------------|---------|
+| LeanKernel Engine | `5080` | Gateway HTTP API, chat endpoint, and health check |
+| LiteLLM | `4000` | Model proxy |
+| PostgreSQL + pgvector | `5432` | Shared persistence for the stack |
+| GBrain | `8789` | Wiki and memory MCP service |
 
 ## Logging
 

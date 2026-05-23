@@ -1,13 +1,36 @@
-# Features
+# Feature Documentation
 
-This section documents major LeanKernel feature implementations.
+Documentation for implemented features. Each file documents one major capability.
 
-## Contents
+## Phase 1 — Core Runtime
+- [Context Gating](context-gating.md)
+- [Turn Pipeline](turn-pipeline.md)
+- [Knowledge Retrieval](knowledge-retrieval.md)
+- [Tool Governance](tool-governance.md)
+- [Diagnostics](diagnostics.md)
+- [Gateway API](gateway-api.md)
+- [Authentication and Authorization](authentication.md)
 
-| Document | Description |
-|----------|-------------|
-| [authentication.md](authentication.md) | Implemented auth model: local passcode, OIDC, bearer tokens, policies, and endpoint protection behavior. |
-| [intelligent-model-routing.md](intelligent-model-routing.md) | Implemented routing pipeline: complexity scoring, candidate selection, quality escalation, cooldowns, and spend guard. |
-| [scheduled-jobs-management.md](scheduled-jobs-management.md) | Runtime scheduler management with chat CRUD tooling, scoped defaults, and durable job/state storage. |
+## Phase 2 — Context & Personalization
+- [Identity and Onboarding](identity-onboarding.md)
+- [Scoped Retrieval](scoped-retrieval.md)
+- [History Shaping](history-shaping.md)
+- [Channels](channels.md)
+- [Context Diagnostics API](context-diagnostics-api.md)
 
-Roadmap and planned enhancements live under [docs/plans/](../plans/index.md).
+## Phase 3 — Reliability & Optimization
+- [Model Routing](model-routing.md)
+- [Quality Gates](quality-gates.md)
+- [Shadow Routing](shadow-routing.md)
+- [Multi-Agent Orchestration](multi-agent.md)
+- [Response Enhancement](response-enhancement.md)
+- [Learning Pipeline](learning-pipeline.md)
+- [Scheduler](scheduler.md)
+- [Production Operations](production-ops.md)
+
+## Phase 4 — User Interface
+- [Chat UI](ui-chat.md)
+- [Diagnostics UI](ui-diagnostics.md)
+- [Admin UI](ui-admin.md)
+- [Knowledge UI](ui-knowledge.md)
+- [Onboarding UI](ui-onboarding.md)
