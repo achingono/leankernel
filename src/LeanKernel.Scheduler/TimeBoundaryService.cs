@@ -1,131 +1,98 @@
-using Microsoft.Extensions.Logging;
-using LeanKernel.Core.Configuration;
-using LeanKernel.Core.Interfaces;
-using LeanKernel.Core.Models;
+using LeanKernel.Abstractions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Scheduler;
 
 /// <summary>
-/// Service for checking time boundaries from engagement rules.
+/// Provides timezone-aware day-boundary calculations for scheduled jobs.
 /// </summary>
-public sealed class TimeBoundaryService : ITimeBoundaryService
+public sealed class TimeBoundaryService(IOptions<SchedulerConfig> config)
 {
-    private readonly EngagementRules _rules;
-    private readonly TimeZoneInfo _userTimeZone;
-    private readonly ILogger<TimeBoundaryService> _logger;
+    private readonly SchedulerConfig _config = (config ?? throw new ArgumentNullException(nameof(config))).Value;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="TimeBoundaryService" /> class.
+    /// Gets the current local day boundary for the supplied UTC timestamp.
     /// </summary>
-    /// <param name="rules">The engagement rules that define active hours and quiet windows.</param>
-    /// <param name="logger">The logger used for time-boundary diagnostics.</param>
-    public TimeBoundaryService(EngagementRules rules, ILogger<TimeBoundaryService> logger)
+    /// <param name="utcNow">The UTC timestamp to evaluate.</param>
+    /// <param name="timeZoneId">The optional timezone identifier.</param>
+    /// <returns>The resolved time boundary.</returns>
+    public TimeBoundary GetCurrentBoundary(DateTimeOffset utcNow, string? timeZoneId = null)
     {
-        _rules = rules;
-        _logger = logger;
-        
-        // Parse timezone from engagement rules (default to UTC if not specified or invalid)
-        var tzName = _rules.TimeBoundaries.Timezone ?? "UTC";
-        
-        // Map common timezone names to IANA timezone identifiers
-        tzName = tzName switch
+        var localTime = TimeZoneInfo.ConvertTime(utcNow, ResolveTimeZone(timeZoneId));
+        return localTime.Hour switch
         {
-            "Eastern" => "America/New_York",
-            "Central" => "America/Chicago",
-            "Mountain" => "America/Denver",
-            "Pacific" => "America/Los_Angeles",
-            "GMT" => "Etc/UTC",
-            "UTC" => "Etc/UTC",
-            _ => tzName
+            < 6 => TimeBoundary.Night,
+            < 12 => TimeBoundary.Morning,
+            < 18 => TimeBoundary.Afternoon,
+            < 22 => TimeBoundary.Evening,
+            _ => TimeBoundary.Night,
         };
-        
+    }
+
+    /// <summary>
+    /// Gets the UTC start time for the current boundary.
+    /// </summary>
+    /// <param name="utcNow">The UTC timestamp to evaluate.</param>
+    /// <param name="timeZoneId">The optional timezone identifier.</param>
+    /// <returns>The UTC timestamp for the current boundary start.</returns>
+    public DateTimeOffset GetStartOfCurrentBoundary(DateTimeOffset utcNow, string? timeZoneId = null)
+        => GetBoundaryStart(utcNow, GetCurrentBoundary(utcNow, timeZoneId), timeZoneId);
+
+    /// <summary>
+    /// Gets the UTC start time for a specific boundary on the day containing the supplied timestamp.
+    /// </summary>
+    /// <param name="utcNow">The UTC timestamp to evaluate.</param>
+    /// <param name="boundary">The boundary whose start should be returned.</param>
+    /// <param name="timeZoneId">The optional timezone identifier.</param>
+    /// <returns>The UTC timestamp for the requested boundary start.</returns>
+    public DateTimeOffset GetBoundaryStart(DateTimeOffset utcNow, TimeBoundary boundary, string? timeZoneId = null)
+    {
+        var timeZone = ResolveTimeZone(timeZoneId);
+        var localTime = TimeZoneInfo.ConvertTime(utcNow, timeZone);
+        var localDate = localTime.Date;
+
+        var localBoundary = boundary switch
+        {
+            TimeBoundary.Morning => localDate.AddHours(6),
+            TimeBoundary.Afternoon => localDate.AddHours(12),
+            TimeBoundary.Evening => localDate.AddHours(18),
+            TimeBoundary.Night when localTime.Hour < 6 => localDate.AddDays(-1).AddHours(22),
+            TimeBoundary.Night => localDate.AddHours(22),
+            _ => throw new ArgumentOutOfRangeException(nameof(boundary), boundary, "Unsupported time boundary."),
+        };
+
+        return ConvertLocalTimeToUtc(localBoundary, timeZone);
+    }
+
+    /// <summary>
+    /// Resolves a timezone identifier, falling back to the configured scheduler default.
+    /// </summary>
+    /// <param name="timeZoneId">The optional timezone identifier.</param>
+    /// <returns>The resolved timezone.</returns>
+    public TimeZoneInfo ResolveTimeZone(string? timeZoneId = null)
+    {
+        var effectiveTimeZoneId = string.IsNullOrWhiteSpace(timeZoneId)
+            ? _config.DefaultTimezone
+            : timeZoneId;
+
         try
         {
-            _userTimeZone = TimeZoneInfo.FindSystemTimeZoneById(tzName);
+            return TimeZoneInfo.FindSystemTimeZoneById(effectiveTimeZoneId);
         }
-        catch (TimeZoneNotFoundException)
+        catch (TimeZoneNotFoundException ex)
         {
-            _logger.LogWarning("Timezone {Timezone} not found; using UTC", tzName);
-            _userTimeZone = TimeZoneInfo.Utc;
+            throw new ArgumentException($"Timezone '{effectiveTimeZoneId}' was not found.", nameof(timeZoneId), ex);
+        }
+        catch (InvalidTimeZoneException ex)
+        {
+            throw new ArgumentException($"Timezone '{effectiveTimeZoneId}' is invalid.", nameof(timeZoneId), ex);
         }
     }
 
-    /// <inheritdoc />
-    public bool IsInActiveHours()
+    private static DateTimeOffset ConvertLocalTimeToUtc(DateTime localTime, TimeZoneInfo timeZone)
     {
-        var now = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _userTimeZone);
-        var boundaries = _rules.TimeBoundaries;
-        
-        // Check Sabbath first
-        if (boundaries.SabbathDay.HasValue && now.DayOfWeek == boundaries.SabbathDay && !boundaries.AllowSabbathMessages)
-        {
-            _logger.LogDebug("Current time is Sabbath; not in active hours");
-            return false;
-        }
-        
-        // Check active hours boundaries
-        if (boundaries.ActiveHoursStart.HasValue && now.Hour < boundaries.ActiveHoursStart.Value)
-        {
-            _logger.LogDebug("Current time {Hour}:00 is before active hours start {Start}", now.Hour, boundaries.ActiveHoursStart);
-            return false;
-        }
-        
-        if (boundaries.ActiveHoursEnd.HasValue && now.Hour >= boundaries.ActiveHoursEnd.Value)
-        {
-            _logger.LogDebug("Current time {Hour}:00 is after active hours end {End}", now.Hour, boundaries.ActiveHoursEnd);
-            return false;
-        }
-        
-        _logger.LogDebug("Current time is within active hours");
-        return true;
-    }
-
-    /// <inheritdoc />
-    public DateTime GetNextActiveWindow()
-    {
-        var now = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _userTimeZone);
-        var boundaries = _rules.TimeBoundaries;
-        
-        // Start with tomorrow at active hours start
-        var hour = boundaries.ActiveHoursStart ?? 8;
-        var next = now.Date.AddDays(1).AddHours(hour);
-        
-        // If Sabbath, skip to next day after Sabbath
-        if (boundaries.SabbathDay.HasValue)
-        {
-            while (next.DayOfWeek == boundaries.SabbathDay.Value)
-            {
-                next = next.AddDays(1);
-            }
-        }
-        
-        // Convert back to UTC for storage
-        var nextUtc = TimeZoneInfo.ConvertTimeToUtc(next, _userTimeZone);
-        
-        _logger.LogDebug("Next active window: {NextWindow}", nextUtc);
-        return nextUtc;
-    }
-
-    /// <inheritdoc />
-    public TimeBoundaryStatus GetStatus()
-    {
-        var now = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _userTimeZone);
-        var boundaries = _rules.TimeBoundaries;
-        var isActive = IsInActiveHours();
-        var nextWindow = GetNextActiveWindow();
-        
-        var isSabbath = boundaries.SabbathDay.HasValue && now.DayOfWeek == boundaries.SabbathDay;
-        var isQuiet = !isSabbath && 
-            (boundaries.ActiveHoursStart.HasValue && now.Hour < boundaries.ActiveHoursStart.Value ||
-             boundaries.ActiveHoursEnd.HasValue && now.Hour >= boundaries.ActiveHoursEnd.Value);
-        
-        return new TimeBoundaryStatus
-        {
-            IsInActiveHours = isActive,
-            NextActiveWindow = nextWindow,
-            IsSabbath = isSabbath,
-            IsQuietHours = isQuiet,
-            CurrentTimeZone = _userTimeZone.Id
-        };
+        var unspecified = DateTime.SpecifyKind(localTime, DateTimeKind.Unspecified);
+        var offset = timeZone.GetUtcOffset(unspecified);
+        return new DateTimeOffset(unspecified, offset).ToUniversalTime();
     }
 }
