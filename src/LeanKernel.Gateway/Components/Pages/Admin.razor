@@ -1,0 +1,626 @@
+@page "/admin"
+@using System.Globalization
+@implements IAsyncDisposable
+@inject AdminService AdminService
+@rendermode InteractiveServer
+
+<PageTitle>LeanKernel Admin</PageTitle>
+
+<section class="admin-page">
+    <header class="page-header admin-page__header">
+        <div>
+            <h1>Admin Console</h1>
+            <p>Govern provider health, model routing, tool access, spend, and scheduled jobs from one runtime surface.</p>
+        </div>
+        <div class="admin-page__meta">
+            <span class="admin-status-badge admin-status-badge--preview">Mock-backed preview</span>
+            @if (_dashboard is not null)
+            {
+                <time datetime="@FormatTimestampAttribute(_dashboard.GeneratedAt)">Updated @FormatDateTime(_dashboard.GeneratedAt)</time>
+            }
+        </div>
+    </header>
+
+    <div class="admin-page__notice" role="status" aria-live="polite">
+        <div>
+            <strong>Runtime governance preview</strong>
+            <p>@(_statusMessage ?? "Actions on this page currently update mock state only so the future admin API can slot in behind the same UI contract.")</p>
+        </div>
+        <span class="admin-status-badge admin-status-badge--neutral">Non-persistent</span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="status-banner status-banner--error" role="alert">
+            @_errorMessage
+        </div>
+    }
+
+    <section class="admin-page__section" aria-labelledby="admin-health-heading" aria-busy="@(_isLoading || _isRefreshingHealth)">
+        <header class="admin-section-heading">
+            <div>
+                <h2 id="admin-health-heading">System health overview</h2>
+                <p>Provider reachability, routing readiness, and the latest heartbeat checks.</p>
+            </div>
+            <div class="admin-section-heading__actions">
+                <button type="button"
+                        class="button button-secondary"
+                        @onclick="RefreshProviderHealthAsync"
+                        disabled="@(_isLoading || _isRefreshingHealth)"
+                        aria-label="Refresh provider health checks">
+                    @(_isRefreshingHealth ? "Re-checking…" : "Refresh checks")
+                </button>
+            </div>
+        </header>
+
+        @if (_isLoading || _dashboard is null)
+        {
+            <div class="admin-health-grid" aria-hidden="true">
+                @for (var index = 0; index < 4; index++)
+                {
+                    <article class="admin-health-card admin-health-card--skeleton">
+                        <div class="admin-skeleton admin-skeleton--title"></div>
+                        <div class="admin-skeleton admin-skeleton--body"></div>
+                        <div class="admin-health-card__metrics admin-health-card__metrics--skeleton">
+                            <div class="admin-skeleton admin-skeleton--metric"></div>
+                            <div class="admin-skeleton admin-skeleton--metric"></div>
+                            <div class="admin-skeleton admin-skeleton--metric"></div>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="admin-health-grid">
+                @foreach (var provider in _dashboard.ProviderHealth)
+                {
+                    <article class="admin-health-card">
+                        <header class="admin-health-card__header">
+                            <div>
+                                <h3 class="admin-health-card__title">@provider.Name</h3>
+                                <p class="admin-health-card__subtitle">@provider.Summary</p>
+                            </div>
+                            <span class="@GetProviderDotClass(provider.Status)" aria-hidden="true"></span>
+                        </header>
+
+                        <dl class="admin-health-card__metrics">
+                            <div>
+                                <dt>Status</dt>
+                                <dd>
+                                    <span class="@GetProviderBadgeClass(provider.Status)">@GetProviderStatusLabel(provider.Status)</span>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Latency</dt>
+                                <dd class="admin-table__metric">@provider.LatencyMs ms</dd>
+                            </div>
+                            <div>
+                                <dt>Last check</dt>
+                                <dd>
+                                    <time datetime="@FormatTimestampAttribute(provider.LastCheckedAt)">@FormatDateTime(provider.LastCheckedAt)</time>
+                                </dd>
+                            </div>
+                        </dl>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="admin-page__section" aria-labelledby="admin-routing-heading" aria-busy="@_isLoading">
+        <header class="admin-section-heading">
+            <div>
+                <h2 id="admin-routing-heading">Model routing configuration</h2>
+                <p>Current tier-to-model mapping prepared for future inline editing.</p>
+            </div>
+            <span class="admin-status-badge admin-status-badge--neutral">Read only</span>
+        </header>
+
+        @if (_isLoading || _dashboard is null)
+        {
+            <div class="admin-table-skeleton" aria-hidden="true">
+                @for (var index = 0; index < 5; index++)
+                {
+                    <div class="admin-skeleton admin-skeleton--row"></div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <caption>Routing rules by complexity tier.</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Tier</th>
+                            <th scope="col">Model</th>
+                            <th scope="col">Fallback model</th>
+                            <th scope="col">Max tokens</th>
+                            <th scope="col">Cost / 1k</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var rule in _dashboard.RoutingRules)
+                        {
+                            <tr>
+                                <th scope="row">@rule.Tier</th>
+                                <td><span class="admin-table__readonly">@rule.Model</span></td>
+                                <td><span class="admin-table__readonly">@rule.FallbackModel</span></td>
+                                <td class="admin-table__metric">@rule.MaxTokens.ToString("N0", CultureInfo.CurrentCulture)</td>
+                                <td class="admin-table__metric">@FormatCurrency(rule.CostPer1K)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="admin-page__section" aria-labelledby="admin-tools-heading" aria-busy="@(_isLoading || !string.IsNullOrWhiteSpace(_updatingToolName))">
+        <header class="admin-section-heading">
+            <div>
+                <h2 id="admin-tools-heading">Tool governance</h2>
+                <p>Filter the current registry and preview enablement changes before the admin API ships.</p>
+            </div>
+            <label class="admin-filter" for="admin-tool-filter">
+                <span>Category</span>
+                <select id="admin-tool-filter"
+                        class="admin-select"
+                        @bind="_selectedToolCategory"
+                        aria-label="Filter tool governance table by category">
+                    <option value="@AllCategoriesValue">All categories</option>
+                    @foreach (var category in ToolCategories)
+                    {
+                        <option value="@category">@category</option>
+                    }
+                </select>
+            </label>
+        </header>
+
+        @if (_isLoading || _dashboard is null)
+        {
+            <div class="admin-table-skeleton" aria-hidden="true">
+                @for (var index = 0; index < 6; index++)
+                {
+                    <div class="admin-skeleton admin-skeleton--row"></div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <caption>Registered runtime tools and preview governance controls.</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Category</th>
+                            <th scope="col">Enabled</th>
+                            <th scope="col">Visibility scope</th>
+                            <th scope="col">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tool in FilteredTools)
+                        {
+                            <tr>
+                                <th scope="row">
+                                    <span title="@tool.Description">@tool.Name</span>
+                                </th>
+                                <td>@tool.Category</td>
+                                <td>
+                                    <label class="admin-toggle">
+                                        <input type="checkbox"
+                                               checked="@tool.Enabled"
+                                               @onchange="@(async args => await OnToolToggleChangedAsync(tool.Name, args))"
+                                               disabled="@(_isLoading || !string.IsNullOrWhiteSpace(_updatingToolName))"
+                                               aria-label="@GetToggleAriaLabel(tool)" />
+                                        <span class="admin-toggle__track" aria-hidden="true">
+                                            <span class="admin-toggle__thumb"></span>
+                                        </span>
+                                        <span class="admin-toggle__label">@GetToggleLabel(tool)</span>
+                                    </label>
+                                </td>
+                                <td>@tool.VisibilityScope</td>
+                                <td>
+                                    <details class="admin-disclosure">
+                                        <summary title="@tool.Description" aria-label="View description for @tool.Name">Details</summary>
+                                        <p>@tool.Description</p>
+                                    </details>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="admin-page__footnote">Tool toggles are stored in mock circuit state only for this preview.</p>
+        }
+    </section>
+
+    <section class="admin-page__section" aria-labelledby="admin-spend-heading" aria-busy="@_isLoading">
+        <header class="admin-section-heading">
+            <div>
+                <h2 id="admin-spend-heading">Spend tracking dashboard</h2>
+                <p>Daily spend trend, current rollups, and budget posture for model usage.</p>
+            </div>
+        </header>
+
+        @if (_isLoading || _dashboard is null)
+        {
+            <div class="admin-summary-grid" aria-hidden="true">
+                @for (var index = 0; index < 4; index++)
+                {
+                    <article class="admin-summary-card admin-summary-card--skeleton">
+                        <div class="admin-skeleton admin-skeleton--label"></div>
+                        <div class="admin-skeleton admin-skeleton--value"></div>
+                    </article>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="admin-summary-grid">
+                <article class="admin-summary-card">
+                    <span class="admin-summary-card__label">Today</span>
+                    <strong class="admin-summary-card__value">@FormatCurrency(_dashboard.Spend.TodaySpend)</strong>
+                </article>
+                <article class="admin-summary-card">
+                    <span class="admin-summary-card__label">This week</span>
+                    <strong class="admin-summary-card__value">@FormatCurrency(_dashboard.Spend.WeekSpend)</strong>
+                </article>
+                <article class="admin-summary-card">
+                    <span class="admin-summary-card__label">This month</span>
+                    <strong class="admin-summary-card__value">@FormatCurrency(_dashboard.Spend.MonthSpend)</strong>
+                </article>
+                <article class="admin-summary-card">
+                    <span class="admin-summary-card__label">Budget status</span>
+                    <strong class="admin-summary-card__value">@GetBudgetSummary()</strong>
+                </article>
+            </div>
+
+            <div class="admin-spend-layout">
+                <article class="admin-chart-card">
+                    <header class="admin-chart-card__header">
+                        <div>
+                            <h3>Last 7 days</h3>
+                            <p>Each bar represents total model spend for the day.</p>
+                        </div>
+                    </header>
+
+                    <div class="admin-spend-chart" role="img" aria-label="@GetSpendChartSummary()">
+                        @foreach (var point in _dashboard.Spend.DailySpend)
+                        {
+                            <div class="admin-spend-chart__column">
+                                <span class="admin-spend-chart__value">@FormatCurrency(point.Amount)</span>
+                                <div class="admin-spend-chart__bar-shell">
+                                    <span class="@GetSpendBarClass(point)" style="@GetSpendBarStyle(point)"></span>
+                                </div>
+                                <span class="admin-spend-chart__label">@point.Label</span>
+                            </div>
+                        }
+                    </div>
+                </article>
+
+                <article class="admin-budget-card">
+                    <header class="admin-chart-card__header">
+                        <div>
+                            <h3>Budget limit</h3>
+                            <p>@GetBudgetCaption()</p>
+                        </div>
+                    </header>
+
+                    @if (_dashboard.Spend.MonthlyBudgetLimit is decimal monthlyBudgetLimit)
+                    {
+                        <div class="admin-budget__meter"
+                             role="meter"
+                             aria-label="Monthly budget usage"
+                             aria-valuemin="0"
+                             aria-valuemax="@monthlyBudgetLimit"
+                             aria-valuenow="@_dashboard.Spend.MonthSpend">
+                            <span class="@GetBudgetMeterClass()" style="@GetBudgetMeterStyle()"></span>
+                        </div>
+                        <p class="admin-budget__summary">@FormatCurrency(_dashboard.Spend.MonthSpend) of @FormatCurrency(monthlyBudgetLimit) used this month.</p>
+                    }
+                    else
+                    {
+                        <p class="admin-budget__summary">No budget limit is configured for this environment yet.</p>
+                    }
+                </article>
+            </div>
+        }
+    </section>
+
+    <section class="admin-page__section" aria-labelledby="admin-jobs-heading" aria-busy="@_isLoading">
+        <header class="admin-section-heading">
+            <div>
+                <h2 id="admin-jobs-heading">Scheduled jobs</h2>
+                <p>Active automation cadence, previous execution, and next expected run.</p>
+            </div>
+        </header>
+
+        @if (_isLoading || _dashboard is null)
+        {
+            <div class="admin-table-skeleton" aria-hidden="true">
+                @for (var index = 0; index < 5; index++)
+                {
+                    <div class="admin-skeleton admin-skeleton--row"></div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <caption>Currently active scheduled jobs.</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Schedule</th>
+                            <th scope="col">Last run</th>
+                            <th scope="col">Next run</th>
+                            <th scope="col">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var job in _dashboard.ScheduledJobs)
+                        {
+                            <tr>
+                                <th scope="row">@job.Name</th>
+                                <td><code>@job.Schedule</code></td>
+                                <td>
+                                    <time datetime="@FormatTimestampAttribute(job.LastRunAt)">@FormatDateTime(job.LastRunAt)</time>
+                                </td>
+                                <td>
+                                    <time datetime="@FormatTimestampAttribute(job.NextRunAt)">@FormatDateTime(job.NextRunAt)</time>
+                                </td>
+                                <td>
+                                    <span class="@GetJobBadgeClass(job.Status)">@GetJobStatusLabel(job.Status)</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</section>
+
+@code {
+    private const string AllCategoriesValue = "__all";
+    private readonly CancellationTokenSource _disposeCts = new();
+    private AdminDashboardSnapshot? _dashboard;
+    private bool _isLoading = true;
+    private bool _isRefreshingHealth;
+    private string _selectedToolCategory = AllCategoriesValue;
+    private string? _statusMessage;
+    private string? _errorMessage;
+    private string? _updatingToolName;
+
+    private IReadOnlyList<string> ToolCategories => _dashboard is null
+        ? []
+        : [.. _dashboard.Tools.Select(tool => tool.Category).Distinct(StringComparer.Ordinal).OrderBy(category => category, StringComparer.Ordinal)];
+
+    private IEnumerable<AdminToolGovernanceItem> FilteredTools => _dashboard?.Tools.Where(tool =>
+            string.Equals(_selectedToolCategory, AllCategoriesValue, StringComparison.Ordinal)
+            || string.Equals(tool.Category, _selectedToolCategory, StringComparison.Ordinal))
+        ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardAsync();
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        try
+        {
+            _errorMessage = null;
+            _dashboard = await AdminService.GetDashboardAsync(_disposeCts.Token);
+            _statusMessage = $"Dashboard loaded {FormatDateTime(_dashboard.GeneratedAt)}.";
+        }
+        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            _errorMessage = "The admin preview could not be loaded. Please refresh the page and try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task RefreshProviderHealthAsync()
+    {
+        try
+        {
+            _isRefreshingHealth = true;
+            _errorMessage = null;
+            _dashboard = await AdminService.RefreshProviderHealthAsync(_disposeCts.Token);
+            _statusMessage = $"Provider health re-checked {FormatDateTime(_dashboard.GeneratedAt)}.";
+        }
+        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Provider health could not be refreshed right now.";
+        }
+        finally
+        {
+            _isRefreshingHealth = false;
+        }
+    }
+
+    private async Task OnToolToggleChangedAsync(string toolName, ChangeEventArgs args)
+    {
+        var enabled = args.Value switch
+        {
+            bool boolValue => boolValue,
+            string stringValue when bool.TryParse(stringValue, out var parsed) => parsed,
+            _ => false,
+        };
+
+        try
+        {
+            _updatingToolName = toolName;
+            _errorMessage = null;
+            _dashboard = await AdminService.SetToolEnabledAsync(toolName, enabled, _disposeCts.Token);
+            _statusMessage = $"{toolName} {(enabled ? "enabled" : "disabled")} in preview mode.";
+        }
+        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            _errorMessage = $"The preview toggle for {toolName} could not be updated.";
+        }
+        finally
+        {
+            _updatingToolName = null;
+        }
+    }
+
+    private static string FormatDateTime(DateTimeOffset value)
+        => value.LocalDateTime.ToString("MMM d, h:mm tt", CultureInfo.CurrentCulture);
+
+    private static string FormatTimestampAttribute(DateTimeOffset value)
+        => value.ToString("O", CultureInfo.InvariantCulture);
+
+    private static string FormatCurrency(decimal value)
+        => value.ToString("C", CultureInfo.CurrentCulture);
+
+    private static string GetToggleAriaLabel(AdminToolGovernanceItem tool)
+        => tool.Enabled ? $"Disable {tool.Name}" : $"Enable {tool.Name}";
+
+    private string GetToggleLabel(AdminToolGovernanceItem tool)
+        => string.Equals(_updatingToolName, tool.Name, StringComparison.Ordinal)
+            ? "Updating…"
+            : tool.Enabled ? "Enabled" : "Disabled";
+
+    private static string GetProviderStatusLabel(AdminProviderStatus status)
+        => status switch
+        {
+            AdminProviderStatus.Healthy => "Healthy",
+            AdminProviderStatus.Degraded => "Degraded",
+            _ => "Unavailable",
+        };
+
+    private static string GetProviderBadgeClass(AdminProviderStatus status)
+        => $"admin-status-badge {status switch
+        {
+            AdminProviderStatus.Healthy => "admin-status-badge--healthy",
+            AdminProviderStatus.Degraded => "admin-status-badge--warning",
+            _ => "admin-status-badge--error",
+        }}";
+
+    private static string GetProviderDotClass(AdminProviderStatus status)
+        => $"admin-status-dot {status switch
+        {
+            AdminProviderStatus.Healthy => "admin-status-dot--healthy",
+            AdminProviderStatus.Degraded => "admin-status-dot--warning",
+            _ => "admin-status-dot--error",
+        }}";
+
+    private static string GetJobStatusLabel(AdminJobStatus status)
+        => status switch
+        {
+            AdminJobStatus.Running => "Running",
+            AdminJobStatus.Idle => "Idle",
+            _ => "Failed",
+        };
+
+    private static string GetJobBadgeClass(AdminJobStatus status)
+        => $"admin-status-badge {status switch
+        {
+            AdminJobStatus.Running => "admin-status-badge--healthy",
+            AdminJobStatus.Idle => "admin-status-badge--neutral",
+            _ => "admin-status-badge--error",
+        }}";
+
+    private decimal GetMaxDailySpend()
+        => _dashboard?.Spend.DailySpend.Max(point => point.Amount) ?? 0m;
+
+    private string GetSpendBarStyle(AdminSpendPoint point)
+    {
+        var maxValue = GetMaxDailySpend();
+        if (maxValue <= 0m)
+        {
+            return "height: 0%;";
+        }
+
+        var height = Math.Round((point.Amount / maxValue) * 100m, 2);
+        if (point.Amount > 0m)
+        {
+            height = Math.Max(height, 14m);
+        }
+
+        return $"height: {height.ToString("0.##", CultureInfo.InvariantCulture)}%;";
+    }
+
+    private static string GetSpendBarClass(AdminSpendPoint point)
+        => point.IsToday
+            ? "admin-spend-chart__bar admin-spend-chart__bar--today"
+            : "admin-spend-chart__bar";
+
+    private decimal GetBudgetUsagePercentage()
+    {
+        if (_dashboard?.Spend.MonthlyBudgetLimit is not decimal monthlyBudgetLimit || monthlyBudgetLimit <= 0m)
+        {
+            return 0m;
+        }
+
+        return Math.Min(Math.Round((_dashboard.Spend.MonthSpend / monthlyBudgetLimit) * 100m, 2), 100m);
+    }
+
+    private string GetBudgetSummary()
+    {
+        if (_dashboard?.Spend.MonthlyBudgetLimit is not decimal monthlyBudgetLimit || monthlyBudgetLimit <= 0m)
+        {
+            return "Not set";
+        }
+
+        return $"{GetBudgetUsagePercentage():0}% used";
+    }
+
+    private string GetBudgetCaption()
+        => _dashboard?.Spend.MonthlyBudgetLimit is decimal monthlyBudgetLimit && monthlyBudgetLimit > 0m
+            ? $"Tracking against a {FormatCurrency(monthlyBudgetLimit)} monthly spend threshold."
+            : "Add a budget threshold when the admin API exposes spend guardrails.";
+
+    private string GetBudgetMeterStyle()
+        => $"width: {GetBudgetUsagePercentage().ToString("0.##", CultureInfo.InvariantCulture)}%;";
+
+    private string GetBudgetMeterClass()
+    {
+        var usage = GetBudgetUsagePercentage();
+        return usage >= 90m
+            ? "admin-budget__value admin-budget__value--danger"
+            : usage >= 75m
+                ? "admin-budget__value admin-budget__value--warning"
+                : "admin-budget__value";
+    }
+
+    private string GetSpendChartSummary()
+    {
+        if (_dashboard is null)
+        {
+            return "Spend trend unavailable.";
+        }
+
+        var highest = _dashboard.Spend.DailySpend.OrderByDescending(point => point.Amount).First();
+        return $"Daily spend for the last 7 days. Highest spend was {FormatCurrency(highest.Amount)} on {highest.Label}.";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_disposeCts.IsCancellationRequested)
+        {
+            await _disposeCts.CancelAsync();
+        }
+
+        _disposeCts.Dispose();
+    }
+}

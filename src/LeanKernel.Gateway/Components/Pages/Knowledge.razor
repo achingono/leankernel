@@ -1,0 +1,714 @@
+@page "/knowledge"
+@using System.Globalization
+@using System.Threading
+@inject KnowledgeUiService KnowledgeUiService
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+
+<PageTitle>LeanKernel Knowledge</PageTitle>
+
+<section class="knowledge-browser">
+    <header class="knowledge-browser__header page-header">
+        <div>
+            <h1>Knowledge</h1>
+            <p>Browse GBrain wiki pages, inspect linked knowledge, and curate durable context.</p>
+        </div>
+        <button type="button" class="button button-primary" @onclick="OpenCreateModal">Create new page</button>
+    </header>
+
+    <section class="knowledge-browser__search-panel" aria-labelledby="knowledge-search-title">
+        <div class="knowledge-browser__section-header">
+            <div>
+                <h2 id="knowledge-search-title">Search knowledge</h2>
+                <p>Find pages by slug, facts, and compiled truth.</p>
+            </div>
+            @if (_isSearching)
+            {
+                <span class="knowledge-browser__search-status" role="status">Searching…</span>
+            }
+        </div>
+
+        <label class="knowledge-browser__field-label" for="knowledge-search-input">Search query</label>
+        <input id="knowledge-search-input"
+               class="knowledge-browser__input"
+               type="search"
+               value="@_searchText"
+               @oninput="HandleSearchInputAsync"
+               placeholder="Search wiki pages..."
+               autocomplete="off" />
+
+        @if (!string.IsNullOrWhiteSpace(_searchError))
+        {
+            <div class="status-banner status-banner--error" role="alert">@_searchError</div>
+        }
+
+        <div class="knowledge-browser__search-results" aria-live="polite">
+            @if (string.IsNullOrWhiteSpace(_searchText) && _searchResults.Count == 0 && !_isSearching)
+            {
+                <div class="knowledge-browser__empty-state">
+                    <h3>Start with a question</h3>
+                    <p>Search by topic, slug, or relationship to jump directly into the knowledge base.</p>
+                </div>
+            }
+            else if (_searchResults.Count == 0 && !_isSearching)
+            {
+                <div class="knowledge-browser__empty-state">
+                    <h3>No matches found</h3>
+                    <p>Try another keyword or create a new page for this topic.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var result in _searchResults)
+                {
+                    <button type="button"
+                            class="knowledge-browser__search-result"
+                            @onclick="() => OpenPageAsync(result.Slug)">
+                        <div class="knowledge-browser__result-meta">
+                            <span class="knowledge-browser__result-slug">@result.Slug</span>
+                            <span class="knowledge-browser__result-score">Score @result.Score.ToString("0.000", CultureInfo.InvariantCulture)</span>
+                        </div>
+                        <p class="knowledge-browser__result-preview">@result.Preview</p>
+                    </button>
+                }
+            }
+        </div>
+    </section>
+
+    <div class="knowledge-browser__layout">
+        <aside class="knowledge-browser__browse" aria-labelledby="knowledge-browse-title">
+            <div class="knowledge-browser__section-header">
+                <div>
+                    <h2 id="knowledge-browse-title">Browse pages</h2>
+                    <p>Page through the wiki and jump into recently changed knowledge.</p>
+                </div>
+
+                <label class="knowledge-browser__sort">
+                    <span class="knowledge-browser__field-label">Sort</span>
+                    <select class="knowledge-browser__select"
+                            value="@_browseSort.ToString()"
+                            @onchange="HandleSortChangedAsync">
+                        <option value="@KnowledgeBrowseSort.RecentlyModified">Recently modified</option>
+                        <option value="@KnowledgeBrowseSort.Alphabetical">Alphabetical</option>
+                    </select>
+                </label>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_browseError))
+            {
+                <div class="status-banner status-banner--error" role="alert">@_browseError</div>
+            }
+            else if (!string.IsNullOrWhiteSpace(_browseStatusMessage))
+            {
+                <div class="knowledge-browser__status knowledge-browser__status--info">@_browseStatusMessage</div>
+            }
+
+            @if (_isBrowseLoading)
+            {
+                <div class="knowledge-browser__loading-state" role="status">Loading pages…</div>
+            }
+            else if (_browseItems.Count == 0)
+            {
+                <div class="knowledge-browser__empty-state">
+                    <h3>No pages available</h3>
+                    <p>Use search or create a new page to start building knowledge.</p>
+                </div>
+            }
+            else
+            {
+                <div class="knowledge-browser__browse-list">
+                    @foreach (var item in _browseItems)
+                    {
+                        <button type="button"
+                                class="knowledge-browser__browse-item @(IsSelected(item.Slug) ? "knowledge-browser__browse-item--active" : null)"
+                                @onclick="() => OpenPageAsync(item.Slug)">
+                            <span class="knowledge-browser__browse-slug">@item.Slug</span>
+                            <span class="knowledge-browser__browse-meta">@FormatTimestamp(item.LastModified)</span>
+                            <span class="knowledge-browser__browse-meta">@item.TagCount tag@(item.TagCount == 1 ? string.Empty : "s")</span>
+                        </button>
+                    }
+                </div>
+            }
+
+            <div class="knowledge-browser__browse-footer">
+                <button type="button"
+                        class="button button-secondary"
+                        @onclick="() => ChangePageAsync(_browsePageNumber - 1)"
+                        disabled="@(!_browseResult.HasPreviousPage || _isBrowseLoading)">
+                    Previous
+                </button>
+                <span class="knowledge-browser__browse-page-label">Page @_browsePageNumber</span>
+                <button type="button"
+                        class="button button-secondary"
+                        @onclick="() => ChangePageAsync(_browsePageNumber + 1)"
+                        disabled="@(!_browseResult.HasNextPage || _isBrowseLoading)">
+                    Next
+                </button>
+            </div>
+        </aside>
+
+        <section class="knowledge-browser__workspace" aria-busy="@(_isPageLoading || _isSaving || _isCreating)">
+            @if (!string.IsNullOrWhiteSpace(_pageError))
+            {
+                <div class="status-banner status-banner--error" role="alert">@_pageError</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_pageStatusMessage))
+            {
+                <div class="knowledge-browser__status knowledge-browser__status--success">@_pageStatusMessage</div>
+            }
+
+            @if (_isPageLoading)
+            {
+                <div class="knowledge-browser__loading-state" role="status">Loading page details…</div>
+            }
+            else if (_selectedPage is null)
+            {
+                <div class="knowledge-browser__empty-state knowledge-browser__empty-state--workspace">
+                    <h2>Select a page</h2>
+                    <p>Choose a browse result or run a search to inspect wiki content, metadata, and linked relationships.</p>
+                </div>
+            }
+            else
+            {
+                <div class="knowledge-browser__detail-shell">
+                    <div class="knowledge-browser__detail-header">
+                        <div>
+                            <h2>@_selectedPage.Slug</h2>
+                            <p>@GetSelectedPageSubtitle()</p>
+                        </div>
+                        <div class="knowledge-browser__actions">
+                            @if (_isEditing)
+                            {
+                                <button type="button"
+                                        class="button button-primary"
+                                        @onclick="SaveEditAsync"
+                                        disabled="@IsSaveDisabled">
+                                    Save changes
+                                </button>
+                                <button type="button" class="button button-secondary" @onclick="CancelEdit">Cancel</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="button button-secondary" @onclick="StartEdit">Edit</button>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="knowledge-browser__detail-grid">
+                        <section class="knowledge-browser__content-panel">
+                            <div class="knowledge-browser__panel-header">
+                                <div>
+                                    <h3>Page content</h3>
+                                    <p>Rendered as raw wiki text for now.</p>
+                                </div>
+                            </div>
+
+                            @if (_isEditing)
+                            {
+                                <textarea class="knowledge-browser__textarea"
+                                          @bind="_editContent"
+                                          rows="20"
+                                          maxlength="40000"></textarea>
+                            }
+                            else
+                            {
+                                <pre class="knowledge-browser__content">@_selectedPage.Content</pre>
+                            }
+                        </section>
+
+                        <aside class="knowledge-browser__sidebar">
+                            <section class="knowledge-browser__meta-panel">
+                                <div class="knowledge-browser__panel-header">
+                                    <div>
+                                        <h3>Metadata</h3>
+                                        <p>Key page facts and navigation links.</p>
+                                    </div>
+                                </div>
+
+                                <dl class="knowledge-browser__metadata">
+                                    <div>
+                                        <dt>Slug</dt>
+                                        <dd><code>@_selectedPage.Slug</code></dd>
+                                    </div>
+                                    <div>
+                                        <dt>Last modified</dt>
+                                        <dd>@FormatTimestamp(_selectedPage.LastModified)</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Tags</dt>
+                                        <dd>
+                                            @if (_selectedPage.Tags.Count == 0)
+                                            {
+                                                <span class="knowledge-browser__muted">No tags</span>
+                                            }
+                                            else
+                                            {
+                                                <div class="knowledge-browser__pill-list">
+                                                    @foreach (var tag in _selectedPage.Tags)
+                                                    {
+                                                        <span class="knowledge-browser__pill">@tag</span>
+                                                    }
+                                                </div>
+                                            }
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt>Linked pages</dt>
+                                        <dd>
+                                            @if (_selectedPage.LinkedPages.Count == 0)
+                                            {
+                                                <span class="knowledge-browser__muted">No linked pages</span>
+                                            }
+                                            else
+                                            {
+                                                <div class="knowledge-browser__link-list">
+                                                    @foreach (var linkedPage in _selectedPage.LinkedPages)
+                                                    {
+                                                        <button type="button"
+                                                                class="knowledge-browser__link-button"
+                                                                @onclick="() => OpenPageAsync(linkedPage)">
+                                                            @linkedPage
+                                                        </button>
+                                                    }
+                                                </div>
+                                            }
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </section>
+
+                            <section class="knowledge-browser__graph-panel">
+                                <div class="knowledge-browser__panel-header">
+                                    <div>
+                                        <h3>Relationship graph</h3>
+                                        <p>Quick navigation across linked wiki pages.</p>
+                                    </div>
+                                </div>
+
+                                <div class="knowledge-browser__graph" role="group" aria-label="Knowledge graph">
+                                    <div class="knowledge-browser__graph-center">
+                                        <button type="button"
+                                                class="knowledge-browser__graph-node knowledge-browser__graph-node--current"
+                                                @onclick="() => OpenPageAsync(_selectedPage.Slug)">
+                                            @_selectedPage.Slug
+                                        </button>
+                                    </div>
+
+                                    @if (_selectedPage.LinkedPages.Count == 0)
+                                    {
+                                        <p class="knowledge-browser__muted">Add links to this page to expand the graph.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="knowledge-browser__graph-links">
+                                            @foreach (var linkedPage in _selectedPage.LinkedPages)
+                                            {
+                                                <div class="knowledge-browser__graph-edge">
+                                                    <span class="knowledge-browser__graph-line" aria-hidden="true"></span>
+                                                    <button type="button"
+                                                            class="knowledge-browser__graph-node"
+                                                            @onclick="() => OpenPageAsync(linkedPage)">
+                                                        @linkedPage
+                                                    </button>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </section>
+                        </aside>
+                    </div>
+                </div>
+            }
+        </section>
+    </div>
+
+    @if (_isCreateOpen)
+    {
+        <div class="knowledge-browser__modal-backdrop" role="presentation" @onclick="CloseCreateModal">
+            <section class="knowledge-browser__modal"
+                     role="dialog"
+                     aria-modal="true"
+                     aria-labelledby="knowledge-create-title"
+                     @onclick:stopPropagation="true">
+                <div class="knowledge-browser__modal-header">
+                    <div>
+                        <h2 id="knowledge-create-title">Create knowledge page</h2>
+                        <p>Add a new wiki page and immediately open it in the browser.</p>
+                    </div>
+                    <button type="button" class="button button-secondary" @onclick="CloseCreateModal">Close</button>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_createError))
+                {
+                    <div class="status-banner status-banner--error" role="alert">@_createError</div>
+                }
+
+                <label class="knowledge-browser__field-label" for="knowledge-create-slug">Slug</label>
+                <input id="knowledge-create-slug"
+                       class="knowledge-browser__input"
+                       type="text"
+                       @bind="_newPageSlug"
+                       maxlength="256"
+                       autocomplete="off"
+                       autofocus />
+
+                <label class="knowledge-browser__field-label" for="knowledge-create-content">Content</label>
+                <textarea id="knowledge-create-content"
+                          class="knowledge-browser__textarea"
+                          @bind="_newPageContent"
+                          rows="12"
+                          maxlength="40000"></textarea>
+
+                <div class="knowledge-browser__modal-actions">
+                    <button type="button" class="button button-secondary" @onclick="CloseCreateModal" disabled="@_isCreating">Cancel</button>
+                    <button type="button"
+                            class="button button-primary"
+                            @onclick="CreatePageAsync"
+                            disabled="@IsCreateDisabled">
+                        Create page
+                    </button>
+                </div>
+            </section>
+        </div>
+    }
+</section>
+
+@code {
+    private const int BrowsePageSize = 10;
+    private readonly CancellationTokenSource _disposeCts = new();
+    private CancellationTokenSource? _searchDebounceCts;
+
+    private int _browsePageNumber = 1;
+    private int _searchRequestVersion;
+    private bool _isBrowseLoading = true;
+    private bool _isCreateOpen;
+    private bool _isCreating;
+    private bool _isEditing;
+    private bool _isPageLoading;
+    private bool _isSaving;
+    private bool _isSearching;
+    private string _editContent = string.Empty;
+    private string _newPageContent = string.Empty;
+    private string _newPageSlug = string.Empty;
+    private string _searchText = string.Empty;
+    private string? _browseError;
+    private string? _browseStatusMessage;
+    private string? _createError;
+    private string? _pageError;
+    private string? _pageStatusMessage;
+    private string? _searchError;
+    private KnowledgeBrowseResult _browseResult = new()
+    {
+        Items = [],
+        PageNumber = 1,
+        PageSize = BrowsePageSize,
+        TotalCount = 0,
+        Sort = KnowledgeBrowseSort.RecentlyModified
+    };
+    private KnowledgeBrowseSort _browseSort = KnowledgeBrowseSort.RecentlyModified;
+    private KnowledgePageDetail? _selectedPage;
+    private IReadOnlyList<KnowledgePageSummary> _browseItems = [];
+    private IReadOnlyList<KnowledgeSearchResult> _searchResults = [];
+
+    private bool IsCreateDisabled => _isCreating || string.IsNullOrWhiteSpace(_newPageSlug) || string.IsNullOrWhiteSpace(_newPageContent);
+
+    private bool IsSaveDisabled
+        => _isSaving || _selectedPage is null || string.IsNullOrWhiteSpace(_editContent);
+
+    protected override async Task OnInitializedAsync()
+        => await LoadBrowseAsync(selectFirstPage: true);
+
+    private async Task HandleSearchInputAsync(ChangeEventArgs args)
+    {
+        _searchText = args.Value?.ToString() ?? string.Empty;
+        _searchError = null;
+        _pageStatusMessage = null;
+
+        var requestVersion = Interlocked.Increment(ref _searchRequestVersion);
+        CancelPendingSearch();
+
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            _isSearching = false;
+            _searchResults = [];
+            return;
+        }
+
+        var searchDebounceCts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
+        _searchDebounceCts = searchDebounceCts;
+        _isSearching = true;
+
+        try
+        {
+            await Task.Delay(300, searchDebounceCts.Token);
+            var searchResults = await KnowledgeUiService.SearchPagesAsync(_searchText.Trim(), 8, searchDebounceCts.Token);
+            if (requestVersion != _searchRequestVersion || _disposeCts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _searchResults = searchResults;
+        }
+        catch (OperationCanceledException) when (searchDebounceCts.IsCancellationRequested || _disposeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (requestVersion != _searchRequestVersion || _disposeCts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _searchResults = [];
+            _searchError = $"Search failed: {ex.Message}";
+        }
+        finally
+        {
+            if (ReferenceEquals(_searchDebounceCts, searchDebounceCts))
+            {
+                _searchDebounceCts = null;
+            }
+
+            searchDebounceCts.Dispose();
+
+            if (requestVersion == _searchRequestVersion && !_disposeCts.IsCancellationRequested)
+            {
+                _isSearching = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task HandleSortChangedAsync(ChangeEventArgs args)
+    {
+        if (!Enum.TryParse<KnowledgeBrowseSort>(args.Value?.ToString(), out var sort) || sort == _browseSort)
+        {
+            return;
+        }
+
+        _browseSort = sort;
+        _browsePageNumber = 1;
+        await LoadBrowseAsync(selectFirstPage: _selectedPage is null);
+    }
+
+    private async Task ChangePageAsync(int pageNumber)
+    {
+        if (pageNumber < 1 || pageNumber == _browsePageNumber)
+        {
+            return;
+        }
+
+        _browsePageNumber = pageNumber;
+        await LoadBrowseAsync(selectFirstPage: _selectedPage is null);
+    }
+
+    private async Task LoadBrowseAsync(bool selectFirstPage)
+    {
+        _isBrowseLoading = true;
+        _browseError = null;
+        _browseStatusMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            _browseResult = await KnowledgeUiService.BrowsePagesAsync(_browsePageNumber, BrowsePageSize, _browseSort, _disposeCts.Token);
+            _browseItems = _browseResult.Items;
+            _browseStatusMessage = _browseResult.StatusMessage;
+
+            if (selectFirstPage && _selectedPage is null && _browseItems.Count > 0)
+            {
+                await OpenPageAsync(_browseItems[0].Slug);
+            }
+        }
+        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _browseItems = [];
+            _browseError = $"Browse failed: {ex.Message}";
+        }
+        finally
+        {
+            _isBrowseLoading = false;
+        }
+    }
+
+    private async Task OpenPageAsync(string slug)
+    {
+        _isPageLoading = true;
+        _isEditing = false;
+        _pageError = null;
+        _pageStatusMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var page = await KnowledgeUiService.GetPageDetailAsync(slug, _disposeCts.Token);
+            if (page is null)
+            {
+                _selectedPage = null;
+                _pageError = $"Page '{slug}' was not found.";
+                return;
+            }
+
+            _selectedPage = page;
+            _editContent = page.Content;
+        }
+        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _selectedPage = null;
+            _pageError = $"Page load failed: {ex.Message}";
+        }
+        finally
+        {
+            _isPageLoading = false;
+        }
+    }
+
+    private void StartEdit()
+    {
+        if (_selectedPage is null)
+        {
+            return;
+        }
+
+        _editContent = _selectedPage.Content;
+        _pageStatusMessage = null;
+        _isEditing = true;
+    }
+
+    private void CancelEdit()
+    {
+        _isEditing = false;
+        _pageStatusMessage = null;
+
+        if (_selectedPage is not null)
+        {
+            _editContent = _selectedPage.Content;
+        }
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (_selectedPage is null || string.IsNullOrWhiteSpace(_editContent))
+        {
+            return;
+        }
+
+        _isSaving = true;
+        _pageError = null;
+        _pageStatusMessage = null;
+
+        try
+        {
+            await KnowledgeUiService.SavePageAsync(_selectedPage.Slug, _editContent, _disposeCts.Token);
+            await LoadBrowseAsync(selectFirstPage: false);
+            await OpenPageAsync(_selectedPage.Slug);
+            _pageStatusMessage = $"Saved {_selectedPage.Slug}.";
+            _isEditing = false;
+        }
+        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _pageError = $"Save failed: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        _createError = null;
+        _newPageSlug = string.Empty;
+        _newPageContent = string.Empty;
+        _isCreateOpen = true;
+    }
+
+    private void CloseCreateModal()
+    {
+        if (_isCreating)
+        {
+            return;
+        }
+
+        _isCreateOpen = false;
+        _createError = null;
+    }
+
+    private async Task CreatePageAsync()
+    {
+        if (IsCreateDisabled)
+        {
+            return;
+        }
+
+        _isCreating = true;
+        _createError = null;
+
+        var slug = _newPageSlug.Trim();
+
+        try
+        {
+            await KnowledgeUiService.SavePageAsync(slug, _newPageContent, _disposeCts.Token);
+            _browsePageNumber = 1;
+            await LoadBrowseAsync(selectFirstPage: false);
+            await OpenPageAsync(slug);
+            _pageStatusMessage = $"Created {slug}.";
+            _isCreateOpen = false;
+        }
+        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _createError = $"Create failed: {ex.Message}";
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private void CancelPendingSearch()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts = null;
+    }
+
+    private bool IsSelected(string slug)
+        => _selectedPage is not null && string.Equals(_selectedPage.Slug, slug, StringComparison.OrdinalIgnoreCase);
+
+    private string GetSelectedPageSubtitle()
+        => _selectedPage is null
+            ? string.Empty
+            : _selectedPage.LastModified is { } lastModified
+                ? $"Last updated {lastModified.LocalDateTime:g}"
+                : "Last modified date unavailable";
+
+    private static string FormatTimestamp(DateTimeOffset? value)
+        => value is { } timestamp
+            ? timestamp.LocalDateTime.ToString("g", CultureInfo.CurrentCulture)
+            : "Unknown";
+
+    public async ValueTask DisposeAsync()
+    {
+        CancelPendingSearch();
+
+        if (!_disposeCts.IsCancellationRequested)
+        {
+            await _disposeCts.CancelAsync();
+        }
+
+        _disposeCts.Dispose();
+    }
+}

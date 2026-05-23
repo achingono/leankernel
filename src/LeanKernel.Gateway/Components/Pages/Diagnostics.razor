@@ -1,0 +1,762 @@
+@page "/diagnostics"
+@using System.Globalization
+@using LeanKernel.Abstractions.Enums
+@inject DiagnosticsService DiagnosticsApi
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+
+<PageTitle>LeanKernel Diagnostics</PageTitle>
+
+<section class="diagnostics-page" aria-busy="@_isLoading">
+    <header class="page-header diagnostics-page__header">
+        <div>
+            <h1>Diagnostics explorer</h1>
+            <p>Inspect the latest persisted context audit, budget usage, history shaping, and routing decisions for any session.</p>
+        </div>
+    </header>
+
+    <section class="diagnostics-page__surface">
+        <form class="diagnostics-page__loader" @onsubmit="LoadDiagnosticsAsync" aria-label="Load diagnostics by session id">
+            <div class="diagnostics-page__field">
+                <label class="diagnostics-page__label" for="diagnostics-session-id">Session ID</label>
+                <input id="diagnostics-session-id"
+                       class="diagnostics-page__input"
+                       @bind="_sessionId"
+                       @bind:event="oninput"
+                       type="text"
+                       inputmode="text"
+                       autocomplete="off"
+                       spellcheck="false"
+                       placeholder="Enter a session id"
+                       aria-describedby="diagnostics-session-hint"
+                       disabled="@_isLoading" />
+                <p id="diagnostics-session-hint" class="diagnostics-page__hint">The latest persisted turn is loaded unless a turn-specific diagnostics record is the only one available.</p>
+            </div>
+
+            <button type="submit"
+                    class="button button-primary diagnostics-page__button"
+                    disabled="@IsLoadDisabled">
+                @(_isLoading ? "Loading…" : "Load")
+            </button>
+        </form>
+
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <div class="status-banner status-banner--error" role="alert">
+                @_errorMessage
+            </div>
+        }
+
+        @if (_warnings.Count > 0)
+        {
+            <div class="status-banner status-banner--warning" aria-live="polite">
+                <strong>Some diagnostics are missing.</strong>
+                <ul class="diagnostics-page__warnings">
+                    @foreach (var warning in _warnings)
+                    {
+                        <li>@warning</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (_isLoading)
+        {
+            <div class="chat-loading diagnostics-page__loading" role="status" aria-live="polite">
+                <span class="chat-loading__dot"></span>
+                <span class="chat-loading__dot"></span>
+                <span class="chat-loading__dot"></span>
+                <span>Loading diagnostics…</span>
+            </div>
+        }
+        else if (_model is null)
+        {
+            <section class="placeholder-card diagnostics-page__empty">
+                <h2>Load a session to inspect turn diagnostics</h2>
+                <p>Use a persisted session id to view context admission decisions, budget usage, history shaping, and model routing telemetry.</p>
+            </section>
+        }
+        else
+        {
+            <div class="diagnostics-summary" aria-label="Diagnostics summary">
+                <div class="diagnostics-summary__item">
+                    <span class="diagnostics-summary__label">Session</span>
+                    <strong class="diagnostics-summary__value diagnostics-summary__value--mono">@_model.SessionId</strong>
+                </div>
+                <div class="diagnostics-summary__item">
+                    <span class="diagnostics-summary__label">Turn</span>
+                    <strong class="diagnostics-summary__value diagnostics-summary__value--mono">@(_model.TurnId ?? "Latest available")</strong>
+                </div>
+                <div class="diagnostics-summary__item">
+                    <span class="diagnostics-summary__label">Captured</span>
+                    <strong class="diagnostics-summary__value">@FormatTimestamp(_model.Timestamp)</strong>
+                </div>
+                <div class="diagnostics-summary__item">
+                    <span class="diagnostics-summary__label">Diagnostics entries</span>
+                    <strong class="diagnostics-summary__value">@_model.RawEntryCount</strong>
+                </div>
+                <div class="diagnostics-summary__item">
+                    <span class="diagnostics-summary__label">Context candidates</span>
+                    <strong class="diagnostics-summary__value">@(_model.Context?.TotalCandidatesConsidered ?? 0)</strong>
+                </div>
+                <div class="diagnostics-summary__item">
+                    <span class="diagnostics-summary__label">Tokens saved</span>
+                    <strong class="diagnostics-summary__value">@(_model.History?.TokensSaved ?? 0)</strong>
+                </div>
+            </div>
+
+            <div class="diagnostics-grid">
+                <section class="diagnostics-card diagnostics-card--span-2" aria-labelledby="diagnostics-context-heading">
+                    <header class="diagnostics-card__header">
+                        <div>
+                            <h2 id="diagnostics-context-heading">Context audit</h2>
+                            <p>Review what the context gate admitted into the prompt versus what it excluded.</p>
+                        </div>
+
+                        @if (_model.Context is not null)
+                        {
+                            <div class="diagnostics-card__meta">
+                                <span class="badge">@_model.Context.TotalAdmitted admitted</span>
+                                <span class="badge">@_model.Context.TotalExcluded excluded</span>
+                            </div>
+                        }
+                    </header>
+
+                    <div class="diagnostics-audit">
+                        <section class="diagnostics-audit__column" aria-labelledby="diagnostics-admitted-heading">
+                            <header class="diagnostics-audit__column-header">
+                                <h3 id="diagnostics-admitted-heading">Admitted</h3>
+                            </header>
+
+                            @if (AdmittedItems.Count == 0)
+                            {
+                                <p class="diagnostics-card__empty">No admitted context items were recorded for this turn.</p>
+                            }
+                            else
+                            {
+                                <ol class="diagnostics-audit__list">
+                                    @foreach (var item in AdmittedItems)
+                                    {
+                                        <li>
+                                            <article class="diagnostics-context-item diagnostics-context-item--@GetCategoryModifier(item.Source)">
+                                                <header class="diagnostics-context-item__header">
+                                                    <strong class="diagnostics-context-item__key">@item.Key</strong>
+                                                    <span class="diagnostics-pill diagnostics-pill--@GetCategoryModifier(item.Source)">@GetCategoryLabel(item.Source)</span>
+                                                </header>
+
+                                                <dl class="diagnostics-context-item__meta">
+                                                    <div>
+                                                        <dt>Score</dt>
+                                                        <dd>@FormatScore(item.Score)</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt>Tokens</dt>
+                                                        <dd>@item.TokenCount</dd>
+                                                    </div>
+                                                </dl>
+
+                                                <p class="diagnostics-context-item__reason">@GetAuditReason(item)</p>
+                                            </article>
+                                        </li>
+                                    }
+                                </ol>
+                            }
+                        </section>
+
+                        <section class="diagnostics-audit__column" aria-labelledby="diagnostics-excluded-heading">
+                            <header class="diagnostics-audit__column-header">
+                                <h3 id="diagnostics-excluded-heading">Excluded</h3>
+                            </header>
+
+                            @if (ExcludedItems.Count == 0)
+                            {
+                                <p class="diagnostics-card__empty">No exclusions were recorded for this turn.</p>
+                            }
+                            else
+                            {
+                                <ol class="diagnostics-audit__list">
+                                    @foreach (var item in ExcludedItems)
+                                    {
+                                        <li>
+                                            <article class="diagnostics-context-item diagnostics-context-item--@GetCategoryModifier(item.Source)">
+                                                <header class="diagnostics-context-item__header">
+                                                    <strong class="diagnostics-context-item__key">@item.Key</strong>
+                                                    <span class="diagnostics-pill diagnostics-pill--@GetCategoryModifier(item.Source)">@GetCategoryLabel(item.Source)</span>
+                                                </header>
+
+                                                <dl class="diagnostics-context-item__meta">
+                                                    <div>
+                                                        <dt>Score</dt>
+                                                        <dd>@FormatScore(item.Score)</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt>Tokens</dt>
+                                                        <dd>@item.TokenCount</dd>
+                                                    </div>
+                                                </dl>
+
+                                                <p class="diagnostics-context-item__reason">@GetAuditReason(item)</p>
+                                            </article>
+                                        </li>
+                                    }
+                                </ol>
+                            }
+                        </section>
+                    </div>
+
+                    @if (_model.Context?.RetrievalDiagnostics is { } retrieval)
+                    {
+                        <footer class="diagnostics-card__footer diagnostics-card__footer--chips">
+                            <span class="badge badge--history">Scope: @retrieval.EffectiveScope</span>
+                            <span class="badge">@retrieval.TotalConsidered candidates</span>
+                            <span class="badge">@retrieval.TotalAdmitted admitted</span>
+                            <span class="badge">@retrieval.TotalExcludedByScope scope-filtered</span>
+                            <span class="badge">@retrieval.TotalExcludedByScore score-filtered</span>
+                        </footer>
+                    }
+                </section>
+
+                <section class="diagnostics-card" aria-labelledby="diagnostics-budget-heading">
+                    <header class="diagnostics-card__header">
+                        <div>
+                            <h2 id="diagnostics-budget-heading">Budget usage</h2>
+                            <p>Compare token usage against each context budget and the reserved response headroom.</p>
+                        </div>
+                    </header>
+
+                    @if (BudgetMetrics.Count == 0)
+                    {
+                        <p class="diagnostics-card__empty">No budget telemetry is available for this turn.</p>
+                    }
+                    else
+                    {
+                        <div class="diagnostics-budget__stack" role="img" aria-label="Budget usage across prompt categories">
+                            @foreach (var metric in BudgetMetrics)
+                            {
+                                <span class="diagnostics-budget__segment diagnostics-budget__segment--@GetBudgetModifier(metric)"
+                                      style="@GetSegmentStyle(metric.Used, TotalBudgetTokens)"
+                                      title="@GetBudgetTooltip(metric)"></span>
+                            }
+                        </div>
+
+                        <ul class="diagnostics-budget__list">
+                            @foreach (var metric in BudgetMetrics)
+                            {
+                                <li class="diagnostics-budget__item">
+                                    <div class="diagnostics-budget__row">
+                                        <div>
+                                            <h3>@metric.Label</h3>
+                                            <p>@metric.Description</p>
+                                        </div>
+
+                                        <div class="diagnostics-budget__stats">
+                                            <strong>@metric.Used / @metric.Allocated</strong>
+                                            <span>@metric.UtilizationLabel</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="diagnostics-budget__bar" aria-hidden="true">
+                                        <span class="diagnostics-budget__fill diagnostics-budget__fill--@GetBudgetModifier(metric)"
+                                              style="@GetWidthStyle(metric.WidthPercent)"></span>
+                                    </div>
+
+                                    @if (metric.IsOverBudget)
+                                    {
+                                        <p class="diagnostics-budget__warning">Over budget by @(metric.Used - metric.Allocated) tokens.</p>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+
+                <section class="diagnostics-card" aria-labelledby="diagnostics-history-heading">
+                    <header class="diagnostics-card__header">
+                        <div>
+                            <h2 id="diagnostics-history-heading">History shaping</h2>
+                            <p>See how earlier turns were kept verbatim, compacted, summarized, or dropped to fit budget.</p>
+                        </div>
+                    </header>
+
+                    @if (_model.History is null)
+                    {
+                        <p class="diagnostics-card__empty">No history shaping telemetry is available for this turn.</p>
+                    }
+                    else
+                    {
+                        <div class="diagnostics-history__summary">
+                            <span class="diagnostics-pill diagnostics-pill--verbatim">@_model.History.VerbatimTurns verbatim</span>
+                            <span class="diagnostics-pill diagnostics-pill--compacted">@_model.History.CompactedTurns compacted</span>
+                            <span class="diagnostics-pill diagnostics-pill--summarized">@_model.History.SummarizedTurns summarized</span>
+                            <span class="diagnostics-pill diagnostics-pill--dropped">@_model.History.DroppedTurns dropped</span>
+                            <span class="badge">Saved @_model.History.TokensSaved tokens</span>
+                        </div>
+
+                        @if (HistoryTimeline.Count == 0)
+                        {
+                            <p class="diagnostics-card__empty">History shaping counts were recorded, but no timeline markers were persisted.</p>
+                        }
+                        else
+                        {
+                            <ol class="diagnostics-history__timeline">
+                                @foreach (var item in HistoryTimeline)
+                                {
+                                    <li class="diagnostics-history__item diagnostics-history__item--@item.Modifier">
+                                        <div class="diagnostics-history__marker" aria-hidden="true"></div>
+                                        <article class="diagnostics-history__content">
+                                            <header class="diagnostics-history__header">
+                                                <span class="diagnostics-history__index">@item.Index.ToString("00")</span>
+                                                <div>
+                                                    <h3>@item.Label</h3>
+                                                    <p>@item.Summary</p>
+                                                </div>
+                                            </header>
+
+                                            <div class="diagnostics-history__ratio" aria-label="Compression ratio @item.CompressionLabel">
+                                                <span class="diagnostics-history__ratio-bar">
+                                                    <span class="diagnostics-history__ratio-fill diagnostics-history__ratio-fill--@item.Modifier"
+                                                          style="@GetWidthStyle(item.CompressionPercent)"></span>
+                                                </span>
+                                                <strong>@item.CompressionLabel</strong>
+                                            </div>
+                                        </article>
+                                    </li>
+                                }
+                            </ol>
+                        }
+                    }
+                </section>
+
+                <section class="diagnostics-card diagnostics-card--span-2" aria-labelledby="diagnostics-routing-heading">
+                    <header class="diagnostics-card__header">
+                        <div>
+                            <h2 id="diagnostics-routing-heading">Routing decisions</h2>
+                            <p>Inspect the selected model, complexity score, alternatives considered, and quality-gate result.</p>
+                        </div>
+                    </header>
+
+                    @if (_model.RoutingDecision is null && _model.QualityGate is null && _model.ShadowRouting is null)
+                    {
+                        <p class="diagnostics-card__empty">No model-routing diagnostics were recorded for this turn.</p>
+                    }
+                    else
+                    {
+                        <div class="diagnostics-routing">
+                            @if (_model.RoutingDecision is { } routing)
+                            {
+                                <section class="diagnostics-routing__panel">
+                                    <div class="diagnostics-routing__stats">
+                                        <div class="diagnostics-routing__stat">
+                                            <span>Model</span>
+                                            <strong>@routing.SelectedModel</strong>
+                                        </div>
+                                        <div class="diagnostics-routing__stat">
+                                            <span>Tier</span>
+                                            <strong>@routing.SelectedTier</strong>
+                                        </div>
+                                        <div class="diagnostics-routing__stat">
+                                            <span>Complexity</span>
+                                            <strong>@routing.ComplexityScore.ToString("0.00", CultureInfo.InvariantCulture)</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="diagnostics-routing__reason">
+                                        <h3>Reason</h3>
+                                        <p>@routing.Reason</p>
+                                    </div>
+
+                                    <div class="diagnostics-routing__columns">
+                                        <section>
+                                            <h3>Decision factors</h3>
+                                            @if (routing.Factors.Count == 0)
+                                            {
+                                                <p class="diagnostics-card__empty">No routing factors were persisted.</p>
+                                            }
+                                            else
+                                            {
+                                                <ul class="diagnostics-routing__list">
+                                                    @foreach (var factor in routing.Factors)
+                                                    {
+                                                        <li>@factor</li>
+                                                    }
+                                                </ul>
+                                            }
+                                        </section>
+
+                                        <section>
+                                            <h3>Alternatives considered</h3>
+                                            @if (RoutingAlternatives.Count == 0)
+                                            {
+                                                <p class="diagnostics-card__empty">No alternative routing paths were recorded.</p>
+                                            }
+                                            else
+                                            {
+                                                <ul class="diagnostics-routing__list">
+                                                    @foreach (var alternative in RoutingAlternatives)
+                                                    {
+                                                        <li>
+                                                            <strong>@alternative.Title</strong>
+                                                            <span>@alternative.Detail</span>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            }
+                                        </section>
+                                    </div>
+                                </section>
+                            }
+
+                            @if (_model.QualityGate is { } qualityGate)
+                            {
+                                <section class="diagnostics-routing__panel diagnostics-routing__panel--quality">
+                                    <header class="diagnostics-routing__quality-header">
+                                        <h3>Quality gate</h3>
+                                        <span class="diagnostics-pill diagnostics-pill--@GetQualityModifier(qualityGate)">@GetQualityLabel(qualityGate)</span>
+                                    </header>
+
+                                    <div class="diagnostics-routing__quality-summary">
+                                        <div class="diagnostics-routing__stat">
+                                            <span>Score</span>
+                                            <strong>@qualityGate.OverallScore.ToString("0.00", CultureInfo.InvariantCulture)</strong>
+                                        </div>
+                                        <div class="diagnostics-routing__stat">
+                                            <span>Status</span>
+                                            <strong>@(qualityGate.Passed ? "Passed" : "Needs escalation")</strong>
+                                        </div>
+                                    </div>
+
+                                    <p class="diagnostics-routing__quality-reason">@(qualityGate.FailureReason ?? "The response cleared all configured checks.")</p>
+
+                                    @if (qualityGate.Checks.Count > 0)
+                                    {
+                                        <ul class="diagnostics-routing__checks">
+                                            @foreach (var check in qualityGate.Checks)
+                                            {
+                                                <li class="diagnostics-routing__check diagnostics-routing__check--@(check.Passed ? "pass" : "fail")">
+                                                    <div>
+                                                        <strong>@check.CheckName</strong>
+                                                        @if (!string.IsNullOrWhiteSpace(check.Details))
+                                                        {
+                                                            <span>@check.Details</span>
+                                                        }
+                                                    </div>
+                                                    <strong>@check.Score.ToString("0.00", CultureInfo.InvariantCulture)</strong>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </section>
+                            }
+
+                            @if (_model.ShadowRouting is { } shadow)
+                            {
+                                <section class="diagnostics-routing__panel diagnostics-routing__panel--shadow">
+                                    <h3>Shadow comparison</h3>
+                                    <dl class="diagnostics-routing__shadow-grid">
+                                        <div>
+                                            <dt>Primary model</dt>
+                                            <dd>@shadow.PrimaryModel</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Shadow model</dt>
+                                            <dd>@shadow.ShadowModel</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Primary tokens</dt>
+                                            <dd>@shadow.PrimaryTokensUsed</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Shadow tokens</dt>
+                                            <dd>@shadow.ShadowTokensUsed</dd>
+                                        </div>
+                                    </dl>
+
+                                    @if (shadow.Comparison is { } comparison)
+                                    {
+                                        <p class="diagnostics-routing__quality-reason">
+                                            Length ratio: @comparison.LengthRatio.ToString("0.00", CultureInfo.InvariantCulture) ·
+                                            Primary refusal: @(comparison.PrimaryRefusal ? "Yes" : "No") ·
+                                            Shadow refusal: @(comparison.ShadowRefusal ? "Yes" : "No")
+                                        </p>
+
+                                        @if (!string.IsNullOrWhiteSpace(comparison.Notes))
+                                        {
+                                            <p class="diagnostics-routing__quality-reason">@comparison.Notes</p>
+                                        }
+                                    }
+                                </section>
+                            }
+                        </div>
+                    }
+                </section>
+            </div>
+        }
+    </section>
+</section>
+
+@code {
+    private CancellationTokenSource _loadCts = new();
+    private string _sessionId = string.Empty;
+    private bool _isLoading;
+    private string? _errorMessage;
+    private DiagnosticsService.DiagnosticsExplorerData? _model;
+    private IReadOnlyList<string> _warnings = [];
+
+    private bool IsLoadDisabled => _isLoading || string.IsNullOrWhiteSpace(_sessionId);
+    private int TotalBudgetTokens => _model?.Budget?.TotalBudgetTokens ?? 0;
+    private IReadOnlyList<ContextAdmissionRecord> AdmittedItems => _model?.Context?.Admissions
+        .Where(item => item.Admitted)
+        .OrderByDescending(item => item.Score)
+        .ToList()
+        ?? [];
+    private IReadOnlyList<ContextAdmissionRecord> ExcludedItems => _model?.Context?.Admissions
+        .Where(item => !item.Admitted)
+        .OrderByDescending(item => item.Score)
+        .ToList()
+        ?? [];
+    private IReadOnlyList<BudgetMetric> BudgetMetrics => BuildBudgetMetrics(_model?.Budget);
+    private IReadOnlyList<HistoryTimelineEntry> HistoryTimeline => BuildHistoryTimeline(_model?.History);
+    private IReadOnlyList<RoutingAlternative> RoutingAlternatives => BuildRoutingAlternatives(_model);
+
+    private async Task LoadDiagnosticsAsync()
+    {
+        var sessionId = _sessionId.Trim();
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return;
+        }
+
+        var previousCts = _loadCts;
+        await previousCts.CancelAsync();
+        previousCts.Dispose();
+
+        var loadCts = new CancellationTokenSource();
+        _loadCts = loadCts;
+        _isLoading = true;
+        _errorMessage = null;
+        _warnings = [];
+        _model = null;
+
+        try
+        {
+            var result = await DiagnosticsApi.LoadAsync(sessionId, loadCts.Token);
+            _model = result.Data;
+            _warnings = result.Data?.Warnings ?? [];
+            _errorMessage = result.ErrorMessage;
+        }
+        catch (OperationCanceledException) when (loadCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_loadCts, loadCts))
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    private static string FormatTimestamp(DateTimeOffset? timestamp)
+        => timestamp is null ? "Not recorded" : timestamp.Value.LocalDateTime.ToString("g", CultureInfo.CurrentCulture);
+
+    private static string FormatScore(double score) => score.ToString("0.00", CultureInfo.InvariantCulture);
+
+    private static string GetAuditReason(ContextAdmissionRecord item)
+        => item.Admitted
+            ? $"Included from {GetCategoryLabel(item.Source).ToLowerInvariant()} context after scoring and budget checks."
+            : item.ExclusionReason ?? "Excluded during context admission.";
+
+    private static string GetCategoryModifier(string source)
+    {
+        var normalized = source.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            var value when value.Contains("system", StringComparison.Ordinal) || value.Contains("prompt", StringComparison.Ordinal) => "system",
+            var value when value.Contains("wiki", StringComparison.Ordinal) || value.Contains("knowledge", StringComparison.Ordinal) || value.Contains("fact", StringComparison.Ordinal) => "wiki",
+            var value when value.Contains("history", StringComparison.Ordinal) || value.Contains("conversation", StringComparison.Ordinal) || value.Contains("turn", StringComparison.Ordinal) => "history",
+            var value when value.Contains("retrieval", StringComparison.Ordinal) || value.Contains("gbrain", StringComparison.Ordinal) || value.Contains("search", StringComparison.Ordinal) => "retrieval",
+            var value when value.Contains("tool", StringComparison.Ordinal) => "tools",
+            _ => "default"
+        };
+    }
+
+    private static string GetCategoryLabel(string source)
+        => GetCategoryModifier(source) switch
+        {
+            "system" => "System",
+            "wiki" => "Wiki",
+            "history" => "History",
+            "retrieval" => "Retrieval",
+            "tools" => "Tools",
+            _ => string.IsNullOrWhiteSpace(source) ? "Unknown" : source
+        };
+
+    private static IReadOnlyList<BudgetMetric> BuildBudgetMetrics(BudgetDiagnosticsResponse? budget)
+    {
+        if (budget is null)
+        {
+            return [];
+        }
+
+        var headroomTokens = Math.Max(budget.TotalBudgetTokens - budget.UsableBudgetTokens, 0);
+
+        return
+        [
+            new BudgetMetric("System", budget.SystemPrompt.Used, budget.SystemPrompt.Allocated, "system", "System prompt instructions."),
+            new BudgetMetric("Wiki", budget.WikiFacts.Used, budget.WikiFacts.Allocated, "wiki", "Persisted wiki facts admitted into the prompt."),
+            new BudgetMetric("History", budget.Conversation.Used, budget.Conversation.Allocated, "history", "Conversation history retained after shaping."),
+            new BudgetMetric("Retrieval", budget.Retrieval.Used, budget.Retrieval.Allocated, "retrieval", "Retrieved documents and evidence."),
+            new BudgetMetric("Tools", budget.Tools.Used, budget.Tools.Allocated, "tools", "Tool metadata exposed for the turn."),
+            new BudgetMetric("Response headroom", headroomTokens, headroomTokens, "headroom", $"Reserved output budget ({budget.ResponseHeadroomRatio:P0}).", true)
+        ];
+    }
+
+    private static IReadOnlyList<HistoryTimelineEntry> BuildHistoryTimeline(HistoryDiagnosticsResponse? history)
+    {
+        if (history is null)
+        {
+            return [];
+        }
+
+        var entries = new List<HistoryTimelineEntry>();
+
+        if (history.VerbatimTurns > 0)
+        {
+            entries.Add(new HistoryTimelineEntry(0, "Verbatim turns", "verbatim", $"{history.VerbatimTurns} recent {Pluralize("turn", history.VerbatimTurns)} kept in full.", 100, "100% retained"));
+        }
+
+        if (history.Shaping?.Markers.Count > 0)
+        {
+            foreach (var marker in history.Shaping.Markers.OrderBy(marker => marker.CompactedAt))
+            {
+                var modifier = string.Equals(marker.MarkerType, "summarized", StringComparison.OrdinalIgnoreCase)
+                    ? "summarized"
+                    : "compacted";
+                var ratio = marker.OriginalTokenCount > 0
+                    ? (double)marker.CompactedTokenCount / marker.OriginalTokenCount * 100
+                    : 0;
+                var actor = string.IsNullOrWhiteSpace(marker.CompactedBy)
+                    ? string.Empty
+                    : $" by {marker.CompactedBy}";
+
+                entries.Add(new HistoryTimelineEntry(
+                    0,
+                    modifier == "summarized" ? "Summarized block" : "Compacted block",
+                    modifier,
+                    $"{marker.OriginalTurnCount} {Pluralize("turn", marker.OriginalTurnCount)} compressed from {marker.OriginalTokenCount} to {marker.CompactedTokenCount} tokens{actor}.",
+                    ratio,
+                    $"{marker.CompactedTokenCount}/{marker.OriginalTokenCount} tokens"));
+            }
+        }
+        else
+        {
+            if (history.CompactedTurns > 0)
+            {
+                entries.Add(new HistoryTimelineEntry(0, "Compacted turns", "compacted", $"{history.CompactedTurns} {Pluralize("turn", history.CompactedTurns)} compacted into shorter history slices.", 60, "Compaction recorded"));
+            }
+
+            if (history.SummarizedTurns > 0)
+            {
+                entries.Add(new HistoryTimelineEntry(0, "Summarized turns", "summarized", $"{history.SummarizedTurns} {Pluralize("turn", history.SummarizedTurns)} summarized into higher-level notes.", 35, "Summary recorded"));
+            }
+        }
+
+        if (history.DroppedTurns > 0)
+        {
+            entries.Add(new HistoryTimelineEntry(0, "Dropped turns", "dropped", $"{history.DroppedTurns} oldest {Pluralize("turn", history.DroppedTurns)} removed from prompt assembly.", 0, "0% retained"));
+        }
+
+        return entries
+            .Select((item, index) => item with { Index = index + 1 })
+            .ToList();
+    }
+
+    private static IReadOnlyList<RoutingAlternative> BuildRoutingAlternatives(DiagnosticsService.DiagnosticsExplorerData? model)
+    {
+        if (model is null)
+        {
+            return [];
+        }
+
+        var alternatives = new List<RoutingAlternative>();
+
+        if (model.RoutingDecision?.EscalatedFrom is { } escalatedFrom)
+        {
+            alternatives.Add(new RoutingAlternative($"Escalated from {escalatedFrom}", "A lower-cost tier was attempted before the selected model tier."));
+        }
+
+        if (model.ShadowRouting is { } shadow)
+        {
+            var comparisonNotes = shadow.Comparison?.Notes;
+            var detail = string.IsNullOrWhiteSpace(comparisonNotes)
+                ? $"Shadow model {shadow.ShadowModel} ran in parallel for comparison."
+                : comparisonNotes;
+            alternatives.Add(new RoutingAlternative($"Shadow model: {shadow.ShadowModel}", detail));
+        }
+
+        return alternatives;
+    }
+
+    private static string GetBudgetModifier(BudgetMetric metric)
+        => metric.IsOverBudget ? "over" : metric.Modifier;
+
+    private static string GetBudgetTooltip(BudgetMetric metric)
+        => $"{metric.Label}: {metric.Used} of {metric.Allocated} tokens ({metric.UtilizationLabel})";
+
+    private static string GetQualityModifier(QualityGateResult qualityGate)
+        => qualityGate.Passed
+            ? "quality-pass"
+            : qualityGate.Outcome == QualityOutcome.Escalated
+                ? "quality-warn"
+                : "quality-fail";
+
+    private static string GetQualityLabel(QualityGateResult qualityGate)
+        => qualityGate.Outcome switch
+        {
+            QualityOutcome.Passed => "Passed",
+            QualityOutcome.Escalated => "Escalated",
+            QualityOutcome.FailedEmpty => "Failed: empty",
+            QualityOutcome.FailedTooShort => "Failed: too short",
+            QualityOutcome.FailedLowCoverage => "Failed: low coverage",
+            QualityOutcome.FailedRefusal => "Failed: refusal",
+            _ => qualityGate.Outcome.ToString()
+        };
+
+    private static string GetSegmentStyle(int value, int total)
+    {
+        if (total <= 0 || value <= 0)
+        {
+            return "width: 0%;";
+        }
+
+        var percent = (double)value / total * 100;
+        return GetWidthStyle(percent);
+    }
+
+    private static string GetWidthStyle(double percent)
+        => $"width: {Math.Clamp(percent, 0, 100).ToString("0.##", CultureInfo.InvariantCulture)}%;";
+
+    private static string Pluralize(string noun, int count) => count == 1 ? noun : $"{noun}s";
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_loadCts.IsCancellationRequested)
+        {
+            await _loadCts.CancelAsync();
+        }
+
+        _loadCts.Dispose();
+    }
+
+    private sealed record BudgetMetric(string Label, int Used, int Allocated, string Modifier, string Description, bool IsReserved = false)
+    {
+        public bool IsOverBudget => !IsReserved && Allocated > 0 && Used > Allocated;
+        public double UtilizationPercent => Allocated > 0 ? (double)Used / Allocated * 100 : 0;
+        public double WidthPercent => Math.Clamp(UtilizationPercent, 0, 100);
+        public string UtilizationLabel => IsReserved ? "Reserved" : $"{UtilizationPercent.ToString("0.#", CultureInfo.InvariantCulture)}%";
+    }
+
+    private sealed record HistoryTimelineEntry(int Index, string Label, string Modifier, string Summary, double CompressionPercent, string CompressionLabel);
+
+    private sealed record RoutingAlternative(string Title, string Detail);
+}

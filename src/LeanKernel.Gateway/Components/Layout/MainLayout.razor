@@ -1,0 +1,16 @@
+@inherits LayoutComponentBase
+
+<a class="skip-link" href="#main-content">Skip to content</a>
+
+<div class="app-container">
+    <nav class="sidebar" aria-label="Primary navigation">
+        <div class="brand">
+            <h1>LeanKernel</h1>
+            <p>Gateway UI</p>
+        </div>
+        <NavMenu />
+    </nav>
+    <main id="main-content" class="main-content" tabindex="-1">
+        @Body
+    </main>
+</div>

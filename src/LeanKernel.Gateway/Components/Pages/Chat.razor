@@ -1,0 +1,233 @@
+@page "/"
+@page "/chat"
+@page "/chat/{SessionId}"
+@inject ChatService ChatService
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+
+<PageTitle>LeanKernel Chat</PageTitle>
+
+<section class="chat-page">
+    <aside class="chat-page__sessions" aria-label="Session list">
+        <SessionList Sessions="ChatService.Sessions"
+                     ActiveSessionId="ChatService.CurrentSessionId"
+                     OnNewSession="StartNewSessionAsync"
+                     OnSelectSession="SelectSessionAsync" />
+    </aside>
+
+    <section class="chat-panel" aria-busy="@ChatService.IsLoading">
+        <header class="chat-panel__header page-header">
+            <div>
+                <h1>Chat</h1>
+                <p>@GetHeaderSubtitle()</p>
+            </div>
+            <button type="button" class="button button-secondary" @onclick="StartNewSessionAsync">New session</button>
+        </header>
+
+        @if (!string.IsNullOrWhiteSpace(ChatService.ErrorMessage))
+        {
+            <div class="status-banner status-banner--error" role="alert">
+                @ChatService.ErrorMessage
+            </div>
+        }
+
+        <div id="chat-message-list" class="chat-thread" aria-live="polite">
+            @if (ChatService.Messages.Count == 0 && !ChatService.IsLoading)
+            {
+                <section class="chat-empty-state">
+                    <h2>Start a LeanKernel conversation</h2>
+                    <p>Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.</p>
+                </section>
+            }
+            else
+            {
+                @foreach (var message in ChatService.Messages)
+                {
+                    <ChatMessage Message="message" />
+                }
+            }
+
+            @if (ChatService.IsLoading)
+            {
+                <div class="chat-loading" role="status">
+                    <span class="chat-loading__dot"></span>
+                    <span class="chat-loading__dot"></span>
+                    <span class="chat-loading__dot"></span>
+                    <span>LeanKernel is thinking…</span>
+                </div>
+            }
+        </div>
+
+        <div class="chat-composer">
+            <label class="chat-composer__label" for="chat-composer-input">Message</label>
+            <textarea id="chat-composer-input"
+                      class="chat-composer__input"
+                      @bind="ChatService.ComposerText"
+                      @bind:event="oninput"
+                      rows="4"
+                      maxlength="12000"
+                      placeholder="Ask LeanKernel anything…"
+                      disabled="@ChatService.IsLoading"></textarea>
+
+            <div class="chat-composer__footer">
+                <p class="chat-composer__hint">Enter to send · Shift+Enter for newline</p>
+                <button id="chat-send-button"
+                        type="button"
+                        class="button button-primary"
+                        @onclick="SendAsync"
+                        disabled="@IsSendDisabled">
+                    Send
+                </button>
+            </div>
+        </div>
+    </section>
+</section>
+
+@code {
+    private const string OwnerStorageKey = "leankernel.chat.owner-id";
+    private const string SessionCacheStorageKey = "leankernel.chat.sessions";
+    private readonly CancellationTokenSource _disposeCts = new();
+    private bool _initialized;
+    private bool _shouldScroll;
+
+    [Parameter]
+    public string? SessionId { get; set; }
+
+    private bool IsSendDisabled => ChatService.IsLoading || string.IsNullOrWhiteSpace(ChatService.ComposerText);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized && !string.IsNullOrWhiteSpace(SessionId)
+            && !string.Equals(SessionId, ChatService.CurrentSessionId, StringComparison.Ordinal))
+        {
+            await ChatService.OpenSessionAsync(SessionId, _disposeCts.Token);
+            await PersistSessionCacheAsync();
+            _shouldScroll = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var ownerId = await GetOrCreateOwnerIdAsync();
+            var cachedSessions = await LoadCachedSessionsAsync();
+
+            await ChatService.InitializeAsync(ownerId, cachedSessions, SessionId, _disposeCts.Token);
+            await PersistSessionCacheAsync();
+            await JS.InvokeVoidAsync("leanKernelChat.registerComposer", "chat-composer-input", "chat-send-button");
+
+            _initialized = true;
+            _shouldScroll = true;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (_shouldScroll)
+        {
+            _shouldScroll = false;
+            await JS.InvokeVoidAsync("leanKernelChat.scrollToBottom", "chat-message-list");
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        var sent = await ChatService.SendAsync(_disposeCts.Token);
+        await PersistSessionCacheAsync();
+
+        if (!sent)
+        {
+            return;
+        }
+
+        _shouldScroll = true;
+
+        if (!string.IsNullOrWhiteSpace(ChatService.CurrentSessionId))
+        {
+            Navigation.NavigateTo($"/chat/{ChatService.CurrentSessionId}", replace: true);
+        }
+    }
+
+    private async Task StartNewSessionAsync()
+    {
+        var sessionId = await ChatService.CreateNewSessionAsync(_disposeCts.Token);
+        await PersistSessionCacheAsync();
+        _shouldScroll = true;
+        Navigation.NavigateTo($"/chat/{sessionId}");
+    }
+
+    private async Task SelectSessionAsync(string sessionId)
+    {
+        if (string.Equals(sessionId, ChatService.CurrentSessionId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await ChatService.OpenSessionAsync(sessionId, _disposeCts.Token);
+        await PersistSessionCacheAsync();
+        _shouldScroll = true;
+        Navigation.NavigateTo($"/chat/{sessionId}");
+    }
+
+    private async Task<string> GetOrCreateOwnerIdAsync()
+    {
+        var existingOwnerId = await JS.InvokeAsync<string?>("leanKernelChat.storage.get", OwnerStorageKey);
+        if (!string.IsNullOrWhiteSpace(existingOwnerId))
+        {
+            return existingOwnerId;
+        }
+
+        var ownerId = Guid.NewGuid().ToString("N");
+        await JS.InvokeVoidAsync("leanKernelChat.storage.set", OwnerStorageKey, ownerId);
+        return ownerId;
+    }
+
+    private async Task<IReadOnlyList<ChatSessionSummary>> LoadCachedSessionsAsync()
+    {
+        var json = await JS.InvokeAsync<string?>("leanKernelChat.storage.get", SessionCacheStorageKey);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ChatSessionSummary>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private Task PersistSessionCacheAsync()
+        => JS.InvokeVoidAsync(
+            "leanKernelChat.storage.set",
+            SessionCacheStorageKey,
+            JsonSerializer.Serialize(ChatService.Sessions)).AsTask();
+
+    private string GetHeaderSubtitle()
+    {
+        if (string.IsNullOrWhiteSpace(ChatService.CurrentSessionId))
+        {
+            return "Create a session or pick a recent conversation from the rail.";
+        }
+
+        var session = ChatService.Sessions.FirstOrDefault(item => string.Equals(item.SessionId, ChatService.CurrentSessionId, StringComparison.Ordinal));
+        return session is null
+            ? $"Session {ChatService.CurrentSessionId}"
+            : $"{session.Title} · Updated {session.UpdatedAt.LocalDateTime:g}";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_disposeCts.IsCancellationRequested)
+        {
+            await _disposeCts.CancelAsync();
+        }
+
+        _disposeCts.Dispose();
+    }
+}

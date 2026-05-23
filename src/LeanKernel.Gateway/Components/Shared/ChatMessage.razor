@@ -1,0 +1,53 @@
+@using System.Text.Encodings.Web
+@using System.Text.RegularExpressions
+
+<article class="chat-message @(IsUser ? "chat-message--user" : "chat-message--assistant")">
+    <header class="chat-message__meta">
+        <span class="chat-message__role">@(IsUser ? "You" : "LeanKernel")</span>
+        <div class="chat-message__badges">
+            @if (!string.IsNullOrWhiteSpace(Message.CompactionLabel))
+            {
+                <span class="badge badge--history">@Message.CompactionLabel</span>
+            }
+
+            @if (Message.Status == ChatMessageStatus.Pending)
+            {
+                <span class="badge">Sending</span>
+            }
+        </div>
+        <time datetime="@GetTimestampAttribute()">@GetTimestampLabel()</time>
+    </header>
+
+    @if (IsUser)
+    {
+        <p class="chat-message__content">@Message.Content</p>
+    }
+    else
+    {
+        <div class="chat-message__content markdown-body">@((MarkupString)RenderMarkdown(Message.Content))</div>
+    }
+</article>
+
+@code {
+    private static readonly Regex BoldPattern = new(@"\*\*(.+?)\*\*", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex InlineCodePattern = new(@"`([^`]+)`", RegexOptions.Compiled);
+    private static readonly Regex LinkPattern = new(@"\[(.+?)\]\((https?://[^\s)]+)\)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    [Parameter]
+    public required ChatMessageViewModel Message { get; set; }
+
+    private bool IsUser => string.Equals(Message.Role, "user", StringComparison.OrdinalIgnoreCase);
+
+    private string GetTimestampAttribute() => Message.Timestamp.ToString("O");
+
+    private string GetTimestampLabel() => Message.Timestamp.LocalDateTime.ToString("g");
+
+    private static string RenderMarkdown(string content)
+    {
+        var encoded = HtmlEncoder.Default.Encode(content ?? string.Empty);
+        encoded = LinkPattern.Replace(encoded, "<a href=\"$2\" target=\"_blank\" rel=\"noreferrer\">$1</a>");
+        encoded = BoldPattern.Replace(encoded, "<strong>$1</strong>");
+        encoded = InlineCodePattern.Replace(encoded, "<code>$1</code>");
+        return encoded.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", "<br />", StringComparison.Ordinal);
+    }
+}

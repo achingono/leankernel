@@ -1,0 +1,68 @@
+<section class="session-list">
+    <header class="session-list__header">
+        <div>
+            <h2>Sessions</h2>
+            <p>Resume recent conversations.</p>
+        </div>
+        <button type="button" class="button button-primary" @onclick="CreateNewAsync">New</button>
+    </header>
+
+    @if (Sessions.Count == 0)
+    {
+        <p class="session-list__empty">No sessions yet. Start a conversation to populate this list.</p>
+    }
+    else
+    {
+        <ul class="session-list__items">
+            @foreach (var session in Sessions)
+            {
+                var isActive = string.Equals(session.SessionId, ActiveSessionId, StringComparison.Ordinal);
+                <li>
+                    <button type="button"
+                            class="session-list__item @(isActive ? "session-list__item--active" : string.Empty)"
+                            @onclick="() => SelectAsync(session.SessionId)">
+                        <span class="session-list__title">@session.Title</span>
+                        <span class="session-list__preview">@session.Preview</span>
+                        <span class="session-list__meta">@FormatTimestamp(session.UpdatedAt)</span>
+                    </button>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<ChatSessionSummary> Sessions { get; set; } = [];
+
+    [Parameter]
+    public string? ActiveSessionId { get; set; }
+
+    [Parameter]
+    public EventCallback OnNewSession { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnSelectSession { get; set; }
+
+    private Task CreateNewAsync() => OnNewSession.InvokeAsync();
+
+    private Task SelectAsync(string sessionId) => OnSelectSession.InvokeAsync(sessionId);
+
+    private static string FormatTimestamp(DateTimeOffset value)
+    {
+        var local = value.ToLocalTime();
+        var now = DateTimeOffset.Now;
+
+        if (local.Date == now.Date)
+        {
+            return local.ToString("t");
+        }
+
+        if (local.Year == now.Year)
+        {
+            return local.ToString("MMM d");
+        }
+
+        return local.ToString("g");
+    }
+}
