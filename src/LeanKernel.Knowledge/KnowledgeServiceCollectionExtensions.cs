@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,16 +13,14 @@ public static class KnowledgeServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(config);
 
         services.AddSingleton<IOptions<GBrainConfig>>(Options.Create(config));
+        services.AddTransient<GBrainAuthHandler>();
         services.AddHttpClient<GBrainMcpClient>(client =>
         {
-            client.BaseAddress = new Uri(config.BaseUrl);
+            var baseUrl = config.BaseUrl.TrimEnd('/');
+            client.BaseAddress = new Uri($"{baseUrl}/mcp");
             client.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
-
-            if (!string.IsNullOrWhiteSpace(config.AuthToken))
-            {
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
-            }
-        });
+        })
+        .AddHttpMessageHandler<GBrainAuthHandler>();
 
         services.AddSingleton<GBrainKnowledgeService>();
         services.AddSingleton<IKnowledgeService>(provider => provider.GetRequiredService<GBrainKnowledgeService>());

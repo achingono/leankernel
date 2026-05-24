@@ -89,7 +89,7 @@ services:
       - GBRAIN_DB_URL=${GBRAIN_DB_URL:-}
       - GBRAIN_EMBEDDING_MODEL=${GBRAIN_EMBEDDING_MODEL:-openai:embedding-small}
       - LITELLM_BASE_URL=${LITELLM_BASE_URL:-http://litellm:4000}
-      - LITELLM_API_KEY=${LITELLM_API_KEY:-${LITELLM_MASTER_KEY:-sk-leankernel-local}}
+      - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - TZ=${TZ:-America/Toronto}
@@ -140,6 +140,8 @@ services:
       - LEANKERNEL__DIAGNOSTICS__PERSISTTODATABASE=true
       - LEANKERNEL__GATEWAY__APIKEY=${GATEWAY_API_KEY:-}
       - TZ=${TZ:-America/Toronto}
+    volumes:
+      - gbrain-data:/app/data/gbrain:ro
     ports:
       - "${ENGINE_PORT:-5080}:5080"
     depends_on:

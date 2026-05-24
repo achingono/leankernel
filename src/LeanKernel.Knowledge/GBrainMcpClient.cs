@@ -36,10 +36,8 @@ public sealed class GBrainMcpClient
 
         _logger.LogDebug("GBrain MCP call: {Tool} (id={Id})", toolName, requestId);
 
-        using var response = await _httpClient.PostAsJsonAsync(string.Empty, request, SerializerOptions, ct);
-        response.EnsureSuccessStatusCode();
+        var result = await SendMcpRequestAsync(request, ct).ConfigureAwait(false);
 
-        var result = await response.Content.ReadFromJsonAsync<McpResponse>(SerializerOptions, ct);
         if (result?.Error is not null)
         {
             _logger.LogWarning("GBrain MCP error: {Code} {Message}", result.Error.Code, result.Error.Message);
@@ -64,10 +62,8 @@ public sealed class GBrainMcpClient
             Params = new { }
         };
 
-        using var response = await _httpClient.PostAsJsonAsync(string.Empty, request, SerializerOptions, ct);
-        response.EnsureSuccessStatusCode();
+        var result = await SendMcpRequestAsync(request, ct).ConfigureAwait(false);
 
-        var result = await response.Content.ReadFromJsonAsync<McpResponse>(SerializerOptions, ct);
         if (result?.Error is not null)
         {
             _logger.LogWarning("GBrain MCP error: {Code} {Message}", result.Error.Code, result.Error.Message);
@@ -81,6 +77,48 @@ public sealed class GBrainMcpClient
 
         var tools = result.Result.Value.Deserialize<McpToolListResult>(SerializerOptions);
         return tools?.Tools ?? [];
+    }
+
+    private async Task<McpResponse?> SendMcpRequestAsync(McpRequest request, CancellationToken ct)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(string.Empty, request, SerializerOptions, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var contentType = response.Content.Headers.ContentType?.MediaType;
+
+        if (string.Equals(contentType, "text/event-stream", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ReadSseResponseAsync(response, ct).ConfigureAwait(false);
+        }
+
+        // Direct JSON response
+        return await response.Content.ReadFromJsonAsync<McpResponse>(SerializerOptions, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<McpResponse?> ReadSseResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        using var reader = new StreamReader(stream);
+
+        McpResponse? lastResponse = null;
+
+        while (await reader.ReadLineAsync(ct).ConfigureAwait(false) is { } line)
+        {
+            if (!line.StartsWith("data: ", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var json = line[6..]; // Strip "data: " prefix
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                continue;
+            }
+
+            lastResponse = JsonSerializer.Deserialize<McpResponse>(json, SerializerOptions);
+        }
+
+        return lastResponse;
     }
 
     private static JsonElement? UnwrapToolResult(JsonElement result)

@@ -19,4 +19,14 @@ if [ -z "${OPENAI_API_KEY:-}" ] && [ -n "${LITELLM_API_KEY:-}" ]; then
 fi
 
 gbrain init --url "${db_url}" --embedding-model "${GBRAIN_EMBEDDING_MODEL:-openai:embedding-small}"
-exec gbrain serve --http --bind "${GBRAIN_BIND:-0.0.0.0}" --port "${GBRAIN_PORT:-8789}"
+
+# Create a bearer token for the engine if one doesn't already exist
+TOKEN_FILE="/app/data/wiki/.engine-token"
+if [ ! -f "$TOKEN_FILE" ]; then
+  token=$(gbrain auth create leankernel-engine --takes-holders world 2>&1 | grep "^  gbrain_" | tr -d ' ')
+  if [ -n "$token" ]; then
+    printf '%s' "$token" > "$TOKEN_FILE"
+  fi
+fi
+
+exec gbrain serve --http --bind "${GBRAIN_BIND:-0.0.0.0}" --port "${GBRAIN_PORT:-8789}" --enable-dcr

@@ -19,27 +19,33 @@ public static class LeanKernelDbContextSchemaExtensions
 
         await dbContext.Database.ExecuteSqlRawAsync(
             """
-            CREATE TABLE IF NOT EXISTS \"ScheduledJobExecutions\" (
-                \"Id\" uuid NOT NULL,
-                \"JobName\" text NOT NULL,
-                \"ScheduledAt\" timestamp with time zone NOT NULL,
-                \"StartedAt\" timestamp with time zone NOT NULL,
-                \"CompletedAt\" timestamp with time zone NULL,
-                \"Success\" boolean NOT NULL,
-                \"Result\" text NULL,
-                \"Error\" text NULL,
-                CONSTRAINT \"PK_ScheduledJobExecutions\" PRIMARY KEY (\"Id\")
+            CREATE SCHEMA IF NOT EXISTS engine
+            """,
+            ct).ConfigureAwait(false);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS engine."ScheduledJobExecutions" (
+                "Id" uuid NOT NULL,
+                "JobName" text NOT NULL,
+                "ScheduledAt" timestamp with time zone NOT NULL,
+                "StartedAt" timestamp with time zone NOT NULL,
+                "CompletedAt" timestamp with time zone NULL,
+                "Success" boolean NOT NULL,
+                "Result" text NULL,
+                "Error" text NULL,
+                CONSTRAINT "PK_ScheduledJobExecutions" PRIMARY KEY ("Id")
             )
             """,
             ct).ConfigureAwait(false);
         await dbContext.Database.ExecuteSqlRawAsync(
-            "CREATE INDEX IF NOT EXISTS \"IX_ScheduledJobExecutions_JobName\" ON \"ScheduledJobExecutions\" (\"JobName\")",
+            """CREATE INDEX IF NOT EXISTS "IX_ScheduledJobExecutions_JobName" ON engine."ScheduledJobExecutions" ("JobName")""",
             ct).ConfigureAwait(false);
         await dbContext.Database.ExecuteSqlRawAsync(
-            "CREATE INDEX IF NOT EXISTS \"IX_ScheduledJobExecutions_JobName_ScheduledAt\" ON \"ScheduledJobExecutions\" (\"JobName\", \"ScheduledAt\")",
+            """CREATE INDEX IF NOT EXISTS "IX_ScheduledJobExecutions_JobName_ScheduledAt" ON engine."ScheduledJobExecutions" ("JobName", "ScheduledAt")""",
             ct).ConfigureAwait(false);
         await dbContext.Database.ExecuteSqlRawAsync(
-            "CREATE INDEX IF NOT EXISTS \"IX_ScheduledJobExecutions_StartedAt\" ON \"ScheduledJobExecutions\" (\"StartedAt\")",
+            """CREATE INDEX IF NOT EXISTS "IX_ScheduledJobExecutions_StartedAt" ON engine."ScheduledJobExecutions" ("StartedAt")""",
             ct).ConfigureAwait(false);
     }
 }

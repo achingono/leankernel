@@ -74,7 +74,17 @@ try
         await using var scope = app.Services.CreateAsyncScope();
         var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<LeanKernelDbContext>>();
         await using var dbContext = await dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
-        await dbContext.Database.EnsureCreatedAsync().ConfigureAwait(false);
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE SCHEMA IF NOT EXISTS engine").ConfigureAwait(false);
+        var hasSessionsTable = await dbContext.Database
+            .SqlQueryRaw<int>("""SELECT CAST(COUNT(*) AS int) AS "Value" FROM information_schema.tables WHERE table_schema = 'engine' AND table_name = 'Sessions'""")
+            .FirstOrDefaultAsync().ConfigureAwait(false);
+        if (hasSessionsTable == 0)
+        {
+            // Drop partial schema state from previous failed initializations
+            await dbContext.Database.ExecuteSqlRawAsync("""DROP TABLE IF EXISTS engine."ScheduledJobExecutions" CASCADE""").ConfigureAwait(false);
+            var script = dbContext.Database.GenerateCreateScript();
+            await dbContext.Database.ExecuteSqlRawAsync(script).ConfigureAwait(false);
+        }
         await dbContext.EnsureSchedulerSchemaAsync().ConfigureAwait(false);
     }
     catch (Exception ex)

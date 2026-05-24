@@ -43,6 +43,8 @@ public sealed class LeanKernelDbContext(DbContextOptions<LeanKernelDbContext> op
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
+        modelBuilder.HasDefaultSchema("engine");
+
         modelBuilder.Entity<SessionEntity>(entity =>
         {
             entity.HasKey(x => x.Id);
