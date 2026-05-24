@@ -19,11 +19,11 @@
 
     <FluentStack Orientation="Orientation.Vertical" Class="chat-main">
         <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-header-row">
-            <FluentStack Orientation="Orientation.Vertical" Class="chat-header-copy">
-                <h2 class="chat-heading">Chat</h2>
-                <p class="chat-subtitle">@GetHeaderSubtitle()</p>
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
+                <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Chat</FluentLabel>
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetHeaderSubtitle()</FluentLabel>
             </FluentStack>
-            <FluentButton Appearance="Appearance.Outline" OnClick="StartNewSessionAsync" Class="chat-new-session-button">New session</FluentButton>
+            <FluentButton Appearance="Appearance.Outline" OnClick="StartNewSessionAsync">New session</FluentButton>
         </FluentStack>
 
         @if (!string.IsNullOrWhiteSpace(ChatService.ErrorMessage))
@@ -36,11 +36,11 @@
         <div id="chat-message-list" class="chat-message-list">
             @if (ChatService.Messages.Count == 0 && !ChatService.IsLoading)
             {
-                <FluentCard Class="chat-empty-state">
-                    <h3 class="chat-empty-title">Start a LeanKernel conversation</h3>
-                    <p class="chat-empty-copy">
+                <FluentCard Class="lk-empty-state">
+                    <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Start a LeanKernel conversation</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">
                         Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.
-                    </p>
+                    </FluentLabel>
                 </FluentCard>
             }
             else
@@ -53,8 +53,8 @@
 
             @if (ChatService.IsLoading)
             {
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-loading-state">
-                    <FluentProgressRing Class="chat-loading-ring" />
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
+                    <FluentProgressRing />
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">LeanKernel is thinking…</FluentLabel>
                 </FluentStack>
             }
@@ -69,11 +69,10 @@
                            Disabled="@ChatService.IsLoading"
                            Class="chat-composer-input" />
             <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-composer-footer">
-                <span class="chat-input-hint">Enter to send · Shift+Enter for newline</span>
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Enter to send · Shift+Enter for newline</FluentLabel>
                 <FluentButton Id="chat-send-button"
                               Appearance="Appearance.Accent"
                               OnClick="SendAsync"
-                              Class="chat-send-button"
                               Disabled="@IsSendDisabled">
                     Send
                 </FluentButton>

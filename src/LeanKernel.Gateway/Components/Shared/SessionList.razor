@@ -1,23 +1,23 @@
 <FluentCard>
-    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.75rem;">
-        <h3 class="session-list-title">Sessions</h3>
+    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
+        <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Sessions</FluentLabel>
         <FluentButton Appearance="Appearance.Accent" OnClick="CreateNewAsync">New</FluentButton>
     </FluentStack>
 
     @if (Sessions.Count == 0)
     {
-        <p class="session-list-empty">No sessions yet. Start a conversation to populate this list.</p>
+        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No sessions yet. Start a conversation to populate this list.</FluentLabel>
     }
     else
     {
-        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+        <FluentStack Orientation="Orientation.Vertical" Class="lk-section-tight">
             @foreach (var session in Sessions)
             {
                 var isActive = string.Equals(session.SessionId, ActiveSessionId, StringComparison.Ordinal);
-                <FluentCard Style="@($"cursor: pointer; {(isActive ? "border: 2px solid var(--accent-fill-rest);" : "")}")" @onclick="() => SelectAsync(session.SessionId)">
-                    <div class="session-item-title">@session.Title</div>
-                    <div class="session-item-preview">@session.Preview</div>
-                    <div class="session-item-time">@FormatTimestamp(session.UpdatedAt)</div>
+                <FluentCard Class="@($"lk-card-interactive{(isActive ? " lk-active" : "")}")" @onclick="() => SelectAsync(session.SessionId)">
+                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@session.Title</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@session.Preview</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@FormatTimestamp(session.UpdatedAt)</FluentLabel>
                 </FluentCard>
             }
         </FluentStack>

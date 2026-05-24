@@ -6,13 +6,13 @@
 
 <PageTitle>LeanKernel Admin</PageTitle>
 
-<FluentStack Orientation="Orientation.Vertical" Style="gap: 1.5rem;">
-    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Style="justify-content: space-between; gap: 1rem;">
-        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+<FluentStack Orientation="Orientation.Vertical" Class="lk-page">
+    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-page-header">
+        <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
             <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Admin Console</FluentLabel>
             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Govern provider health, model routing, tool access, spend, and scheduled jobs from one runtime surface.</FluentLabel>
         </FluentStack>
-        <FluentStack Orientation="Orientation.Vertical" Style="align-items: flex-end; gap: 0.35rem;">
+        <FluentStack Orientation="Orientation.Vertical" Style="align-items: flex-end; gap: var(--lk-space-xs);">
             <FluentBadge Appearance="Appearance.Accent">Live</FluentBadge>
             @if (_dashboard is not null)
             {
@@ -24,8 +24,8 @@
     </FluentStack>
 
     <FluentCard>
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Style="justify-content: space-between; gap: 1rem;">
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-card-header">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                 <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Runtime governance</FluentLabel>
                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@(_statusMessage ?? "Tool governance and health data are sourced from the live runtime. Spend tracking uses projected estimates until the accounting API is available.")</FluentLabel>
             </FluentStack>
@@ -42,9 +42,9 @@
 
     <section aria-labelledby="admin-health-heading" aria-busy="@(_isLoading || _isRefreshingHealth)">
         <FluentCard>
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Style="justify-content: space-between; gap: 1rem;">
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-card-header">
+                    <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                         <FluentLabel Id="admin-health-heading" Typo="Typography.Subject" Weight="FontWeight.Bold">System health overview</FluentLabel>
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Provider reachability, routing readiness, and the latest heartbeat checks.</FluentLabel>
                     </FluentStack>
@@ -58,20 +58,20 @@
 
                 @if (_isLoading || _dashboard is null)
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 1rem 0; gap: 0.75rem;">
-                        <FluentProgressRing Style="width: 24px; height: 24px;" />
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
+                        <FluentProgressRing />
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading provider health…</FluentLabel>
                     </FluentStack>
                 }
                 else
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem;">
+                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: var(--lk-space-l);">
                         @foreach (var provider in _dashboard.ProviderHealth)
                         {
                             <FluentCard Style="flex: 1 1 240px; min-width: 240px;">
-                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
-                                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Style="justify-content: space-between; gap: 0.75rem;">
-                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                <FluentStack Orientation="Orientation.Vertical" Class="lk-section">
+                                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-card-header">
+                                        <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@provider.Name</FluentLabel>
                                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@provider.Summary</FluentLabel>
                                         </FluentStack>
@@ -79,12 +79,12 @@
                                             @GetProviderStatusLabel(provider.Status)
                                         </FluentBadge>
                                     </FluentStack>
-                                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.75rem;">
-                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.15rem; min-width: 90px;">
+                                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Class="lk-data-row">
+                                        <FluentStack Orientation="Orientation.Vertical" Class="lk-data-pair" Style="min-width: 90px;">
                                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Latency</FluentLabel>
                                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@provider.LatencyMs ms</FluentLabel>
                                         </FluentStack>
-                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.15rem; min-width: 160px;">
+                                        <FluentStack Orientation="Orientation.Vertical" Class="lk-data-pair" Style="min-width: 160px;">
                                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Last check</FluentLabel>
                                             <FluentLabel Typo="Typography.Body">
                                                 <time datetime="@FormatTimestampAttribute(provider.LastCheckedAt)">@FormatDateTime(provider.LastCheckedAt)</time>
@@ -102,9 +102,9 @@
 
     <section aria-labelledby="admin-routing-heading" aria-busy="@_isLoading">
         <FluentCard>
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Style="justify-content: space-between; gap: 1rem;">
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-card-header">
+                    <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                         <FluentLabel Id="admin-routing-heading" Typo="Typography.Subject" Weight="FontWeight.Bold">Model routing configuration</FluentLabel>
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Current tier-to-model mapping prepared for future inline editing.</FluentLabel>
                     </FluentStack>
@@ -113,8 +113,8 @@
 
                 @if (_isLoading || _dashboard is null)
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 1rem 0; gap: 0.75rem;">
-                        <FluentProgressRing Style="width: 24px; height: 24px;" />
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
+                        <FluentProgressRing />
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading routing configuration…</FluentLabel>
                     </FluentStack>
                 }
@@ -140,13 +140,13 @@
 
     <section aria-labelledby="admin-tools-heading" aria-busy="@(_isLoading || !string.IsNullOrWhiteSpace(_updatingToolName))">
         <FluentCard>
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Wrap="true" Style="justify-content: space-between; gap: 1rem;">
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Wrap="true" Class="lk-card-header">
+                    <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                         <FluentLabel Id="admin-tools-heading" Typo="Typography.Subject" Weight="FontWeight.Bold">Tool governance</FluentLabel>
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Filter the current registry and preview enablement changes before the admin API ships.</FluentLabel>
                     </FluentStack>
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; min-width: 220px;">
+                    <FluentStack Orientation="Orientation.Vertical" Class="lk-form-field" Style="min-width: 220px;">
                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Category</FluentLabel>
                         <FluentSelect Id="admin-tool-filter"
                                       @bind-Value="_selectedToolCategory"
@@ -163,8 +163,8 @@
 
                 @if (_isLoading || _dashboard is null)
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 1rem 0; gap: 0.75rem;">
-                        <FluentProgressRing Style="width: 24px; height: 24px;" />
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
+                        <FluentProgressRing />
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading tool governance…</FluentLabel>
                     </FluentStack>
                 }
@@ -192,42 +192,42 @@
 
     <section aria-labelledby="admin-spend-heading" aria-busy="@_isLoading">
         <FluentCard>
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                     <FluentLabel Id="admin-spend-heading" Typo="Typography.Subject" Weight="FontWeight.Bold">Spend tracking dashboard</FluentLabel>
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Daily spend trend, current rollups, and budget posture for model usage.</FluentLabel>
                 </FluentStack>
 
                 @if (_isLoading || _dashboard is null)
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 1rem 0; gap: 0.75rem;">
-                        <FluentProgressRing Style="width: 24px; height: 24px;" />
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
+                        <FluentProgressRing />
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading spend dashboard…</FluentLabel>
                     </FluentStack>
                 }
                 else
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem;">
-                        <FluentCard Style="flex: 1 1 180px; min-width: 180px;">
-                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: var(--lk-space-l);">
+                        <FluentCard Class="lk-stat-card">
+                            <FluentStack Orientation="Orientation.Vertical" Class="lk-stat-card-content">
                                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Today</FluentLabel>
                                 <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">@FormatCurrency(_dashboard.Spend.TodaySpend)</FluentLabel>
                             </FluentStack>
                         </FluentCard>
-                        <FluentCard Style="flex: 1 1 180px; min-width: 180px;">
-                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentCard Class="lk-stat-card">
+                            <FluentStack Orientation="Orientation.Vertical" Class="lk-stat-card-content">
                                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">This week</FluentLabel>
                                 <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">@FormatCurrency(_dashboard.Spend.WeekSpend)</FluentLabel>
                             </FluentStack>
                         </FluentCard>
-                        <FluentCard Style="flex: 1 1 180px; min-width: 180px;">
-                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentCard Class="lk-stat-card">
+                            <FluentStack Orientation="Orientation.Vertical" Class="lk-stat-card-content">
                                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">This month</FluentLabel>
                                 <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">@FormatCurrency(_dashboard.Spend.MonthSpend)</FluentLabel>
                             </FluentStack>
                         </FluentCard>
-                        <FluentCard Style="flex: 1 1 180px; min-width: 180px;">
-                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentCard Class="lk-stat-card">
+                            <FluentStack Orientation="Orientation.Vertical" Class="lk-stat-card-content">
                                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Budget status</FluentLabel>
                                 <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">@GetBudgetSummary()</FluentLabel>
                             </FluentStack>
@@ -283,16 +283,16 @@
 
     <section aria-labelledby="admin-jobs-heading" aria-busy="@_isLoading">
         <FluentCard>
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                     <FluentLabel Id="admin-jobs-heading" Typo="Typography.Subject" Weight="FontWeight.Bold">Scheduled jobs</FluentLabel>
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Active automation cadence, previous execution, and next expected run.</FluentLabel>
                 </FluentStack>
 
                 @if (_isLoading || _dashboard is null)
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 1rem 0; gap: 0.75rem;">
-                        <FluentProgressRing Style="width: 24px; height: 24px;" />
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
+                        <FluentProgressRing />
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading scheduled jobs…</FluentLabel>
                     </FluentStack>
                 }

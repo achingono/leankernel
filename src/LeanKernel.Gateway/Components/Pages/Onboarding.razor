@@ -11,11 +11,11 @@
     <FluentStack Orientation="Orientation.Vertical"
                  HorizontalAlignment="HorizontalAlignment.Center"
                  VerticalAlignment="VerticalAlignment.Center"
-                 Style="padding: 3rem; gap: 1rem;">
-        <FluentCard Style="padding: 2rem; min-width: 320px; text-align: center;">
+                 Style="padding: var(--lk-space-xxxl); gap: var(--lk-space-l);">
+        <FluentCard Style="padding: var(--lk-space-xxl); min-width: 320px; text-align: center;">
             <FluentStack Orientation="Orientation.Vertical"
                          HorizontalAlignment="HorizontalAlignment.Center"
-                         Style="gap: 0.75rem;">
+                         Class="lk-section">
                 <FluentProgressRing Style="width: 32px; height: 32px;" />
                 <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Setup</FluentLabel>
                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading your onboarding profile…</FluentLabel>
@@ -25,13 +25,13 @@
 }
 else
 {
-    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-        <FluentCard Style="padding: 1.5rem;">
+    <FluentStack Orientation="Orientation.Vertical" Class="lk-page">
+        <FluentCard>
             <FluentStack Orientation="Orientation.Horizontal"
                          VerticalAlignment="VerticalAlignment.Center"
                          Wrap="true"
-                         Style="justify-content: space-between; gap: 1rem;">
-                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; max-width: 720px;">
+                         Class="lk-card-header">
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy" Style="max-width: 720px;">
                     <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Guided setup</FluentLabel>
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tell LeanKernel how to address you, what domains matter most, and what outcomes you want help with.</FluentLabel>
                 </FluentStack>

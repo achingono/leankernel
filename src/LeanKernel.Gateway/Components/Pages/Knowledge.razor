@@ -7,9 +7,9 @@
 
 <PageTitle>LeanKernel Knowledge</PageTitle>
 
-<FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+<FluentStack Orientation="Orientation.Vertical" Class="lk-page">
+    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-page-header">
+        <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
             <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Knowledge</FluentLabel>
             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Browse GBrain wiki pages, inspect linked knowledge, and curate durable context.</FluentLabel>
         </FluentStack>
@@ -17,22 +17,22 @@
     </FluentStack>
 
     <FluentCard aria-labelledby="knowledge-search-title">
-        <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+        <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                     <FluentLabel Id="knowledge-search-title" Typo="Typography.Subject" Weight="FontWeight.Bold">Search knowledge</FluentLabel>
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Find pages by slug, facts, and compiled truth.</FluentLabel>
                 </FluentStack>
                 @if (_isSearching)
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;" role="status">
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-badge-group" role="status">
                         <FluentProgressRing Style="width: 20px; height: 20px;" />
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Searching…</FluentLabel>
                     </FluentStack>
                 }
             </FluentStack>
 
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-form-field">
                 <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Search query</FluentLabel>
                 <FluentSearch Id="knowledge-search-input"
                               @bind-Value="_searchText"
@@ -51,17 +51,17 @@
                 </FluentMessageBar>
             }
 
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;" aria-live="polite">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-section" aria-live="polite">
                 @if (string.IsNullOrWhiteSpace(_searchText) && _searchResults.Count == 0 && !_isSearching)
                 {
-                    <FluentCard Style="text-align: center; padding: 1.5rem;">
+                    <FluentCard Class="lk-empty-state">
                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Start with a question</FluentLabel>
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Search by topic, slug, or relationship to jump directly into the knowledge base.</FluentLabel>
                     </FluentCard>
                 }
                 else if (_searchResults.Count == 0 && !_isSearching)
                 {
-                    <FluentCard Style="text-align: center; padding: 1.5rem;">
+                    <FluentCard Class="lk-empty-state">
                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No matches found</FluentLabel>
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Try another keyword or create a new page for this topic.</FluentLabel>
                     </FluentCard>
@@ -70,9 +70,9 @@
                 {
                     @foreach (var result in _searchResults)
                     {
-                        <FluentCard Style="cursor: pointer; padding: 1rem;" role="button" tabindex="0" @onclick="() => OpenPageAsync(result.Slug)">
-                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
-                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+                        <FluentCard Class="lk-card-interactive" role="button" tabindex="0" @onclick="() => OpenPageAsync(result.Slug)">
+                            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
+                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
                                     <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@result.Slug</FluentLabel>
                                     <FluentBadge Appearance="Appearance.Neutral">Score @result.Score.ToString("0.000", CultureInfo.InvariantCulture)</FluentBadge>
                                 </FluentStack>
@@ -85,16 +85,16 @@
         </FluentStack>
     </FluentCard>
 
-    <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+    <FluentStack Orientation="Orientation.Horizontal" Style="gap: var(--lk-space-l); align-items: flex-start; flex-wrap: wrap;">
         <FluentCard aria-labelledby="knowledge-browse-title" Style="width: 320px; flex: 0 0 320px;">
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Style="justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Class="lk-card-header">
+                    <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                         <FluentLabel Id="knowledge-browse-title" Typo="Typography.Subject" Weight="FontWeight.Bold">Browse pages</FluentLabel>
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Page through the wiki and jump into recently changed knowledge.</FluentLabel>
                     </FluentStack>
 
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; min-width: 180px;">
+                    <FluentStack Orientation="Orientation.Vertical" Class="lk-form-field" Style="min-width: 180px;">
                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Sort</FluentLabel>
                         <FluentSelect Id="knowledge-sort-select"
                                       TOption="string"
@@ -123,25 +123,25 @@
 
                 @if (_isBrowseLoading)
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 1rem 0; gap: 0.75rem;" role="status">
-                        <FluentProgressRing Style="width: 24px; height: 24px;" />
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading" role="status">
+                        <FluentProgressRing />
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading pages…</FluentLabel>
                     </FluentStack>
                 }
                 else if (_browseItems.Count == 0)
                 {
-                    <FluentCard Style="text-align: center; padding: 1.5rem;">
+                    <FluentCard Class="lk-empty-state">
                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No pages available</FluentLabel>
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Use search or create a new page to start building knowledge.</FluentLabel>
                     </FluentCard>
                 }
                 else
                 {
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
+                    <FluentStack Orientation="Orientation.Vertical" Class="lk-section-tight">
                         @foreach (var item in _browseItems)
                         {
-                            <FluentCard Style="@($"cursor: pointer; padding: 0.75rem; border: {(IsSelected(item.Slug) ? "2px solid var(--accent-fill-rest)" : "1px solid var(--neutral-stroke-rest)")};")" role="button" tabindex="0" @onclick="() => OpenPageAsync(item.Slug)">
-                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.35rem;">
+                            <FluentCard Class="@($"lk-card-interactive{(IsSelected(item.Slug) ? " lk-active" : "")}")" role="button" tabindex="0" @onclick="() => OpenPageAsync(item.Slug)">
+                                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
                                     <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Slug</FluentLabel>
                                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@FormatTimestamp(item.LastModified)</FluentLabel>
                                     <FluentBadge Appearance="Appearance.Neutral">@item.TagCount tag@(item.TagCount == 1 ? string.Empty : "s")</FluentBadge>
@@ -151,7 +151,7 @@
                     </FluentStack>
                 }
 
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
                     <FluentButton Appearance="Appearance.Outline"
                                   @onclick="() => ChangePageAsync(_browsePageNumber - 1)"
                                   Disabled="@(!_browseResult.HasPreviousPage || _isBrowseLoading)">
@@ -168,7 +168,7 @@
         </FluentCard>
 
         <FluentCard aria-busy="@(_isPageLoading || _isSaving || _isCreating)" Style="flex: 1 1 720px; min-width: 320px;">
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
                 @if (!string.IsNullOrWhiteSpace(_pageError))
                 {
                     <FluentMessageBar Title="Page error" Intent="@MessageIntent.Error">
@@ -185,27 +185,27 @@
 
                 @if (_isPageLoading)
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 2rem 0; gap: 0.75rem;" role="status">
-                        <FluentProgressRing Style="width: 24px; height: 24px;" />
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading" role="status">
+                        <FluentProgressRing />
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading page details…</FluentLabel>
                     </FluentStack>
                 }
                 else if (_selectedPage is null)
                 {
-                    <FluentCard Style="text-align: center; padding: 2rem;">
+                    <FluentCard Class="lk-empty-state">
                         <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Select a page</FluentLabel>
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Choose a browse result or run a search to inspect wiki content, metadata, and linked relationships.</FluentLabel>
                     </FluentCard>
                 }
                 else
                 {
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                    <FluentStack Orientation="Orientation.Vertical" Class="lk-section">
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
+                            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                                 <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">@_selectedPage.Slug</FluentLabel>
                                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetSelectedPageSubtitle()</FluentLabel>
                             </FluentStack>
-                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 0.5rem; flex-wrap: wrap;">
+                            <FluentStack Orientation="Orientation.Horizontal" Class="lk-badge-group">
                                 @if (_isEditing)
                                 {
                                     <FluentButton Appearance="Appearance.Accent"

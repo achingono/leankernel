@@ -1,9 +1,145 @@
-/* LeanKernel — minimal app overrides for FluentUI */
+/* LeanKernel — Design System & FluentUI overrides */
+
+/* ── Design Tokens ─────────────────────────────────────────────── */
+:root {
+    /* Spacing scale (4px base unit) */
+    --lk-space-xxs: 2px;
+    --lk-space-xs: 4px;
+    --lk-space-s: 8px;
+    --lk-space-m: 12px;
+    --lk-space-l: 16px;
+    --lk-space-xl: 24px;
+    --lk-space-xxl: 32px;
+    --lk-space-xxxl: 48px;
+
+    /* Border radius */
+    --lk-radius-s: 4px;
+    --lk-radius-m: 8px;
+    --lk-radius-l: 12px;
+}
+
+/* ── Base Reset ────────────────────────────────────────────────── */
 html, body {
     margin: 0;
     padding: 0;
     height: 100%;
     font-family: var(--body-font);
+}
+
+/* ── Page Layout ───────────────────────────────────────────────── */
+.lk-page {
+    gap: var(--lk-space-xl);
+}
+
+.lk-page-header {
+    justify-content: space-between;
+    gap: var(--lk-space-l);
+    flex-wrap: wrap;
+}
+
+.lk-page-header-copy {
+    gap: var(--lk-space-xs);
+}
+
+.lk-page-body {
+    gap: var(--lk-space-l);
+}
+
+/* ── Cards ─────────────────────────────────────────────────────── */
+.lk-card-content {
+    gap: var(--lk-space-l);
+}
+
+.lk-card-header {
+    justify-content: space-between;
+    gap: var(--lk-space-l);
+    flex-wrap: wrap;
+}
+
+.lk-card-header-copy {
+    gap: var(--lk-space-xs);
+}
+
+.lk-card-compact {
+    gap: var(--lk-space-s);
+}
+
+/* ── Loading States ────────────────────────────────────────────── */
+.lk-loading {
+    padding: var(--lk-space-xl) 0;
+    gap: var(--lk-space-s);
+}
+
+.lk-loading fluent-progress-ring,
+.lk-loading .fluent-progress-ring {
+    width: 24px;
+    height: 24px;
+}
+
+/* ── Empty States ──────────────────────────────────────────────── */
+.lk-empty-state {
+    max-width: 640px;
+    margin: var(--lk-space-xxl) auto;
+    text-align: center;
+    padding: var(--lk-space-xxl);
+}
+
+/* ── Interactive Cards ─────────────────────────────────────────── */
+.lk-card-interactive {
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.lk-card-interactive:hover {
+    border-color: var(--accent-fill-hover);
+}
+
+.lk-card-interactive.lk-active {
+    border: 2px solid var(--accent-fill-rest);
+}
+
+/* ── Stat Cards ────────────────────────────────────────────────── */
+.lk-stat-card {
+    flex: 1 1 180px;
+    min-width: 180px;
+}
+
+.lk-stat-card-content {
+    gap: var(--lk-space-xs);
+}
+
+/* ── Section Gaps (standard internal content spacing) ──────────── */
+.lk-section {
+    gap: var(--lk-space-l);
+}
+
+.lk-section-tight {
+    gap: var(--lk-space-s);
+}
+
+/* ── Badge Groups ──────────────────────────────────────────────── */
+.lk-badge-group {
+    gap: var(--lk-space-s);
+    flex-wrap: wrap;
+}
+
+/* ── Form Layout ───────────────────────────────────────────────── */
+.lk-form-group {
+    gap: var(--lk-space-l);
+}
+
+.lk-form-field {
+    gap: var(--lk-space-xs);
+}
+
+/* ── Data Pairs (label + value stacked) ────────────────────────── */
+.lk-data-pair {
+    gap: 0;
+}
+
+.lk-data-row {
+    gap: var(--lk-space-l);
+    flex-wrap: wrap;
 }
 
 .lk-shell {
