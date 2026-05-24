@@ -199,7 +199,8 @@ Spin up LeanKernel, complete guided onboarding, and run your first production-st
 ```bash
 # 1) Configure environment
 cp .env.example .env
-# Add provider keys in .env as needed (ZEROENTROPY_API_KEY or OPENAI_API_KEY recommended for GBrain)
+# Add LiteLLM backend provider keys in .env as needed (for example OPENAI_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, AZURE_AI_API_KEY)
+# GBrain uses LITELLM_BASE_URL and LITELLM_API_KEY from the same root env file.
 
 # 2) Start the supporting services
 # (Signal is optional and commented out by default in docker-compose.yml)

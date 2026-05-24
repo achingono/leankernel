@@ -25,6 +25,7 @@ flowchart LR
 - `engine` is the only service that needs to be exposed outside the Compose network.
 - `litellm`, `gbrain`, and `database` stay on the internal application network.
 - `gbrain` no longer depends on the shared Postgres service; it persists its own embedded PGLite state in the `gbrain-data` Docker volume.
+- `gbrain` resolves its model traffic through the LiteLLM proxy (`LITELLM_BASE_URL` + `LITELLM_API_KEY`) instead of reaching backend providers directly.
 
 ## Health checks
 
@@ -43,8 +44,8 @@ Use .NET double-underscore binding for application settings and standard service
 |------|-------------------|-------|
 | Gateway | `ASPNETCORE_URLS`, `LEANKERNEL__GATEWAY__*` | Host binding, API behavior, and endpoint security |
 | Database | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LEANKERNEL__DATABASE__CONNECTIONSTRING` | Service bootstrap values plus the application connection string |
-| LiteLLM | `LITELLM_MASTER_KEY`, `DATABASE_URL`, provider API keys | Model proxy secrets and routing configuration |
-| GBrain | `LEANKERNEL__GBRAIN__BASEURL`, `GBRAIN_PORT`, `OPENAI_API_KEY`, `ZEROENTROPY_API_KEY`, `ANTHROPIC_API_KEY` | MCP endpoint, Bun-hosted GBrain runtime, and embedding/query-expansion provider keys |
+| LiteLLM | `LITELLM_MASTER_KEY`, `DATABASE_URL`, `OPENAI_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `AZURE_AI_API_KEY`, `GITHUB_COPILOT_OAUTH_TOKEN`, `OLLAMA_BASE_URL`, `NVIDIA_API_KEY` | Model proxy secrets, backend provider access, and routing configuration |
+| GBrain | `LEANKERNEL__GBRAIN__BASEURL`, `GBRAIN_PORT`, `LITELLM_BASE_URL`, `LITELLM_API_KEY` | MCP endpoint plus LiteLLM proxy wiring for GBrain's model calls |
 | Observability | `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES` | OpenTelemetry exporters and resource tagging |
 
 ## Configuration hierarchy
