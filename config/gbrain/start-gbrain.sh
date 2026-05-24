@@ -19,4 +19,4 @@ if [ -z "${OPENAI_API_KEY:-}" ] && [ -n "${LITELLM_API_KEY:-}" ]; then
 fi
 
 gbrain init --url "${db_url}" --embedding-model "${GBRAIN_EMBEDDING_MODEL:-openai:embedding-small}"
-exec gbrain serve --http --port "${GBRAIN_PORT:-8789}"
+exec gbrain serve --http --bind "${GBRAIN_BIND:-0.0.0.0}" --port "${GBRAIN_PORT:-8789}"

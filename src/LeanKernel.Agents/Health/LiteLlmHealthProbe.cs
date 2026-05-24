@@ -33,16 +33,16 @@ public sealed class LiteLlmHealthProbe(
 
         try
         {
-            using var healthResponse = await client.GetAsync("health", ct).ConfigureAwait(false);
-            if (healthResponse.IsSuccessStatusCode)
+            using var livelinessResponse = await client.GetAsync("health/liveliness", ct).ConfigureAwait(false);
+            if (livelinessResponse.IsSuccessStatusCode)
             {
-                return ProviderProbeResult.Healthy("LiteLLM health probe succeeded.");
+                return ProviderProbeResult.Healthy("LiteLLM liveliness probe succeeded.");
             }
 
-            using var fallbackResponse = await client.GetAsync("health/liveliness", ct).ConfigureAwait(false);
+            using var fallbackResponse = await client.GetAsync("health", ct).ConfigureAwait(false);
             return fallbackResponse.IsSuccessStatusCode
-                ? ProviderProbeResult.Healthy("LiteLLM fallback liveliness probe succeeded.")
-                : ProviderProbeResult.Unhealthy($"LiteLLM health probe returned {(int)healthResponse.StatusCode} and fallback returned {(int)fallbackResponse.StatusCode}.");
+                ? ProviderProbeResult.Healthy("LiteLLM fallback health probe succeeded.")
+                : ProviderProbeResult.Unhealthy($"LiteLLM liveliness probe returned {(int)livelinessResponse.StatusCode} and fallback health probe returned {(int)fallbackResponse.StatusCode}.");
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
