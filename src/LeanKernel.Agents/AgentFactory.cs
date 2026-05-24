@@ -16,22 +16,23 @@ public sealed class AgentFactory
     private readonly ConcurrentDictionary<string, IChatClient> _chatClients;
     private readonly LiteLlmConfig _config;
     private readonly ILogger<AgentFactory> _logger;
+    private readonly ILoggerFactory? _loggerFactory;
     private readonly OpenAIClient? _openAiClient;
 
-    public AgentFactory(IOptions<LeanKernelConfig> config, ILogger<AgentFactory> logger)
+    public AgentFactory(IOptions<LeanKernelConfig> config, ILogger<AgentFactory> logger, ILoggerFactory? loggerFactory = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(logger);
 
         _config = config.Value.LiteLlm;
         _logger = logger;
+        _loggerFactory = loggerFactory;
         _openAiClient = new OpenAIClient(
             new ApiKeyCredential(_config.ApiKey),
             new OpenAIClientOptions { Endpoint = new Uri(_config.BaseUrl) });
         _chatClients = new ConcurrentDictionary<string, IChatClient>(StringComparer.OrdinalIgnoreCase);
-        _chatClients[_config.DefaultModel] = _openAiClient
-            .GetChatClient(_config.DefaultModel)
-            .AsIChatClient();
+        _chatClients[_config.DefaultModel] = WrapWithFunctionInvocation(
+            _openAiClient.GetChatClient(_config.DefaultModel).AsIChatClient());
 
         _logger.LogInformation(
             "AgentFactory initialized: model={Model}, endpoint={Endpoint}",
@@ -53,13 +54,13 @@ public sealed class AgentFactory
         _logger = logger;
         _config = new LiteLlmConfig();
         _chatClients = new ConcurrentDictionary<string, IChatClient>(StringComparer.OrdinalIgnoreCase);
-        _chatClients[_config.DefaultModel] = chatClient;
+        _chatClients[_config.DefaultModel] = WrapWithFunctionInvocation(chatClient);
 
         if (chatClients is not null)
         {
             foreach (var pair in chatClients)
             {
-                _chatClients[pair.Key] = pair.Value;
+                _chatClients[pair.Key] = WrapWithFunctionInvocation(pair.Value);
             }
         }
     }
@@ -96,7 +97,10 @@ public sealed class AgentFactory
         return _chatClients.GetOrAdd(modelName, name =>
         {
             _logger.LogDebug("Creating chat client for model {Model}", name);
-            return _openAiClient.GetChatClient(name).AsIChatClient();
+            return WrapWithFunctionInvocation(_openAiClient.GetChatClient(name).AsIChatClient());
         });
     }
+
+    private IChatClient WrapWithFunctionInvocation(IChatClient innerClient)
+        => new FunctionInvokingChatClient(innerClient, _loggerFactory);
 }

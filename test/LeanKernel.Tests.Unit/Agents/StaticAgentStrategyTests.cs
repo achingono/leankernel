@@ -74,6 +74,78 @@ public class StaticAgentStrategyTests
         chatClient.ReceivedOptions.Tools!.Single().Should().BeSameAs(tool);
     }
 
+    [Fact]
+    public async Task InvokeAsync_executes_tool_calls_and_returns_final_text_response()
+    {
+        var toolInvoked = false;
+        var tool = AIFunctionFactory.Create(
+            () =>
+            {
+                toolInvoked = true;
+                return "tool result";
+            },
+            new AIFunctionFactoryOptions { Name = "wiki_write" });
+
+        var callCount = 0;
+        var chatClient = new ToolCallChatClient(() =>
+        {
+            callCount++;
+            if (callCount == 1)
+            {
+                // First call: model wants to invoke a tool
+                var functionCallContent = new FunctionCallContent("call-1", "wiki_write",
+                    new Dictionary<string, object?> { ["key"] = "greeting", ["content"] = "Hello!" });
+                var assistantMessage = new ChatMessage(ChatRole.Assistant, [functionCallContent]);
+                return new ChatResponse(assistantMessage);
+            }
+
+            // Second call: model returns final text
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, "Hello! How can I help you?"));
+        });
+
+        var strategy = new StaticAgentStrategy(
+            new AgentFactory(chatClient, NullLogger<AgentFactory>.Instance),
+            NullLogger<StaticAgentStrategy>.Instance);
+
+        var response = await strategy.InvokeAsync(new AgentStrategyContext
+        {
+            SessionId = "session-tool",
+            TurnId = "turn-tool",
+            UserMessage = "Hello!",
+            SystemMessage = "System policy",
+            History = [],
+            Tools = [tool]
+        });
+
+        response.Should().Be("Hello! How can I help you?");
+        toolInvoked.Should().BeTrue();
+        callCount.Should().Be(2);
+    }
+
+    private sealed class ToolCallChatClient(Func<ChatResponse> responseFactory) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(responseFactory());
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose()
+        {
+        }
+    }
+
     private sealed class RecordingChatClient : IChatClient
     {
         private readonly ChatResponse _response;

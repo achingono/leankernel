@@ -48,8 +48,8 @@ public class AgentRuntimeTests
 
         var factory = new AgentFactory(chatClient.Object, NullLogger<AgentFactory>.Instance);
 
-        factory.ChatClient.Should().BeSameAs(chatClient.Object);
-        factory.GetChatClientForModel("gpt-4o-mini").Should().BeSameAs(chatClient.Object);
+        factory.ChatClient.Should().BeOfType<FunctionInvokingChatClient>();
+        factory.GetChatClientForModel("gpt-4o-mini").Should().BeOfType<FunctionInvokingChatClient>();
         factory.DefaultModel.Should().Be("gpt-4o-mini");
     }
 
@@ -66,7 +66,7 @@ public class AgentRuntimeTests
                 ["claude-sonnet-4-20250514"] = premiumClient.Object
             });
 
-        factory.GetChatClientForModel("claude-sonnet-4-20250514").Should().BeSameAs(premiumClient.Object);
+        factory.GetChatClientForModel("claude-sonnet-4-20250514").Should().BeOfType<FunctionInvokingChatClient>();
     }
 
     [Fact]
