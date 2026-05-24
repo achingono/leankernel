@@ -24,6 +24,7 @@ RUN dotnet restore LeanKernel.sln
 
 # Copy source and build
 COPY src/ .
+RUN dotnet restore LeanKernel.sln
 RUN dotnet publish LeanKernel.Gateway/LeanKernel.Gateway.csproj -c Release -o /app/publish --no-restore
 
 # Runtime image

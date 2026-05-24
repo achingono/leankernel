@@ -1,0 +1,18 @@
+.session-list-title {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.session-list-empty {
+    margin: 0;
+    color: var(--neutral-foreground-hint);
+}
+
+.session-item-title {
+    font-weight: 600;
+}
+
+.session-item-preview,
+.session-item-time {
+    color: var(--neutral-foreground-hint);
+}

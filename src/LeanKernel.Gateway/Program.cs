@@ -86,6 +86,7 @@ try
     app.UseMiddleware<RateLimitingMiddleware>();
     app.UseStaticFiles();
     app.UseAntiforgery();
+    app.MapStaticAssets();
 
     if (app.Environment.IsDevelopment())
     {

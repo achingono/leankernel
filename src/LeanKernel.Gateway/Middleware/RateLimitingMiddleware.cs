@@ -31,7 +31,7 @@ public sealed class RateLimitingMiddleware(
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (!_config.RateLimit.Enabled || IsExemptPath(context.Request.Path))
+        if (!_config.RateLimit.Enabled || !ShouldRateLimitPath(context.Request.Path))
         {
             await _next(context).ConfigureAwait(false);
             return;
@@ -81,9 +81,15 @@ public sealed class RateLimitingMiddleware(
         }
     }
 
-    private static bool IsExemptPath(PathString path)
-        => path.StartsWithSegments("/api/health", StringComparison.OrdinalIgnoreCase)
-            || path.StartsWithSegments("/healthz", StringComparison.OrdinalIgnoreCase);
+    private static bool ShouldRateLimitPath(PathString path)
+    {
+        if (!path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return !path.StartsWithSegments("/api/health", StringComparison.OrdinalIgnoreCase);
+    }
 
     private RateLimitBucket GetBucket(string key)
     {

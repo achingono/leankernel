@@ -6,6 +6,45 @@ html, body {
     font-family: var(--body-font);
 }
 
+.lk-shell {
+    min-height: 100vh;
+    padding: 0.75rem;
+    gap: 0.75rem;
+    box-sizing: border-box;
+}
+
+.lk-shell-header {
+    padding: 0.75rem 1rem;
+}
+
+.lk-shell-main {
+    flex: 1;
+    gap: 0.75rem;
+    min-height: 0;
+}
+
+.lk-shell-nav {
+    padding: 0.5rem;
+    overflow: auto;
+}
+
+.lk-shell-content {
+    padding: 1rem;
+    overflow: auto;
+}
+
+@media (max-width: 900px) {
+    .lk-shell-main {
+        flex-direction: column;
+    }
+
+    .lk-shell-nav {
+        width: 100% !important;
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+    }
+}
+
 #blazor-error-ui {
     background: lightyellow;
     bottom: 0;

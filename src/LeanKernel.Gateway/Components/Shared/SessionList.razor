@@ -1,12 +1,12 @@
 <FluentCard>
     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.75rem;">
-        <FluentLabel Typo="Typography.Subject">Sessions</FluentLabel>
+        <h3 class="session-list-title">Sessions</h3>
         <FluentButton Appearance="Appearance.Accent" OnClick="CreateNewAsync">New</FluentButton>
     </FluentStack>
 
     @if (Sessions.Count == 0)
     {
-        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No sessions yet. Start a conversation to populate this list.</FluentLabel>
+        <p class="session-list-empty">No sessions yet. Start a conversation to populate this list.</p>
     }
     else
     {
@@ -15,9 +15,9 @@
             {
                 var isActive = string.Equals(session.SessionId, ActiveSessionId, StringComparison.Ordinal);
                 <FluentCard Style="@($"cursor: pointer; {(isActive ? "border: 2px solid var(--accent-fill-rest);" : "")}")" @onclick="() => SelectAsync(session.SessionId)">
-                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@session.Title</FluentLabel>
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@session.Preview</FluentLabel>
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@FormatTimestamp(session.UpdatedAt)</FluentLabel>
+                    <div class="session-item-title">@session.Title</div>
+                    <div class="session-item-preview">@session.Preview</div>
+                    <div class="session-item-time">@FormatTimestamp(session.UpdatedAt)</div>
                 </FluentCard>
             }
         </FluentStack>

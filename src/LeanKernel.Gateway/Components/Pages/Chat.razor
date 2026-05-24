@@ -9,21 +9,21 @@
 
 <PageTitle>LeanKernel Chat</PageTitle>
 
-<FluentStack Orientation="Orientation.Horizontal" Style="height: 100%; gap: 1rem;">
-    <aside style="width: 280px; min-width: 280px; overflow-y: auto;">
+<FluentStack Orientation="Orientation.Vertical" Class="chat-page">
+    <FluentCard Class="chat-sessions-panel">
         <SessionList Sessions="ChatService.Sessions"
                      ActiveSessionId="ChatService.CurrentSessionId"
                      OnNewSession="StartNewSessionAsync"
                      OnSelectSession="SelectSessionAsync" />
-    </aside>
+    </FluentCard>
 
-    <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; overflow: hidden;">
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                <FluentLabel Typo="Typography.PageTitle">Chat</FluentLabel>
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetHeaderSubtitle()</FluentLabel>
+    <FluentStack Orientation="Orientation.Vertical" Class="chat-main">
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-header-row">
+            <FluentStack Orientation="Orientation.Vertical" Class="chat-header-copy">
+                <h2 class="chat-heading">Chat</h2>
+                <p class="chat-subtitle">@GetHeaderSubtitle()</p>
             </FluentStack>
-            <FluentButton Appearance="Appearance.Outline" OnClick="StartNewSessionAsync">New session</FluentButton>
+            <FluentButton Appearance="Appearance.Outline" OnClick="StartNewSessionAsync" Class="chat-new-session-button">New session</FluentButton>
         </FluentStack>
 
         @if (!string.IsNullOrWhiteSpace(ChatService.ErrorMessage))
@@ -33,14 +33,14 @@
             </FluentMessageBar>
         }
 
-        <div id="chat-message-list" style="flex: 1; overflow-y: auto; padding: 0.5rem 0;">
+        <div id="chat-message-list" class="chat-message-list">
             @if (ChatService.Messages.Count == 0 && !ChatService.IsLoading)
             {
-                <FluentCard Style="max-width: 600px; margin: 2rem auto; text-align: center;">
-                    <FluentLabel Typo="Typography.Subject">Start a LeanKernel conversation</FluentLabel>
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">
+                <FluentCard Class="chat-empty-state">
+                    <h3 class="chat-empty-title">Start a LeanKernel conversation</h3>
+                    <p class="chat-empty-copy">
                         Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.
-                    </FluentLabel>
+                    </p>
                 </FluentCard>
             }
             else
@@ -53,26 +53,27 @@
 
             @if (ChatService.IsLoading)
             {
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 1rem; gap: 0.5rem;">
-                    <FluentProgressRing Style="width: 20px; height: 20px;" />
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-loading-state">
+                    <FluentProgressRing Class="chat-loading-ring" />
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">LeanKernel is thinking…</FluentLabel>
                 </FluentStack>
             }
         </div>
 
-        <FluentStack Orientation="Orientation.Vertical" Style="padding-top: 0.5rem; border-top: 1px solid var(--neutral-stroke-rest);">
+        <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell">
             <FluentTextArea Id="chat-composer-input"
                            @bind-Value="ChatService.ComposerText"
                            Rows="4"
                            Maxlength="12000"
                            Placeholder="Ask LeanKernel anything…"
                            Disabled="@ChatService.IsLoading"
-                           Style="width: 100%;" />
-            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Enter to send · Shift+Enter for newline</FluentLabel>
+                           Class="chat-composer-input" />
+            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-composer-footer">
+                <span class="chat-input-hint">Enter to send · Shift+Enter for newline</span>
                 <FluentButton Id="chat-send-button"
                               Appearance="Appearance.Accent"
                               OnClick="SendAsync"
+                              Class="chat-send-button"
                               Disabled="@IsSendDisabled">
                     Send
                 </FluentButton>

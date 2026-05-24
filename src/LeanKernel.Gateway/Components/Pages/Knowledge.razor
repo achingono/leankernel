@@ -98,7 +98,7 @@
                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Sort</FluentLabel>
                         <FluentSelect Id="knowledge-sort-select"
                                       TOption="string"
-                                      @bind-Value:get="@_browseSort.ToString()"
+                                      @bind-Value:get="@BrowseSortValue"
                                       @bind-Value:set="@(async value => await HandleSortChangedAsync(new ChangeEventArgs { Value = value }))"
                                       Disabled="@_isBrowseLoading"
                                       Style="width: 100%;">
@@ -427,6 +427,7 @@
     private KnowledgePageDetail? _selectedPage;
     private IReadOnlyList<KnowledgePageSummary> _browseItems = [];
     private IReadOnlyList<KnowledgeSearchResult> _searchResults = [];
+    private string BrowseSortValue => _browseSort.ToString();
 
     private bool IsCreateDisabled => _isCreating || string.IsNullOrWhiteSpace(_newPageSlug) || string.IsNullOrWhiteSpace(_newPageContent);
 

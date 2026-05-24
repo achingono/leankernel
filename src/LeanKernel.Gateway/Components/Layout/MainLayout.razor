@@ -1,20 +1,19 @@
 @inherits LayoutComponentBase
 
-<FluentLayout>
-    <FluentHeader>
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="width: 100%;">
-            <FluentLabel Typo="Typography.H4" Color="Color.Fill">LeanKernel</FluentLabel>
-        </FluentStack>
-    </FluentHeader>
-    <FluentStack Orientation="Orientation.Horizontal" Style="height: calc(100vh - 50px); overflow: hidden;">
-        <FluentNavMenu Width="250" Title="Navigation">
-            <NavMenu />
-        </FluentNavMenu>
-        <FluentBodyContent Style="overflow-y: auto; padding: 1rem;">
-            @Body
-        </FluentBodyContent>
-    </FluentStack>
-</FluentLayout>
+<FluentMainLayout>
+    <Header>
+        <FluentLabel Typo="Typography.H4" Weight="FontWeight.Bold">LeanKernel</FluentLabel>
+        <FluentBadge Appearance="Appearance.Accent">Gateway</FluentBadge>
+    </Header>
+    <SubHeader>
+    </SubHeader>
+    <Body>
+        @Body
+    </Body>
+    <NavMenuContent>
+        <NavMenu />
+    </NavMenuContent>
+</FluentMainLayout>
 
 <FluentDialogProvider />
 <FluentMessageBarProvider />
