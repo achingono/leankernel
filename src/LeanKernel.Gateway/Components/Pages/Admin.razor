@@ -13,7 +13,7 @@
             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Govern provider health, model routing, tool access, spend, and scheduled jobs from one runtime surface.</FluentLabel>
         </FluentStack>
         <FluentStack Orientation="Orientation.Vertical" Style="align-items: flex-end; gap: 0.35rem;">
-            <FluentBadge Appearance="Appearance.Accent">Mock-backed preview</FluentBadge>
+            <FluentBadge Appearance="Appearance.Accent">Live</FluentBadge>
             @if (_dashboard is not null)
             {
                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">
@@ -26,10 +26,10 @@
     <FluentCard>
         <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Style="justify-content: space-between; gap: 1rem;">
             <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
-                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Runtime governance preview</FluentLabel>
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@(_statusMessage ?? "Actions on this page currently update mock state only so the future admin API can slot in behind the same UI contract.")</FluentLabel>
+                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Runtime governance</FluentLabel>
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@(_statusMessage ?? "Tool governance and health data are sourced from the live runtime. Spend tracking uses projected estimates until the accounting API is available.")</FluentLabel>
             </FluentStack>
-            <FluentBadge Appearance="Appearance.Neutral">Non-persistent</FluentBadge>
+            <FluentBadge Appearance="Appearance.Neutral">Session-scoped toggles</FluentBadge>
         </FluentStack>
     </FluentCard>
 
@@ -120,36 +120,19 @@
                 }
                 else
                 {
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <caption style="padding-bottom: 0.75rem; text-align: left; color: var(--neutral-foreground-rest);">Routing rules by complexity tier.</caption>
-                            <thead>
-                                <tr>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Tier</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Model</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Fallback model</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: right; border-bottom: 1px solid var(--neutral-stroke-rest);">Max tokens</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: right; border-bottom: 1px solid var(--neutral-stroke-rest);">Cost / 1k</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var rule in _dashboard.RoutingRules)
-                                {
-                                    <tr>
-                                        <th scope="row" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">@rule.Tier</th>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);">
-                                            <span style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 999px; background: var(--neutral-layer-3);">@rule.Model</span>
-                                        </td>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);">
-                                            <span style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 999px; background: var(--neutral-layer-3);">@rule.FallbackModel</span>
-                                        </td>
-                                        <td style="padding: 0.75rem; text-align: right; border-bottom: 1px solid var(--neutral-stroke-rest);">@rule.MaxTokens.ToString("N0", CultureInfo.CurrentCulture)</td>
-                                        <td style="padding: 0.75rem; text-align: right; border-bottom: 1px solid var(--neutral-stroke-rest);">@FormatCurrency(rule.CostPer1K)</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+                    <FluentDataGrid Items="@(_dashboard.RoutingRules.AsQueryable())" TGridItem="AdminRoutingRule" Style="width: 100%;" GridTemplateColumns="1fr 2fr 2fr 1fr 1fr">
+                        <PropertyColumn Property="@(rule => rule.Tier)" Title="Tier" Sortable="true" />
+                        <TemplateColumn Title="Model">
+                            <FluentBadge Appearance="Appearance.Neutral">@context.Model</FluentBadge>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Fallback model">
+                            <FluentBadge Appearance="Appearance.Neutral">@context.FallbackModel</FluentBadge>
+                        </TemplateColumn>
+                        <PropertyColumn Property="@(rule => rule.MaxTokens)" Title="Max tokens" Sortable="true" Format="N0" Align="Align.End" />
+                        <TemplateColumn Title="Cost / 1k" Align="Align.End">
+                            @FormatCurrency(context.CostPer1K)
+                        </TemplateColumn>
+                    </FluentDataGrid>
                 }
             </FluentStack>
         </FluentCard>
@@ -187,48 +170,21 @@
                 }
                 else
                 {
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <caption style="padding-bottom: 0.75rem; text-align: left; color: var(--neutral-foreground-rest);">Registered runtime tools and preview governance controls.</caption>
-                            <thead>
-                                <tr>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Name</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Category</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Enabled</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Visibility scope</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Description</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var tool in FilteredTools)
-                                {
-                                    <tr>
-                                        <th scope="row" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">
-                                            <span title="@tool.Description">@tool.Name</span>
-                                        </th>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);">@tool.Category</td>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);">
-                                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
-                                                <FluentSwitch Value="@tool.Enabled"
-                                                              ValueChanged="@(async enabled => await OnToolToggleChangedAsync(tool.Name, new ChangeEventArgs { Value = enabled }))"
-                                                              Disabled="@(_isLoading || !string.IsNullOrWhiteSpace(_updatingToolName))"
-                                                              AriaLabel="@GetToggleAriaLabel(tool)" />
-                                                <FluentLabel Typo="Typography.Body">@GetToggleLabel(tool)</FluentLabel>
-                                            </FluentStack>
-                                        </td>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);">@tool.VisibilityScope</td>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);">
-                                            <details>
-                                                <summary title="@tool.Description" aria-label="View description for @tool.Name">Details</summary>
-                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="display: block; margin-top: 0.5rem;">@tool.Description</FluentLabel>
-                                            </details>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tool toggles are stored in mock circuit state only for this preview.</FluentLabel>
+                    <FluentDataGrid Items="@(FilteredTools.AsQueryable())" TGridItem="AdminToolGovernanceItem" Style="width: 100%;" GridTemplateColumns="2fr 1fr auto 1fr 3fr">
+                        <PropertyColumn Property="@(tool => tool.Name)" Title="Name" Sortable="true" />
+                        <PropertyColumn Property="@(tool => tool.Category)" Title="Category" Sortable="true" />
+                        <TemplateColumn Title="Enabled">
+                            <FluentSwitch Value="@context.Enabled"
+                                          ValueChanged="@(async enabled => await OnToolToggleChangedAsync(context.Name, new ChangeEventArgs { Value = enabled }))"
+                                          Disabled="@(_isLoading || !string.IsNullOrWhiteSpace(_updatingToolName))"
+                                          AriaLabel="@GetToggleAriaLabel(context)" />
+                        </TemplateColumn>
+                        <PropertyColumn Property="@(tool => tool.VisibilityScope)" Title="Visibility scope" Sortable="true" />
+                        <TemplateColumn Title="Description">
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@context.Description</FluentLabel>
+                        </TemplateColumn>
+                    </FluentDataGrid>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tool toggles update in-memory governance state for the current session.</FluentLabel>
                 }
             </FluentStack>
         </FluentCard>
@@ -342,40 +298,23 @@
                 }
                 else
                 {
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <caption style="padding-bottom: 0.75rem; text-align: left; color: var(--neutral-foreground-rest);">Currently active scheduled jobs.</caption>
-                            <thead>
-                                <tr>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Name</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Schedule</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Last run</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Next run</th>
-                                    <th scope="col" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var job in _dashboard.ScheduledJobs)
-                                {
-                                    <tr>
-                                        <th scope="row" style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--neutral-stroke-rest);">@job.Name</th>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);"><code>@job.Schedule</code></td>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);">
-                                            <time datetime="@FormatTimestampAttribute(job.LastRunAt)">@FormatDateTime(job.LastRunAt)</time>
-                                        </td>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);">
-                                            <time datetime="@FormatTimestampAttribute(job.NextRunAt)">@FormatDateTime(job.NextRunAt)</time>
-                                        </td>
-                                        <td style="padding: 0.75rem; border-bottom: 1px solid var(--neutral-stroke-rest);">
-                                            <FluentBadge Appearance="@(job.Status == AdminJobStatus.Running ? Appearance.Accent : job.Status == AdminJobStatus.Idle ? Appearance.Neutral : Appearance.Lightweight)">
-                                                @GetJobStatusLabel(job.Status)
-                                            </FluentBadge>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+                    <FluentDataGrid Items="@(_dashboard.ScheduledJobs.AsQueryable())" TGridItem="AdminScheduledJob" Style="width: 100%;" GridTemplateColumns="2fr 1.5fr 1.5fr 1.5fr auto">
+                        <PropertyColumn Property="@(job => job.Name)" Title="Name" Sortable="true" />
+                        <TemplateColumn Title="Schedule">
+                            <code>@context.Schedule</code>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Last run">
+                            <time datetime="@FormatTimestampAttribute(context.LastRunAt)">@FormatDateTime(context.LastRunAt)</time>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Next run">
+                            <time datetime="@FormatTimestampAttribute(context.NextRunAt)">@FormatDateTime(context.NextRunAt)</time>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Status">
+                            <FluentBadge Appearance="@(context.Status == AdminJobStatus.Running ? Appearance.Accent : context.Status == AdminJobStatus.Idle ? Appearance.Neutral : Appearance.Lightweight)">
+                                @GetJobStatusLabel(context.Status)
+                            </FluentBadge>
+                        </TemplateColumn>
+                    </FluentDataGrid>
                 }
             </FluentStack>
         </FluentCard>
@@ -464,7 +403,7 @@
             _updatingToolName = toolName;
             _errorMessage = null;
             _dashboard = await AdminService.SetToolEnabledAsync(toolName, enabled, _disposeCts.Token);
-            _statusMessage = $"{toolName} {(enabled ? "enabled" : "disabled")} in preview mode.";
+            _statusMessage = $"{toolName} {(enabled ? "enabled" : "disabled")} for this session.";
         }
         catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
         {
@@ -491,11 +430,6 @@
     private static string GetToggleAriaLabel(AdminToolGovernanceItem tool)
         => tool.Enabled ? $"Disable {tool.Name}" : $"Enable {tool.Name}";
 
-    private string GetToggleLabel(AdminToolGovernanceItem tool)
-        => string.Equals(_updatingToolName, tool.Name, StringComparison.Ordinal)
-            ? "Updating…"
-            : tool.Enabled ? "Enabled" : "Disabled";
-
     private static string GetProviderStatusLabel(AdminProviderStatus status)
         => status switch
         {
@@ -504,22 +438,6 @@
             _ => "Unavailable",
         };
 
-    private static string GetProviderBadgeClass(AdminProviderStatus status)
-        => $"admin-status-badge {status switch
-        {
-            AdminProviderStatus.Healthy => "admin-status-badge--healthy",
-            AdminProviderStatus.Degraded => "admin-status-badge--warning",
-            _ => "admin-status-badge--error",
-        }}";
-
-    private static string GetProviderDotClass(AdminProviderStatus status)
-        => $"admin-status-dot {status switch
-        {
-            AdminProviderStatus.Healthy => "admin-status-dot--healthy",
-            AdminProviderStatus.Degraded => "admin-status-dot--warning",
-            _ => "admin-status-dot--error",
-        }}";
-
     private static string GetJobStatusLabel(AdminJobStatus status)
         => status switch
         {
@@ -527,14 +445,6 @@
             AdminJobStatus.Idle => "Idle",
             _ => "Failed",
         };
-
-    private static string GetJobBadgeClass(AdminJobStatus status)
-        => $"admin-status-badge {status switch
-        {
-            AdminJobStatus.Running => "admin-status-badge--healthy",
-            AdminJobStatus.Idle => "admin-status-badge--neutral",
-            _ => "admin-status-badge--error",
-        }}";
 
     private decimal GetMaxDailySpend()
         => _dashboard?.Spend.DailySpend.Max(point => point.Amount) ?? 0m;
@@ -555,11 +465,6 @@
 
         return $"height: {height.ToString("0.##", CultureInfo.InvariantCulture)}%;";
     }
-
-    private static string GetSpendBarClass(AdminSpendPoint point)
-        => point.IsToday
-            ? "admin-spend-chart__bar admin-spend-chart__bar--today"
-            : "admin-spend-chart__bar";
 
     private decimal GetBudgetUsagePercentage()
     {
@@ -585,19 +490,6 @@
         => _dashboard?.Spend.MonthlyBudgetLimit is decimal monthlyBudgetLimit && monthlyBudgetLimit > 0m
             ? $"Tracking against a {FormatCurrency(monthlyBudgetLimit)} monthly spend threshold."
             : "Add a budget threshold when the admin API exposes spend guardrails.";
-
-    private string GetBudgetMeterStyle()
-        => $"width: {GetBudgetUsagePercentage().ToString("0.##", CultureInfo.InvariantCulture)}%;";
-
-    private string GetBudgetMeterClass()
-    {
-        var usage = GetBudgetUsagePercentage();
-        return usage >= 90m
-            ? "admin-budget__value admin-budget__value--danger"
-            : usage >= 75m
-                ? "admin-budget__value admin-budget__value--warning"
-                : "admin-budget__value";
-    }
 
     private string GetSpendChartSummary()
     {

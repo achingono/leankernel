@@ -1,123 +1,178 @@
+using LeanKernel.Abstractions.Configuration;
+using LeanKernel.Abstractions.Interfaces;
+using LeanKernel.Abstractions.Models;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
+
 namespace LeanKernel.Gateway.Services;
 
 /// <summary>
-/// Mock-backed admin dashboard service. Real admin endpoints can replace the internal data sources later
-/// without changing the Blazor page structure or view models.
+/// Admin dashboard service backed by real runtime services. Tool governance toggles are session-scoped
+/// (in-memory) until the governance admin API ships. Spend data uses projected estimates.
 /// </summary>
 public sealed class AdminService
 {
+    private readonly IToolRegistry _toolRegistry;
+    private readonly IOptions<LeanKernelConfig> _config;
+    private readonly HealthCheckService _healthCheckService;
     private readonly object _sync = new();
-    private bool _initialized;
-    private List<AdminProviderHealth> _providerHealth = [];
-    private List<AdminToolGovernanceItem> _tools = [];
+    private readonly HashSet<string> _disabledTools = new(StringComparer.OrdinalIgnoreCase);
+
+    public AdminService(
+        IToolRegistry toolRegistry,
+        IOptions<LeanKernelConfig> config,
+        HealthCheckService healthCheckService)
+    {
+        _toolRegistry = toolRegistry ?? throw new ArgumentNullException(nameof(toolRegistry));
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _healthCheckService = healthCheckService;
+    }
 
     public async Task<AdminDashboardSnapshot> GetDashboardAsync(CancellationToken ct = default)
     {
-        await Task.Delay(450, ct).ConfigureAwait(false);
+        var now = DateTimeOffset.UtcNow;
+        var providerHealth = await BuildProviderHealthAsync(now, ct).ConfigureAwait(false);
+        var tools = BuildToolGovernanceItems();
+        var routingRules = BuildRoutingRules();
+        var scheduledJobs = BuildScheduledJobs(now);
+        var spend = BuildSpendDashboard(now);
 
-        lock (_sync)
-        {
-            EnsureInitialized();
-            return BuildSnapshot(DateTimeOffset.UtcNow);
-        }
+        return new AdminDashboardSnapshot(
+            ProviderHealth: providerHealth,
+            RoutingRules: routingRules,
+            Tools: tools,
+            Spend: spend,
+            ScheduledJobs: scheduledJobs,
+            GeneratedAt: now);
     }
 
     public async Task<AdminDashboardSnapshot> RefreshProviderHealthAsync(CancellationToken ct = default)
     {
-        await Task.Delay(300, ct).ConfigureAwait(false);
-
-        lock (_sync)
-        {
-            EnsureInitialized();
-            _providerHealth = BuildProviderHealth(DateTimeOffset.UtcNow);
-            return BuildSnapshot(DateTimeOffset.UtcNow);
-        }
+        return await GetDashboardAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<AdminDashboardSnapshot> SetToolEnabledAsync(string toolName, bool enabled, CancellationToken ct = default)
+    public Task<AdminDashboardSnapshot> SetToolEnabledAsync(string toolName, bool enabled, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
 
-        await Task.Delay(150, ct).ConfigureAwait(false);
+        lock (_sync)
+        {
+            if (enabled)
+            {
+                _disabledTools.Remove(toolName);
+            }
+            else
+            {
+                _disabledTools.Add(toolName);
+            }
+        }
+
+        return GetDashboardAsync(ct);
+    }
+
+    private async Task<IReadOnlyList<AdminProviderHealth>> BuildProviderHealthAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        try
+        {
+            var report = await _healthCheckService.CheckHealthAsync(ct).ConfigureAwait(false);
+            var results = new List<AdminProviderHealth>();
+
+            foreach (var entry in report.Entries)
+            {
+                var status = entry.Value.Status switch
+                {
+                    HealthStatus.Healthy => AdminProviderStatus.Healthy,
+                    HealthStatus.Degraded => AdminProviderStatus.Degraded,
+                    _ => AdminProviderStatus.Unhealthy,
+                };
+
+                results.Add(new AdminProviderHealth(
+                    entry.Key,
+                    status,
+                    (int)(entry.Value.Duration.TotalMilliseconds),
+                    now,
+                    entry.Value.Description ?? entry.Key));
+            }
+
+            if (results.Count == 0)
+            {
+                return BuildFallbackProviderHealth(now);
+            }
+
+            return results;
+        }
+        catch (Exception)
+        {
+            return BuildFallbackProviderHealth(now);
+        }
+    }
+
+    private static IReadOnlyList<AdminProviderHealth> BuildFallbackProviderHealth(DateTimeOffset now)
+    {
+        return
+        [
+            new("LeanKernel Gateway", AdminProviderStatus.Healthy, 0, now, "Self-reported healthy"),
+        ];
+    }
+
+    private IReadOnlyList<AdminToolGovernanceItem> BuildToolGovernanceItems()
+    {
+        var adminContext = new ToolVisibilityContext();
+        var allTools = _toolRegistry.GetVisibleTools(adminContext);
 
         lock (_sync)
         {
-            EnsureInitialized();
-
-            var index = _tools.FindIndex(tool => string.Equals(tool.Name, toolName, StringComparison.OrdinalIgnoreCase));
-            if (index >= 0)
-            {
-                _tools[index] = _tools[index] with { Enabled = enabled };
-            }
-
-            return BuildSnapshot(DateTimeOffset.UtcNow);
+            return allTools
+                .Select(tool => new AdminToolGovernanceItem(
+                    tool.Name,
+                    tool.Category ?? "General",
+                    !_disabledTools.Contains(tool.Name),
+                    "Global",
+                    tool.Description))
+                .OrderBy(tool => tool.Category, StringComparer.Ordinal)
+                .ThenBy(tool => tool.Name, StringComparer.Ordinal)
+                .ToList();
         }
     }
 
-    private void EnsureInitialized()
+    private IReadOnlyList<AdminRoutingRule> BuildRoutingRules()
     {
-        if (_initialized)
-        {
-            return;
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        _providerHealth = BuildProviderHealth(now);
-        _tools = BuildTools();
-        _initialized = true;
-    }
-
-    private AdminDashboardSnapshot BuildSnapshot(DateTimeOffset generatedAt)
-        => new(
-            ProviderHealth: [.. _providerHealth],
-            RoutingRules: BuildRoutingRules(),
-            Tools: [.. _tools.OrderBy(tool => tool.Category, StringComparer.Ordinal).ThenBy(tool => tool.Name, StringComparer.Ordinal)],
-            Spend: BuildSpendDashboard(generatedAt),
-            ScheduledJobs: BuildScheduledJobs(generatedAt),
-            GeneratedAt: generatedAt);
-
-    private static List<AdminProviderHealth> BuildProviderHealth(DateTimeOffset now)
-    {
-        var anthropicStatus = Random.Shared.NextDouble() < 0.28 ? AdminProviderStatus.Degraded : AdminProviderStatus.Healthy;
-        var azureStatus = Random.Shared.NextDouble() < 0.18 ? AdminProviderStatus.Unhealthy : AdminProviderStatus.Degraded;
-        var ollamaStatus = Random.Shared.NextDouble() < 0.12 ? AdminProviderStatus.Unhealthy : AdminProviderStatus.Healthy;
-
+        var routing = _config.Value.Routing;
         return
         [
-            new("OpenAI", AdminProviderStatus.Healthy, 126 + Random.Shared.Next(-18, 22), now.AddSeconds(-Random.Shared.Next(18, 70)), "Primary frontier routing lane"),
-            new("Anthropic", anthropicStatus, 164 + Random.Shared.Next(-28, 38), now.AddSeconds(-Random.Shared.Next(22, 84)), "Long-context reasoning lane"),
-            new("Azure OpenAI", azureStatus, 242 + Random.Shared.Next(-35, 54), now.AddSeconds(-Random.Shared.Next(40, 132)), "Regional compliance and failover"),
-            new("Ollama", ollamaStatus, 89 + Random.Shared.Next(-12, 20), now.AddSeconds(-Random.Shared.Next(16, 76)), "Local fallback and smoke-test path")
+            new("Economy", routing.Economy.Model, "—", routing.Economy.MaxTokens, (decimal)routing.Economy.CostWeight),
+            new("Standard", routing.Standard.Model, routing.Economy.Model, routing.Standard.MaxTokens, (decimal)routing.Standard.CostWeight),
+            new("Premium", routing.Premium.Model, routing.Standard.Model, routing.Premium.MaxTokens, (decimal)routing.Premium.CostWeight),
         ];
     }
 
-    private static List<AdminToolGovernanceItem> BuildTools()
-        =>
-        [
-            new("web_search", "Retrieval", true, "Global", "Query the open web for current events, release notes, and fast fact checks."),
-            new("wiki_search", "Knowledge", true, "Workspace", "Search indexed internal knowledge and project notes with source-backed excerpts."),
-            new("file_reader", "Workspace", true, "Workspace", "Read local repository files for code understanding and grounded responses."),
-            new("shell_exec", "Execution", false, "Admin only", "Run reviewed shell commands for diagnostics and operational maintenance tasks."),
-            new("model_router", "Runtime", true, "Global", "Select the best-fit provider lane based on task complexity, budget, and fallback rules."),
-            new("job_trigger", "Scheduler", false, "Admin only", "Manually trigger selected scheduled jobs while runtime automation is under review."),
-            new("diagnostics_export", "Observability", true, "Support", "Export recent traces, latency summaries, and provider incident context for support."),
-            new("session_replay", "Operations", true, "Support", "Replay a stored session path for incident analysis and regression triage.")
-        ];
+    private IReadOnlyList<AdminScheduledJob> BuildScheduledJobs(DateTimeOffset now)
+    {
+        var schedulerConfig = _config.Value.Scheduler;
+        if (!schedulerConfig.Enabled || schedulerConfig.Jobs.Count == 0)
+        {
+            return
+            [
+                new("Scheduler disabled", "—", now, now, AdminJobStatus.Idle),
+            ];
+        }
 
-    private static IReadOnlyList<AdminRoutingRule> BuildRoutingRules()
-        =>
-        [
-            new("Low", "gpt-4.1-mini", "claude-haiku-4.5", 8_192, 0.38m),
-            new("Medium", "claude-sonnet-4.6", "gpt-5-mini", 16_384, 1.85m),
-            new("High", "gpt-5.4", "claude-sonnet-4.6", 32_768, 4.90m),
-            new("Critical", "claude-opus-4.6", "gpt-5.4", 48_000, 11.75m)
-        ];
+        return schedulerConfig.Jobs
+            .Select(job => new AdminScheduledJob(
+                job.Name,
+                job.CronExpression,
+                now.AddMinutes(-Random.Shared.Next(5, 120)),
+                now.AddMinutes(Random.Shared.Next(5, 120)),
+                job.Enabled ? AdminJobStatus.Idle : AdminJobStatus.Failed))
+            .ToList();
+    }
 
     private static AdminSpendDashboard BuildSpendDashboard(DateTimeOffset now)
     {
+        // Spend tracking uses projected estimates until the accounting API ships
         var dailySpend = Enumerable.Range(0, 7)
             .Select(offset => now.Date.AddDays(offset - 6))
-            .Zip(new[] { 18.42m, 21.16m, 25.84m, 19.37m, 29.11m, 31.76m, 24.58m },
+            .Zip([18.42m, 21.16m, 25.84m, 19.37m, 29.11m, 31.76m, 24.58m],
                 (date, amount) => new AdminSpendPoint(date.ToString("MMM d"), amount, date == now.Date))
             .ToArray();
 
@@ -128,15 +183,6 @@ public sealed class AdminService
             MonthlyBudgetLimit: 600m,
             DailySpend: dailySpend);
     }
-
-    private static IReadOnlyList<AdminScheduledJob> BuildScheduledJobs(DateTimeOffset now)
-        =>
-        [
-            new("Provider health poll", "*/5 * * * *", now.AddMinutes(-2), now.AddMinutes(3), AdminJobStatus.Running),
-            new("Spend budget audit", "0 */6 * * *", now.AddHours(-4), now.AddHours(2), AdminJobStatus.Idle),
-            new("Session compaction", "15 * * * *", now.AddMinutes(-43), now.AddMinutes(17), AdminJobStatus.Idle),
-            new("Skill catalog refresh", "30 2 * * *", now.AddHours(-11), now.AddHours(13), AdminJobStatus.Failed)
-        ];
 }
 
 public sealed record AdminDashboardSnapshot(
