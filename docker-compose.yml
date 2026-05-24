@@ -30,6 +30,12 @@ services:
     container_name: leankernel-litellm
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
+      - POSTGRES_HOST=database
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-leankernel}
+      - POSTGRES_USER=${POSTGRES_USER:-leankernel}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - LITELLM_DB_SCHEMA=${LITELLM_DB_SCHEMA:-litellm}
       - PYTHONPATH=/app/config
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
@@ -53,7 +59,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     entrypoint: ["sh", "-c"]
-    command: ["python3 /app/config/render_litellm_config.py /app/config/config.yaml /app/litellm_config.generated.yaml && exec litellm --config /app/litellm_config.generated.yaml --port 4000"]
+    command: ["set -eu; ENCODED_POSTGRES_PASSWORD=$$(python3 -c \"import os, urllib.parse; print(urllib.parse.quote(os.environ['POSTGRES_PASSWORD']))\"); export DATABASE_URL=postgresql://$${POSTGRES_USER}:$${ENCODED_POSTGRES_PASSWORD}@$${POSTGRES_HOST}:$${POSTGRES_PORT}/$${POSTGRES_DB}?schema=$${LITELLM_DB_SCHEMA}; python3 /app/config/render_litellm_config.py /app/config/config.yaml /app/litellm_config.generated.yaml && exec litellm --config /app/litellm_config.generated.yaml --port 4000"]
     ports:
       - "${LITELLM_PORT:-4000}:4000"
     depends_on:
@@ -64,6 +70,7 @@ services:
       test: ["CMD", "python3", "-c", "import os,sys,urllib.request; req = urllib.request.Request('http://localhost:4000/health', headers={'Authorization': f\"Bearer {os.getenv('LITELLM_MASTER_KEY','')}\"}); sys.exit(0 if urllib.request.urlopen(req).getcode() == 200 else 1)"]
       interval: 15s
       timeout: 30s
+      start_period: 120s
       retries: 5
 
   # ── GBrain (Wiki/Memory MCP Server) ───────────────────────────
@@ -74,13 +81,27 @@ services:
     container_name: leankernel-gbrain
     working_dir: /app/data/wiki
     environment:
+      - POSTGRES_HOST=database
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-leankernel}
+      - POSTGRES_USER=${POSTGRES_USER:-leankernel}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - GBRAIN_DB_URL=${GBRAIN_DB_URL:-}
+      - GBRAIN_EMBEDDING_MODEL=${GBRAIN_EMBEDDING_MODEL:-openai:embedding-small}
       - LITELLM_BASE_URL=${LITELLM_BASE_URL:-http://litellm:4000}
       - LITELLM_API_KEY=${LITELLM_API_KEY:-${LITELLM_MASTER_KEY:-sk-leankernel-local}}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - TZ=${TZ:-America/Toronto}
     volumes:
       - gbrain-data:/app/data/wiki
     ports:
       - "${GBRAIN_PORT:-8789}:8789"
+    depends_on:
+      database:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://localhost:8789/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
