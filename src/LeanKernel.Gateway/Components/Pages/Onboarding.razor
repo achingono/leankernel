@@ -8,451 +8,497 @@
 
 @if (!_initialized)
 {
-    <section class="placeholder-page">
-        <header class="page-header">
-            <h1>Setup</h1>
-            <p>Loading your onboarding profile…</p>
-        </header>
-    </section>
+    <FluentStack Orientation="Orientation.Vertical"
+                 HorizontalAlignment="HorizontalAlignment.Center"
+                 VerticalAlignment="VerticalAlignment.Center"
+                 Style="padding: 3rem; gap: 1rem;">
+        <FluentCard Style="padding: 2rem; min-width: 320px; text-align: center;">
+            <FluentStack Orientation="Orientation.Vertical"
+                         HorizontalAlignment="HorizontalAlignment.Center"
+                         Style="gap: 0.75rem;">
+                <FluentProgressRing Style="width: 32px; height: 32px;" />
+                <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Setup</FluentLabel>
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading your onboarding profile…</FluentLabel>
+            </FluentStack>
+        </FluentCard>
+    </FluentStack>
 }
 else
 {
-    <section class="onboarding-wizard">
-        <header class="page-header onboarding-wizard__hero">
-            <div>
-                <h1>Guided setup</h1>
-                <p>Tell LeanKernel how to address you, what domains matter most, and what outcomes you want help with.</p>
-            </div>
-            <span class="badge">Step @(CurrentStepIndex + 1) of @Steps.Count</span>
-        </header>
+    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+        <FluentCard Style="padding: 1.5rem;">
+            <FluentStack Orientation="Orientation.Horizontal"
+                         VerticalAlignment="VerticalAlignment.Center"
+                         Wrap="true"
+                         Style="justify-content: space-between; gap: 1rem;">
+                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; max-width: 720px;">
+                    <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Guided setup</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tell LeanKernel how to address you, what domains matter most, and what outcomes you want help with.</FluentLabel>
+                </FluentStack>
+                <FluentBadge Appearance="Appearance.Accent">Step @(CurrentStepIndex + 1) of @Steps.Count</FluentBadge>
+            </FluentStack>
+        </FluentCard>
 
         @if (!string.IsNullOrWhiteSpace(_errorMessage))
         {
-            <div class="status-banner status-banner--error" role="alert">
+            <FluentMessageBar Title="Error" Intent="@MessageIntent.Error">
                 @_errorMessage
-            </div>
+            </FluentMessageBar>
         }
 
         @if (!string.IsNullOrWhiteSpace(_successMessage))
         {
-            <div class="status-banner status-banner--success" role="status" aria-live="polite">
+            <FluentMessageBar Title="Success" Intent="@MessageIntent.Success">
                 @_successMessage
-            </div>
+            </FluentMessageBar>
         }
 
-        <div class="onboarding-wizard__layout">
-            <section class="onboarding-wizard__panel" aria-busy="@_isSaving">
-                <ol class="onboarding-wizard__steps" aria-label="Onboarding progress">
-                    @for (var index = 0; index < Steps.Count; index++)
+        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="align-items: flex-start; gap: 1rem;">
+            <FluentCard Style="flex: 1 1 720px; padding: 1.5rem;" aria-busy="@_isSaving">
+                <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;" aria-label="Onboarding progress">
+                        @for (var index = 0; index < Steps.Count; index++)
+                        {
+                            var step = Steps[index];
+                            var isActive = index == CurrentStepIndex;
+                            var isComplete = index < CurrentStepIndex || (_saveCompleted && index == Steps.Count - 1);
+                            var badgeAppearance = isActive ? Appearance.Accent : isComplete ? Appearance.Neutral : Appearance.Lightweight;
+                            var cardStyle = isActive
+                                ? "padding: 0.75rem; border: 1px solid var(--accent-fill-rest);"
+                                : "padding: 0.75rem;";
+
+                            <FluentCard Style="@cardStyle" aria-current="@(isActive ? "step" : null)">
+                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.75rem;">
+                                    <FluentBadge Appearance="@badgeAppearance">@(index + 1)</FluentBadge>
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.15rem;">
+                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@step.Label</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@step.Hint</FluentLabel>
+                                    </FluentStack>
+                                </FluentStack>
+                            </FluentCard>
+                        }
+                    </FluentStack>
+
+                    @if (_saveCompleted)
                     {
-                        var step = Steps[index];
-                        var isActive = index == CurrentStepIndex;
-                        var isComplete = index < CurrentStepIndex || (_saveCompleted && index == Steps.Count - 1);
-                        var stepClass = $"onboarding-wizard__step{(isActive ? " onboarding-wizard__step--active" : string.Empty)}{(isComplete ? " onboarding-wizard__step--complete" : string.Empty)}";
-
-                        <li class="@stepClass" aria-current="@(isActive ? "step" : null)">
-                            <span class="onboarding-wizard__step-index">@(index + 1)</span>
-                            <span class="onboarding-wizard__step-text">
-                                <span class="onboarding-wizard__step-label">@step.Label</span>
-                                <span class="onboarding-wizard__step-hint">@step.Hint</span>
-                            </span>
-                        </li>
-                    }
-                </ol>
-
-                @if (_saveCompleted)
-                {
-                    <section class="onboarding-wizard__success">
-                        <h2>Profile saved</h2>
-                        <p>Your onboarding profile is now written to the GBrain wiki pages for identity and goals.</p>
-                        <div class="onboarding-wizard__actions onboarding-wizard__actions--stacked">
-                            <a href="/chat" class="button button-primary" aria-label="Go to chat after completing onboarding">Go to Chat</a>
-                            <button type="button"
-                                    class="button button-secondary"
-                                    aria-label="Review your saved onboarding summary"
-                                    @onclick="ReviewSummaryAsync">
-                                Review summary
-                            </button>
-                        </div>
-                    </section>
-                }
-                else
-                {
-                    <div class="onboarding-wizard__content">
-                        @switch (CurrentStepIndex)
-                        {
-                            case 0:
-                                <section class="onboarding-wizard__section">
-                                    <h2>Welcome to LeanKernel</h2>
-                                    <p>This guided setup creates durable identity pages so LeanKernel can personalize retrieval, tone, and follow-up support without asking you to repeat yourself every session.</p>
-
-                                    <div class="onboarding-wizard__intro-grid">
-                                        <article class="onboarding-wizard__card onboarding-wizard__card--inline">
-                                            <h3>What we capture</h3>
-                                            <ul class="onboarding-wizard__list">
-                                                <li>How you want LeanKernel to address and respond to you</li>
-                                                <li>Knowledge domains that should shape retrieval and memory</li>
-                                                <li>Goals that help prioritize future support</li>
-                                            </ul>
-                                        </article>
-
-                                        <article class="onboarding-wizard__card onboarding-wizard__card--inline">
-                                            <h3>What gets written</h3>
-                                            <ul class="onboarding-wizard__list">
-                                                <li><code>@LeanKernel.Gateway.Services.OnboardingService.UserProfilePageKey</code></li>
-                                                <li><code>@LeanKernel.Gateway.Services.OnboardingService.UserGoalsPageKey</code></li>
-                                            </ul>
-                                        </article>
-                                    </div>
-                                </section>
-                                break;
-                            case 1:
-                                <section class="onboarding-wizard__section">
-                                    <h2>Identity</h2>
-                                    <p>Give LeanKernel the core profile details it should use across future conversations.</p>
-
-                                    <EditForm EditContext="_editContext" class="onboarding-wizard__form">
-                                        <DataAnnotationsValidator />
-
-                                        <div class="onboarding-wizard__field-grid">
-                                            <div class="onboarding-wizard__field-group">
-                                                <label class="onboarding-wizard__label" for="onboarding-display-name">
-                                                    Display name <span class="onboarding-wizard__required">*</span>
-                                                </label>
-                                                <InputText id="onboarding-display-name"
-                                                           class="onboarding-wizard__input"
-                                                           @bind-Value="_draft.DisplayName"
-                                                           @bind-Value:event="oninput"
-                                                           @onblur="RefreshInsightsAsync"
-                                                           maxlength="120"
-                                                           autocomplete="name" />
-                                                <ValidationMessage class="onboarding-wizard__validation" For="@(() => _draft.DisplayName)" />
-                                            </div>
-
-                                            <div class="onboarding-wizard__field-group">
-                                                <label class="onboarding-wizard__label" for="onboarding-role">Role or title</label>
-                                                <InputText id="onboarding-role"
-                                                           class="onboarding-wizard__input"
-                                                           @bind-Value="_draft.RoleTitle"
-                                                           @bind-Value:event="oninput"
-                                                           @onblur="RefreshInsightsAsync"
-                                                           maxlength="120"
-                                                           autocomplete="organization-title" />
-                                            </div>
-
-                                            <div class="onboarding-wizard__field-group">
-                                                <label class="onboarding-wizard__label" for="onboarding-timezone">Timezone</label>
-                                                <InputText id="onboarding-timezone"
-                                                           class="onboarding-wizard__input"
-                                                           @bind-Value="_draft.Timezone"
-                                                           @bind-Value:event="oninput"
-                                                           @onblur="RefreshInsightsAsync"
-                                                           maxlength="120"
-                                                           placeholder="UTC, America/New_York, GMT+1…"
-                                                           autocomplete="off" />
-                                            </div>
-
-                                            <div class="onboarding-wizard__field-group">
-                                                <label class="onboarding-wizard__label" for="onboarding-language">Preferred language</label>
-                                                <InputText id="onboarding-language"
-                                                           class="onboarding-wizard__input"
-                                                           @bind-Value="_draft.PreferredLanguage"
-                                                           @bind-Value:event="oninput"
-                                                           @onblur="RefreshInsightsAsync"
-                                                           maxlength="120"
-                                                           autocomplete="language"
-                                                           placeholder="English, French, Swahili…" />
-                                            </div>
-                                        </div>
-
-                                        <fieldset class="onboarding-wizard__fieldset">
-                                            <legend class="onboarding-wizard__legend">Communication style</legend>
-                                            <div class="onboarding-wizard__choices" role="radiogroup" aria-label="Communication style">
-                                                @foreach (var option in CommunicationStyles)
-                                                {
-                                                    <label class="onboarding-wizard__choice">
-                                                        <input type="radio"
-                                                               name="communication-style"
-                                                               value="@option.Value"
-                                                               checked="@string.Equals(_draft.CommunicationStyle, option.Value, StringComparison.OrdinalIgnoreCase)"
-                                                               @onchange="() => SetCommunicationStyleAsync(option.Value)" />
-                                                        <span>
-                                                            <strong>@option.Label</strong>
-                                                            <span class="onboarding-wizard__choice-hint">@option.Hint</span>
-                                                        </span>
-                                                    </label>
-                                                }
-                                            </div>
-                                        </fieldset>
-                                    </EditForm>
-                                </section>
-                                break;
-                            case 2:
-                                <section class="onboarding-wizard__section">
-                                    <h2>Knowledge domains</h2>
-                                    <p>Add the areas LeanKernel should treat as important context for retrieval and memory.</p>
-
-                                    <div class="onboarding-wizard__field-group">
-                                        <label class="onboarding-wizard__label" for="onboarding-domain-input">Add a domain</label>
-                                        <div class="onboarding-wizard__tag-editor">
-                                            <input id="onboarding-domain-input"
-                                                   class="onboarding-wizard__input"
-                                                   @bind="_domainInput"
-                                                   @bind:event="oninput"
-                                                   @onkeydown="HandleDomainKeyDown"
-                                                   maxlength="120"
-                                                   placeholder="Type a domain and press Enter"
-                                                   autocomplete="off" />
-                                            <button type="button"
-                                                    class="button button-secondary"
-                                                    aria-label="Add knowledge domain"
-                                                    @onclick="AddDomainAsync"
-                                                    disabled="@string.IsNullOrWhiteSpace(_domainInput)">
-                                                Add
-                                            </button>
-                                        </div>
-                                        <p class="onboarding-wizard__helper">At least one domain is recommended to improve retrieval quality.</p>
-                                    </div>
-
-                                    @if (_draft.Domains.Count > 0)
-                                    {
-                                        <ul class="onboarding-wizard__tags" aria-label="Selected knowledge domains">
-                                            @foreach (var domain in _draft.Domains)
-                                            {
-                                                <li class="onboarding-wizard__tag">
-                                                    <span>@domain</span>
-                                                    <button type="button"
-                                                            class="onboarding-wizard__tag-remove"
-                                                            aria-label="Remove @domain domain"
-                                                            @onclick="() => RemoveDomainAsync(domain)">
-                                                        Remove
-                                                    </button>
-                                                </li>
-                                            }
-                                        </ul>
-                                    }
-
-                                    <div class="onboarding-wizard__suggestions">
-                                        <span class="onboarding-wizard__suggestions-label">Suggested domains</span>
-                                        <div class="onboarding-wizard__chip-list">
-                                            @foreach (var suggestion in DomainSuggestions)
-                                            {
-                                                <button type="button"
-                                                        class="onboarding-wizard__chip"
-                                                        aria-label="Add suggested domain @suggestion"
-                                                        @onclick="() => AddDomainAsync(suggestion)">
-                                                    @suggestion
-                                                </button>
-                                            }
-                                        </div>
-                                    </div>
-                                </section>
-                                break;
-                            case 3:
-                                <section class="onboarding-wizard__section">
-                                    <h2>Goals</h2>
-                                    <p>Choose the outcomes LeanKernel should optimize for when supporting you.</p>
-
-                                    <fieldset class="onboarding-wizard__fieldset">
-                                        <legend class="onboarding-wizard__legend">Common goals</legend>
-                                        <div class="onboarding-wizard__checks">
-                                            @foreach (var goal in GoalOptions)
-                                            {
-                                                <label class="onboarding-wizard__check">
-                                                    <input type="checkbox"
-                                                           checked="@IsGoalSelected(goal)"
-                                                           @onchange="args => ToggleGoalAsync(goal, args)" />
-                                                    <span>@goal</span>
-                                                </label>
-                                            }
-                                        </div>
-                                    </fieldset>
-
-                                    @if (_draft.Goals.Count > 0)
-                                    {
-                                        <ul class="onboarding-wizard__tags" aria-label="Selected goals">
-                                            @foreach (var goal in _draft.Goals)
-                                            {
-                                                <li class="onboarding-wizard__tag onboarding-wizard__tag--goal">
-                                                    <span>@goal</span>
-                                                    <button type="button"
-                                                            class="onboarding-wizard__tag-remove"
-                                                            aria-label="Remove @goal goal"
-                                                            @onclick="() => RemoveGoalAsync(goal)">
-                                                        Remove
-                                                    </button>
-                                                </li>
-                                            }
-                                        </ul>
-                                    }
-
-                                    <div class="onboarding-wizard__field-group">
-                                        <label class="onboarding-wizard__label" for="onboarding-other-goals">Other goals</label>
-                                        <textarea id="onboarding-other-goals"
-                                                  class="onboarding-wizard__textarea"
-                                                  @bind="_draft.OtherGoals"
-                                                  @bind:event="oninput"
-                                                  @onblur="RefreshInsightsAsync"
-                                                  rows="4"
-                                                  maxlength="1200"
-                                                  placeholder="Anything else you want LeanKernel to help with?"></textarea>
-                                    </div>
-                                </section>
-                                break;
-                            case 4:
-                                <section class="onboarding-wizard__section">
-                                    <h2>Complete</h2>
-                                    <p>Review what LeanKernel will save, then confirm to write your profile pages.</p>
-
-                                    <div class="onboarding-wizard__summary-grid">
-                                        <article class="onboarding-wizard__summary-card">
-                                            <h3>Identity</h3>
-                                            <dl class="onboarding-wizard__summary-list">
-                                                <div>
-                                                    <dt>Display name</dt>
-                                                    <dd>@GetValueOrFallback(_draft.DisplayName, "Required")</dd>
-                                                </div>
-                                                <div>
-                                                    <dt>Role or title</dt>
-                                                    <dd>@GetValueOrFallback(_draft.RoleTitle, "Skipped for now")</dd>
-                                                </div>
-                                                <div>
-                                                    <dt>Communication style</dt>
-                                                    <dd>@GetValueOrFallback(_draft.CommunicationStyle, "Balanced")</dd>
-                                                </div>
-                                                <div>
-                                                    <dt>Timezone</dt>
-                                                    <dd>@GetValueOrFallback(_draft.Timezone, "Skipped for now")</dd>
-                                                </div>
-                                                <div>
-                                                    <dt>Preferred language</dt>
-                                                    <dd>@GetValueOrFallback(_draft.PreferredLanguage, "Skipped for now")</dd>
-                                                </div>
-                                            </dl>
-                                        </article>
-
-                                        <article class="onboarding-wizard__summary-card">
-                                            <h3>Domains</h3>
-                                            @if (_draft.Domains.Count == 0)
-                                            {
-                                                <p class="onboarding-wizard__empty">No domains added yet.</p>
-                                            }
-                                            else
-                                            {
-                                                <ul class="onboarding-wizard__tags onboarding-wizard__tags--summary">
-                                                    @foreach (var domain in _draft.Domains)
-                                                    {
-                                                        <li class="onboarding-wizard__tag">@domain</li>
-                                                    }
-                                                </ul>
-                                            }
-                                        </article>
-
-                                        <article class="onboarding-wizard__summary-card">
-                                            <h3>Goals</h3>
-                                            @if (_draft.Goals.Count == 0 && string.IsNullOrWhiteSpace(_draft.OtherGoals))
-                                            {
-                                                <p class="onboarding-wizard__empty">No goals selected yet.</p>
-                                            }
-                                            else
-                                            {
-                                                <ul class="onboarding-wizard__summary-points">
-                                                    @foreach (var goal in _draft.Goals)
-                                                    {
-                                                        <li>@goal</li>
-                                                    }
-                                                </ul>
-
-                                                @if (!string.IsNullOrWhiteSpace(_draft.OtherGoals))
-                                                {
-                                                    <p class="onboarding-wizard__summary-note">Other goals: @_draft.OtherGoals</p>
-                                                }
-                                            }
-                                        </article>
-                                    </div>
-                                </section>
-                                break;
-                        }
-                    </div>
-
-                    <div class="onboarding-wizard__actions">
-                        @if (CurrentStepIndex > 0)
-                        {
-                            <button type="button"
-                                    class="button button-secondary"
-                                    aria-label="Go to the previous onboarding step"
-                                    @onclick="GoBackAsync">
-                                Back
-                            </button>
-                        }
-
-                        @if (IsOptionalStep)
-                        {
-                            <button type="button"
-                                    class="button button-secondary"
-                                    aria-label="Skip the @CurrentStep.Label step for now"
-                                    @onclick="SkipOptionalStepAsync">
-                                Skip for now
-                            </button>
-                        }
-
-                        @if (CurrentStepIndex < Steps.Count - 1)
-                        {
-                            <button type="button"
-                                    class="button button-primary"
-                                    aria-label="Continue to the next onboarding step"
-                                    @onclick="GoNextAsync">
-                                Next
-                            </button>
-                        }
-                        else
-                        {
-                            <button type="button"
-                                    class="button button-primary"
-                                    aria-label="Save onboarding profile"
-                                    @onclick="SaveAsync"
-                                    disabled="@_isSaving">
-                                @(_isSaving ? "Saving…" : "Save Profile")
-                            </button>
-                        }
-                    </div>
-                }
-            </section>
-
-            <aside class="onboarding-wizard__aside" aria-label="Profile guidance">
-                <section class="onboarding-wizard__card">
-                    <h2>Identity gaps</h2>
-                    <p>These suggestions reflect the profile fields this wizard uses to improve personalization quality.</p>
-
-                    @if (_gaps.Count == 0)
-                    {
-                        <p class="onboarding-wizard__empty">No priority gaps detected for the current profile draft.</p>
+                        <FluentCard Style="padding: 1.25rem;">
+                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                                <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Profile saved</FluentLabel>
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Your onboarding profile is now written to the GBrain wiki pages for identity and goals.</FluentLabel>
+                                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.75rem;">
+                                    <FluentButton Appearance="Appearance.Accent" OnClick='@(() => JS.InvokeVoidAsync("open", "/chat", "_self").AsTask())'>Go to Chat</FluentButton>
+                                    <FluentButton Appearance="Appearance.Outline" OnClick="ReviewSummaryAsync">Review summary</FluentButton>
+                                </FluentStack>
+                            </FluentStack>
+                        </FluentCard>
                     }
                     else
                     {
-                        <ul class="onboarding-wizard__gap-list">
-                            @foreach (var gap in _gaps)
+                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                            @switch (CurrentStepIndex)
                             {
-                                <li>
-                                    <strong>@gap.Title</strong>
-                                    <span>@gap.Detail</span>
-                                </li>
-                            }
-                        </ul>
-                    }
-                </section>
+                                case 0:
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Welcome to LeanKernel</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">This guided setup creates durable identity pages so LeanKernel can personalize retrieval, tone, and follow-up support without asking you to repeat yourself every session.</FluentLabel>
+                                        </FluentStack>
 
-                <section class="onboarding-wizard__card">
-                    <h2>Recommended next context</h2>
-                    <ul class="onboarding-wizard__recommendation-list">
-                        <li>@GetDomainRecommendation()</li>
-                        <li>@GetGoalRecommendation()</li>
-                        <li>Re-open setup any time to keep your profile current as your work evolves.</li>
-                    </ul>
-                </section>
-            </aside>
-        </div>
-    </section>
+                                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem; align-items: stretch;">
+                                            <FluentCard Style="flex: 1 1 280px; padding: 1rem;">
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
+                                                    <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">What we capture</FluentLabel>
+                                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">• How you want LeanKernel to address and respond to you</FluentLabel>
+                                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">• Knowledge domains that should shape retrieval and memory</FluentLabel>
+                                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">• Goals that help prioritize future support</FluentLabel>
+                                                </FluentStack>
+                                            </FluentCard>
+
+                                            <FluentCard Style="flex: 1 1 280px; padding: 1rem;">
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                                    <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">What gets written</FluentLabel>
+                                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
+                                                        <FluentBadge Appearance="Appearance.Neutral">@LeanKernel.Gateway.Services.OnboardingService.UserProfilePageKey</FluentBadge>
+                                                        <FluentBadge Appearance="Appearance.Neutral">@LeanKernel.Gateway.Services.OnboardingService.UserGoalsPageKey</FluentBadge>
+                                                    </FluentStack>
+                                                </FluentStack>
+                                            </FluentCard>
+                                        </FluentStack>
+                                    </FluentStack>
+                                    break;
+                                case 1:
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Identity</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Give LeanKernel the core profile details it should use across future conversations.</FluentLabel>
+                                        </FluentStack>
+
+                                        <EditForm EditContext="_editContext">
+                                            <DataAnnotationsValidator />
+
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                                                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem;">
+                                                    <FluentTextField Id="onboarding-display-name"
+                                                                     Name="display-name"
+                                                                     Label="Display name"
+                                                                     Required="true"
+                                                                     @bind-Value="_draft.DisplayName"
+                                                                     Immediate="true"
+                                                                     @onblur="RefreshInsightsAsync"
+                                                                     Maxlength="120"
+                                                                     AutoComplete="name"
+                                                                     Style="flex: 1 1 260px; min-width: 260px;" />
+
+                                                    <FluentTextField Id="onboarding-role"
+                                                                     Name="role"
+                                                                     Label="Role or title"
+                                                                     @bind-Value="_draft.RoleTitle"
+                                                                     Immediate="true"
+                                                                     @onblur="RefreshInsightsAsync"
+                                                                     Maxlength="120"
+                                                                     AutoComplete="organization-title"
+                                                                     Style="flex: 1 1 260px; min-width: 260px;" />
+
+                                                    <FluentTextField Id="onboarding-timezone"
+                                                                     Name="timezone"
+                                                                     Label="Timezone"
+                                                                     @bind-Value="_draft.Timezone"
+                                                                     Immediate="true"
+                                                                     @onblur="RefreshInsightsAsync"
+                                                                     Maxlength="120"
+                                                                     Placeholder="UTC, America/New_York, GMT+1…"
+                                                                     AutoComplete="off"
+                                                                     Style="flex: 1 1 260px; min-width: 260px;" />
+
+                                                    <FluentTextField Id="onboarding-language"
+                                                                     Name="preferred-language"
+                                                                     Label="Preferred language"
+                                                                     @bind-Value="_draft.PreferredLanguage"
+                                                                     Immediate="true"
+                                                                     @onblur="RefreshInsightsAsync"
+                                                                     Maxlength="120"
+                                                                     AutoComplete="language"
+                                                                     Placeholder="English, French, Swahili…"
+                                                                     Style="flex: 1 1 260px; min-width: 260px;" />
+                                                </FluentStack>
+
+                                                <ValidationMessage For="@(() => _draft.DisplayName)" />
+
+                                                <FluentCard Style="padding: 1rem;">
+                                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
+                                                        <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Communication style</FluentLabel>
+                                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Choose the tone LeanKernel should default to when responding.</FluentLabel>
+                                                        <FluentSelect Id="onboarding-communication-style"
+                                                                      Name="communication-style"
+                                                                      Label="Communication style"
+                                                                      TOption="string"
+                                                                      Value="@_draft.CommunicationStyle"
+                                                                      ValueChanged='@(value => SetCommunicationStyleAsync(value ?? "balanced"))'
+                                                                      Style="width: 100%;">
+                                                            @foreach (var option in CommunicationStyles)
+                                                            {
+                                                                <FluentOption Value="@option.Value">@option.Label — @option.Hint</FluentOption>
+                                                            }
+                                                        </FluentSelect>
+                                                    </FluentStack>
+                                                </FluentCard>
+                                            </FluentStack>
+                                        </EditForm>
+                                    </FluentStack>
+                                    break;
+                                case 2:
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Knowledge domains</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Add the areas LeanKernel should treat as important context for retrieval and memory.</FluentLabel>
+                                        </FluentStack>
+
+                                        <FluentCard Style="padding: 1rem;">
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Wrap="true" Style="gap: 0.75rem;">
+                                                    <FluentTextField Id="onboarding-domain-input"
+                                                                     Name="domain-input"
+                                                                     Label="Add a domain"
+                                                                     @bind-Value="_domainInput"
+                                                                     Immediate="true"
+                                                                     @onkeydown="HandleDomainKeyDown"
+                                                                     Maxlength="120"
+                                                                     Placeholder="Type a domain and press Enter"
+                                                                     AutoComplete="off"
+                                                                     Style="flex: 1 1 280px; min-width: 280px;" />
+                                                    <FluentButton Appearance="Appearance.Outline"
+                                                                  OnClick="AddDomainAsync"
+                                                                  Disabled="@string.IsNullOrWhiteSpace(_domainInput)">
+                                                        Add
+                                                    </FluentButton>
+                                                </FluentStack>
+                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">At least one domain is recommended to improve retrieval quality.</FluentLabel>
+                                            </FluentStack>
+                                        </FluentCard>
+
+                                        @if (_draft.Domains.Count > 0)
+                                        {
+                                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.75rem;">
+                                                @foreach (var domain in _draft.Domains)
+                                                {
+                                                    <FluentCard Style="padding: 0.5rem 0.75rem;">
+                                                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
+                                                            <FluentBadge Appearance="Appearance.Accent">@domain</FluentBadge>
+                                                            <FluentButton Appearance="Appearance.Outline"
+                                                                          OnClick="@(() => RemoveDomainAsync(domain))"
+                                                                          Title="@($"Remove {domain} domain")">
+                                                                Remove
+                                                            </FluentButton>
+                                                        </FluentStack>
+                                                    </FluentCard>
+                                                }
+                                            </FluentStack>
+                                        }
+
+                                        <FluentCard Style="padding: 1rem;">
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Suggested domains</FluentLabel>
+                                                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem;">
+                                                    @foreach (var suggestion in DomainSuggestions)
+                                                    {
+                                                        <FluentButton Appearance="Appearance.Outline"
+                                                                      OnClick="@(() => AddDomainAsync(suggestion))"
+                                                                      Title="@($"Add suggested domain {suggestion}")">
+                                                            @suggestion
+                                                        </FluentButton>
+                                                    }
+                                                </FluentStack>
+                                            </FluentStack>
+                                        </FluentCard>
+                                    </FluentStack>
+                                    break;
+                                case 3:
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Goals</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Choose the outcomes LeanKernel should optimize for when supporting you.</FluentLabel>
+                                        </FluentStack>
+
+                                        <FluentCard Style="padding: 1rem;">
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                                <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Common goals</FluentLabel>
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
+                                                    @foreach (var goal in GoalOptions)
+                                                    {
+                                                        <FluentCheckbox Value="@IsGoalSelected(goal)"
+                                                                        ValueChanged="@(value => ToggleGoalAsync(goal, new ChangeEventArgs { Value = value }))"
+                                                                        Label="@goal" />
+                                                    }
+                                                </FluentStack>
+                                            </FluentStack>
+                                        </FluentCard>
+
+                                        @if (_draft.Goals.Count > 0)
+                                        {
+                                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.75rem;">
+                                                @foreach (var goal in _draft.Goals)
+                                                {
+                                                    <FluentCard Style="padding: 0.5rem 0.75rem;">
+                                                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
+                                                            <FluentBadge Appearance="Appearance.Accent">@goal</FluentBadge>
+                                                            <FluentButton Appearance="Appearance.Outline"
+                                                                          OnClick="@(() => RemoveGoalAsync(goal))"
+                                                                          Title="@($"Remove {goal} goal")">
+                                                                Remove
+                                                            </FluentButton>
+                                                        </FluentStack>
+                                                    </FluentCard>
+                                                }
+                                            </FluentStack>
+                                        }
+
+                                        <FluentTextArea Id="onboarding-other-goals"
+                                                        Name="other-goals"
+                                                        Label="Other goals"
+                                                        @bind-Value="_draft.OtherGoals"
+                                                        Immediate="true"
+                                                        @onblur="RefreshInsightsAsync"
+                                                        Rows="4"
+                                                        Maxlength="1200"
+                                                        Placeholder="Anything else you want LeanKernel to help with?"
+                                                        Style="width: 100%;" />
+                                    </FluentStack>
+                                    break;
+                                case 4:
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Complete</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Review what LeanKernel will save, then confirm to write your profile pages.</FluentLabel>
+                                        </FluentStack>
+
+                                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem; align-items: stretch;">
+                                            <FluentCard Style="flex: 1 1 260px; padding: 1rem;">
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                                    <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Identity</FluentLabel>
+                                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
+                                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.1rem;">
+                                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Display name</FluentLabel>
+                                                            <FluentLabel Typo="Typography.Body">@GetValueOrFallback(_draft.DisplayName, "Required")</FluentLabel>
+                                                        </FluentStack>
+                                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.1rem;">
+                                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Role or title</FluentLabel>
+                                                            <FluentLabel Typo="Typography.Body">@GetValueOrFallback(_draft.RoleTitle, "Skipped for now")</FluentLabel>
+                                                        </FluentStack>
+                                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.1rem;">
+                                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Communication style</FluentLabel>
+                                                            <FluentLabel Typo="Typography.Body">@GetValueOrFallback(_draft.CommunicationStyle, "Balanced")</FluentLabel>
+                                                        </FluentStack>
+                                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.1rem;">
+                                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Timezone</FluentLabel>
+                                                            <FluentLabel Typo="Typography.Body">@GetValueOrFallback(_draft.Timezone, "Skipped for now")</FluentLabel>
+                                                        </FluentStack>
+                                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.1rem;">
+                                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Preferred language</FluentLabel>
+                                                            <FluentLabel Typo="Typography.Body">@GetValueOrFallback(_draft.PreferredLanguage, "Skipped for now")</FluentLabel>
+                                                        </FluentStack>
+                                                    </FluentStack>
+                                                </FluentStack>
+                                            </FluentCard>
+
+                                            <FluentCard Style="flex: 1 1 220px; padding: 1rem;">
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                                    <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Domains</FluentLabel>
+                                                    @if (_draft.Domains.Count == 0)
+                                                    {
+                                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No domains added yet.</FluentLabel>
+                                                    }
+                                                    else
+                                                    {
+                                                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem;">
+                                                            @foreach (var domain in _draft.Domains)
+                                                            {
+                                                                <FluentBadge Appearance="Appearance.Neutral">@domain</FluentBadge>
+                                                            }
+                                                        </FluentStack>
+                                                    }
+                                                </FluentStack>
+                                            </FluentCard>
+
+                                            <FluentCard Style="flex: 1 1 260px; padding: 1rem;">
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                                    <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Goals</FluentLabel>
+                                                    @if (_draft.Goals.Count == 0 && string.IsNullOrWhiteSpace(_draft.OtherGoals))
+                                                    {
+                                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No goals selected yet.</FluentLabel>
+                                                    }
+                                                    else
+                                                    {
+                                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.4rem;">
+                                                            @foreach (var goal in _draft.Goals)
+                                                            {
+                                                                <FluentLabel Typo="Typography.Body">• @goal</FluentLabel>
+                                                            }
+                                                        </FluentStack>
+
+                                                        @if (!string.IsNullOrWhiteSpace(_draft.OtherGoals))
+                                                        {
+                                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Other goals: @_draft.OtherGoals</FluentLabel>
+                                                        }
+                                                    }
+                                                </FluentStack>
+                                            </FluentCard>
+                                        </FluentStack>
+                                    </FluentStack>
+                                    break;
+                            }
+                        </FluentStack>
+
+                        <FluentStack Orientation="Orientation.Horizontal"
+                                     VerticalAlignment="VerticalAlignment.Center"
+                                     Wrap="true"
+                                     Style="justify-content: space-between; gap: 0.75rem;">
+                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.75rem;">
+                                @if (CurrentStepIndex > 0)
+                                {
+                                    <FluentButton Appearance="Appearance.Outline"
+                                                  OnClick="GoBackAsync"
+                                                  Title="Go to the previous onboarding step">
+                                        Back
+                                    </FluentButton>
+                                }
+
+                                @if (IsOptionalStep)
+                                {
+                                    <FluentButton Appearance="Appearance.Outline"
+                                                  OnClick="SkipOptionalStepAsync"
+                                                  Title="@($"Skip the {CurrentStep.Label} step for now")">
+                                        Skip for now
+                                    </FluentButton>
+                                }
+                            </FluentStack>
+
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Style="gap: 0.75rem;">
+                                @if (_isSaving)
+                                {
+                                    <FluentProgressRing Style="width: 20px; height: 20px;" />
+                                }
+
+                                @if (CurrentStepIndex < Steps.Count - 1)
+                                {
+                                    <FluentButton Appearance="Appearance.Accent"
+                                                  OnClick="GoNextAsync"
+                                                  Title="Continue to the next onboarding step">
+                                        Next
+                                    </FluentButton>
+                                }
+                                else
+                                {
+                                    <FluentButton Appearance="Appearance.Accent"
+                                                  OnClick="SaveAsync"
+                                                  Disabled="@_isSaving"
+                                                  Title="Save onboarding profile">
+                                        @(_isSaving ? "Saving…" : "Save Profile")
+                                    </FluentButton>
+                                }
+                            </FluentStack>
+                        </FluentStack>
+                    }
+                </FluentStack>
+            </FluentCard>
+
+            <FluentStack Orientation="Orientation.Vertical" Style="flex: 0 1 320px; gap: 1rem;">
+                <FluentCard Style="padding: 1rem;" aria-label="Profile guidance">
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                        <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Identity gaps</FluentLabel>
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">These suggestions reflect the profile fields this wizard uses to improve personalization quality.</FluentLabel>
+
+                        @if (_gaps.Count == 0)
+                        {
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No priority gaps detected for the current profile draft.</FluentLabel>
+                        }
+                        else
+                        {
+                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                @foreach (var gap in _gaps)
+                                {
+                                    <FluentCard Style="padding: 0.75rem;">
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@gap.Title</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@gap.Detail</FluentLabel>
+                                        </FluentStack>
+                                    </FluentCard>
+                                }
+                            </FluentStack>
+                        }
+                    </FluentStack>
+                </FluentCard>
+
+                <FluentCard Style="padding: 1rem;">
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                        <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Recommended next context</FluentLabel>
+                        <FluentLabel Typo="Typography.Body">• @GetDomainRecommendation()</FluentLabel>
+                        <FluentLabel Typo="Typography.Body">• @GetGoalRecommendation()</FluentLabel>
+                        <FluentLabel Typo="Typography.Body">• Re-open setup any time to keep your profile current as your work evolves.</FluentLabel>
+                    </FluentStack>
+                </FluentCard>
+            </FluentStack>
+        </FluentStack>
+    </FluentStack>
 }
 
 @code {

@@ -18,6 +18,7 @@ COPY src/LeanKernel.Channels/LeanKernel.Channels.csproj LeanKernel.Channels/
 COPY src/LeanKernel.Learning/LeanKernel.Learning.csproj LeanKernel.Learning/
 COPY test/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj ../test/LeanKernel.Tests.Unit/
 COPY test/LeanKernel.Tests.Integration/LeanKernel.Tests.Integration.csproj ../test/LeanKernel.Tests.Integration/
+COPY test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj ../test/LeanKernel.Tests.Playwright/
 
 RUN dotnet restore LeanKernel.sln
 

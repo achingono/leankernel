@@ -7,492 +7,378 @@
 
 <PageTitle>LeanKernel Diagnostics</PageTitle>
 
-<section class="diagnostics-page" aria-busy="@_isLoading">
-    <header class="page-header diagnostics-page__header">
-        <div>
-            <h1>Diagnostics explorer</h1>
-            <p>Inspect the latest persisted context audit, budget usage, history shaping, and routing decisions for any session.</p>
-        </div>
-    </header>
+<FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+        <FluentLabel Typo="Typography.PageTitle">Diagnostics explorer</FluentLabel>
+        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Inspect the latest persisted context audit, budget usage, history shaping, and routing decisions for any session.</FluentLabel>
+    </FluentStack>
 
-    <section class="diagnostics-page__surface">
-        <form class="diagnostics-page__loader" @onsubmit="LoadDiagnosticsAsync" aria-label="Load diagnostics by session id">
-            <div class="diagnostics-page__field">
-                <label class="diagnostics-page__label" for="diagnostics-session-id">Session ID</label>
-                <input id="diagnostics-session-id"
-                       class="diagnostics-page__input"
-                       @bind="_sessionId"
-                       @bind:event="oninput"
-                       type="text"
-                       inputmode="text"
-                       autocomplete="off"
-                       spellcheck="false"
-                       placeholder="Enter a session id"
-                       aria-describedby="diagnostics-session-hint"
-                       disabled="@_isLoading" />
-                <p id="diagnostics-session-hint" class="diagnostics-page__hint">The latest persisted turn is loaded unless a turn-specific diagnostics record is the only one available.</p>
-            </div>
-
-            <button type="submit"
-                    class="button button-primary diagnostics-page__button"
-                    disabled="@IsLoadDisabled">
+    <FluentCard>
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Style="gap: 1rem;">
+            <FluentTextField @bind-Value="_sessionId"
+                             Label="Session ID"
+                             Placeholder="Enter a session id"
+                             Disabled="@_isLoading"
+                             Style="flex: 1;" />
+            <FluentButton Appearance="Appearance.Accent"
+                          OnClick="LoadDiagnosticsAsync"
+                          Disabled="@IsLoadDisabled">
                 @(_isLoading ? "Loading…" : "Load")
-            </button>
-        </form>
+            </FluentButton>
+        </FluentStack>
+        <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-top: 0.25rem;">
+            The latest persisted turn is loaded unless a turn-specific diagnostics record is the only one available.
+        </FluentLabel>
+    </FluentCard>
 
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <div class="status-banner status-banner--error" role="alert">
-                @_errorMessage
-            </div>
-        }
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <FluentMessageBar Title="Error" Intent="@MessageIntent.Error">
+            @_errorMessage
+        </FluentMessageBar>
+    }
 
-        @if (_warnings.Count > 0)
-        {
-            <div class="status-banner status-banner--warning" aria-live="polite">
-                <strong>Some diagnostics are missing.</strong>
-                <ul class="diagnostics-page__warnings">
-                    @foreach (var warning in _warnings)
+    @if (_warnings.Count > 0)
+    {
+        <FluentMessageBar Title="Some diagnostics are missing" Intent="@MessageIntent.Warning">
+            <ul style="margin: 0; padding-left: 1.25rem;">
+                @foreach (var warning in _warnings)
+                {
+                    <li>@warning</li>
+                }
+            </ul>
+        </FluentMessageBar>
+    }
+
+    @if (_isLoading)
+    {
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 2rem; gap: 0.75rem;">
+            <FluentProgressRing Style="width: 24px; height: 24px;" />
+            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading diagnostics…</FluentLabel>
+        </FluentStack>
+    }
+    else if (_model is null)
+    {
+        <FluentCard Style="text-align: center; padding: 2rem;">
+            <FluentLabel Typo="Typography.Subject">Load a session to inspect turn diagnostics</FluentLabel>
+            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">
+                Use a persisted session id to view context admission decisions, budget usage, history shaping, and model routing telemetry.
+            </FluentLabel>
+        </FluentCard>
+    }
+    else
+    {
+        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem;">
+            <FluentBadge Appearance="Appearance.Neutral">Session: @_model.SessionId</FluentBadge>
+            <FluentBadge Appearance="Appearance.Neutral">Turn: @(_model.TurnId ?? "Latest available")</FluentBadge>
+            <FluentBadge Appearance="Appearance.Neutral">Captured: @FormatTimestamp(_model.Timestamp)</FluentBadge>
+            <FluentBadge Appearance="Appearance.Neutral">Entries: @_model.RawEntryCount</FluentBadge>
+            <FluentBadge Appearance="Appearance.Neutral">Context candidates: @(_model.Context?.TotalCandidatesConsidered ?? 0)</FluentBadge>
+            <FluentBadge Appearance="Appearance.Neutral">Tokens saved: @(_model.History?.TokensSaved ?? 0)</FluentBadge>
+        </FluentStack>
+
+        <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+            @* Context Audit Card *@
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 1rem;">
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                        <FluentLabel Typo="Typography.Subject">Context audit</FluentLabel>
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Review what the context gate admitted into the prompt versus what it excluded.</FluentLabel>
+                    </FluentStack>
+                    @if (_model.Context is not null)
                     {
-                        <li>@warning</li>
+                        <FluentStack Orientation="Orientation.Horizontal" Style="gap: 0.5rem;">
+                            <FluentBadge Appearance="Appearance.Accent">@_model.Context.TotalAdmitted admitted</FluentBadge>
+                            <FluentBadge Appearance="Appearance.Neutral">@_model.Context.TotalExcluded excluded</FluentBadge>
+                        </FluentStack>
                     }
-                </ul>
-            </div>
-        }
+                </FluentStack>
 
-        @if (_isLoading)
-        {
-            <div class="chat-loading diagnostics-page__loading" role="status" aria-live="polite">
-                <span class="chat-loading__dot"></span>
-                <span class="chat-loading__dot"></span>
-                <span class="chat-loading__dot"></span>
-                <span>Loading diagnostics…</span>
-            </div>
-        }
-        else if (_model is null)
-        {
-            <section class="placeholder-card diagnostics-page__empty">
-                <h2>Load a session to inspect turn diagnostics</h2>
-                <p>Use a persisted session id to view context admission decisions, budget usage, history shaping, and model routing telemetry.</p>
-            </section>
-        }
-        else
-        {
-            <div class="diagnostics-summary" aria-label="Diagnostics summary">
-                <div class="diagnostics-summary__item">
-                    <span class="diagnostics-summary__label">Session</span>
-                    <strong class="diagnostics-summary__value diagnostics-summary__value--mono">@_model.SessionId</strong>
-                </div>
-                <div class="diagnostics-summary__item">
-                    <span class="diagnostics-summary__label">Turn</span>
-                    <strong class="diagnostics-summary__value diagnostics-summary__value--mono">@(_model.TurnId ?? "Latest available")</strong>
-                </div>
-                <div class="diagnostics-summary__item">
-                    <span class="diagnostics-summary__label">Captured</span>
-                    <strong class="diagnostics-summary__value">@FormatTimestamp(_model.Timestamp)</strong>
-                </div>
-                <div class="diagnostics-summary__item">
-                    <span class="diagnostics-summary__label">Diagnostics entries</span>
-                    <strong class="diagnostics-summary__value">@_model.RawEntryCount</strong>
-                </div>
-                <div class="diagnostics-summary__item">
-                    <span class="diagnostics-summary__label">Context candidates</span>
-                    <strong class="diagnostics-summary__value">@(_model.Context?.TotalCandidatesConsidered ?? 0)</strong>
-                </div>
-                <div class="diagnostics-summary__item">
-                    <span class="diagnostics-summary__label">Tokens saved</span>
-                    <strong class="diagnostics-summary__value">@(_model.History?.TokensSaved ?? 0)</strong>
-                </div>
-            </div>
-
-            <div class="diagnostics-grid">
-                <section class="diagnostics-card diagnostics-card--span-2" aria-labelledby="diagnostics-context-heading">
-                    <header class="diagnostics-card__header">
-                        <div>
-                            <h2 id="diagnostics-context-heading">Context audit</h2>
-                            <p>Review what the context gate admitted into the prompt versus what it excluded.</p>
-                        </div>
-
-                        @if (_model.Context is not null)
+                <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem;">
+                    <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.5rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Admitted</FluentLabel>
+                        @if (AdmittedItems.Count == 0)
                         {
-                            <div class="diagnostics-card__meta">
-                                <span class="badge">@_model.Context.TotalAdmitted admitted</span>
-                                <span class="badge">@_model.Context.TotalExcluded excluded</span>
-                            </div>
-                        }
-                    </header>
-
-                    <div class="diagnostics-audit">
-                        <section class="diagnostics-audit__column" aria-labelledby="diagnostics-admitted-heading">
-                            <header class="diagnostics-audit__column-header">
-                                <h3 id="diagnostics-admitted-heading">Admitted</h3>
-                            </header>
-
-                            @if (AdmittedItems.Count == 0)
-                            {
-                                <p class="diagnostics-card__empty">No admitted context items were recorded for this turn.</p>
-                            }
-                            else
-                            {
-                                <ol class="diagnostics-audit__list">
-                                    @foreach (var item in AdmittedItems)
-                                    {
-                                        <li>
-                                            <article class="diagnostics-context-item diagnostics-context-item--@GetCategoryModifier(item.Source)">
-                                                <header class="diagnostics-context-item__header">
-                                                    <strong class="diagnostics-context-item__key">@item.Key</strong>
-                                                    <span class="diagnostics-pill diagnostics-pill--@GetCategoryModifier(item.Source)">@GetCategoryLabel(item.Source)</span>
-                                                </header>
-
-                                                <dl class="diagnostics-context-item__meta">
-                                                    <div>
-                                                        <dt>Score</dt>
-                                                        <dd>@FormatScore(item.Score)</dd>
-                                                    </div>
-                                                    <div>
-                                                        <dt>Tokens</dt>
-                                                        <dd>@item.TokenCount</dd>
-                                                    </div>
-                                                </dl>
-
-                                                <p class="diagnostics-context-item__reason">@GetAuditReason(item)</p>
-                                            </article>
-                                        </li>
-                                    }
-                                </ol>
-                            }
-                        </section>
-
-                        <section class="diagnostics-audit__column" aria-labelledby="diagnostics-excluded-heading">
-                            <header class="diagnostics-audit__column-header">
-                                <h3 id="diagnostics-excluded-heading">Excluded</h3>
-                            </header>
-
-                            @if (ExcludedItems.Count == 0)
-                            {
-                                <p class="diagnostics-card__empty">No exclusions were recorded for this turn.</p>
-                            }
-                            else
-                            {
-                                <ol class="diagnostics-audit__list">
-                                    @foreach (var item in ExcludedItems)
-                                    {
-                                        <li>
-                                            <article class="diagnostics-context-item diagnostics-context-item--@GetCategoryModifier(item.Source)">
-                                                <header class="diagnostics-context-item__header">
-                                                    <strong class="diagnostics-context-item__key">@item.Key</strong>
-                                                    <span class="diagnostics-pill diagnostics-pill--@GetCategoryModifier(item.Source)">@GetCategoryLabel(item.Source)</span>
-                                                </header>
-
-                                                <dl class="diagnostics-context-item__meta">
-                                                    <div>
-                                                        <dt>Score</dt>
-                                                        <dd>@FormatScore(item.Score)</dd>
-                                                    </div>
-                                                    <div>
-                                                        <dt>Tokens</dt>
-                                                        <dd>@item.TokenCount</dd>
-                                                    </div>
-                                                </dl>
-
-                                                <p class="diagnostics-context-item__reason">@GetAuditReason(item)</p>
-                                            </article>
-                                        </li>
-                                    }
-                                </ol>
-                            }
-                        </section>
-                    </div>
-
-                    @if (_model.Context?.RetrievalDiagnostics is { } retrieval)
-                    {
-                        <footer class="diagnostics-card__footer diagnostics-card__footer--chips">
-                            <span class="badge badge--history">Scope: @retrieval.EffectiveScope</span>
-                            <span class="badge">@retrieval.TotalConsidered candidates</span>
-                            <span class="badge">@retrieval.TotalAdmitted admitted</span>
-                            <span class="badge">@retrieval.TotalExcludedByScope scope-filtered</span>
-                            <span class="badge">@retrieval.TotalExcludedByScore score-filtered</span>
-                        </footer>
-                    }
-                </section>
-
-                <section class="diagnostics-card" aria-labelledby="diagnostics-budget-heading">
-                    <header class="diagnostics-card__header">
-                        <div>
-                            <h2 id="diagnostics-budget-heading">Budget usage</h2>
-                            <p>Compare token usage against each context budget and the reserved response headroom.</p>
-                        </div>
-                    </header>
-
-                    @if (BudgetMetrics.Count == 0)
-                    {
-                        <p class="diagnostics-card__empty">No budget telemetry is available for this turn.</p>
-                    }
-                    else
-                    {
-                        <div class="diagnostics-budget__stack" role="img" aria-label="Budget usage across prompt categories">
-                            @foreach (var metric in BudgetMetrics)
-                            {
-                                <span class="diagnostics-budget__segment diagnostics-budget__segment--@GetBudgetModifier(metric)"
-                                      style="@GetSegmentStyle(metric.Used, TotalBudgetTokens)"
-                                      title="@GetBudgetTooltip(metric)"></span>
-                            }
-                        </div>
-
-                        <ul class="diagnostics-budget__list">
-                            @foreach (var metric in BudgetMetrics)
-                            {
-                                <li class="diagnostics-budget__item">
-                                    <div class="diagnostics-budget__row">
-                                        <div>
-                                            <h3>@metric.Label</h3>
-                                            <p>@metric.Description</p>
-                                        </div>
-
-                                        <div class="diagnostics-budget__stats">
-                                            <strong>@metric.Used / @metric.Allocated</strong>
-                                            <span>@metric.UtilizationLabel</span>
-                                        </div>
-                                    </div>
-
-                                    <div class="diagnostics-budget__bar" aria-hidden="true">
-                                        <span class="diagnostics-budget__fill diagnostics-budget__fill--@GetBudgetModifier(metric)"
-                                              style="@GetWidthStyle(metric.WidthPercent)"></span>
-                                    </div>
-
-                                    @if (metric.IsOverBudget)
-                                    {
-                                        <p class="diagnostics-budget__warning">Over budget by @(metric.Used - metric.Allocated) tokens.</p>
-                                    }
-                                </li>
-                            }
-                        </ul>
-                    }
-                </section>
-
-                <section class="diagnostics-card" aria-labelledby="diagnostics-history-heading">
-                    <header class="diagnostics-card__header">
-                        <div>
-                            <h2 id="diagnostics-history-heading">History shaping</h2>
-                            <p>See how earlier turns were kept verbatim, compacted, summarized, or dropped to fit budget.</p>
-                        </div>
-                    </header>
-
-                    @if (_model.History is null)
-                    {
-                        <p class="diagnostics-card__empty">No history shaping telemetry is available for this turn.</p>
-                    }
-                    else
-                    {
-                        <div class="diagnostics-history__summary">
-                            <span class="diagnostics-pill diagnostics-pill--verbatim">@_model.History.VerbatimTurns verbatim</span>
-                            <span class="diagnostics-pill diagnostics-pill--compacted">@_model.History.CompactedTurns compacted</span>
-                            <span class="diagnostics-pill diagnostics-pill--summarized">@_model.History.SummarizedTurns summarized</span>
-                            <span class="diagnostics-pill diagnostics-pill--dropped">@_model.History.DroppedTurns dropped</span>
-                            <span class="badge">Saved @_model.History.TokensSaved tokens</span>
-                        </div>
-
-                        @if (HistoryTimeline.Count == 0)
-                        {
-                            <p class="diagnostics-card__empty">History shaping counts were recorded, but no timeline markers were persisted.</p>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No admitted context items were recorded for this turn.</FluentLabel>
                         }
                         else
                         {
-                            <ol class="diagnostics-history__timeline">
-                                @foreach (var item in HistoryTimeline)
-                                {
-                                    <li class="diagnostics-history__item diagnostics-history__item--@item.Modifier">
-                                        <div class="diagnostics-history__marker" aria-hidden="true"></div>
-                                        <article class="diagnostics-history__content">
-                                            <header class="diagnostics-history__header">
-                                                <span class="diagnostics-history__index">@item.Index.ToString("00")</span>
-                                                <div>
-                                                    <h3>@item.Label</h3>
-                                                    <p>@item.Summary</p>
-                                                </div>
-                                            </header>
-
-                                            <div class="diagnostics-history__ratio" aria-label="Compression ratio @item.CompressionLabel">
-                                                <span class="diagnostics-history__ratio-bar">
-                                                    <span class="diagnostics-history__ratio-fill diagnostics-history__ratio-fill--@item.Modifier"
-                                                          style="@GetWidthStyle(item.CompressionPercent)"></span>
-                                                </span>
-                                                <strong>@item.CompressionLabel</strong>
-                                            </div>
-                                        </article>
-                                    </li>
-                                }
-                            </ol>
+                            @foreach (var item in AdmittedItems)
+                            {
+                                <FluentCard Style="padding: 0.5rem;">
+                                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
+                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Key</FluentLabel>
+                                        <FluentBadge Appearance="Appearance.Accent">@GetCategoryLabel(item.Source)</FluentBadge>
+                                    </FluentStack>
+                                    <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; margin-top: 0.25rem;">
+                                        <FluentLabel Typo="Typography.Body">Score: @FormatScore(item.Score)</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body">Tokens: @item.TokenCount</FluentLabel>
+                                    </FluentStack>
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetAuditReason(item)</FluentLabel>
+                                </FluentCard>
+                            }
                         }
-                    }
-                </section>
+                    </FluentStack>
 
-                <section class="diagnostics-card diagnostics-card--span-2" aria-labelledby="diagnostics-routing-heading">
-                    <header class="diagnostics-card__header">
-                        <div>
-                            <h2 id="diagnostics-routing-heading">Routing decisions</h2>
-                            <p>Inspect the selected model, complexity score, alternatives considered, and quality-gate result.</p>
-                        </div>
-                    </header>
+                    <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.5rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Excluded</FluentLabel>
+                        @if (ExcludedItems.Count == 0)
+                        {
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No exclusions were recorded for this turn.</FluentLabel>
+                        }
+                        else
+                        {
+                            @foreach (var item in ExcludedItems)
+                            {
+                                <FluentCard Style="padding: 0.5rem;">
+                                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
+                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Key</FluentLabel>
+                                        <FluentBadge Appearance="Appearance.Neutral">@GetCategoryLabel(item.Source)</FluentBadge>
+                                    </FluentStack>
+                                    <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; margin-top: 0.25rem;">
+                                        <FluentLabel Typo="Typography.Body">Score: @FormatScore(item.Score)</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body">Tokens: @item.TokenCount</FluentLabel>
+                                    </FluentStack>
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetAuditReason(item)</FluentLabel>
+                                </FluentCard>
+                            }
+                        }
+                    </FluentStack>
+                </FluentStack>
 
-                    @if (_model.RoutingDecision is null && _model.QualityGate is null && _model.ShadowRouting is null)
+                @if (_model.Context?.RetrievalDiagnostics is { } retrieval)
+                {
+                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--neutral-stroke-rest);">
+                        <FluentBadge Appearance="Appearance.Accent">Scope: @retrieval.EffectiveScope</FluentBadge>
+                        <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalConsidered candidates</FluentBadge>
+                        <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalAdmitted admitted</FluentBadge>
+                        <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalExcludedByScope scope-filtered</FluentBadge>
+                        <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalExcludedByScore score-filtered</FluentBadge>
+                    </FluentStack>
+                }
+            </FluentCard>
+
+            @* Budget Usage Card *@
+            <FluentCard>
+                <FluentLabel Typo="Typography.Subject">Budget usage</FluentLabel>
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-bottom: 1rem;">Compare token usage against each context budget and the reserved response headroom.</FluentLabel>
+
+                @if (BudgetMetrics.Count == 0)
+                {
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No budget telemetry is available for this turn.</FluentLabel>
+                }
+                else
+                {
+                    @foreach (var metric in BudgetMetrics)
                     {
-                        <p class="diagnostics-card__empty">No model-routing diagnostics were recorded for this turn.</p>
+                        <FluentStack Orientation="Orientation.Vertical" Style="margin-bottom: 0.75rem;">
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
+                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@metric.Label</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@metric.Description</FluentLabel>
+                                </FluentStack>
+                                <FluentLabel Typo="Typography.Body">@metric.Used / @metric.Allocated (@metric.UtilizationLabel)</FluentLabel>
+                            </FluentStack>
+                            <FluentProgress Min="0" Max="@metric.Allocated" Value="@metric.Used" Style="width: 100%;" />
+                            @if (metric.IsOverBudget)
+                            {
+                                <FluentLabel Typo="Typography.Body" Color="Color.Error">Over budget by @(metric.Used - metric.Allocated) tokens.</FluentLabel>
+                            }
+                        </FluentStack>
+                    }
+                }
+            </FluentCard>
+
+            @* History Shaping Card *@
+            <FluentCard>
+                <FluentLabel Typo="Typography.Subject">History shaping</FluentLabel>
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-bottom: 1rem;">See how earlier turns were kept verbatim, compacted, summarized, or dropped to fit budget.</FluentLabel>
+
+                @if (_model.History is null)
+                {
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No history shaping telemetry is available for this turn.</FluentLabel>
+                }
+                else
+                {
+                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem; margin-bottom: 1rem;">
+                        <FluentBadge Appearance="Appearance.Accent">@_model.History.VerbatimTurns verbatim</FluentBadge>
+                        <FluentBadge Appearance="Appearance.Neutral">@_model.History.CompactedTurns compacted</FluentBadge>
+                        <FluentBadge Appearance="Appearance.Neutral">@_model.History.SummarizedTurns summarized</FluentBadge>
+                        <FluentBadge Appearance="Appearance.Lightweight">@_model.History.DroppedTurns dropped</FluentBadge>
+                        <FluentBadge Appearance="Appearance.Neutral">Saved @_model.History.TokensSaved tokens</FluentBadge>
+                    </FluentStack>
+
+                    @if (HistoryTimeline.Count == 0)
+                    {
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">History shaping counts were recorded, but no timeline markers were persisted.</FluentLabel>
                     }
                     else
                     {
-                        <div class="diagnostics-routing">
-                            @if (_model.RoutingDecision is { } routing)
-                            {
-                                <section class="diagnostics-routing__panel">
-                                    <div class="diagnostics-routing__stats">
-                                        <div class="diagnostics-routing__stat">
-                                            <span>Model</span>
-                                            <strong>@routing.SelectedModel</strong>
-                                        </div>
-                                        <div class="diagnostics-routing__stat">
-                                            <span>Tier</span>
-                                            <strong>@routing.SelectedTier</strong>
-                                        </div>
-                                        <div class="diagnostics-routing__stat">
-                                            <span>Complexity</span>
-                                            <strong>@routing.ComplexityScore.ToString("0.00", CultureInfo.InvariantCulture)</strong>
-                                        </div>
-                                    </div>
-
-                                    <div class="diagnostics-routing__reason">
-                                        <h3>Reason</h3>
-                                        <p>@routing.Reason</p>
-                                    </div>
-
-                                    <div class="diagnostics-routing__columns">
-                                        <section>
-                                            <h3>Decision factors</h3>
-                                            @if (routing.Factors.Count == 0)
-                                            {
-                                                <p class="diagnostics-card__empty">No routing factors were persisted.</p>
-                                            }
-                                            else
-                                            {
-                                                <ul class="diagnostics-routing__list">
-                                                    @foreach (var factor in routing.Factors)
-                                                    {
-                                                        <li>@factor</li>
-                                                    }
-                                                </ul>
-                                            }
-                                        </section>
-
-                                        <section>
-                                            <h3>Alternatives considered</h3>
-                                            @if (RoutingAlternatives.Count == 0)
-                                            {
-                                                <p class="diagnostics-card__empty">No alternative routing paths were recorded.</p>
-                                            }
-                                            else
-                                            {
-                                                <ul class="diagnostics-routing__list">
-                                                    @foreach (var alternative in RoutingAlternatives)
-                                                    {
-                                                        <li>
-                                                            <strong>@alternative.Title</strong>
-                                                            <span>@alternative.Detail</span>
-                                                        </li>
-                                                    }
-                                                </ul>
-                                            }
-                                        </section>
-                                    </div>
-                                </section>
-                            }
-
-                            @if (_model.QualityGate is { } qualityGate)
-                            {
-                                <section class="diagnostics-routing__panel diagnostics-routing__panel--quality">
-                                    <header class="diagnostics-routing__quality-header">
-                                        <h3>Quality gate</h3>
-                                        <span class="diagnostics-pill diagnostics-pill--@GetQualityModifier(qualityGate)">@GetQualityLabel(qualityGate)</span>
-                                    </header>
-
-                                    <div class="diagnostics-routing__quality-summary">
-                                        <div class="diagnostics-routing__stat">
-                                            <span>Score</span>
-                                            <strong>@qualityGate.OverallScore.ToString("0.00", CultureInfo.InvariantCulture)</strong>
-                                        </div>
-                                        <div class="diagnostics-routing__stat">
-                                            <span>Status</span>
-                                            <strong>@(qualityGate.Passed ? "Passed" : "Needs escalation")</strong>
-                                        </div>
-                                    </div>
-
-                                    <p class="diagnostics-routing__quality-reason">@(qualityGate.FailureReason ?? "The response cleared all configured checks.")</p>
-
-                                    @if (qualityGate.Checks.Count > 0)
-                                    {
-                                        <ul class="diagnostics-routing__checks">
-                                            @foreach (var check in qualityGate.Checks)
-                                            {
-                                                <li class="diagnostics-routing__check diagnostics-routing__check--@(check.Passed ? "pass" : "fail")">
-                                                    <div>
-                                                        <strong>@check.CheckName</strong>
-                                                        @if (!string.IsNullOrWhiteSpace(check.Details))
-                                                        {
-                                                            <span>@check.Details</span>
-                                                        }
-                                                    </div>
-                                                    <strong>@check.Score.ToString("0.00", CultureInfo.InvariantCulture)</strong>
-                                                </li>
-                                            }
-                                        </ul>
-                                    }
-                                </section>
-                            }
-
-                            @if (_model.ShadowRouting is { } shadow)
-                            {
-                                <section class="diagnostics-routing__panel diagnostics-routing__panel--shadow">
-                                    <h3>Shadow comparison</h3>
-                                    <dl class="diagnostics-routing__shadow-grid">
-                                        <div>
-                                            <dt>Primary model</dt>
-                                            <dd>@shadow.PrimaryModel</dd>
-                                        </div>
-                                        <div>
-                                            <dt>Shadow model</dt>
-                                            <dd>@shadow.ShadowModel</dd>
-                                        </div>
-                                        <div>
-                                            <dt>Primary tokens</dt>
-                                            <dd>@shadow.PrimaryTokensUsed</dd>
-                                        </div>
-                                        <div>
-                                            <dt>Shadow tokens</dt>
-                                            <dd>@shadow.ShadowTokensUsed</dd>
-                                        </div>
-                                    </dl>
-
-                                    @if (shadow.Comparison is { } comparison)
-                                    {
-                                        <p class="diagnostics-routing__quality-reason">
-                                            Length ratio: @comparison.LengthRatio.ToString("0.00", CultureInfo.InvariantCulture) ·
-                                            Primary refusal: @(comparison.PrimaryRefusal ? "Yes" : "No") ·
-                                            Shadow refusal: @(comparison.ShadowRefusal ? "Yes" : "No")
-                                        </p>
-
-                                        @if (!string.IsNullOrWhiteSpace(comparison.Notes))
-                                        {
-                                            <p class="diagnostics-routing__quality-reason">@comparison.Notes</p>
-                                        }
-                                    }
-                                </section>
-                            }
-                        </div>
+                        @foreach (var item in HistoryTimeline)
+                        {
+                            <FluentCard Style="margin-bottom: 0.5rem; padding: 0.5rem;">
+                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
+                                    <FluentBadge Appearance="Appearance.Accent">@item.Index.ToString("00")</FluentBadge>
+                                    <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0;">
+                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Label</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@item.Summary</FluentLabel>
+                                    </FluentStack>
+                                    <FluentLabel Typo="Typography.Body">@item.CompressionLabel</FluentLabel>
+                                </FluentStack>
+                                <FluentProgress Min="0" Max="100" Value="@((int)item.CompressionPercent)" Style="width: 100%; margin-top: 0.25rem;" />
+                            </FluentCard>
+                        }
                     }
-                </section>
-            </div>
-        }
-    </section>
-</section>
+                }
+            </FluentCard>
+
+            @* Routing Decisions Card *@
+            <FluentCard>
+                <FluentLabel Typo="Typography.Subject">Routing decisions</FluentLabel>
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-bottom: 1rem;">Inspect the selected model, complexity score, alternatives considered, and quality-gate result.</FluentLabel>
+
+                @if (_model.RoutingDecision is null && _model.QualityGate is null && _model.ShadowRouting is null)
+                {
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No model-routing diagnostics were recorded for this turn.</FluentLabel>
+                }
+                else
+                {
+                    @if (_model.RoutingDecision is { } routing)
+                    {
+                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem; margin-bottom: 1rem;">
+                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Model</FluentLabel>
+                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@routing.SelectedModel</FluentLabel>
+                            </FluentStack>
+                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tier</FluentLabel>
+                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@routing.SelectedTier</FluentLabel>
+                            </FluentStack>
+                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Complexity</FluentLabel>
+                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@routing.ComplexityScore.ToString("0.00", CultureInfo.InvariantCulture)</FluentLabel>
+                            </FluentStack>
+                        </FluentStack>
+
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Reason</FluentLabel>
+                        <FluentLabel Typo="Typography.Body">@routing.Reason</FluentLabel>
+
+                        <FluentStack Orientation="Orientation.Horizontal" Style="gap: 2rem; margin-top: 1rem;">
+                            <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.25rem;">
+                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Decision factors</FluentLabel>
+                                @if (routing.Factors.Count == 0)
+                                {
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No routing factors were persisted.</FluentLabel>
+                                }
+                                else
+                                {
+                                    <ul style="margin: 0; padding-left: 1.25rem;">
+                                        @foreach (var factor in routing.Factors)
+                                        {
+                                            <li>@factor</li>
+                                        }
+                                    </ul>
+                                }
+                            </FluentStack>
+
+                            <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.25rem;">
+                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Alternatives considered</FluentLabel>
+                                @if (RoutingAlternatives.Count == 0)
+                                {
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No alternative routing paths were recorded.</FluentLabel>
+                                }
+                                else
+                                {
+                                    @foreach (var alternative in RoutingAlternatives)
+                                    {
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@alternative.Title</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@alternative.Detail</FluentLabel>
+                                        </FluentStack>
+                                    }
+                                }
+                            </FluentStack>
+                        </FluentStack>
+                    }
+
+                    @if (_model.QualityGate is { } qualityGate)
+                    {
+                        <FluentCard Style="margin-top: 1rem; padding: 0.75rem;">
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.5rem;">
+                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Quality gate</FluentLabel>
+                                <FluentBadge Appearance="@(qualityGate.Passed ? Appearance.Accent : Appearance.Lightweight)">@GetQualityLabel(qualityGate)</FluentBadge>
+                            </FluentStack>
+                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; margin-bottom: 0.5rem;">
+                                <FluentLabel Typo="Typography.Body">Score: @qualityGate.OverallScore.ToString("0.00", CultureInfo.InvariantCulture)</FluentLabel>
+                                <FluentLabel Typo="Typography.Body">Status: @(qualityGate.Passed ? "Passed" : "Needs escalation")</FluentLabel>
+                            </FluentStack>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@(qualityGate.FailureReason ?? "The response cleared all configured checks.")</FluentLabel>
+
+                            @if (qualityGate.Checks.Count > 0)
+                            {
+                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; margin-top: 0.5rem;">
+                                    @foreach (var check in qualityGate.Checks)
+                                    {
+                                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
+                                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 0.5rem;">
+                                                <FluentBadge Appearance="@(check.Passed ? Appearance.Accent : Appearance.Lightweight)">@(check.Passed ? "✓" : "✗")</FluentBadge>
+                                                <FluentLabel Typo="Typography.Body">@check.CheckName</FluentLabel>
+                                                @if (!string.IsNullOrWhiteSpace(check.Details))
+                                                {
+                                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@check.Details</FluentLabel>
+                                                }
+                                            </FluentStack>
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@check.Score.ToString("0.00", CultureInfo.InvariantCulture)</FluentLabel>
+                                        </FluentStack>
+                                    }
+                                </FluentStack>
+                            }
+                        </FluentCard>
+                    }
+
+                    @if (_model.ShadowRouting is { } shadow)
+                    {
+                        <FluentCard Style="margin-top: 1rem; padding: 0.75rem;">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold" Style="margin-bottom: 0.5rem;">Shadow comparison</FluentLabel>
+                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem;">
+                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Primary model</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body">@shadow.PrimaryModel</FluentLabel>
+                                </FluentStack>
+                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Shadow model</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body">@shadow.ShadowModel</FluentLabel>
+                                </FluentStack>
+                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Primary tokens</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body">@shadow.PrimaryTokensUsed</FluentLabel>
+                                </FluentStack>
+                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Shadow tokens</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body">@shadow.ShadowTokensUsed</FluentLabel>
+                                </FluentStack>
+                            </FluentStack>
+
+                            @if (shadow.Comparison is { } comparison)
+                            {
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-top: 0.5rem;">
+                                    Length ratio: @comparison.LengthRatio.ToString("0.00", CultureInfo.InvariantCulture) ·
+                                    Primary refusal: @(comparison.PrimaryRefusal ? "Yes" : "No") ·
+                                    Shadow refusal: @(comparison.ShadowRefusal ? "Yes" : "No")
+                                </FluentLabel>
+
+                                @if (!string.IsNullOrWhiteSpace(comparison.Notes))
+                                {
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@comparison.Notes</FluentLabel>
+                                }
+                            }
+                        </FluentCard>
+                    }
+                }
+            </FluentCard>
+        </FluentStack>
+    }
+</FluentStack>
 
 @code {
     private CancellationTokenSource _loadCts = new();

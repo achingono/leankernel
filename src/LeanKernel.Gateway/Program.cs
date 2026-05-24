@@ -1,6 +1,7 @@
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Agents;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.FluentUI.AspNetCore.Components;
 using LeanKernel.Channels;
 using LeanKernel.Context;
 using LeanKernel.Diagnostics;
@@ -30,8 +31,10 @@ try
     var builder = WebApplication.CreateBuilder(args);
 
     builder.Services.AddOpenApi();
+    builder.Services.AddHttpClient();
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
+    builder.Services.AddFluentUIComponents();
     builder.Services.AddScoped<ChatService>();
     builder.Services.AddScoped<OnboardingService>();
     builder.Services.AddScoped<DiagnosticsService>();

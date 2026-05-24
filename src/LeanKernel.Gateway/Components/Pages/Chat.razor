@@ -9,37 +9,39 @@
 
 <PageTitle>LeanKernel Chat</PageTitle>
 
-<section class="chat-page">
-    <aside class="chat-page__sessions" aria-label="Session list">
+<FluentStack Orientation="Orientation.Horizontal" Style="height: 100%; gap: 1rem;">
+    <aside style="width: 280px; min-width: 280px; overflow-y: auto;">
         <SessionList Sessions="ChatService.Sessions"
                      ActiveSessionId="ChatService.CurrentSessionId"
                      OnNewSession="StartNewSessionAsync"
                      OnSelectSession="SelectSessionAsync" />
     </aside>
 
-    <section class="chat-panel" aria-busy="@ChatService.IsLoading">
-        <header class="chat-panel__header page-header">
-            <div>
-                <h1>Chat</h1>
-                <p>@GetHeaderSubtitle()</p>
-            </div>
-            <button type="button" class="button button-secondary" @onclick="StartNewSessionAsync">New session</button>
-        </header>
+    <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; overflow: hidden;">
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
+            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                <FluentLabel Typo="Typography.PageTitle">Chat</FluentLabel>
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetHeaderSubtitle()</FluentLabel>
+            </FluentStack>
+            <FluentButton Appearance="Appearance.Outline" OnClick="StartNewSessionAsync">New session</FluentButton>
+        </FluentStack>
 
         @if (!string.IsNullOrWhiteSpace(ChatService.ErrorMessage))
         {
-            <div class="status-banner status-banner--error" role="alert">
+            <FluentMessageBar Title="Error" Intent="@MessageIntent.Error">
                 @ChatService.ErrorMessage
-            </div>
+            </FluentMessageBar>
         }
 
-        <div id="chat-message-list" class="chat-thread" aria-live="polite">
+        <div id="chat-message-list" style="flex: 1; overflow-y: auto; padding: 0.5rem 0;">
             @if (ChatService.Messages.Count == 0 && !ChatService.IsLoading)
             {
-                <section class="chat-empty-state">
-                    <h2>Start a LeanKernel conversation</h2>
-                    <p>Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.</p>
-                </section>
+                <FluentCard Style="max-width: 600px; margin: 2rem auto; text-align: center;">
+                    <FluentLabel Typo="Typography.Subject">Start a LeanKernel conversation</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">
+                        Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.
+                    </FluentLabel>
+                </FluentCard>
             }
             else
             {
@@ -51,39 +53,33 @@
 
             @if (ChatService.IsLoading)
             {
-                <div class="chat-loading" role="status">
-                    <span class="chat-loading__dot"></span>
-                    <span class="chat-loading__dot"></span>
-                    <span class="chat-loading__dot"></span>
-                    <span>LeanKernel is thinking…</span>
-                </div>
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="padding: 1rem; gap: 0.5rem;">
+                    <FluentProgressRing Style="width: 20px; height: 20px;" />
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">LeanKernel is thinking…</FluentLabel>
+                </FluentStack>
             }
         </div>
 
-        <div class="chat-composer">
-            <label class="chat-composer__label" for="chat-composer-input">Message</label>
-            <textarea id="chat-composer-input"
-                      class="chat-composer__input"
-                      @bind="ChatService.ComposerText"
-                      @bind:event="oninput"
-                      rows="4"
-                      maxlength="12000"
-                      placeholder="Ask LeanKernel anything…"
-                      disabled="@ChatService.IsLoading"></textarea>
-
-            <div class="chat-composer__footer">
-                <p class="chat-composer__hint">Enter to send · Shift+Enter for newline</p>
-                <button id="chat-send-button"
-                        type="button"
-                        class="button button-primary"
-                        @onclick="SendAsync"
-                        disabled="@IsSendDisabled">
+        <FluentStack Orientation="Orientation.Vertical" Style="padding-top: 0.5rem; border-top: 1px solid var(--neutral-stroke-rest);">
+            <FluentTextArea Id="chat-composer-input"
+                           @bind-Value="ChatService.ComposerText"
+                           Rows="4"
+                           Maxlength="12000"
+                           Placeholder="Ask LeanKernel anything…"
+                           Disabled="@ChatService.IsLoading"
+                           Style="width: 100%;" />
+            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Enter to send · Shift+Enter for newline</FluentLabel>
+                <FluentButton Id="chat-send-button"
+                              Appearance="Appearance.Accent"
+                              OnClick="SendAsync"
+                              Disabled="@IsSendDisabled">
                     Send
-                </button>
-            </div>
-        </div>
-    </section>
-</section>
+                </FluentButton>
+            </FluentStack>
+        </FluentStack>
+    </FluentStack>
+</FluentStack>
 
 @code {
     private const string OwnerStorageKey = "leankernel.chat.owner-id";

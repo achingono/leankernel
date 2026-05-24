@@ -1,16 +1,21 @@
 @inherits LayoutComponentBase
 
-<a class="skip-link" href="#main-content">Skip to content</a>
+<FluentLayout>
+    <FluentHeader>
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="width: 100%;">
+            <FluentLabel Typo="Typography.H4" Color="Color.Fill">LeanKernel</FluentLabel>
+        </FluentStack>
+    </FluentHeader>
+    <FluentStack Orientation="Orientation.Horizontal" Style="height: calc(100vh - 50px); overflow: hidden;">
+        <FluentNavMenu Width="250" Title="Navigation">
+            <NavMenu />
+        </FluentNavMenu>
+        <FluentBodyContent Style="overflow-y: auto; padding: 1rem;">
+            @Body
+        </FluentBodyContent>
+    </FluentStack>
+</FluentLayout>
 
-<div class="app-container">
-    <nav class="sidebar" aria-label="Primary navigation">
-        <div class="brand">
-            <h1>LeanKernel</h1>
-            <p>Gateway UI</p>
-        </div>
-        <NavMenu />
-    </nav>
-    <main id="main-content" class="main-content" tabindex="-1">
-        @Body
-    </main>
-</div>
+<FluentDialogProvider />
+<FluentMessageBarProvider />
+<FluentTooltipProvider />

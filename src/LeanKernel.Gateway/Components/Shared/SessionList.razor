@@ -1,35 +1,28 @@
-<section class="session-list">
-    <header class="session-list__header">
-        <div>
-            <h2>Sessions</h2>
-            <p>Resume recent conversations.</p>
-        </div>
-        <button type="button" class="button button-primary" @onclick="CreateNewAsync">New</button>
-    </header>
+<FluentCard>
+    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.75rem;">
+        <FluentLabel Typo="Typography.Subject">Sessions</FluentLabel>
+        <FluentButton Appearance="Appearance.Accent" OnClick="CreateNewAsync">New</FluentButton>
+    </FluentStack>
 
     @if (Sessions.Count == 0)
     {
-        <p class="session-list__empty">No sessions yet. Start a conversation to populate this list.</p>
+        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No sessions yet. Start a conversation to populate this list.</FluentLabel>
     }
     else
     {
-        <ul class="session-list__items">
+        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
             @foreach (var session in Sessions)
             {
                 var isActive = string.Equals(session.SessionId, ActiveSessionId, StringComparison.Ordinal);
-                <li>
-                    <button type="button"
-                            class="session-list__item @(isActive ? "session-list__item--active" : string.Empty)"
-                            @onclick="() => SelectAsync(session.SessionId)">
-                        <span class="session-list__title">@session.Title</span>
-                        <span class="session-list__preview">@session.Preview</span>
-                        <span class="session-list__meta">@FormatTimestamp(session.UpdatedAt)</span>
-                    </button>
-                </li>
+                <FluentCard Style="@($"cursor: pointer; {(isActive ? "border: 2px solid var(--accent-fill-rest);" : "")}")" @onclick="() => SelectAsync(session.SessionId)">
+                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@session.Title</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@session.Preview</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@FormatTimestamp(session.UpdatedAt)</FluentLabel>
+                </FluentCard>
             }
-        </ul>
+        </FluentStack>
     }
-</section>
+</FluentCard>
 
 @code {
     [Parameter]

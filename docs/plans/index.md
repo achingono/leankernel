@@ -44,6 +44,7 @@ This section contains execution-ready product requirements documents (PRDs) for 
 | [phase-4-user-interface.md](phase-4-user-interface.md) | Deliver the full Blazor Server UI layer for the rearchitecture Phase 4 milestone | Complete daily-use product surface for chat, diagnostics, admin, onboarding, and knowledge browsing |
 | [phase-4-blazor-chat-interface-prd.md](phase-4-blazor-chat-interface-prd.md) | Implement the foundational Phase 4 chat shell in `LeanKernel.Gateway` | Interactive Blazor Server chat workspace, layout, and navigation baseline for the rest of the UI |
 | [onboarding-wizard-ui-prd.md](onboarding-wizard-ui-prd.md) | Implement the guided onboarding wizard in `LeanKernel.Gateway` | Interactive identity and preference setup that writes durable GBrain wiki profile pages |
+| [onboarding-fluentui-v4-prd.md](onboarding-fluentui-v4-prd.md) | Rewrite the Gateway onboarding page markup to Microsoft FluentUI v4 components | Fluent-styled onboarding experience without changing existing onboarding logic |
 
 ## Planning Conventions
 
