@@ -115,7 +115,7 @@ public sealed class AdminService
         ];
     }
 
-    private IReadOnlyList<AdminToolGovernanceItem> BuildToolGovernanceItems()
+    private List<AdminToolGovernanceItem> BuildToolGovernanceItems()
     {
         var adminContext = new ToolVisibilityContext();
         var allTools = _toolRegistry.GetVisibleTools(adminContext);
@@ -146,7 +146,7 @@ public sealed class AdminService
         ];
     }
 
-    private IReadOnlyList<AdminScheduledJob> BuildScheduledJobs(DateTimeOffset now)
+    private List<AdminScheduledJob> BuildScheduledJobs(DateTimeOffset now)
     {
         var schedulerConfig = _config.Value.Scheduler;
         if (!schedulerConfig.Enabled || schedulerConfig.Jobs.Count == 0)
