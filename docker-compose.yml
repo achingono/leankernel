@@ -30,7 +30,6 @@ services:
     container_name: leankernel-litellm
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-leankernel}:${POSTGRES_PASSWORD:-leankernel-dev-password}@database:5432/${POSTGRES_DB:-leankernel}
       - PYTHONPATH=/app/config
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
@@ -50,12 +49,11 @@ services:
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./config/litellm:/app/config:ro
+      - ./config/litellm/leankernel_litellm_callbacks.py:/app/leankernel_litellm_callbacks.py:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     entrypoint: ["sh", "-c"]
-    command: >-
-      python3 /app/config/render_litellm_config.py /app/config/config.yaml /app/litellm_config.generated.yaml
-      && exec litellm --config /app/litellm_config.generated.yaml --port 4000
+    command: ["python3 /app/config/render_litellm_config.py /app/config/config.yaml /app/litellm_config.generated.yaml && exec litellm --config /app/litellm_config.generated.yaml --port 4000"]
     ports:
       - "${LITELLM_PORT:-4000}:4000"
     depends_on:
@@ -63,9 +61,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python3", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/health').getcode() == 200 else 1)"]
+      test: ["CMD", "python3", "-c", "import os,sys,urllib.request; req = urllib.request.Request('http://localhost:4000/health', headers={'Authorization': f\"Bearer {os.getenv('LITELLM_MASTER_KEY','')}\"}); sys.exit(0 if urllib.request.urlopen(req).getcode() == 200 else 1)"]
       interval: 15s
-      timeout: 5s
+      timeout: 30s
       retries: 5
 
   # ── GBrain (Wiki/Memory MCP Server) ───────────────────────────

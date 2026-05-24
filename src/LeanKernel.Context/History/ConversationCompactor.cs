@@ -107,7 +107,7 @@ public sealed class ConversationCompactor : IConversationCompactor
         [property: JsonPropertyName("role")] string Role,
         [property: JsonPropertyName("content")] string Content);
 
-    private sealed record ChatCompletionResponse([property: JsonPropertyName("choices")] IReadOnlyList<Choice> Choices)
+    private sealed record ChatCompletionResponse([property: JsonPropertyName("choices")] IReadOnlyList<ChatCompletionResponse.Choice> Choices)
     {
         public sealed record Choice([property: JsonPropertyName("message")] Message Message);
 

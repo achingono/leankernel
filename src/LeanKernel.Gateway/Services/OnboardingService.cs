@@ -184,7 +184,7 @@ public sealed class OnboardingService(
 
     private static string BuildProfilePageContent(string userId, OnboardingDraft draft)
     {
-        var frontmatter = new (string Key, string Value?)[]
+        var frontmatter = new (string Key, string? Value)[]
         {
             ("page_type", "user-profile"),
             ("user_id", userId),
@@ -214,7 +214,7 @@ public sealed class OnboardingService(
 
     private static string BuildGoalsPageContent(string userId, OnboardingDraft draft)
     {
-        var frontmatter = new (string Key, string Value?)[]
+        var frontmatter = new (string Key, string? Value)[]
         {
             ("page_type", "user-goals"),
             ("user_id", userId),
@@ -252,7 +252,7 @@ public sealed class OnboardingService(
         }
     }
 
-    private static string SerializeDocument(IEnumerable<(string Key, string Value?)> frontmatter, string body)
+    private static string SerializeDocument(IEnumerable<(string Key, string? Value)> frontmatter, string body)
     {
         var builder = new StringBuilder();
         builder.AppendLine("---");

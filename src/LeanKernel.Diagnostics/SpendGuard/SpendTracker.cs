@@ -20,7 +20,7 @@ public sealed class SpendTracker(
     private readonly object _sync = new();
     private readonly Dictionary<string, decimal> _sessionTotalsUsd = new(StringComparer.OrdinalIgnoreCase);
     private DateOnly _currentDayUtc = DateOnly.FromDateTime((timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime);
-    private DateOnly _currentMonthUtc = new(_currentDayUtc.Year, _currentDayUtc.Month, 1);
+    private DateOnly _currentMonthUtc;
     private decimal _dailyTotalUsd;
     private decimal _monthlyTotalUsd;
 

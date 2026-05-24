@@ -6,8 +6,10 @@ using LeanKernel.Agents.Resilience;
 using LeanKernel.Diagnostics.Health;
 using LeanKernel.Diagnostics.SpendGuard;
 using LeanKernel.Gateway.Middleware;
+using LeanKernel.Knowledge;
 using LeanKernel.Knowledge.Health;
 using LeanKernel.Knowledge.Resilience;
+using LeanKernel.Persistence;
 using LeanKernel.Persistence.Health;
 using LeanKernel.Persistence.Resilience;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -98,5 +100,5 @@ public static class LeanKernelHardeningServiceCollectionExtensions
     private static string EnsureTrailingSlash(string value)
         => string.IsNullOrWhiteSpace(value)
             ? "http://litellm:4000/"
-            : value.EndsWith('/', StringComparison.Ordinal) ? value : value + "/";
+            : value.EndsWith("/", StringComparison.Ordinal) ? value : value + "/";
 }

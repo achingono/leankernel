@@ -43,7 +43,7 @@ public sealed class EscalationPolicy(
             return null;
         }
 
-        var nextTier = currentDecision.SelectedTier switch
+        ModelTier? nextTier = currentDecision.SelectedTier switch
         {
             ModelTier.Economy => ModelTier.Standard,
             ModelTier.Standard => ModelTier.Premium,

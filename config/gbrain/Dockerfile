@@ -15,5 +15,5 @@ WORKDIR /app/data/wiki
 # Note: actual init happens at first run via entrypoint
 EXPOSE 8789
 
-ENTRYPOINT ["gbrain"]
-CMD ["serve", "--http", "--port", "8789"]
+ENTRYPOINT ["sh", "-lc"]
+CMD ["gbrain init --pglite --no-embedding && exec gbrain serve --http --port 8789"]

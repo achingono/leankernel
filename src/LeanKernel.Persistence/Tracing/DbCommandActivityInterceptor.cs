@@ -107,17 +107,17 @@ public sealed class DbCommandActivityInterceptor : DbCommandInterceptor
     }
 
     /// <inheritdoc />
-    public override object ScalarExecuted(DbCommand command, CommandExecutedEventData eventData, object result)
+    public override object? ScalarExecuted(DbCommand command, CommandExecutedEventData eventData, object? result)
     {
         StopActivity(eventData.CommandId, null);
         return result;
     }
 
     /// <inheritdoc />
-    public override ValueTask<object> ScalarExecutedAsync(
+    public override ValueTask<object?> ScalarExecutedAsync(
         DbCommand command,
         CommandExecutedEventData eventData,
-        object result,
+        object? result,
         CancellationToken cancellationToken = default)
     {
         StopActivity(eventData.CommandId, null);
@@ -166,7 +166,9 @@ public sealed class DbCommandActivityInterceptor : DbCommandInterceptor
         if (exception is not null)
         {
             activity.SetStatus(ActivityStatusCode.Error, exception.Message);
-            activity.RecordException(exception);
+            activity.SetTag("exception.type", exception.GetType().FullName);
+            activity.SetTag("exception.message", exception.Message);
+            activity.SetTag("exception.stacktrace", exception.StackTrace);
         }
 
         activity.Dispose();

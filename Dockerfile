@@ -11,8 +11,11 @@ COPY src/LeanKernel.Context/LeanKernel.Context.csproj LeanKernel.Context/
 COPY src/LeanKernel.Knowledge/LeanKernel.Knowledge.csproj LeanKernel.Knowledge/
 COPY src/LeanKernel.Tools/LeanKernel.Tools.csproj LeanKernel.Tools/
 COPY src/LeanKernel.Persistence/LeanKernel.Persistence.csproj LeanKernel.Persistence/
+COPY src/LeanKernel.Scheduler/LeanKernel.Scheduler.csproj LeanKernel.Scheduler/
 COPY src/LeanKernel.Diagnostics/LeanKernel.Diagnostics.csproj LeanKernel.Diagnostics/
 COPY src/LeanKernel.Gateway/LeanKernel.Gateway.csproj LeanKernel.Gateway/
+COPY src/LeanKernel.Channels/LeanKernel.Channels.csproj LeanKernel.Channels/
+COPY src/LeanKernel.Learning/LeanKernel.Learning.csproj LeanKernel.Learning/
 COPY src/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj LeanKernel.Tests.Unit/
 COPY src/LeanKernel.Tests.Integration/LeanKernel.Tests.Integration.csproj LeanKernel.Tests.Integration/
 
