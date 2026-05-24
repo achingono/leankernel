@@ -126,7 +126,11 @@ public class ChannelRouterTests
 
         public List<(string RecipientId, string Message)> SentMessages { get; } = [];
 
-        public event Func<ChannelMessage, Task>? MessageReceived;
+        public event Func<ChannelMessage, Task>? MessageReceived
+        {
+            add { }
+            remove { }
+        }
 
         public Task StartAsync(CancellationToken ct = default)
         {

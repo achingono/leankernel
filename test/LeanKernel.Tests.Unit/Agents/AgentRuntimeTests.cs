@@ -122,6 +122,10 @@ public class AgentRuntimeTests
         services.AddLogging();
         services.AddSingleton(Options.Create(new LeanKernelConfig
         {
+            LiteLlm = new LiteLlmConfig
+            {
+                ApiKey = "test-key"
+            },
             Orchestration = new OrchestrationConfig
             {
                 Enabled = orchestrationEnabled,
@@ -140,6 +144,10 @@ public class AgentRuntimeTests
         services.AddSingleton(Mock.Of<IToolRegistry>());
         services.AddLeanKernelAgents(new LeanKernelConfig
         {
+            LiteLlm = new LiteLlmConfig
+            {
+                ApiKey = "test-key"
+            },
             Orchestration = new OrchestrationConfig
             {
                 Enabled = orchestrationEnabled,

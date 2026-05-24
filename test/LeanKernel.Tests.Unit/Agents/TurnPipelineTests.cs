@@ -450,7 +450,7 @@ public class TurnPipelineTests
                 It.Is<LeanKernelMessage>(candidate =>
                     candidate.Content == "Status?"
                     && candidate.SessionId == "existing-session"
-                    && candidate.Metadata is not null
+                    && candidate.Metadata != null
                     && candidate.Metadata.ContainsKey("turn_id")),
                 It.IsAny<ContextBudget>(),
                 "existing-session",

@@ -25,9 +25,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LeanKernel.Channels", "Lean
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LeanKernel.Learning", "LeanKernel.Learning\LeanKernel.Learning.csproj", "{D3B04E5D-3BEF-49A2-B85D-DA8A936B3D6F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LeanKernel.Tests.Unit", "LeanKernel.Tests.Unit\LeanKernel.Tests.Unit.csproj", "{597D74FE-3966-4275-8ED4-9582902EE9A3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LeanKernel.Tests.Unit", "..\test\LeanKernel.Tests.Unit\LeanKernel.Tests.Unit.csproj", "{597D74FE-3966-4275-8ED4-9582902EE9A3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LeanKernel.Tests.Integration", "LeanKernel.Tests.Integration\LeanKernel.Tests.Integration.csproj", "{7F34F0CB-3171-4E10-929E-9CC466774AB5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LeanKernel.Tests.Integration", "..\test\LeanKernel.Tests.Integration\LeanKernel.Tests.Integration.csproj", "{7F34F0CB-3171-4E10-929E-9CC466774AB5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

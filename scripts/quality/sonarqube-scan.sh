@@ -62,6 +62,7 @@ docker run --rm \
       /k:"$SONAR_PROJECT_KEY" \
       /d:sonar.host.url="$SONAR_HOST_URL" \
       /d:sonar.token="$SONAR_TOKEN" \
+      /d:sonar.scm.disabled=true \
       /d:sonar.qualitygate.wait=true \
       /d:sonar.python.version=3.12 \
       /d:sonar.cs.opencover.reportsPaths="coverage-results/sonar/**/coverage.opencover.xml" \
@@ -69,10 +70,9 @@ docker run --rm \
       /d:sonar.coverage.exclusions="scripts/**/*.py,config/litellm/*.py,config/indexer/**/*.py,**/LeanKernel.Tests.*/*,**/*.g.cs,**/*.Designer.cs,**/*.razor,**/Program.cs,**/Data/Migrations/*.cs,**/Services/Auth/AuthRegistration.cs,**/Services/Auth/OidcRegistration.cs,**/Services/Auth/BearerTokenAuthHandler.cs,**/Services/EngagementAuthorizationFilter.cs,**/Services/ChannelInitializationService.cs,**/Services/Skills/SkillHostedService.cs,**/Services/AttachmentTextExtractionService.cs,**/Services/EngagementRulesProvider.cs,**/LeanKernel.Commander/Adapters/SignalRestApiAdapter.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillTool.cs,**/LeanKernel.Plugins/BuiltIn/Skills/BinaryResolver.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillToolFactory.cs,**/LeanKernel.Plugins/BuiltIn/Skills/EgressPolicy.cs,**/LeanKernel.Plugins/BuiltIn/Skills/RuntimeSkillRegistry.cs,**/LeanKernel.Generators/ToolRegistryGenerator.cs"
     dotnet restore src/LeanKernel.sln
     dotnet build src/LeanKernel.sln -c Release --no-restore
-    dotnet test src/LeanKernel.sln -c Release --no-build \
+    dotnet test test/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj -c Release --no-build \
       --collect:"XPlat Code Coverage" \
-      --settings src/LeanKernel.Tests.Unit/coverage.sonar.runsettings \
-      --results-directory coverage-results/sonar \
-      --filter "FullyQualifiedName!~Integration"
+      --settings test/LeanKernel.Tests.Unit/coverage.sonar.runsettings \
+      --results-directory coverage-results/sonar
     dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
   '

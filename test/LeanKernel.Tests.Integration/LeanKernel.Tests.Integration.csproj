@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LeanKernel.Gateway\LeanKernel.Gateway.csproj" />
+    <ProjectReference Include="..\..\src\LeanKernel.Gateway\LeanKernel.Gateway.csproj" />
   </ItemGroup>
 
 </Project>

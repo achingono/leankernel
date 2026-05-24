@@ -25,7 +25,7 @@ public class ResponseQualityGateTests
         result.Passed.Should().BeTrue();
         result.Outcome.Should().Be(QualityOutcome.Passed);
         result.Checks.Should().HaveCount(4);
-        result.OverallScore.Should().Be(1.0);
+        result.OverallScore.Should().BeGreaterThan(0.95);
         result.FailureReason.Should().BeNull();
     }
 

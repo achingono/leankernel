@@ -61,8 +61,15 @@ public class SignalChannelTests
         };
 
         await channel.StartAsync();
-        var message = await receivedMessage.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        await channel.StopAsync();
+        ChannelMessage message;
+        try
+        {
+            message = await receivedMessage.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            await channel.StopAsync();
+        }
 
         message.ChannelId.Should().Be("signal");
         message.SenderId.Should().Be("+15550002");

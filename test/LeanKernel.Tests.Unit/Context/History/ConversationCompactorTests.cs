@@ -38,15 +38,17 @@ public class ConversationCompactorTests
 
         result.Should().Be("Key facts");
         handler.Requests.Should().ContainSingle();
-        handler.Requests[0].Headers.Authorization!.Scheme.Should().Be("Bearer");
-        handler.Requests[0].Headers.Authorization.Parameter.Should().Be("test-key");
+        var authorization = handler.Requests[0].Headers.Authorization;
+        authorization.Should().NotBeNull();
+        authorization!.Scheme.Should().Be("Bearer");
+        authorization.Parameter.Should().Be("test-key");
 
         using var document = JsonDocument.Parse(handler.RequestBodies.Single());
         document.RootElement.GetProperty("model").GetString().Should().Be("gpt-4o-mini");
         document.RootElement.GetProperty("temperature").GetDouble().Should().Be(0.1d);
         document.RootElement.GetProperty("max_tokens").GetInt32().Should().Be(200);
-        document.RootElement.GetProperty("messages")[0].GetProperty("content").GetString().Should().Contain("Extract the key facts");
-        document.RootElement.GetProperty("messages")[1].GetProperty("content").GetString().Should().Contain("Need status");
+        document.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!.Should().Contain("Extract the key facts");
+        document.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!.Should().Contain("Need status");
     }
 
     [Fact]

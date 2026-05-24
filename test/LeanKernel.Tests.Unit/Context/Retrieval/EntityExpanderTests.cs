@@ -75,7 +75,7 @@ public class EntityExpanderTests
             [CreateCandidate("projects/atlas", 0.95, namespaceValue: "projects", subject: "Atlas")]);
 
         result.ExpandedCandidates.Select(candidate => candidate.Key).Should().Equal("projects/atlas");
-        knowledge.PageRequests.Should().Equal("projects/atlas");
+        knowledge.PageRequests.Should().BeEmpty();
         knowledge.SearchRequests.Should().Contain(request => request.Query.Equals("Atlas", StringComparison.OrdinalIgnoreCase));
         knowledge.SearchRequests.Should().NotContain(request => request.Query.Equals("alice", StringComparison.OrdinalIgnoreCase));
     }

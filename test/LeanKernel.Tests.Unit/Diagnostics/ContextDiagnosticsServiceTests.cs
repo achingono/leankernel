@@ -120,7 +120,7 @@ public class ContextDiagnosticsServiceTests
         await service.StoreContextDiagnosticsAsync("session-1", "turn-1", CreateSnapshot());
 
         sink.Entries.Should().BeEmpty();
-        await service.GetContextDiagnosticsAsync("session-1").Should().BeNullAsync();
+        (await service.GetContextDiagnosticsAsync("session-1")).Should().BeNull();
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public class ContextDiagnosticsServiceTests
         await service.StoreContextDiagnosticsAsync("session-1", "turn-2", CreateSnapshot(timestamp: DateTimeOffset.Parse("2025-05-20T10:01:00Z")));
         await service.StoreContextDiagnosticsAsync("session-1", "turn-3", CreateSnapshot(timestamp: DateTimeOffset.Parse("2025-05-20T10:02:00Z")));
 
-        await service.GetContextDiagnosticsAsync("session-1", "turn-1").Should().BeNullAsync();
+        (await service.GetContextDiagnosticsAsync("session-1", "turn-1")).Should().BeNull();
         var latest = await service.GetContextDiagnosticsAsync("session-1");
         latest.Should().NotBeNull();
         latest!.TurnId.Should().Be("turn-3");

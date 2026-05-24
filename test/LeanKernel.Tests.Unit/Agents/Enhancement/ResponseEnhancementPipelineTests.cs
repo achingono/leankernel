@@ -70,7 +70,7 @@ public class ResponseEnhancementPipelineTests
         result.WasModified.Should().BeFalse();
         result.Steps.Should().ContainSingle();
         result.Steps[0].Applied.Should().BeFalse();
-        result.Steps[0].Reason.Should().Contain("timed out", StringComparison.OrdinalIgnoreCase);
+        result.Steps[0].Reason.Should().ContainEquivalentOf("timed out");
     }
 
     [Fact]

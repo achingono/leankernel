@@ -74,7 +74,7 @@ public class WorkerAgentTests
         contribution.WorkerName.Should().Be("researcher");
         contribution.Response.Should().Be("Research complete.");
         workerClient.ReceivedMessages[0].Role.Should().Be(ChatRole.System);
-        workerClient.ReceivedMessages[0].Text.Should().Contain("research worker", StringComparison.OrdinalIgnoreCase);
+        workerClient.ReceivedMessages[0].Text.Should().ContainEquivalentOf("research worker");
         workerClient.ReceivedMessages[^1].Text.Should().Be("Find Atlas facts");
         workerClient.ReceivedOptions.Should().NotBeNull();
         workerClient.ReceivedOptions!.Tools.Should().ContainSingle(tool => tool.Name == "wiki_search");
@@ -115,7 +115,7 @@ public class WorkerAgentTests
         var contribution = await worker.ExecuteTaskAsync(CreateCoordinatorContext(), "Investigate Atlas", 2);
 
         contribution.Success.Should().BeFalse();
-        contribution.Error.Should().Contain("timed out", StringComparison.OrdinalIgnoreCase);
+        contribution.Error.Should().ContainEquivalentOf("timed out");
         registry.Verify(item => item.GetVisibleTools(It.IsAny<ToolVisibilityContext>()), Times.Never);
     }
 
@@ -146,7 +146,7 @@ public class WorkerAgentTests
         var contribution = await worker.ExecuteTaskAsync(CreateCoordinatorContext(), "Investigate Atlas", 2);
 
         contribution.Success.Should().BeFalse();
-        contribution.Error.Should().Contain("exceeds max depth", StringComparison.OrdinalIgnoreCase);
+        contribution.Error.Should().ContainEquivalentOf("exceeds max depth");
         registry.Verify(item => item.GetVisibleTools(It.IsAny<ToolVisibilityContext>()), Times.Never);
     }
 

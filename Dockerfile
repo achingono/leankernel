@@ -16,8 +16,8 @@ COPY src/LeanKernel.Diagnostics/LeanKernel.Diagnostics.csproj LeanKernel.Diagnos
 COPY src/LeanKernel.Gateway/LeanKernel.Gateway.csproj LeanKernel.Gateway/
 COPY src/LeanKernel.Channels/LeanKernel.Channels.csproj LeanKernel.Channels/
 COPY src/LeanKernel.Learning/LeanKernel.Learning.csproj LeanKernel.Learning/
-COPY src/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj LeanKernel.Tests.Unit/
-COPY src/LeanKernel.Tests.Integration/LeanKernel.Tests.Integration.csproj LeanKernel.Tests.Integration/
+COPY test/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj ../test/LeanKernel.Tests.Unit/
+COPY test/LeanKernel.Tests.Integration/LeanKernel.Tests.Integration.csproj ../test/LeanKernel.Tests.Integration/
 
 RUN dotnet restore LeanKernel.sln
 

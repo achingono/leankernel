@@ -19,7 +19,7 @@ public class OrchestrationDeciderTests
         var decision = decider.Decide(CreateContext("First inspect the code, then implement the change, and finally summarize the result."));
 
         decision.ShouldOrchestrate.Should().BeTrue();
-        decision.Reason.Should().Contain("multi-step", StringComparison.OrdinalIgnoreCase);
+        decision.Reason.Should().ContainEquivalentOf("multi-step");
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public class OrchestrationDeciderTests
         var decision = decider.Decide(CreateContext("Delegate this task to a worker and coordinate the final answer."));
 
         decision.ShouldOrchestrate.Should().BeTrue();
-        decision.Reason.Should().Contain("delegation", StringComparison.OrdinalIgnoreCase);
+        decision.Reason.Should().ContainEquivalentOf("delegation");
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public class OrchestrationDeciderTests
         var decision = decider.Decide(CreateContext(complexPrompt));
 
         decision.ShouldOrchestrate.Should().BeTrue();
-        decision.Reason.Should().Contain("complexity score", StringComparison.OrdinalIgnoreCase);
+        decision.Reason.Should().ContainEquivalentOf("complexity score");
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class OrchestrationDeciderTests
         var decision = decider.Decide(CreateContext("Summarize the latest status."));
 
         decision.ShouldOrchestrate.Should().BeFalse();
-        decision.Reason.Should().Contain("below orchestration threshold", StringComparison.OrdinalIgnoreCase);
+        decision.Reason.Should().ContainEquivalentOf("below orchestration threshold");
     }
 
     private static AgentStrategyContext CreateContext(string userMessage) => new()

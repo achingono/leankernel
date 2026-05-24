@@ -28,6 +28,7 @@ public class EngagementTrackingStepTests
             AssistantResponse = "Atlas release notes are ready.",
             Context = new ConversationContext
             {
+                SystemPrompt = "You are a helpful assistant.",
                 RetrievedKnowledge =
                 [
                     new RetrievalCandidate

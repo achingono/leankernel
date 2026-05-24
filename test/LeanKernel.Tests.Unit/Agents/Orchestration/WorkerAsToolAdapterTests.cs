@@ -54,7 +54,7 @@ public class WorkerAsToolAdapterTests
         contributions.Should().ContainSingle();
         contributions.TryPeek(out var contribution).Should().BeTrue();
         contribution!.Success.Should().BeFalse();
-        contribution.Error.Should().Contain("exceeds max depth", StringComparison.OrdinalIgnoreCase);
+        contribution.Error.Should().ContainEquivalentOf("exceeds max depth");
     }
 
     private static WorkerAgent CreateWorker(ChatResponse response, int maxDepth)

@@ -8,11 +8,10 @@ THRESHOLD="${COVERAGE_THRESHOLD:-80}"
 rm -rf "$RESULTS_DIR"
 mkdir -p "$RESULTS_DIR"
 
-dotnet test "$ROOT_DIR/src/LeanKernel.sln" \
+dotnet test "$ROOT_DIR/test/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj" \
   -c Release \
   --collect:"XPlat Code Coverage" \
-  --filter "FullyQualifiedName!~Integration" \
-  --settings "$ROOT_DIR/src/LeanKernel.Tests.Unit/coverage.runsettings" \
+  --settings "$ROOT_DIR/test/LeanKernel.Tests.Unit/coverage.runsettings" \
   --results-directory "$RESULTS_DIR"
 
 "$ROOT_DIR/scripts/quality/coverage-gate.py" \
