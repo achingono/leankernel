@@ -1,4 +1,6 @@
-<FluentCard>
+@using Microsoft.AspNetCore.Components.Web
+
+<FluentStack Orientation="Orientation.Vertical" Class="lk-session-list">
     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
         <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Sessions</FluentLabel>
         <FluentButton Appearance="Appearance.Accent" OnClick="CreateNewAsync">New</FluentButton>
@@ -14,15 +16,20 @@
             @foreach (var session in Sessions)
             {
                 var isActive = string.Equals(session.SessionId, ActiveSessionId, StringComparison.Ordinal);
-                <FluentCard Class="@($"lk-card-interactive{(isActive ? " lk-active" : "")}")" @onclick="() => SelectAsync(session.SessionId)">
+                <div class="@($"lk-session-item lk-card-interactive{(isActive ? " lk-active" : string.Empty)}")"
+                     role="button"
+                     tabindex="0"
+                     aria-label="@($"Open session {session.Title}")"
+                     @onclick="() => SelectAsync(session.SessionId)"
+                     @onkeydown="@(args => HandleSessionKeyDownAsync(args, session.SessionId))">
                     <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@session.Title</FluentLabel>
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@session.Preview</FluentLabel>
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@FormatTimestamp(session.UpdatedAt)</FluentLabel>
-                </FluentCard>
+                </div>
             }
         </FluentStack>
     }
-</FluentCard>
+</FluentStack>
 
 @code {
     [Parameter]
@@ -40,6 +47,16 @@
     private Task CreateNewAsync() => OnNewSession.InvokeAsync();
 
     private Task SelectAsync(string sessionId) => OnSelectSession.InvokeAsync(sessionId);
+
+    private Task HandleSessionKeyDownAsync(KeyboardEventArgs args, string sessionId)
+        => IsActivationKey(args)
+            ? SelectAsync(sessionId)
+            : Task.CompletedTask;
+
+    private static bool IsActivationKey(KeyboardEventArgs args)
+        => string.Equals(args.Key, "Enter", StringComparison.Ordinal)
+            || string.Equals(args.Key, " ", StringComparison.Ordinal)
+            || string.Equals(args.Key, "Spacebar", StringComparison.Ordinal);
 
     private static string FormatTimestamp(DateTimeOffset value)
     {

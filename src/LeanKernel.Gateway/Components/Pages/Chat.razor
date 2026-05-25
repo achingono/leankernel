@@ -20,7 +20,7 @@
     <FluentStack Orientation="Orientation.Vertical" Class="chat-main">
         <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-header-row">
             <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-                <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Chat</FluentLabel>
+                <h2 class="chat-heading">Chat</h2>
                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetHeaderSubtitle()</FluentLabel>
             </FluentStack>
             <FluentButton Appearance="Appearance.Outline" OnClick="StartNewSessionAsync">New session</FluentButton>
@@ -37,10 +37,15 @@
             @if (ChatService.Messages.Count == 0 && !ChatService.IsLoading)
             {
                 <FluentCard Class="lk-empty-state">
-                    <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Start a LeanKernel conversation</FluentLabel>
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">
-                        Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.
-                    </FluentLabel>
+                    <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="gap: var(--lk-space-xs);">
+                        <div style="background: linear-gradient(135deg, var(--accent-fill-rest) 0%, #a855f7 100%); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--lk-space-xs) auto; box-shadow: 0 8px 16px var(--lk-glow-indigo);">
+                            <fluent-icon name="chat" value="@(new Icons.Regular.Size32.Chat())" color="white" />
+                        </div>
+                        <FluentLabel Typo="Typography.H3" Weight="FontWeight.Bold" Style="background: linear-gradient(90deg, var(--accent-fill-rest) 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: var(--lk-space-xxs);">Start a LeanKernel conversation</FluentLabel>
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="max-width: 440px; margin: 0 auto; line-height: 1.6;">
+                            Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.
+                        </FluentLabel>
+                    </FluentStack>
                 </FluentCard>
             }
             else

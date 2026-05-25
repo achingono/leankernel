@@ -1,73 +1,282 @@
-/* LeanKernel — Design System & FluentUI overrides */
+/* LeanKernel — Premium Design System & FluentUI Overrides */
 
 /* ── Design Tokens ─────────────────────────────────────────────── */
 :root {
     /* Spacing scale (4px base unit) */
-    --lk-space-xxs: 2px;
-    --lk-space-xs: 4px;
-    --lk-space-s: 8px;
-    --lk-space-m: 12px;
-    --lk-space-l: 16px;
-    --lk-space-xl: 24px;
-    --lk-space-xxl: 32px;
-    --lk-space-xxxl: 48px;
+    --lk-space-xxs: 4px;
+    --lk-space-xs: 8px;
+    --lk-space-s: 12px;
+    --lk-space-m: 16px;
+    --lk-space-l: 20px;
+    --lk-space-xl: 28px;
+    --lk-space-xxl: 40px;
+    --lk-space-xxxl: 56px;
 
     /* Border radius */
-    --lk-radius-s: 4px;
-    --lk-radius-m: 8px;
-    --lk-radius-l: 12px;
+    --lk-radius-s: 6px;
+    --lk-radius-m: 12px;
+    --lk-radius-l: 16px;
+
+    /* Theme colors & gradients */
+    --lk-glow-indigo: rgba(99, 102, 241, 0.15);
+    --lk-glow-purple: rgba(168, 85, 247, 0.15);
+    --lk-glass-bg: rgba(255, 255, 255, 0.45);
+    --lk-glass-border: rgba(255, 255, 255, 0.6);
+    --lk-card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+    --lk-card-hover-shadow: 0 12px 24px -4px rgba(99, 102, 241, 0.12), 0 4px 12px -2px rgba(99, 102, 241, 0.06);
+    --lk-user-bubble-bg: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(168, 85, 247, 0.06) 100%);
+    --lk-user-bubble-border: rgba(99, 102, 241, 0.2);
 }
 
-/* ── Base Reset ────────────────────────────────────────────────── */
+/* Dark mode adjustments using Fluent's body background selectors */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --lk-glass-bg: rgba(30, 30, 45, 0.45);
+        --lk-glass-border: rgba(255, 255, 255, 0.08);
+        --lk-card-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.35), 0 2px 8px -1px rgba(0, 0, 0, 0.2);
+        --lk-card-hover-shadow: 0 16px 32px -4px rgba(168, 85, 247, 0.18), 0 6px 16px -2px rgba(168, 85, 247, 0.1);
+        --lk-user-bubble-bg: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
+        --lk-user-bubble-border: rgba(168, 85, 247, 0.45);
+    }
+}
+
+/* ── Base Reset & Font Upgrades ────────────────────────────────── */
 html, body {
     margin: 0;
     padding: 0;
     height: 100%;
-    font-family: var(--body-font);
+    font-family: 'Outfit', var(--body-font), system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background-color: var(--neutral-layer-1);
+    color: var(--neutral-foreground-rest);
+    scroll-behavior: smooth;
 }
 
-/* ── Page Layout ───────────────────────────────────────────────── */
+/* Global Typography Tweaks */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 700 !important;
+    letter-spacing: -0.025em;
+}
+
+/* ── FluentUI Base Card Overrides (Glassmorphism) ──────────────── */
+fluent-card, .fluent-card, .lk-glass-panel {
+    background: var(--lk-glass-bg) !important;
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+    border: 1px solid var(--lk-glass-border) !important;
+    border-radius: var(--lk-radius-m) !important;
+    box-shadow: var(--lk-card-shadow) !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    padding: var(--lk-space-m);
+}
+
+/* ── Interactive Cards & Hover Transitions ──────────────────────── */
+.lk-card-interactive {
+    cursor: pointer !important;
+}
+
+.lk-card-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--lk-card-hover-shadow) !important;
+    border-color: var(--accent-fill-hover) !important;
+}
+
+.lk-card-interactive.lk-active,
+.lk-card-interactive:active {
+    border: 2px solid var(--accent-fill-rest) !important;
+    box-shadow: 0 0 14px 0 var(--lk-glow-indigo) !important;
+}
+
+.lk-card-interactive:focus-visible {
+    outline: 3px solid var(--accent-fill-rest);
+    outline-offset: 2px;
+}
+
+.lk-session-list {
+    gap: var(--lk-space-xs);
+}
+
+.lk-session-item {
+    padding: var(--lk-space-xs);
+    border: 1px solid var(--lk-glass-border);
+    border-radius: var(--lk-radius-m);
+    background: var(--lk-glass-bg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--lk-space-xxs);
+}
+
+.lk-panel {
+    padding: var(--lk-space-m);
+    border: 1px solid var(--lk-glass-border);
+    border-radius: var(--lk-radius-m);
+    background: var(--lk-glass-bg);
+}
+
+.lk-list-item {
+    padding: var(--lk-space-xs);
+    border: 1px solid var(--lk-glass-border);
+    border-radius: var(--lk-radius-m);
+    background: var(--lk-glass-bg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--lk-space-xxs);
+}
+
+/* ── Page Shell Layout ──────────────────────────────────────────── */
+.lk-shell {
+    min-height: 100vh;
+    padding: var(--lk-space-s);
+    gap: var(--lk-space-s);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.lk-shell-header {
+    padding: var(--lk-space-xs) var(--lk-space-m);
+    border-radius: var(--lk-radius-m);
+    background: linear-gradient(90deg, var(--lk-glass-bg) 0%, rgba(99, 102, 241, 0.05) 100%) !important;
+    border: 1px solid var(--lk-glass-border);
+}
+
+.lk-shell-main {
+    flex: 1;
+    gap: var(--lk-space-s);
+    min-height: 0;
+    display: flex;
+}
+
+.lk-shell-nav {
+    padding: var(--lk-space-xs);
+    overflow: auto;
+    border-radius: var(--lk-radius-m);
+}
+
+.lk-shell-content {
+    padding: var(--lk-space-m);
+    overflow: auto;
+    border-radius: var(--lk-radius-m);
+    background: var(--neutral-layer-2);
+}
+
+/* ── Standard Page Spacing ─────────────────────────────────────── */
 .lk-page {
-    gap: var(--lk-space-xl);
+    gap: var(--lk-space-m);
+    display: flex;
+    flex-direction: column;
 }
 
 .lk-page-header {
     justify-content: space-between;
-    gap: var(--lk-space-l);
+    gap: var(--lk-space-m);
     flex-wrap: wrap;
+    padding-bottom: var(--lk-space-xs);
+    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
 }
 
 .lk-page-header-copy {
-    gap: var(--lk-space-xs);
+    gap: var(--lk-space-xxs);
 }
 
 .lk-page-body {
-    gap: var(--lk-space-l);
+    gap: var(--lk-space-m);
+    display: flex;
+    flex-direction: column;
 }
 
-/* ── Cards ─────────────────────────────────────────────────────── */
+/* ── Internal Card Details ─────────────────────────────────────── */
 .lk-card-content {
-    gap: var(--lk-space-l);
+    gap: var(--lk-space-m);
+    display: flex;
+    flex-direction: column;
 }
 
 .lk-card-header {
     justify-content: space-between;
-    gap: var(--lk-space-l);
+    gap: var(--lk-space-m);
     flex-wrap: wrap;
 }
 
 .lk-card-header-copy {
-    gap: var(--lk-space-xs);
+    gap: var(--lk-space-xxs);
 }
 
 .lk-card-compact {
-    gap: var(--lk-space-s);
+    gap: var(--lk-space-xs);
+    display: flex;
+    flex-direction: column;
 }
 
-/* ── Loading States ────────────────────────────────────────────── */
+/* ── Section Gaps ──────────────────────────────────────────────── */
+.lk-section {
+    gap: var(--lk-space-m);
+    display: flex;
+    flex-direction: column;
+}
+
+.lk-section-tight {
+    gap: var(--lk-space-xs);
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Form Layout ───────────────────────────────────────────────── */
+.lk-form-group {
+    gap: var(--lk-space-m);
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.lk-form-field {
+    gap: var(--lk-space-xxs);
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Data Structures (Telemetry UI) ───────────────────────────── */
+.lk-data-pair {
+    gap: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.lk-data-row {
+    gap: var(--lk-space-m);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.lk-stat-card {
+    flex: 1 1 180px;
+    min-width: 180px;
+    background: linear-gradient(135deg, var(--lk-glass-bg) 0%, rgba(99, 102, 241, 0.03) 100%) !important;
+}
+
+.lk-stat-card-content {
+    gap: var(--lk-space-xxs);
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Empty States & Loaders ────────────────────────────────────── */
+.lk-empty-state {
+    max-width: 600px;
+    margin: var(--lk-space-xxl) auto;
+    text-align: center;
+    padding: var(--lk-space-xxl) var(--lk-space-xl) !important;
+    background: linear-gradient(135deg, var(--lk-glass-bg) 0%, rgba(168, 85, 247, 0.02) 100%) !important;
+    border: 1px dashed rgba(99, 102, 241, 0.25) !important;
+}
+
 .lk-loading {
     padding: var(--lk-space-xl) 0;
-    gap: var(--lk-space-s);
+    gap: var(--lk-space-xs);
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .lk-loading fluent-progress-ring,
@@ -76,126 +285,222 @@ html, body {
     height: 24px;
 }
 
-/* ── Empty States ──────────────────────────────────────────────── */
-.lk-empty-state {
-    max-width: 640px;
-    margin: var(--lk-space-xxl) auto;
-    text-align: center;
-    padding: var(--lk-space-xxl);
-}
-
-/* ── Interactive Cards ─────────────────────────────────────────── */
-.lk-card-interactive {
-    cursor: pointer;
-    transition: border-color 0.15s ease;
-}
-
-.lk-card-interactive:hover {
-    border-color: var(--accent-fill-hover);
-}
-
-.lk-card-interactive.lk-active {
-    border: 2px solid var(--accent-fill-rest);
-}
-
-/* ── Stat Cards ────────────────────────────────────────────────── */
-.lk-stat-card {
-    flex: 1 1 180px;
-    min-width: 180px;
-}
-
-.lk-stat-card-content {
-    gap: var(--lk-space-xs);
-}
-
-/* ── Section Gaps (standard internal content spacing) ──────────── */
-.lk-section {
-    gap: var(--lk-space-l);
-}
-
-.lk-section-tight {
-    gap: var(--lk-space-s);
-}
-
-/* ── Badge Groups ──────────────────────────────────────────────── */
+/* Badge Layouts */
 .lk-badge-group {
-    gap: var(--lk-space-s);
-    flex-wrap: wrap;
-}
-
-/* ── Form Layout ───────────────────────────────────────────────── */
-.lk-form-group {
-    gap: var(--lk-space-l);
-}
-
-.lk-form-field {
     gap: var(--lk-space-xs);
-}
-
-/* ── Data Pairs (label + value stacked) ────────────────────────── */
-.lk-data-pair {
-    gap: 0;
-}
-
-.lk-data-row {
-    gap: var(--lk-space-l);
+    display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
 }
 
-.lk-shell {
-    min-height: 100vh;
-    padding: 0.75rem;
-    gap: 0.75rem;
-    box-sizing: border-box;
-}
-
-.lk-shell-header {
-    padding: 0.75rem 1rem;
-}
-
-.lk-shell-main {
-    flex: 1;
-    gap: 0.75rem;
+/* ── High-Fidelity Chat Specifics ─────────────────────────────── */
+.chat-page {
+    height: 100%;
     min-height: 0;
+    display: flex;
+    flex-direction: row !important;
+    gap: var(--lk-space-m);
 }
 
-.lk-shell-nav {
-    padding: 0.5rem;
+.chat-sessions-panel {
+    width: 280px;
+    flex: 0 0 280px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
     overflow: auto;
 }
 
-.lk-shell-content {
-    padding: 1rem;
-    overflow: auto;
+.chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    gap: var(--lk-space-m);
 }
 
-@media (max-width: 900px) {
-    .lk-shell-main {
-        flex-direction: column;
-    }
-
-    .lk-shell-nav {
-        width: 100% !important;
-        min-width: 0 !important;
-        flex: 1 1 auto !important;
-    }
+.chat-header-row {
+    justify-content: space-between;
+    gap: var(--lk-space-m);
+    flex-wrap: wrap;
 }
 
-#blazor-error-ui {
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
-    display: none;
-    left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
-    position: fixed;
+.chat-heading {
+    margin: 0;
+    font-size: 1.75rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.chat-message-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--lk-space-xs);
+    display: flex;
+    flex-direction: column;
+    gap: var(--lk-space-s);
+    background: var(--neutral-layer-2);
+    border-radius: var(--lk-radius-m);
+    border: 1px solid var(--lk-glass-border);
+}
+
+.chat-composer-shell {
+    gap: var(--lk-space-xs);
+    display: flex;
+    flex-direction: column;
+    padding: var(--lk-space-xs);
+    background: var(--lk-glass-bg);
+    border-radius: var(--lk-radius-m);
+    border: 1px solid var(--lk-glass-border);
+}
+
+.chat-composer-input {
     width: 100%;
-    z-index: 1000;
 }
 
-#blazor-error-ui .dismiss {
+.chat-composer-footer {
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--lk-space-xs);
+    flex-wrap: wrap;
+}
+
+/* User & Assistant Bubble Styles */
+.lk-chat-bubble-user {
+    background: var(--lk-user-bubble-bg) !important;
+    border: 1px solid var(--lk-user-bubble-border) !important;
+    margin-left: 3rem !important;
+    box-shadow: 0 0 15px -2px var(--lk-glow-indigo) !important;
+    align-self: flex-end;
+    height: fit-content;
+}
+
+.lk-chat-bubble-assistant {
+    background: var(--lk-glass-bg) !important;
+    border: 1px solid var(--lk-glass-border) !important;
+    margin-right: 3rem !important;
+    align-self: flex-start;
+    height: fit-content;
+}
+
+/* Markdown block styling */
+code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    background: var(--neutral-layer-3);
+    padding: var(--lk-space-xxs) var(--lk-space-xs);
+    border-radius: var(--lk-radius-s);
+    font-size: 0.9em;
+}
+
+/* ── Interactive Telemetry & Charts ────────────────────────────── */
+.lk-spend-bar-container {
+    appearance: none;
+    border: 0;
+    padding: 0;
     cursor: pointer;
-    position: absolute;
-    right: 0.75rem;
-    top: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.lk-spend-bar-container:hover {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 8px var(--lk-glow-indigo));
+}
+
+.lk-spend-bar-container:focus-visible {
+    outline: 3px solid var(--accent-fill-rest);
+    outline-offset: 3px;
+}
+
+.lk-spend-bar-inner {
+    border-radius: 999px;
+    transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lk-budget-metric {
+    border-left: 3px solid var(--neutral-stroke-divider-rest) !important;
+}
+
+.lk-budget-metric.lk-budget-over {
+    border-left-color: var(--status-danger-foreground-rest) !important;
+    box-shadow: 0 0 14px -6px rgba(220, 38, 38, 0.55) !important;
+}
+
+.lk-budget-progress.lk-budget-progress-over {
+    filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.4));
+}
+
+.lk-inline-panel {
+    margin-top: var(--lk-space-xs);
+    padding: 0.75rem;
+    border: 1px solid var(--lk-glass-border);
+    border-radius: var(--lk-radius-m);
+    background: var(--lk-glass-bg);
+}
+
+.lk-timeline-item {
+    margin-bottom: var(--lk-space-xs);
+    padding: var(--lk-space-xs);
+    border: 1px solid var(--lk-glass-border);
+    border-radius: var(--lk-radius-s);
+    background: var(--lk-glass-bg);
+}
+
+.lk-graph-shell {
+    gap: var(--lk-space-s);
+}
+
+.lk-graph-node-list {
+    gap: var(--lk-space-s);
+}
+
+.lk-graph-link-list {
+    gap: var(--lk-space-xs);
+    justify-content: center;
+}
+
+.lk-graph-node-main {
+    box-shadow: 0 0 12px -2px var(--lk-glow-indigo);
+}
+
+.lk-graph-node-link {
+    border-style: dashed;
+}
+
+.lk-gap-card {
+    border-left: 3px solid var(--accent-fill-rest) !important;
+}
+
+.lk-gap-item {
+    padding: var(--lk-space-xs);
+    border: 1px solid var(--lk-glass-border);
+    border-radius: var(--lk-radius-m);
+    background: var(--lk-glass-bg);
+}
+
+.lk-chip-item {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--lk-glass-border);
+    border-radius: 999px;
+    background: var(--lk-glass-bg);
+    gap: 0.5rem;
+}
+
+/* ── Responsive breakpoints ────────────────────────────────────── */
+@media (max-width: 900px) {
+    .chat-page {
+        flex-direction: column !important;
+    }
+    
+    .chat-sessions-panel {
+        width: 100% !important;
+        flex: 0 0 auto !important;
+        max-height: 200px;
+    }
+
+    .lk-chat-bubble-user,
+    .lk-chat-bubble-assistant {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
 }

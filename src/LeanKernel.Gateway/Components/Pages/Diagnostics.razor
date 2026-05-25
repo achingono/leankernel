@@ -105,7 +105,7 @@
                         {
                             @foreach (var item in AdmittedItems)
                             {
-                                <FluentCard Style="padding: 0.5rem;">
+                                <div class="lk-list-item lk-card-interactive">
                                     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
                                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Key</FluentLabel>
                                         <FluentBadge Appearance="Appearance.Accent">@GetCategoryLabel(item.Source)</FluentBadge>
@@ -115,7 +115,7 @@
                                         <FluentLabel Typo="Typography.Body">Tokens: @item.TokenCount</FluentLabel>
                                     </FluentStack>
                                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetAuditReason(item)</FluentLabel>
-                                </FluentCard>
+                                </div>
                             }
                         }
                     </FluentStack>
@@ -130,7 +130,7 @@
                         {
                             @foreach (var item in ExcludedItems)
                             {
-                                <FluentCard Style="padding: 0.5rem;">
+                                <div class="lk-list-item lk-card-interactive">
                                     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
                                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Key</FluentLabel>
                                         <FluentBadge Appearance="Appearance.Neutral">@GetCategoryLabel(item.Source)</FluentBadge>
@@ -140,7 +140,7 @@
                                         <FluentLabel Typo="Typography.Body">Tokens: @item.TokenCount</FluentLabel>
                                     </FluentStack>
                                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetAuditReason(item)</FluentLabel>
-                                </FluentCard>
+                                </div>
                             }
                         }
                     </FluentStack>
@@ -171,20 +171,32 @@
                 {
                     @foreach (var metric in BudgetMetrics)
                     {
-                        <FluentStack Orientation="Orientation.Vertical" Style="margin-bottom: 0.75rem;">
-                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
-                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@metric.Label</FluentLabel>
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@metric.Description</FluentLabel>
+                        <div class="@($"lk-budget-metric lk-budget-{GetBudgetModifier(metric)}")" role="group" aria-label="@GetBudgetTooltip(metric)">
+                            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
+                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: var(--lk-space-xs);">
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: var(--lk-space-xs);">
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@metric.Label</FluentLabel>
+                                            @if (metric.IsOverBudget)
+                                            {
+                                                <FluentBadge Appearance="Appearance.Lightweight">Over budget</FluentBadge>
+                                            }
+                                        </FluentStack>
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@metric.Description</FluentLabel>
+                                    </FluentStack>
+                                    <FluentLabel Typo="Typography.Body">@metric.Used / @metric.Allocated (@metric.UtilizationLabel)</FluentLabel>
                                 </FluentStack>
-                                <FluentLabel Typo="Typography.Body">@metric.Used / @metric.Allocated (@metric.UtilizationLabel)</FluentLabel>
+                                <FluentProgress Class="@($"lk-budget-progress{(metric.IsOverBudget ? " lk-budget-progress-over" : string.Empty)}")"
+                                                Min="0"
+                                                Max="@metric.Allocated"
+                                                Value="@metric.Used"
+                                                Style="width: 100%;" />
+                                @if (metric.IsOverBudget)
+                                {
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Error">Over budget by @(metric.Used - metric.Allocated) tokens.</FluentLabel>
+                                }
                             </FluentStack>
-                            <FluentProgress Min="0" Max="@metric.Allocated" Value="@metric.Used" Style="width: 100%;" />
-                            @if (metric.IsOverBudget)
-                            {
-                                <FluentLabel Typo="Typography.Body" Color="Color.Error">Over budget by @(metric.Used - metric.Allocated) tokens.</FluentLabel>
-                            }
-                        </FluentStack>
+                        </div>
                     }
                 }
             </FluentCard>
@@ -216,7 +228,7 @@
                     {
                         @foreach (var item in HistoryTimeline)
                         {
-                            <FluentCard Style="margin-bottom: 0.5rem; padding: 0.5rem;">
+                            <div class="lk-timeline-item">
                                 <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
                                     <FluentBadge Appearance="Appearance.Accent">@item.Index.ToString("00")</FluentBadge>
                                     <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0;">
@@ -226,7 +238,7 @@
                                     <FluentLabel Typo="Typography.Body">@item.CompressionLabel</FluentLabel>
                                 </FluentStack>
                                 <FluentProgress Min="0" Max="100" Value="@((int)item.CompressionPercent)" Style="width: 100%; margin-top: 0.25rem;" />
-                            </FluentCard>
+                            </div>
                         }
                     }
                 }
@@ -303,7 +315,7 @@
 
                     @if (_model.QualityGate is { } qualityGate)
                     {
-                        <FluentCard Style="margin-top: 1rem; padding: 0.75rem;">
+                        <div class="lk-inline-panel">
                             <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.5rem;">
                                 <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Quality gate</FluentLabel>
                                 <FluentBadge Appearance="@(qualityGate.Passed ? Appearance.Accent : Appearance.Lightweight)">@GetQualityLabel(qualityGate)</FluentBadge>
@@ -333,12 +345,12 @@
                                     }
                                 </FluentStack>
                             }
-                        </FluentCard>
+                        </div>
                     }
 
                     @if (_model.ShadowRouting is { } shadow)
                     {
-                        <FluentCard Style="margin-top: 1rem; padding: 0.75rem;">
+                        <div class="lk-inline-panel">
                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold" Style="margin-bottom: 0.5rem;">Shadow comparison</FluentLabel>
                             <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem;">
                                 <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
@@ -372,7 +384,7 @@
                                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@comparison.Notes</FluentLabel>
                                 }
                             }
-                        </FluentCard>
+                        </div>
                     }
                 }
             </FluentCard>

@@ -1,6 +1,7 @@
 @page "/knowledge"
 @using System.Globalization
 @using System.Threading
+@using Microsoft.AspNetCore.Components.Web
 @inject KnowledgeUiService KnowledgeUiService
 @implements IAsyncDisposable
 @rendermode InteractiveServer
@@ -70,7 +71,12 @@
                 {
                     @foreach (var result in _searchResults)
                     {
-                        <FluentCard Class="lk-card-interactive" role="button" tabindex="0" @onclick="() => OpenPageAsync(result.Slug)">
+                        <div class="lk-list-item lk-card-interactive"
+                             role="button"
+                             tabindex="0"
+                             aria-label="@($"Open knowledge page {result.Slug}")"
+                             @onclick="() => OpenPageAsync(result.Slug)"
+                             @onkeydown="@(args => HandlePageCardKeyDownAsync(args, result.Slug))">
                             <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
                                 <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
                                     <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@result.Slug</FluentLabel>
@@ -78,7 +84,7 @@
                                 </FluentStack>
                                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@result.Preview</FluentLabel>
                             </FluentStack>
-                        </FluentCard>
+                        </div>
                     }
                 }
             </FluentStack>
@@ -140,13 +146,18 @@
                     <FluentStack Orientation="Orientation.Vertical" Class="lk-section-tight">
                         @foreach (var item in _browseItems)
                         {
-                            <FluentCard Class="@($"lk-card-interactive{(IsSelected(item.Slug) ? " lk-active" : "")}")" role="button" tabindex="0" @onclick="() => OpenPageAsync(item.Slug)">
+                            <div class="@($"lk-list-item lk-card-interactive{(IsSelected(item.Slug) ? " lk-active" : "")}")"
+                                 role="button"
+                                 tabindex="0"
+                                 aria-label="@($"Open knowledge page {item.Slug}")"
+                                 @onclick="() => OpenPageAsync(item.Slug)"
+                                 @onkeydown="@(args => HandlePageCardKeyDownAsync(args, item.Slug))">
                                 <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
                                     <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Slug</FluentLabel>
                                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@FormatTimestamp(item.LastModified)</FluentLabel>
                                     <FluentBadge Appearance="Appearance.Neutral">@item.TagCount tag@(item.TagCount == 1 ? string.Empty : "s")</FluentBadge>
                                 </FluentStack>
-                            </FluentCard>
+                            </div>
                         }
                     </FluentStack>
                 }
@@ -300,14 +311,14 @@
                                 </FluentCard>
 
                                 <FluentCard role="group" aria-label="Knowledge graph">
-                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                    <FluentStack Orientation="Orientation.Vertical" Class="lk-graph-shell">
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
                                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Relationship graph</FluentLabel>
                                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Quick navigation across linked wiki pages.</FluentLabel>
                                         </FluentStack>
 
-                                        <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="gap: 0.75rem;">
-                                            <FluentButton Appearance="Appearance.Accent" @onclick="() => OpenPageAsync(_selectedPage.Slug)">
+                                        <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Class="lk-graph-node-list">
+                                            <FluentButton Appearance="Appearance.Accent" Class="lk-graph-node-main" @onclick="() => OpenPageAsync(_selectedPage.Slug)">
                                                 @_selectedPage.Slug
                                             </FluentButton>
 
@@ -317,10 +328,10 @@
                                             }
                                             else
                                             {
-                                                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalAlignment="HorizontalAlignment.Center" Style="gap: 0.5rem; justify-content: center;">
+                                                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalAlignment="HorizontalAlignment.Center" Class="lk-graph-link-list">
                                                     @foreach (var linkedPage in _selectedPage.LinkedPages)
                                                     {
-                                                        <FluentButton Appearance="Appearance.Outline" @onclick="() => OpenPageAsync(linkedPage)">@linkedPage</FluentButton>
+                                                        <FluentButton Appearance="Appearance.Outline" Class="lk-graph-node-link" @onclick="() => OpenPageAsync(linkedPage)">@linkedPage</FluentButton>
                                                     }
                                                 </FluentStack>
                                             }
@@ -433,6 +444,21 @@
 
     private bool IsSaveDisabled
         => _isSaving || _selectedPage is null || string.IsNullOrWhiteSpace(_editContent);
+
+    private async Task HandlePageCardKeyDownAsync(KeyboardEventArgs args, string slug)
+    {
+        if (!IsActivationKey(args))
+        {
+            return;
+        }
+
+        await OpenPageAsync(slug);
+    }
+
+    private static bool IsActivationKey(KeyboardEventArgs args)
+        => string.Equals(args.Key, "Enter", StringComparison.Ordinal)
+            || string.Equals(args.Key, " ", StringComparison.Ordinal)
+            || string.Equals(args.Key, "Spacebar", StringComparison.Ordinal);
 
     protected override async Task OnInitializedAsync()
         => await LoadBrowseAsync(selectFirstPage: true);

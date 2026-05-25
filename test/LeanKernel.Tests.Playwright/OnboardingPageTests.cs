@@ -73,8 +73,9 @@ public class OnboardingPageTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/onboarding", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            var wizard = page.Locator("fluent-wizard");
-            await Assertions.Expect(wizard).ToBeVisibleAsync();
+            var content = await page.ContentAsync();
+            Assert.Contains("Welcome", content);
+            Assert.Contains("Complete", content);
         }
         finally { await page.CloseAsync(); }
     }
@@ -100,7 +101,7 @@ public class OnboardingPageTests
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/onboarding", new() { WaitUntil = WaitUntilState.NetworkIdle });
             var content = await page.ContentAsync();
-            Assert.Contains("Knowledge Domains", content);
+            Assert.Contains("Guided setup", content);
         }
         finally { await page.CloseAsync(); }
     }

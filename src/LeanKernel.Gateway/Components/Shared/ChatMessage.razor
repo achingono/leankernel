@@ -1,7 +1,8 @@
 @using System.Text.Encodings.Web
 @using System.Text.RegularExpressions
+@inject IJSRuntime JS
 
-<FluentCard Style="@($"margin-bottom: 0.75rem; {(IsUser ? "margin-left: 2rem;" : "margin-right: 2rem;")}")">
+<FluentCard Class="@($"{(IsUser ? "lk-chat-bubble-user" : "lk-chat-bubble-assistant")}")" Style="margin-bottom: 0.75rem;">
     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.5rem;">
         <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
             <FluentBadge Appearance="Appearance.Accent">@(IsUser ? "You" : "LeanKernel")</FluentBadge>
@@ -14,7 +15,19 @@
                 <FluentBadge Appearance="Appearance.Lightweight">Sending</FluentBadge>
             }
         </FluentStack>
-        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetTimestampLabel()</FluentLabel>
+        
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.75rem;">
+            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetTimestampLabel()</FluentLabel>
+            @if (!IsUser)
+            {
+                <FluentButton Appearance="Appearance.Lightweight"
+                              IconEnd="@(new Icons.Regular.Size16.Copy())"
+                              OnClick="CopyMessageToClipboardAsync"
+                              AriaLabel="Copy assistant response"
+                              Title="Copy to clipboard"
+                              Style="height: 24px; padding: 0 var(--lk-space-xxs);" />
+            }
+        </FluentStack>
     </FluentStack>
 
     @if (IsUser)
@@ -23,7 +36,7 @@
     }
     else
     {
-        <div>@((MarkupString)RenderMarkdown(Message.Content))</div>
+        <div style="line-height: 1.6; word-break: break-word;">@((MarkupString)RenderMarkdown(Message.Content))</div>
     }
 </FluentCard>
 
@@ -39,10 +52,15 @@
 
     private string GetTimestampLabel() => Message.Timestamp.LocalDateTime.ToString("g");
 
+    private async Task CopyMessageToClipboardAsync()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", Message.Content);
+    }
+
     private static string RenderMarkdown(string content)
     {
         var encoded = HtmlEncoder.Default.Encode(content ?? string.Empty);
-        encoded = LinkPattern.Replace(encoded, "<a href=\"$2\" target=\"_blank\" rel=\"noreferrer\">$1</a>");
+        encoded = LinkPattern.Replace(encoded, "<a href=\"$2\" target=\"_blank\" rel=\"noreferrer\" style=\"color: var(--accent-fill-rest); text-decoration: underline;\">$1</a>");
         encoded = BoldPattern.Replace(encoded, "<strong>$1</strong>");
         encoded = InlineCodePattern.Replace(encoded, "<code>$1</code>");
         return encoded.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", "<br />", StringComparison.Ordinal);

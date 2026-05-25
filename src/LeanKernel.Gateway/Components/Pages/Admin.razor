@@ -242,16 +242,25 @@
                                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Each bar represents total model spend for the day.</FluentLabel>
                                 </FluentStack>
 
-                                <div role="img" aria-label="@GetSpendChartSummary()" style="display: flex; align-items: end; gap: 1rem; flex-wrap: wrap; min-height: 220px;">
+                                <div role="img" aria-label="@GetSpendChartSummary()" style="display: flex; align-items: end; gap: 1.25rem; flex-wrap: wrap; min-height: 220px; justify-content: space-around;">
                                     @foreach (var point in _dashboard.Spend.DailySpend)
                                     {
+                                        var barId = $"bar-{point.Label.Replace(" ", "-").ToLowerInvariant()}";
                                         <FluentStack Orientation="Orientation.Vertical" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.35rem; align-items: center; min-width: 70px;">
-                                            <FluentLabel Typo="Typography.Body">@FormatCurrency(point.Amount)</FluentLabel>
-                                            <div style="display: flex; align-items: end; width: 32px; height: 160px; background: var(--neutral-layer-3); border-radius: 999px; overflow: hidden;">
-                                                <span style="@($"{GetSpendBarStyle(point)} width: 100%; display: block; border-radius: 999px; background: {(point.IsToday ? "var(--accent-fill-rest)" : "var(--neutral-fill-rest)")};")"></span>
-                                            </div>
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@FormatCurrency(point.Amount)</FluentLabel>
+                                            <button id="@barId"
+                                                    type="button"
+                                                    class="lk-spend-bar-container"
+                                                    aria-label="@($"{point.Label} spend {FormatCurrency(point.Amount)}{(point.IsToday ? ", today" : string.Empty)}")"
+                                                    title="@($"{point.Label}: {FormatCurrency(point.Amount)}")"
+                                                    style="display: flex; align-items: end; width: 32px; height: 160px; background: var(--neutral-layer-3); border-radius: 999px; overflow: hidden;">
+                                                <span class="lk-spend-bar-inner" style="@($"{GetSpendBarStyle(point)} width: 100%; display: block; background: {(point.IsToday ? "var(--accent-fill-rest)" : "var(--neutral-fill-rest)")};")"></span>
+                                            </button>
                                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@point.Label</FluentLabel>
                                         </FluentStack>
+                                        <FluentTooltip Anchor="@barId" Position="TooltipPosition.Top" Delay="150">
+                                            @point.Label spend: @FormatCurrency(point.Amount) @(point.IsToday ? " (Today)" : "")
+                                        </FluentTooltip>
                                     }
                                 </div>
                             </FluentStack>
