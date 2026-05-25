@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.ClientModel;
 using LeanKernel.Abstractions.Configuration;
+using LeanKernel.Abstractions.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OpenAI;
 
@@ -17,9 +19,14 @@ public sealed class AgentFactory
     private readonly LiteLlmConfig _config;
     private readonly ILogger<AgentFactory> _logger;
     private readonly ILoggerFactory? _loggerFactory;
+    private readonly IToolExecutor? _toolExecutor;
     private readonly OpenAIClient? _openAiClient;
 
-    public AgentFactory(IOptions<LeanKernelConfig> config, ILogger<AgentFactory> logger, ILoggerFactory? loggerFactory = null)
+    public AgentFactory(
+        IOptions<LeanKernelConfig> config,
+        ILogger<AgentFactory> logger,
+        ILoggerFactory? loggerFactory = null,
+        IToolExecutor? toolExecutor = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(logger);
@@ -27,12 +34,12 @@ public sealed class AgentFactory
         _config = config.Value.LiteLlm;
         _logger = logger;
         _loggerFactory = loggerFactory;
+        _toolExecutor = toolExecutor;
         _openAiClient = new OpenAIClient(
             new ApiKeyCredential(_config.ApiKey),
             new OpenAIClientOptions { Endpoint = new Uri(_config.BaseUrl) });
         _chatClients = new ConcurrentDictionary<string, IChatClient>(StringComparer.OrdinalIgnoreCase);
-        _chatClients[_config.DefaultModel] = WrapWithFunctionInvocation(
-            _openAiClient.GetChatClient(_config.DefaultModel).AsIChatClient());
+        _chatClients[_config.DefaultModel] = CreateChatClient(_openAiClient.GetChatClient(_config.DefaultModel).AsIChatClient());
 
         _logger.LogInformation(
             "AgentFactory initialized: model={Model}, endpoint={Endpoint}",
@@ -46,21 +53,23 @@ public sealed class AgentFactory
     public AgentFactory(
         IChatClient chatClient,
         ILogger<AgentFactory> logger,
-        IReadOnlyDictionary<string, IChatClient>? chatClients = null)
+        IReadOnlyDictionary<string, IChatClient>? chatClients = null,
+        IToolExecutor? toolExecutor = null)
     {
         ArgumentNullException.ThrowIfNull(chatClient);
         ArgumentNullException.ThrowIfNull(logger);
 
         _logger = logger;
         _config = new LiteLlmConfig();
+        _toolExecutor = toolExecutor;
         _chatClients = new ConcurrentDictionary<string, IChatClient>(StringComparer.OrdinalIgnoreCase);
-        _chatClients[_config.DefaultModel] = WrapWithFunctionInvocation(chatClient);
+        _chatClients[_config.DefaultModel] = CreateChatClient(chatClient);
 
         if (chatClients is not null)
         {
             foreach (var pair in chatClients)
             {
-                _chatClients[pair.Key] = WrapWithFunctionInvocation(pair.Value);
+                _chatClients[pair.Key] = CreateChatClient(pair.Value);
             }
         }
     }
@@ -97,10 +106,22 @@ public sealed class AgentFactory
         return _chatClients.GetOrAdd(modelName, name =>
         {
             _logger.LogDebug("Creating chat client for model {Model}", name);
-            return WrapWithFunctionInvocation(_openAiClient.GetChatClient(name).AsIChatClient());
+            return CreateChatClient(_openAiClient.GetChatClient(name).AsIChatClient());
         });
     }
 
-    private IChatClient WrapWithFunctionInvocation(IChatClient innerClient)
-        => new FunctionInvokingChatClient(innerClient, _loggerFactory);
+    private IChatClient CreateChatClient(IChatClient innerClient)
+    {
+        var functionInvokingClient = new FunctionInvokingChatClient(innerClient, _loggerFactory);
+        if (_toolExecutor is null)
+        {
+            return functionInvokingClient;
+        }
+
+        return new LegacyFunctionCallChatClient(
+            functionInvokingClient,
+            innerClient,
+            _toolExecutor,
+            _loggerFactory?.CreateLogger<LegacyFunctionCallChatClient>() ?? NullLogger<LegacyFunctionCallChatClient>.Instance);
+    }
 }
