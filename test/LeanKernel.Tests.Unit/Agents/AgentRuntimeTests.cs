@@ -70,6 +70,17 @@ public class AgentRuntimeTests
     }
 
     [Fact]
+    public void AgentFactory_test_constructor_throws_for_unknown_named_model()
+    {
+        var defaultClient = new Mock<IChatClient>();
+        var factory = new AgentFactory(defaultClient.Object, NullLogger<AgentFactory>.Instance);
+
+        var act = () => factory.GetChatClientForModel("unknown-model");
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void AddLeanKernelAgents_registers_runtime_services_as_scoped()
     {
         var services = new ServiceCollection();

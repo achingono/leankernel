@@ -117,6 +117,18 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
         }
 
         var trimmed = responseText.Trim();
+        if (IsFencedJson(trimmed))
+        {
+            var firstNewLine = trimmed.IndexOf('\n');
+            var lastFence = trimmed.LastIndexOf("```", StringComparison.Ordinal);
+            if (firstNewLine < 0 || lastFence <= firstNewLine)
+            {
+                return false;
+            }
+
+            trimmed = trimmed[(firstNewLine + 1)..lastFence].Trim();
+        }
+
         if (trimmed.Length < 2 || trimmed[0] != '{' || trimmed[^1] != '}')
         {
             return false;
@@ -175,19 +187,24 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
         }
     }
 
+    private static bool IsFencedJson(string value)
+        => value.StartsWith("```", StringComparison.Ordinal)
+            && value.EndsWith("```", StringComparison.Ordinal)
+            && value.Contains('\n');
+
     private static bool TryGetProperty(JsonElement root, string propertyName, out JsonElement value)
     {
-        var property = root.EnumerateObject()
-            .FirstOrDefault(candidate => string.Equals(candidate.Name, propertyName, StringComparison.OrdinalIgnoreCase));
-
-        if (string.IsNullOrWhiteSpace(property.Name))
+        foreach (var property in root.EnumerateObject())
         {
-            value = default;
-            return false;
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
         }
 
-        value = property.Value;
-        return true;
+        value = default;
+        return false;
     }
 
     private static IDictionary<string, object?> ConvertObject(JsonElement element)

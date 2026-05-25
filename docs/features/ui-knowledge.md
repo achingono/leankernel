@@ -25,7 +25,7 @@ The left browse rail supports:
 - paged navigation
 - recently changed metadata such as last modified time and tag count
 
-When the connected GBrain provider supports `list_pages`, the browse view uses provider-backed pagination. When it does not, `KnowledgeUiService` falls back to an in-memory cache of pages discovered during the current browser session, so the browse list becomes best-effort rather than provider-wide.
+When the connected GBrain provider supports `list_pages`, the browse view uses provider-backed pagination. When it does not (or when listing returns no items), `KnowledgeUiService` runs bounded fallback discovery through `IKnowledgeService.SearchAsync` with seed queries, caches discovered slugs in memory, and then renders that cache as a degraded browse view. The browse list is still best-effort rather than provider-wide, but it is no longer limited only to pages the user already opened in the current browser session.
 
 ### Page detail view
 
@@ -73,7 +73,7 @@ Important runtime dependencies:
 - `GBrainMcpClient` for optional `list_pages` and `get_page` enrichment
 - the configured GBrain connection under the normal LeanKernel knowledge settings
 
-If GBrain listing is unavailable, browsing degrades to pages discovered in the current session cache. If metadata enrichment fails, the page still uses the base knowledge-service result.
+If GBrain listing is unavailable, browsing degrades to pages discovered through fallback search and in-session cache state. If metadata enrichment fails, the page still uses the base knowledge-service result.
 
 ## API Endpoints
 

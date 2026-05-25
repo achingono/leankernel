@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LeanKernel.Abstractions.Models;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Knowledge;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,8 @@ public sealed class KnowledgeUiService(
     ILogger<KnowledgeUiService> logger,
     IServiceProvider serviceProvider)
 {
+    private static readonly string[] DiscoveryQueries = ["wiki", "knowledge", "identity", "learning", "context"];
+
     private readonly IKnowledgeService _knowledgeService = knowledgeService ?? throw new ArgumentNullException(nameof(knowledgeService));
     private readonly ILogger<KnowledgeUiService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
@@ -156,6 +159,7 @@ public sealed class KnowledgeUiService(
 
         if (gBrainClient is null)
         {
+            await DiscoverPagesFromSearchAsync(ct).ConfigureAwait(false);
             return BuildBrowseFromKnownPages(
                 normalizedPageNumber,
                 normalizedPageSize,
@@ -165,6 +169,7 @@ public sealed class KnowledgeUiService(
 
         if (!await SupportsListPagesAsync(gBrainClient, ct).ConfigureAwait(false))
         {
+            await DiscoverPagesFromSearchAsync(ct).ConfigureAwait(false);
             return BuildBrowseFromKnownPages(
                 normalizedPageNumber,
                 normalizedPageSize,
@@ -202,6 +207,16 @@ public sealed class KnowledgeUiService(
             }
 
             var browseResult = ParseBrowseResult(result.Value, normalizedPageNumber, normalizedPageSize, sort);
+            if (browseResult.Items.Count == 0)
+            {
+                await DiscoverPagesFromSearchAsync(ct).ConfigureAwait(false);
+                return BuildBrowseFromKnownPages(
+                    normalizedPageNumber,
+                    normalizedPageSize,
+                    sort,
+                    "The provider returned no pages for this browse request; showing pages discovered in this browser session.");
+            }
+
             foreach (var item in browseResult.Items)
             {
                 RememberPage(item);
@@ -212,11 +227,50 @@ public sealed class KnowledgeUiService(
         catch (Exception ex) when (ex is GBrainException or HttpRequestException or JsonException)
         {
             _logger.LogWarning(ex, "Knowledge page listing failed; falling back to session cache.");
+            await DiscoverPagesFromSearchAsync(ct).ConfigureAwait(false);
             return BuildBrowseFromKnownPages(
                 normalizedPageNumber,
                 normalizedPageSize,
                 sort,
                 "Knowledge page listing is currently unavailable; showing pages discovered in this browser session.");
+        }
+    }
+
+    private async Task DiscoverPagesFromSearchAsync(CancellationToken ct)
+    {
+        if (_knownPages.Count > 0)
+        {
+            return;
+        }
+
+        foreach (var query in DiscoveryQueries)
+        {
+            IReadOnlyList<RetrievalCandidate> candidates;
+            try
+            {
+                candidates = await _knowledgeService.SearchAsync(query, 20, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is GBrainException or HttpRequestException or JsonException)
+            {
+                _logger.LogDebug(ex, "Knowledge fallback discovery search failed for query {Query}", query);
+                continue;
+            }
+
+            foreach (var candidate in candidates)
+            {
+                if (string.IsNullOrWhiteSpace(candidate.Key))
+                {
+                    continue;
+                }
+
+                RememberPage(new KnowledgePageSummary
+                {
+                    Slug = candidate.Key,
+                    LastModified = TryReadDateTimeOffset(candidate.Metadata, "updated_at", "last_modified", "lastModified"),
+                    TagCount = 0,
+                    Tags = []
+                });
+            }
         }
     }
 
@@ -318,7 +372,9 @@ public sealed class KnowledgeUiService(
             }
         }
 
-        var totalCount = TryGetInt(result, "total_count", "total", "count") ?? 0;
+        var totalCount = TryGetInt(result, "total_count", "total", "count")
+            ?? TryGetNestedInt(result, "pagination", "total_count", "total", "count")
+            ?? 0;
 
         return new KnowledgeBrowseResult
         {
@@ -339,7 +395,8 @@ public sealed class KnowledgeUiService(
             return null;
         }
 
-        var slug = TryGetString(item, "slug", "key", "name");
+        var slug = TryGetString(item, "slug", "key", "name", "path")
+            ?? TryGetNumericString(item, "id");
         if (string.IsNullOrWhiteSpace(slug))
         {
             return null;
@@ -539,6 +596,34 @@ public sealed class KnowledgeUiService(
             if (propertyValue.ValueKind == JsonValueKind.String && int.TryParse(propertyValue.GetString(), out var parsedInt))
             {
                 return parsedInt;
+            }
+        }
+
+        return null;
+    }
+
+    private static int? TryGetNestedInt(JsonElement item, string nestedPropertyName, params string[] propertyNames)
+    {
+        if (!TryGetProperty(item, nestedPropertyName, out var nestedItem))
+        {
+            return null;
+        }
+
+        return TryGetInt(nestedItem, propertyNames);
+    }
+
+    private static string? TryGetNumericString(JsonElement item, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (!TryGetProperty(item, propertyName, out var propertyValue))
+            {
+                continue;
+            }
+
+            if (propertyValue.ValueKind == JsonValueKind.Number)
+            {
+                return propertyValue.GetRawText();
             }
         }
 

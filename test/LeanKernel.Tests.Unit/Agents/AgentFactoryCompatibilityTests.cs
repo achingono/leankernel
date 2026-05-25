@@ -113,12 +113,213 @@ public class AgentFactoryCompatibilityTests
         toolExecutor.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task ChatClient_executes_fenced_legacy_function_payloads()
+    {
+        var toolExecutor = new Mock<IToolExecutor>(MockBehavior.Strict);
+        toolExecutor
+            .Setup(executor => executor.ExecuteAsync(
+                "wiki_write",
+                It.Is<IDictionary<string, object?>>(arguments => MatchesWikiWriteArguments(arguments)),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ToolResult
+            {
+                ToolName = "wiki_write",
+                Success = true,
+                Output = "Page 'greeting' updated successfully."
+            });
+
+        const string legacyJson = "```json\n{\"type\":\"function\",\"name\":\"wiki_write\",\"parameters\":{\"key\":\"greeting\",\"content\":\"Hello!\"}}\n```";
+
+        var chatClient = new SequencedChatClient([
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, legacyJson)),
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "Page 'greeting' updated successfully."))
+        ]);
+
+        var factory = new AgentFactory(
+            chatClient,
+            NullLogger<AgentFactory>.Instance,
+            toolExecutor: toolExecutor.Object);
+
+        var response = await factory.ChatClient.GetResponseAsync([
+            new ChatMessage(ChatRole.User, "Hello!")
+        ]);
+
+        response.Text.Should().Be("Page 'greeting' updated successfully.");
+        chatClient.CallCount.Should().Be(2);
+        toolExecutor.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ChatClient_returns_tool_output_when_replay_keeps_returning_legacy_payload()
+    {
+        var toolExecutor = new Mock<IToolExecutor>(MockBehavior.Strict);
+        toolExecutor
+            .Setup(executor => executor.ExecuteAsync(
+                "wiki_write",
+                It.Is<IDictionary<string, object?>>(arguments => MatchesWikiWriteArguments(arguments)),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ToolResult
+            {
+                ToolName = "wiki_write",
+                Success = true,
+                Output = "Page 'greeting' updated successfully."
+            });
+
+        const string legacyJson = "{\"type\":\"function\",\"name\":\"wiki_write\",\"parameters\":{\"key\":\"greeting\",\"content\":\"Hello!\"}}";
+        var chatClient = new SequencedChatClient([
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, legacyJson)),
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, legacyJson)),
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, legacyJson))
+        ]);
+
+        var factory = new AgentFactory(
+            chatClient,
+            NullLogger<AgentFactory>.Instance,
+            toolExecutor: toolExecutor.Object);
+
+        var response = await factory.ChatClient.GetResponseAsync([
+            new ChatMessage(ChatRole.User, "Hello!")
+        ]);
+
+        response.Text.Should().Be("Page 'greeting' updated successfully.");
+        chatClient.CallCount.Should().Be(3);
+        toolExecutor.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ChatClient_converts_nested_legacy_parameters_before_tool_execution()
+    {
+        var toolExecutor = new Mock<IToolExecutor>(MockBehavior.Strict);
+        toolExecutor
+            .Setup(executor => executor.ExecuteAsync(
+                "wiki_write",
+                It.Is<IDictionary<string, object?>>(arguments => MatchesComplexArguments(arguments)),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ToolResult
+            {
+                ToolName = "wiki_write",
+                Success = true,
+                Output = "ok"
+            });
+
+        const string legacyJson = "{\"type\":\"function\",\"name\":\"wiki_write\",\"parameters\":{\"key\":\"greeting\",\"content\":\"Hello!\",\"count\":2,\"decimal\":2.5,\"enabled\":true,\"is_archived\":false,\"optional\":null,\"float\":1e40,\"tags\":[\"a\",\"b\"],\"nested\":{\"note\":\"x\"}}}";
+        var chatClient = new SequencedChatClient([
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, legacyJson)),
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok"))
+        ]);
+
+        var factory = new AgentFactory(
+            chatClient,
+            NullLogger<AgentFactory>.Instance,
+            toolExecutor: toolExecutor.Object);
+
+        var response = await factory.ChatClient.GetResponseAsync([
+            new ChatMessage(ChatRole.User, "Hello!")
+        ]);
+
+        response.Text.Should().Be("ok");
+        toolExecutor.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ChatClient_leaves_empty_responses_untouched()
+    {
+        var toolExecutor = new Mock<IToolExecutor>(MockBehavior.Strict);
+        var chatClient = new SequencedChatClient([
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "   "))
+        ]);
+
+        var factory = new AgentFactory(
+            chatClient,
+            NullLogger<AgentFactory>.Instance,
+            toolExecutor: toolExecutor.Object);
+
+        var response = await factory.ChatClient.GetResponseAsync([
+            new ChatMessage(ChatRole.User, "Hello!")
+        ]);
+
+        response.Text.Should().Be("   ");
+        toolExecutor.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("{\"type\":\"function\",\"name\":\"wiki_write\"}")]
+    [InlineData("{\"type\":\"tool\",\"name\":\"wiki_write\",\"parameters\":{}}")]
+    [InlineData("{\"type\":\"function\",\"name\":123,\"parameters\":{}}")]
+    [InlineData("{\"type\":\"function\",\"name\":\"wiki_write\",\"parameters\":[]}")]
+    [InlineData("```json\n{invalid-json}\n```")]
+    public async Task ChatClient_rejects_invalid_legacy_payload_shapes(string payload)
+    {
+        var toolExecutor = new Mock<IToolExecutor>(MockBehavior.Strict);
+        var chatClient = new SequencedChatClient([
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, payload))
+        ]);
+
+        var factory = new AgentFactory(
+            chatClient,
+            NullLogger<AgentFactory>.Instance,
+            toolExecutor: toolExecutor.Object);
+
+        var response = await factory.ChatClient.GetResponseAsync([
+            new ChatMessage(ChatRole.User, "Hello!")
+        ]);
+
+        response.Text.Should().Be(payload);
+        toolExecutor.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void ChatClient_forwards_service_queries_and_disposal()
+    {
+        var toolExecutor = new Mock<IToolExecutor>(MockBehavior.Strict);
+        var chatClient = new SequencedChatClient([
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok"))
+        ])
+        {
+            ServiceInstance = "service-instance"
+        };
+
+        var factory = new AgentFactory(
+            chatClient,
+            NullLogger<AgentFactory>.Instance,
+            toolExecutor: toolExecutor.Object);
+
+        factory.ChatClient.GetService(typeof(string)).Should().Be("service-instance");
+        factory.ChatClient.Dispose();
+        chatClient.WasDisposed.Should().BeTrue();
+    }
+
     private static bool MatchesWikiWriteArguments(IDictionary<string, object?> arguments)
     {
         var key = arguments.TryGetValue("key", out var keyValue) ? keyValue?.ToString() : null;
         var content = arguments.TryGetValue("content", out var contentValue) ? contentValue?.ToString() : null;
         return string.Equals(key, "greeting", StringComparison.Ordinal)
             && string.Equals(content, "Hello!", StringComparison.Ordinal);
+    }
+
+    private static bool MatchesComplexArguments(IDictionary<string, object?> arguments)
+    {
+        var key = arguments.TryGetValue("key", out var keyValue) ? keyValue?.ToString() : null;
+        var content = arguments.TryGetValue("content", out var contentValue) ? contentValue?.ToString() : null;
+        var count = arguments.TryGetValue("count", out var countValue) ? countValue : null;
+        var decimalValue = arguments.TryGetValue("decimal", out var decimalObject) ? decimalObject : null;
+        var enabled = arguments.TryGetValue("enabled", out var enabledValue) ? enabledValue : null;
+        var isArchived = arguments.TryGetValue("is_archived", out var archivedValue) ? archivedValue : null;
+        var optional = arguments.TryGetValue("optional", out var optionalValue) ? optionalValue : new object();
+        var floatValue = arguments.TryGetValue("float", out var floatObject) ? floatObject : null;
+        var tags = arguments.TryGetValue("tags", out var tagsValue) ? tagsValue : null;
+
+        return string.Equals(key, "greeting", StringComparison.Ordinal)
+            && string.Equals(content, "Hello!", StringComparison.Ordinal)
+            && count is long
+            && decimalValue is decimal
+            && enabled is bool boolValue && boolValue
+            && isArchived is bool archived && !archived
+            && optional is null
+            && floatValue is double
+            && tags is object[];
     }
 
     private sealed class SequencedChatClient(IReadOnlyList<ChatResponse> responses) : IChatClient
@@ -128,6 +329,10 @@ public class AgentFactoryCompatibilityTests
         public List<IReadOnlyList<ChatMessage>> ReceivedMessages { get; } = [];
 
         public int CallCount => ReceivedMessages.Count;
+
+        public object? ServiceInstance { get; init; }
+
+        public bool WasDisposed { get; private set; }
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
@@ -153,10 +358,11 @@ public class AgentFactoryCompatibilityTests
             yield break;
         }
 
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public object? GetService(Type serviceType, object? serviceKey = null) => ServiceInstance;
 
         public void Dispose()
         {
+            WasDisposed = true;
         }
     }
 }
