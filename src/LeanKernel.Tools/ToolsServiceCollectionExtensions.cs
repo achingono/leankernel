@@ -24,7 +24,8 @@ public static class ToolsServiceCollectionExtensions
                 WikiSearchTool.Create(scopeFactory),
                 WikiReadTool.Create(scopeFactory),
                 WikiWriteTool.Create(scopeFactory),
-                WebSearchTool.Create(scopeFactory)
+                WebSearchTool.Create(scopeFactory),
+                WebFetchTool.Create(scopeFactory)
             ];
 
             return new ToolRegistry(policy, builtInTools, logger);
