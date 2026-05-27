@@ -39,6 +39,7 @@ try
     builder.Services.AddScoped<OnboardingService>();
     builder.Services.AddScoped<DiagnosticsService>();
     builder.Services.AddScoped<KnowledgeUiService>();
+    builder.Services.AddScoped<DocumentUiService>();
     builder.Services.AddScoped<AdminService>();
 
     builder.Host.UseSerilog((context, services, configuration) => configuration

@@ -3,6 +3,8 @@
 @using System.Threading
 @using Microsoft.AspNetCore.Components.Web
 @inject KnowledgeUiService KnowledgeUiService
+@inject DocumentUiService DocumentUiService
+@inject ILogger<Knowledge> _logger
 @implements IAsyncDisposable
 @rendermode InteractiveServer
 
@@ -14,396 +16,681 @@
             <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Knowledge</FluentLabel>
             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Browse GBrain wiki pages, inspect linked knowledge, and curate durable context.</FluentLabel>
         </FluentStack>
-        <FluentButton Appearance="Appearance.Accent" @onclick="OpenCreateModal">Create new page</FluentButton>
+        @if (_currentTab == TabMode.Wiki)
+        {
+            <FluentButton Appearance="Appearance.Accent" @onclick="OpenCreateModal">Create new page</FluentButton>
+        }
+        else
+        {
+            <FluentButton Appearance="Appearance.Accent" @onclick="OpenUploadModal">Upload document</FluentButton>
+        }
     </FluentStack>
 
-    <FluentCard aria-labelledby="knowledge-search-title">
-        <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
-            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
-                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
-                    <FluentLabel Id="knowledge-search-title" Typo="Typography.Subject" Weight="FontWeight.Bold">Search knowledge</FluentLabel>
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Find pages by slug, facts, and compiled truth.</FluentLabel>
-                </FluentStack>
-                @if (_isSearching)
-                {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-badge-group" role="status">
-                        <FluentProgressRing Style="width: 20px; height: 20px;" />
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Searching…</FluentLabel>
-                    </FluentStack>
-                }
-            </FluentStack>
+    <FluentStack Orientation="Orientation.Horizontal" Class="lk-tab-toggle-group" Style="background: rgba(255, 255, 255, 0.05); padding: 4px; border-radius: 8px; width: fit-content; gap: 4px; margin-bottom: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.1);">
+        <FluentButton Appearance="@(_currentTab == TabMode.Wiki ? Appearance.Accent : Appearance.Neutral)" 
+                      Style="border-radius: 6px; font-weight: bold; border: none; height: 32px;"
+                      @onclick="() => SetTab(TabMode.Wiki)">
+            Wiki Pages
+        </FluentButton>
+        <FluentButton Appearance="@(_currentTab == TabMode.Documents ? Appearance.Accent : Appearance.Neutral)" 
+                      Style="border-radius: 6px; font-weight: bold; border: none; height: 32px;"
+                      @onclick="() => SetTab(TabMode.Documents)">
+            Document Library
+        </FluentButton>
+    </FluentStack>
 
-            <FluentStack Orientation="Orientation.Vertical" Class="lk-form-field">
-                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Search query</FluentLabel>
-                <FluentSearch Id="knowledge-search-input"
-                              @bind-Value="_searchText"
-                              @bind-Value:after="@(async () => await HandleSearchInputAsync(new ChangeEventArgs { Value = _searchText }))"
-                              Placeholder="Search wiki pages..."
-                              AutoComplete="off"
-                              Immediate="true"
-                              AriaLabel="Search query"
-                              Style="width: 100%;" />
-            </FluentStack>
-
-            @if (!string.IsNullOrWhiteSpace(_searchError))
-            {
-                <FluentMessageBar Title="Search failed" Intent="@MessageIntent.Error">
-                    @_searchError
-                </FluentMessageBar>
-            }
-
-            <FluentStack Orientation="Orientation.Vertical" Class="lk-section" aria-live="polite">
-                @if (string.IsNullOrWhiteSpace(_searchText) && _searchResults.Count == 0 && !_isSearching)
-                {
-                    <FluentCard Class="lk-empty-state">
-                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Start with a question</FluentLabel>
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Search by topic, slug, or relationship to jump directly into the knowledge base.</FluentLabel>
-                    </FluentCard>
-                }
-                else if (_searchResults.Count == 0 && !_isSearching)
-                {
-                    <FluentCard Class="lk-empty-state">
-                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No matches found</FluentLabel>
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Try another keyword or create a new page for this topic.</FluentLabel>
-                    </FluentCard>
-                }
-                else
-                {
-                    @foreach (var result in _searchResults)
-                    {
-                        <div class="lk-list-item lk-card-interactive"
-                             role="button"
-                             tabindex="0"
-                             aria-label="@($"Open knowledge page {result.Slug}")"
-                             @onclick="() => OpenPageAsync(result.Slug)"
-                             @onkeydown="@(args => HandlePageCardKeyDownAsync(args, result.Slug))">
-                            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
-                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
-                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@result.Slug</FluentLabel>
-                                    <FluentBadge Appearance="Appearance.Neutral">Score @result.Score.ToString("0.000", CultureInfo.InvariantCulture)</FluentBadge>
-                                </FluentStack>
-                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@result.Preview</FluentLabel>
-                            </FluentStack>
-                        </div>
-                    }
-                }
-            </FluentStack>
-        </FluentStack>
-    </FluentCard>
-
-    <FluentStack Orientation="Orientation.Horizontal" Style="gap: var(--lk-space-l); align-items: flex-start; flex-wrap: wrap;">
-        <FluentCard aria-labelledby="knowledge-browse-title" Style="width: 320px; flex: 0 0 320px;">
+    @if (_currentTab == TabMode.Wiki)
+    {
+        <FluentCard aria-labelledby="knowledge-search-title">
             <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Class="lk-card-header">
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
                     <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
-                        <FluentLabel Id="knowledge-browse-title" Typo="Typography.Subject" Weight="FontWeight.Bold">Browse pages</FluentLabel>
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Page through the wiki and jump into recently changed knowledge.</FluentLabel>
+                        <FluentLabel Id="knowledge-search-title" Typo="Typography.Subject" Weight="FontWeight.Bold">Search knowledge</FluentLabel>
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Find pages by slug, facts, and compiled truth.</FluentLabel>
                     </FluentStack>
-
-                    <FluentStack Orientation="Orientation.Vertical" Class="lk-form-field" Style="min-width: 180px;">
-                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Sort</FluentLabel>
-                        <FluentSelect Id="knowledge-sort-select"
-                                      TOption="string"
-                                      @bind-Value:get="@BrowseSortValue"
-                                      @bind-Value:set="@(async value => await HandleSortChangedAsync(new ChangeEventArgs { Value = value }))"
-                                      Disabled="@_isBrowseLoading"
-                                      Style="width: 100%;">
-                            <FluentOption Value="@KnowledgeBrowseSort.RecentlyModified.ToString()">Recently modified</FluentOption>
-                            <FluentOption Value="@KnowledgeBrowseSort.Alphabetical.ToString()">Alphabetical</FluentOption>
-                        </FluentSelect>
-                    </FluentStack>
+                    @if (_isSearching)
+                    {
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-badge-group" role="status">
+                            <FluentProgressRing Style="width: 20px; height: 20px;" />
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Searching…</FluentLabel>
+                        </FluentStack>
+                    }
                 </FluentStack>
 
-                @if (!string.IsNullOrWhiteSpace(_browseError))
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-form-field">
+                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Search query</FluentLabel>
+                    <FluentSearch Id="knowledge-search-input"
+                                  @bind-Value="_searchText"
+                                  @bind-Value:after="@(async () => await HandleSearchInputAsync(new ChangeEventArgs { Value = _searchText }))"
+                                  Placeholder="Search wiki pages..."
+                                  AutoComplete="off"
+                                  Immediate="true"
+                                  AriaLabel="Search query"
+                                  Style="width: 100%;" />
+                </FluentStack>
+
+                @if (!string.IsNullOrWhiteSpace(_searchError))
                 {
-                    <FluentMessageBar Title="Browse failed" Intent="@MessageIntent.Error">
-                        @_browseError
-                    </FluentMessageBar>
-                }
-                else if (!string.IsNullOrWhiteSpace(_browseStatusMessage))
-                {
-                    <FluentMessageBar Title="Browse status" Intent="@MessageIntent.Info">
-                        @_browseStatusMessage
+                    <FluentMessageBar Title="Search failed" Intent="@MessageIntent.Error">
+                        @_searchError
                     </FluentMessageBar>
                 }
 
-                @if (_isBrowseLoading)
-                {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading" role="status">
-                        <FluentProgressRing />
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading pages…</FluentLabel>
-                    </FluentStack>
-                }
-                else if (_browseItems.Count == 0)
-                {
-                    <FluentCard Class="lk-empty-state">
-                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No pages available</FluentLabel>
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Use search or create a new page to start building knowledge.</FluentLabel>
-                    </FluentCard>
-                }
-                else
-                {
-                    <FluentStack Orientation="Orientation.Vertical" Class="lk-section-tight">
-                        @foreach (var item in _browseItems)
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-section" aria-live="polite">
+                    @if (string.IsNullOrWhiteSpace(_searchText) && _searchResults.Count == 0 && !_isSearching)
+                    {
+                        <FluentCard Class="lk-empty-state">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Start with a question</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Search by topic, slug, or relationship to jump directly into the knowledge base.</FluentLabel>
+                        </FluentCard>
+                    }
+                    else if (_searchResults.Count == 0 && !_isSearching)
+                    {
+                        <FluentCard Class="lk-empty-state">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No matches found</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Try another keyword or create a new page for this topic.</FluentLabel>
+                        </FluentCard>
+                    }
+                    else
+                    {
+                        @foreach (var result in _searchResults)
                         {
-                            <div class="@($"lk-list-item lk-card-interactive{(IsSelected(item.Slug) ? " lk-active" : "")}")"
+                            <div class="lk-list-item lk-card-interactive"
                                  role="button"
                                  tabindex="0"
-                                 aria-label="@($"Open knowledge page {item.Slug}")"
-                                 @onclick="() => OpenPageAsync(item.Slug)"
-                                 @onkeydown="@(args => HandlePageCardKeyDownAsync(args, item.Slug))">
+                                 aria-label="@($"Open knowledge page {result.Slug}")"
+                                 @onclick="() => OpenPageAsync(result.Slug)"
+                                 @onkeydown="@(args => HandlePageCardKeyDownAsync(args, result.Slug))">
                                 <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
-                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Slug</FluentLabel>
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@FormatTimestamp(item.LastModified)</FluentLabel>
-                                    <FluentBadge Appearance="Appearance.Neutral">@item.TagCount tag@(item.TagCount == 1 ? string.Empty : "s")</FluentBadge>
+                                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
+                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@result.Slug</FluentLabel>
+                                        <FluentBadge Appearance="Appearance.Neutral">Score @result.Score.ToString("0.000", CultureInfo.InvariantCulture)</FluentBadge>
+                                    </FluentStack>
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@result.Preview</FluentLabel>
                                 </FluentStack>
                             </div>
                         }
-                    </FluentStack>
-                }
-
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
-                    <FluentButton Appearance="Appearance.Outline"
-                                  @onclick="() => ChangePageAsync(_browsePageNumber - 1)"
-                                  Disabled="@(!_browseResult.HasPreviousPage || _isBrowseLoading)">
-                        Previous
-                    </FluentButton>
-                    <FluentBadge Appearance="Appearance.Neutral">Page @_browsePageNumber</FluentBadge>
-                    <FluentButton Appearance="Appearance.Outline"
-                                  @onclick="() => ChangePageAsync(_browsePageNumber + 1)"
-                                  Disabled="@(!_browseResult.HasNextPage || _isBrowseLoading)">
-                        Next
-                    </FluentButton>
+                    }
                 </FluentStack>
             </FluentStack>
         </FluentCard>
 
-        <FluentCard aria-busy="@(_isPageLoading || _isSaving || _isCreating)" Style="flex: 1 1 720px; min-width: 320px;">
-            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
-                @if (!string.IsNullOrWhiteSpace(_pageError))
-                {
-                    <FluentMessageBar Title="Page error" Intent="@MessageIntent.Error">
-                        @_pageError
-                    </FluentMessageBar>
-                }
-
-                @if (!string.IsNullOrWhiteSpace(_pageStatusMessage))
-                {
-                    <FluentMessageBar Title="Page updated" Intent="@MessageIntent.Success">
-                        @_pageStatusMessage
-                    </FluentMessageBar>
-                }
-
-                @if (_isPageLoading)
-                {
-                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading" role="status">
-                        <FluentProgressRing />
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading page details…</FluentLabel>
-                    </FluentStack>
-                }
-                else if (_selectedPage is null)
-                {
-                    <FluentCard Class="lk-empty-state">
-                        <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Select a page</FluentLabel>
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Choose a browse result or run a search to inspect wiki content, metadata, and linked relationships.</FluentLabel>
-                    </FluentCard>
-                }
-                else
-                {
-                    <FluentStack Orientation="Orientation.Vertical" Class="lk-section">
-                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
-                            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
-                                <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">@_selectedPage.Slug</FluentLabel>
-                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetSelectedPageSubtitle()</FluentLabel>
-                            </FluentStack>
-                            <FluentStack Orientation="Orientation.Horizontal" Class="lk-badge-group">
-                                @if (_isEditing)
-                                {
-                                    <FluentButton Appearance="Appearance.Accent"
-                                                  @onclick="SaveEditAsync"
-                                                  Disabled="@IsSaveDisabled">
-                                        Save changes
-                                    </FluentButton>
-                                    <FluentButton Appearance="Appearance.Outline" @onclick="CancelEdit">Cancel</FluentButton>
-                                }
-                                else
-                                {
-                                    <FluentButton Appearance="Appearance.Outline" @onclick="StartEdit">Edit</FluentButton>
-                                }
-                            </FluentStack>
+        <FluentStack Orientation="Orientation.Horizontal" Style="gap: var(--lk-space-l); align-items: flex-start; flex-wrap: wrap;">
+            <FluentCard aria-labelledby="knowledge-browse-title" Style="width: 320px; flex: 0 0 320px;">
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Class="lk-card-header">
+                        <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
+                            <FluentLabel Id="knowledge-browse-title" Typo="Typography.Subject" Weight="FontWeight.Bold">Browse pages</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Page through the wiki and jump into recently changed knowledge.</FluentLabel>
                         </FluentStack>
 
-                        <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
-                            <FluentCard Style="flex: 1 1 420px; min-width: 320px;">
-                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
-                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Page content</FluentLabel>
-                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Rendered as raw wiki text for now.</FluentLabel>
-                                    </FluentStack>
+                        <FluentStack Orientation="Orientation.Vertical" Class="lk-form-field" Style="min-width: 180px;">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Sort</FluentLabel>
+                            <FluentSelect Id="knowledge-sort-select"
+                                          TOption="string"
+                                          @bind-Value:get="@BrowseSortValue"
+                                          @bind-Value:set="@(async value => await HandleSortChangedAsync(new ChangeEventArgs { Value = value }))"
+                                          Disabled="@_isBrowseLoading"
+                                          Style="width: 100%;">
+                                <FluentOption Value="@KnowledgeBrowseSort.RecentlyModified.ToString()">Recently modified</FluentOption>
+                                <FluentOption Value="@KnowledgeBrowseSort.Alphabetical.ToString()">Alphabetical</FluentOption>
+                            </FluentSelect>
+                        </FluentStack>
+                    </FluentStack>
 
+                    @if (!string.IsNullOrWhiteSpace(_browseError))
+                    {
+                        <FluentMessageBar Title="Browse failed" Intent="@MessageIntent.Error">
+                            @_browseError
+                        </FluentMessageBar>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(_browseStatusMessage))
+                    {
+                        <FluentMessageBar Title="Browse status" Intent="@MessageIntent.Info">
+                            @_browseStatusMessage
+                        </FluentMessageBar>
+                    }
+
+                    @if (_isBrowseLoading)
+                    {
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading" role="status">
+                            <FluentProgressRing />
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading pages…</FluentLabel>
+                        </FluentStack>
+                    }
+                    else if (_browseItems.Count == 0)
+                    {
+                        <FluentCard Class="lk-empty-state">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No pages available</FluentLabel>
+                            <FluentCard Typo="Typography.Body" Color="Color.Neutral">Use search or create a new page to start building knowledge.</FluentCard>
+                        </FluentCard>
+                    }
+                    else
+                    {
+                        <FluentStack Orientation="Orientation.Vertical" Class="lk-section-tight">
+                            @foreach (var item in _browseItems)
+                            {
+                                <div class="@($"lk-list-item lk-card-interactive{(IsSelected(item.Slug) ? " lk-active" : "")}")"
+                                     role="button"
+                                     tabindex="0"
+                                     aria-label="@($"Open knowledge page {item.Slug}")"
+                                     @onclick="() => OpenPageAsync(item.Slug)"
+                                     @onkeydown="@(args => HandlePageCardKeyDownAsync(args, item.Slug))">
+                                    <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
+                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Slug</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@FormatTimestamp(item.LastModified)</FluentLabel>
+                                        <FluentBadge Appearance="Appearance.Neutral">@item.TagCount tag@(item.TagCount == 1 ? string.Empty : "s")</FluentBadge>
+                                    </FluentStack>
+                                </div>
+                            }
+                        </FluentStack>
+                    }
+
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
+                        <FluentButton Appearance="Appearance.Outline"
+                                      @onclick="() => ChangePageAsync(_browsePageNumber - 1)"
+                                      Disabled="@(!_browseResult.HasPreviousPage || _isBrowseLoading)">
+                            Previous
+                        </FluentButton>
+                        <FluentBadge Appearance="Appearance.Neutral">Page @_browsePageNumber</FluentBadge>
+                        <FluentButton Appearance="Appearance.Outline"
+                                      @onclick="() => ChangePageAsync(_browsePageNumber + 1)"
+                                      Disabled="@(!_browseResult.HasNextPage || _isBrowseLoading)">
+                            Next
+                        </FluentButton>
+                    </FluentStack>
+                </FluentStack>
+            </FluentCard>
+
+            <FluentCard aria-busy="@(_isPageLoading || _isSaving || _isCreating)" Style="flex: 1 1 720px; min-width: 320px;">
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                    @if (!string.IsNullOrWhiteSpace(_pageError))
+                    {
+                        <FluentMessageBar Title="Page error" Intent="@MessageIntent.Error">
+                            @_pageError
+                        </FluentMessageBar>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(_pageStatusMessage))
+                    {
+                        <FluentMessageBar Title="Page updated" Intent="@MessageIntent.Success">
+                            @_pageStatusMessage
+                        </FluentMessageBar>
+                    }
+
+                    @if (_isPageLoading)
+                    {
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading" role="status">
+                            <FluentProgressRing />
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading page details…</FluentLabel>
+                        </FluentStack>
+                    }
+                    else if (_selectedPage is null)
+                    {
+                        <FluentCard Class="lk-empty-state">
+                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Select a page</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Choose a browse result or run a search to inspect wiki content, metadata, and linked relationships.</FluentLabel>
+                        </FluentCard>
+                    }
+                    else
+                    {
+                        <FluentStack Orientation="Orientation.Vertical" Class="lk-section">
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
+                                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
+                                    <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">@_selectedPage.Slug</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetSelectedPageSubtitle()</FluentLabel>
+                                </FluentStack>
+                                <FluentStack Orientation="Orientation.Horizontal" Class="lk-badge-group">
                                     @if (_isEditing)
                                     {
-                                        <FluentTextArea @bind-Value="_editContent"
-                                                        Rows="20"
-                                                        Maxlength="40000"
-                                                        Style="width: 100%;" />
+                                        <FluentButton Appearance="Appearance.Accent"
+                                                      @onclick="SaveEditAsync"
+                                                      Disabled="@IsSaveDisabled">
+                                            Save changes
+                                        </FluentButton>
+                                        <FluentButton Appearance="Appearance.Outline" @onclick="CancelEdit">Cancel</FluentButton>
                                     }
                                     else
                                     {
-                                        <FluentLabel Typo="Typography.Body" Style="display: block; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;">
-                                            @_selectedPage.Content
-                                        </FluentLabel>
+                                        <FluentButton Appearance="Appearance.Outline" @onclick="StartEdit">Edit</FluentButton>
                                     }
                                 </FluentStack>
-                            </FluentCard>
+                            </FluentStack>
 
-                            <FluentStack Orientation="Orientation.Vertical" Style="flex: 0 1 320px; min-width: 280px; gap: 1rem;">
-                                <FluentCard>
-                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+                                <FluentCard Style="flex: 1 1 420px; min-width: 320px;">
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Metadata</FluentLabel>
-                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Key page facts and navigation links.</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Page content</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Rendered as raw wiki text for now.</FluentLabel>
                                         </FluentStack>
 
-                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
-                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
-                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Slug</FluentLabel>
-                                                <FluentBadge Appearance="Appearance.Neutral">@_selectedPage.Slug</FluentBadge>
-                                            </FluentStack>
-                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
-                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Last modified</FluentLabel>
-                                                <FluentLabel Typo="Typography.Body">@FormatTimestamp(_selectedPage.LastModified)</FluentLabel>
-                                            </FluentStack>
-                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
-                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Tags</FluentLabel>
-                                                @if (_selectedPage.Tags.Count == 0)
-                                                {
-                                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No tags</FluentLabel>
-                                                }
-                                                else
-                                                {
-                                                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem;">
-                                                        @foreach (var tag in _selectedPage.Tags)
-                                                        {
-                                                            <FluentBadge Appearance="Appearance.Accent">@tag</FluentBadge>
-                                                        }
-                                                    </FluentStack>
-                                                }
-                                            </FluentStack>
-                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
-                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Linked pages</FluentLabel>
-                                                @if (_selectedPage.LinkedPages.Count == 0)
-                                                {
-                                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No linked pages</FluentLabel>
-                                                }
-                                                else
-                                                {
-                                                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem;">
-                                                        @foreach (var linkedPage in _selectedPage.LinkedPages)
-                                                        {
-                                                            <FluentButton Appearance="Appearance.Outline" @onclick="() => OpenPageAsync(linkedPage)">@linkedPage</FluentButton>
-                                                        }
-                                                    </FluentStack>
-                                                }
-                                            </FluentStack>
-                                        </FluentStack>
+                                        @if (_isEditing)
+                                        {
+                                            <FluentTextArea @bind-Value="_editContent"
+                                                            Rows="20"
+                                                            Maxlength="40000"
+                                                            Style="width: 100%;" />
+                                        }
+                                        else
+                                        {
+                                            <FluentLabel Typo="Typography.Body" Style="display: block; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;">
+                                                @_selectedPage.Content
+                                            </FluentLabel>
+                                        }
                                     </FluentStack>
                                 </FluentCard>
 
-                                <FluentCard role="group" aria-label="Knowledge graph">
-                                    <FluentStack Orientation="Orientation.Vertical" Class="lk-graph-shell">
-                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Relationship graph</FluentLabel>
-                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Quick navigation across linked wiki pages.</FluentLabel>
-                                        </FluentStack>
+                                <FluentStack Orientation="Orientation.Vertical" Style="flex: 0 1 320px; min-width: 280px; gap: 1rem;">
+                                    <FluentCard>
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Metadata</FluentLabel>
+                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Key page facts and navigation links.</FluentLabel>
+                                            </FluentStack>
 
-                                        <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Class="lk-graph-node-list">
-                                            <FluentButton Appearance="Appearance.Accent" Class="lk-graph-node-main" @onclick="() => OpenPageAsync(_selectedPage.Slug)">
-                                                @_selectedPage.Slug
-                                            </FluentButton>
-
-                                            @if (_selectedPage.LinkedPages.Count == 0)
-                                            {
-                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Add links to this page to expand the graph.</FluentLabel>
-                                            }
-                                            else
-                                            {
-                                                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalAlignment="HorizontalAlignment.Center" Class="lk-graph-link-list">
-                                                    @foreach (var linkedPage in _selectedPage.LinkedPages)
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Slug</FluentLabel>
+                                                    <FluentBadge Appearance="Appearance.Neutral">@_selectedPage.Slug</FluentBadge>
+                                                </FluentStack>
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Last modified</FluentLabel>
+                                                    <FluentLabel Typo="Typography.Body">@FormatTimestamp(_selectedPage.LastModified)</FluentLabel>
+                                                </FluentStack>
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Tags</FluentLabel>
+                                                    @if (_selectedPage.Tags.Count == 0)
                                                     {
-                                                        <FluentButton Appearance="Appearance.Outline" Class="lk-graph-node-link" @onclick="() => OpenPageAsync(linkedPage)">@linkedPage</FluentButton>
+                                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No tags</FluentLabel>
+                                                    }
+                                                    else
+                                                    {
+                                                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem;">
+                                                            @foreach (var tag in _selectedPage.Tags)
+                                                            {
+                                                                <FluentBadge Appearance="Appearance.Accent">@tag</FluentBadge>
+                                                            }
+                                                        </FluentStack>
                                                     }
                                                 </FluentStack>
-                                            }
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Linked pages</FluentLabel>
+                                                    @if (_selectedPage.LinkedPages.Count == 0)
+                                                    {
+                                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No linked pages</FluentLabel>
+                                                    }
+                                                    else
+                                                    {
+                                                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem;">
+                                                            @foreach (var linkedPage in _selectedPage.LinkedPages)
+                                                            {
+                                                                <FluentButton Appearance="Appearance.Outline" @onclick="() => OpenPageAsync(linkedPage)">@linkedPage</FluentButton>
+                                                            }
+                                                        </FluentStack>
+                                                    }
+                                                </FluentStack>
+                                            </FluentStack>
                                         </FluentStack>
-                                    </FluentStack>
-                                </FluentCard>
+                                    </FluentCard>
+
+                                    <FluentCard role="group" aria-label="Knowledge graph">
+                                        <FluentStack Orientation="Orientation.Vertical" Class="lk-graph-shell">
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Relationship graph</FluentLabel>
+                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Quick navigation across linked wiki pages.</FluentLabel>
+                                            </FluentStack>
+
+                                            <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Class="lk-graph-node-list">
+                                                <FluentButton Appearance="Appearance.Accent" Class="lk-graph-node-main" @onclick="() => OpenPageAsync(_selectedPage.Slug)">
+                                                    @_selectedPage.Slug
+                                                </FluentButton>
+
+                                                @if (_selectedPage.LinkedPages.Count == 0)
+                                                {
+                                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Add links to this page to expand the graph.</FluentLabel>
+                                                }
+                                                else
+                                                {
+                                                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalAlignment="HorizontalAlignment.Center" Class="lk-graph-link-list">
+                                                        @foreach (var linkedPage in _selectedPage.LinkedPages)
+                                                        {
+                                                            <FluentButton Appearance="Appearance.Outline" Class="lk-graph-node-link" @onclick="() => OpenPageAsync(linkedPage)">@linkedPage</FluentButton>
+                                                        }
+                                                    </FluentStack>
+                                                }
+                                            </FluentStack>
+                                        </FluentStack>
+                                    </FluentCard>
+                                </FluentStack>
                             </FluentStack>
                         </FluentStack>
+                    }
+                </FluentStack>
+            </FluentCard>
+        </FluentStack>
+
+        <FluentDialog @bind-Hidden:get="@(!_isCreateOpen)"
+                      @bind-Hidden:set="@(value => { if (value) CloseCreateModal(); })"
+                      aria-label="Create knowledge page"
+                      Modal="true"
+                      TrapFocus="true"
+                      PreventScroll="true">
+            <FluentDialogBody>
+                <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem; min-width: min(90vw, 720px);">
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Create knowledge page</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Add a new wiki page and immediately open it in the browser.</FluentLabel>
+                        </FluentStack>
+                        <FluentButton Appearance="Appearance.Outline" @onclick="CloseCreateModal" Disabled="@_isCreating">Close</FluentButton>
                     </FluentStack>
-                }
-            </FluentStack>
-        </FluentCard>
-    </FluentStack>
 
-    <FluentDialog @bind-Hidden:get="@(!_isCreateOpen)"
-                  @bind-Hidden:set="@(value => { if (value) CloseCreateModal(); })"
-                  aria-label="Create knowledge page"
-                  Modal="true"
-                  TrapFocus="true"
-                  PreventScroll="true">
-        <FluentDialogBody>
-            <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem; min-width: min(90vw, 720px);">
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                        <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Create knowledge page</FluentLabel>
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Add a new wiki page and immediately open it in the browser.</FluentLabel>
+                    @if (!string.IsNullOrWhiteSpace(_createError))
+                    {
+                        <FluentMessageBar Title="Create failed" Intent="@MessageIntent.Error">
+                            @_createError
+                        </FluentMessageBar>
+                    }
+
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Slug</FluentLabel>
+                        <FluentTextField Id="knowledge-create-slug"
+                                         @bind-Value="_newPageSlug"
+                                         Maxlength="256"
+                                         AutoComplete="off"
+                                         Autofocus="true"
+                                         Disabled="@_isCreating"
+                                         Style="width: 100%;" />
                     </FluentStack>
-                    <FluentButton Appearance="Appearance.Outline" @onclick="CloseCreateModal" Disabled="@_isCreating">Close</FluentButton>
-                </FluentStack>
 
-                @if (!string.IsNullOrWhiteSpace(_createError))
-                {
-                    <FluentMessageBar Title="Create failed" Intent="@MessageIntent.Error">
-                        @_createError
-                    </FluentMessageBar>
-                }
-
-                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
-                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Slug</FluentLabel>
-                    <FluentTextField Id="knowledge-create-slug"
-                                     @bind-Value="_newPageSlug"
-                                     Maxlength="256"
-                                     AutoComplete="off"
-                                     Autofocus="true"
-                                     Disabled="@_isCreating"
-                                     Style="width: 100%;" />
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Content</FluentLabel>
+                        <FluentTextArea Id="knowledge-create-content"
+                                        @bind-Value="_newPageContent"
+                                        Rows="12"
+                                        Maxlength="40000"
+                                        Disabled="@_isCreating"
+                                        Style="width: 100%;" />
+                    </FluentStack>
                 </FluentStack>
+            </FluentDialogBody>
+            <FluentDialogFooter>
+                <FluentButton Appearance="Appearance.Outline" @onclick="CloseCreateModal" Disabled="@_isCreating">Cancel</FluentButton>
+                <FluentButton Appearance="Appearance.Accent"
+                              @onclick="CreatePageAsync"
+                              Disabled="@IsCreateDisabled">
+                    Create page
+                </FluentButton>
+            </FluentDialogFooter>
+        </FluentDialog>
+    }
+    else
+    {
+        <FluentStack Orientation="Orientation.Horizontal" Style="gap: var(--lk-space-l); align-items: flex-start; flex-wrap: wrap; width: 100%;">
+            <!-- Left panel: Browse documents -->
+            <FluentCard aria-labelledby="documents-browse-title" Style="width: 320px; flex: 0 0 320px;">
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                    <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
+                        <FluentLabel Id="documents-browse-title" Typo="Typography.Subject" Weight="FontWeight.Bold">Browse documents</FluentLabel>
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">View and manage rich documents indexed inside GBrain.</FluentLabel>
+                    </FluentStack>
 
-                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
-                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Content</FluentLabel>
-                    <FluentTextArea Id="knowledge-create-content"
-                                    @bind-Value="_newPageContent"
-                                    Rows="12"
-                                    Maxlength="40000"
-                                    Disabled="@_isCreating"
-                                    Style="width: 100%;" />
+                    <FluentButton Appearance="Appearance.Accent" @onclick="OpenUploadModal" Style="width: 100%; margin-top: 1rem; margin-bottom: 1rem;">
+                        Upload document
+                    </FluentButton>
+
+                    @if (_isDocsLoading)
+                    {
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading" role="status">
+                            <FluentProgressRing />
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading documents…</FluentLabel>
+                        </FluentStack>
+                    }
+                    else if (_docsError != null)
+                    {
+                        <FluentMessageBar Title="Error" Intent="@MessageIntent.Error">
+                            @_docsError
+                        </FluentMessageBar>
+                    }
+                    else if (_documentsList.Count == 0)
+                    {
+                        <FluentCard Class="lk-empty-state" Style="border: none; box-shadow: none;">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No documents found</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Upload a PDF, image, or text file to start building your AI memory index.</FluentLabel>
+                        </FluentCard>
+                    }
+                    else
+                    {
+                        <FluentStack Orientation="Orientation.Vertical" Class="lk-section-tight" Style="max-height: 520px; overflow-y: auto;">
+                            @foreach (var doc in _documentsList)
+                            {
+                                <div class="@($"lk-list-item lk-card-interactive{(IsDocSelected(doc.Slug) ? " lk-active" : "")}")"
+                                     role="button"
+                                     tabindex="0"
+                                     @onclick="() => OpenDocumentAsync(doc.Slug)">
+                                    <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
+                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@FormatDocSlug(doc.Slug)</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@FormatTimestamp(doc.LastModified)</FluentLabel>
+                                        @if (doc.Tags.Count > 0)
+                                        {
+                                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 4px; margin-top: 4px;" Wrap="true">
+                                                @foreach (var tag in doc.Tags)
+                                                {
+                                                    <FluentBadge Appearance="Appearance.Neutral" Style="font-size: 10px;">@tag</FluentBadge>
+                                                }
+                                            </FluentStack>
+                                        }
+                                    </FluentStack>
+                                </div>
+                            }
+                        </FluentStack>
+                    }
                 </FluentStack>
-            </FluentStack>
-        </FluentDialogBody>
-        <FluentDialogFooter>
-            <FluentButton Appearance="Appearance.Outline" @onclick="CloseCreateModal" Disabled="@_isCreating">Cancel</FluentButton>
-            <FluentButton Appearance="Appearance.Accent"
-                          @onclick="CreatePageAsync"
-                          Disabled="@IsCreateDisabled">
-                Create page
-            </FluentButton>
-        </FluentDialogFooter>
-    </FluentDialog>
+            </FluentCard>
+
+            <!-- Right panel: Document Details -->
+            <FluentCard aria-busy="@(_isPageLoading || _isUploading)" Style="flex: 1 1 720px; min-width: 320px;">
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                    @if (!string.IsNullOrWhiteSpace(_pageError))
+                    {
+                        <FluentMessageBar Title="Document error" Intent="@MessageIntent.Error">
+                            @_pageError
+                        </FluentMessageBar>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(_pageStatusMessage))
+                    {
+                        <FluentMessageBar Title="Document ingested" Intent="@MessageIntent.Success">
+                            @_pageStatusMessage
+                        </FluentMessageBar>
+                    }
+
+                    @if (_isPageLoading)
+                    {
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading" role="status">
+                            <FluentProgressRing />
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Loading document details…</FluentLabel>
+                        </FluentStack>
+                    }
+                    else if (_selectedDoc is null)
+                    {
+                        <FluentCard Class="lk-empty-state">
+                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Select a document</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Choose a document from the left browser to view its details, tags, and extracted text index.</FluentLabel>
+                        </FluentCard>
+                    }
+                    else
+                    {
+                        <FluentStack Orientation="Orientation.Vertical" Class="lk-section">
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-card-header">
+                                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
+                                    <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">@FormatDocSlug(_selectedDoc.Slug)</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetSelectedPageSubtitle()</FluentLabel>
+                                </FluentStack>
+                                <FluentStack Orientation="Orientation.Horizontal" Class="lk-badge-group">
+                                    @if (!string.IsNullOrWhiteSpace(_downloadUrl))
+                                    {
+                                        <FluentAnchor Appearance="Appearance.Accent" Href="@_downloadUrl" target="_blank">Download original</FluentAnchor>
+                                    }
+                                </FluentStack>
+                            </FluentStack>
+
+                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+                                <!-- Extracted text viewer -->
+                                <FluentCard Style="flex: 1 1 420px; min-width: 320px;">
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Extracted AI memory index</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">The extracted text contents stored and embedded for search.</FluentLabel>
+                                        </FluentStack>
+                                        
+                                        <FluentLabel Typo="Typography.Body" Style="display: block; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-height: 480px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 4px; width: 100%;">
+                                            @GetCleanDocContent(_selectedDoc.Content)
+                                        </FluentLabel>
+                                    </FluentStack>
+                                </FluentCard>
+
+                                <!-- Details sidebar -->
+                                <FluentStack Orientation="Orientation.Vertical" Style="flex: 0 1 320px; min-width: 280px; gap: 1rem;">
+                                    <FluentCard>
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Document info</FluentLabel>
+                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Storage location and cataloging.</FluentLabel>
+                                            </FluentStack>
+
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Source path</FluentLabel>
+                                                    <FluentBadge Appearance="Appearance.Neutral" Style="white-space: normal; height: auto; padding: 4px 8px; text-align: left; display: block; word-break: break-all;">
+                                                        @GetDocSourceFile()
+                                                    </FluentBadge>
+                                                </FluentStack>
+                                                
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Tags</FluentLabel>
+                                                    @if (_selectedDoc.Tags.Count == 0)
+                                                    {
+                                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No tags assigned</FluentLabel>
+                                                    }
+                                                    else
+                                                    {
+                                                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem;">
+                                                            @foreach (var tag in _selectedDoc.Tags)
+                                                            {
+                                                                <FluentBadge Appearance="Appearance.Accent">@tag</FluentBadge>
+                                                            }
+                                                        </FluentStack>
+                                                    }
+                                                </FluentStack>
+
+                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Connected wiki references</FluentLabel>
+                                                    @if (_selectedDoc.LinkedPages.Count == 0)
+                                                    {
+                                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No outgoing references</FluentLabel>
+                                                    }
+                                                    else
+                                                    {
+                                                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem;">
+                                                            @foreach (var linkedPage in _selectedDoc.LinkedPages)
+                                                            {
+                                                                <FluentButton Appearance="Appearance.Outline" @onclick="() => NavigateToWikiPage(linkedPage)">@linkedPage</FluentButton>
+                                                            }
+                                                        </FluentStack>
+                                                    }
+                                                </FluentStack>
+                                            </FluentStack>
+                                        </FluentStack>
+                                    </FluentCard>
+                                </FluentStack>
+                            </FluentStack>
+                        </FluentStack>
+                    }
+                </FluentStack>
+            </FluentCard>
+        </FluentStack>
+
+        <!-- Document Upload Dialog -->
+        <FluentDialog @bind-Hidden:get="@(!_isUploadOpen)"
+                      @bind-Hidden:set="@(value => { if (value) CloseUploadModal(); })"
+                      aria-label="Upload document to library"
+                      Modal="true"
+                      TrapFocus="true"
+                      PreventScroll="true">
+            <FluentDialogBody>
+                <FluentStack Orientation="Orientation.Vertical" Style="gap: 1.25rem; min-width: min(90vw, 540px);">
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Upload & index document</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Extract text (PDF, standard images, text) and index into memory.</FluentLabel>
+                        </FluentStack>
+                        <FluentButton Appearance="Appearance.Outline" @onclick="CloseUploadModal" Disabled="@_isUploading">Close</FluentButton>
+                    </FluentStack>
+
+                    @if (!string.IsNullOrWhiteSpace(_uploadError))
+                    {
+                        <FluentMessageBar Title="Ingestion failed" Intent="@MessageIntent.Error" Style="margin-bottom: 0.5rem;">
+                            @_uploadError
+                        </FluentMessageBar>
+                    }
+
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Document Title (Optional)</FluentLabel>
+                        <FluentTextField @bind-Value="_uploadTitle"
+                                         Placeholder="Defaults to the file name if blank"
+                                         AutoComplete="off"
+                                         Disabled="@_isUploading"
+                                         Style="width: 100%;" />
+                    </FluentStack>
+
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Tags (Comma-separated)</FluentLabel>
+                        <FluentTextField @bind-Value="_uploadTagsString"
+                                         Placeholder="e.g. project, finance, reports"
+                                         AutoComplete="off"
+                                         Disabled="@_isUploading"
+                                         Style="width: 100%;" />
+                    </FluentStack>
+
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem; margin-top: 0.5rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Select file</FluentLabel>
+                        <div style="border: 2px dashed rgba(255,255,255,0.15); border-radius: 6px; padding: 2rem; text-align: center; background: rgba(255,255,255,0.01);">
+                            <InputFile OnChange="HandleFileSelected" Disabled="@_isUploading" style="display: block; width: 100%; max-width: 320px; margin: 0 auto;" />
+                            @if (_selectedBrowserFile != null)
+                            {
+                                <div style="margin-top: 1rem; font-weight: bold; color: var(--accent-fill-rest);">
+                                    Selected: @_selectedBrowserFile.Name (@FormatFileSize(_selectedBrowserFile.Size))
+                                </div>
+                            }
+                        </div>
+                    </FluentStack>
+
+                    @if (_isUploading)
+                    {
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 12px; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 4px; border-left: 3px solid var(--accent-fill-rest);">
+                            <FluentProgressRing Style="width: 20px; height: 20px;" />
+                            <FluentLabel Typo="Typography.Body">Processing PaddleOCR text extraction and hybrid indexing...</FluentLabel>
+                        </FluentStack>
+                    }
+                </FluentStack>
+            </FluentDialogBody>
+            <FluentDialogFooter>
+                <FluentButton Appearance="Appearance.Outline" @onclick="CloseUploadModal" Disabled="@_isUploading">Cancel</FluentButton>
+                <FluentButton Appearance="Appearance.Accent"
+                              @onclick="UploadDocumentAsync"
+                              Disabled="@IsUploadSubmitDisabled">
+                    Upload & index
+                </FluentButton>
+            </FluentDialogFooter>
+        </FluentDialog>
+    }
 </FluentStack>
 
 @code {
     private const int BrowsePageSize = 10;
+    private const int DocumentsBrowsePageSize = 200;
     private readonly CancellationTokenSource _disposeCts = new();
     private CancellationTokenSource? _searchDebounceCts;
 
@@ -754,4 +1041,318 @@
 
         _disposeCts.Dispose();
     }
+
+    // =========================================================================
+    // Document Library Tab Methods & Backing Logic
+    // =========================================================================
+
+    private enum TabMode { Wiki, Documents }
+    private TabMode _currentTab = TabMode.Wiki;
+
+    private List<KnowledgePageSummary> _documentsList = [];
+    private bool _isDocsLoading;
+    private string? _docsError;
+    private KnowledgePageDetail? _selectedDoc;
+    private string? _downloadUrl;
+
+    // Upload & Ingestion variables
+    private bool _isUploadOpen;
+    private bool _isUploading;
+    private string? _uploadError;
+    private string _uploadTitle = string.Empty;
+    private string _uploadTagsString = string.Empty;
+    private Microsoft.AspNetCore.Components.Forms.IBrowserFile? _selectedBrowserFile;
+
+    private bool IsUploadSubmitDisabled => _isUploading || _selectedBrowserFile is null;
+
+    private void SetTab(TabMode mode)
+    {
+        _currentTab = mode;
+        _pageStatusMessage = null;
+        _pageError = null;
+        
+        if (mode == TabMode.Documents)
+        {
+            _ = LoadDocumentsAsync(selectFirst: _selectedDoc is null);
+        }
+        else
+        {
+            _ = LoadBrowseAsync(selectFirstPage: _selectedPage is null);
+        }
+    }
+
+    private async Task LoadDocumentsAsync(bool selectFirst)
+    {
+        _isDocsLoading = true;
+        _docsError = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            _documentsList = await DocumentUiService.BrowseDocumentsAsync(
+                pageNumber: 1,
+                pageSize: DocumentsBrowsePageSize,
+                ct: _disposeCts.Token);
+            if (selectFirst && _documentsList.Count > 0)
+            {
+                await OpenDocumentAsync(_documentsList[0].Slug);
+            }
+        }
+        catch (Exception ex)
+        {
+            _docsError = $"Failed to load documents: {ex.Message}";
+        }
+        finally
+        {
+            _isDocsLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task OpenDocumentAsync(string slug)
+    {
+        _isPageLoading = true;
+        _pageError = null;
+        _pageStatusMessage = null;
+        _downloadUrl = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var page = await KnowledgeUiService.GetPageDetailAsync(slug, _disposeCts.Token);
+            if (page is null)
+            {
+                _selectedDoc = null;
+                _pageError = $"Document '{slug}' was not found.";
+                return;
+            }
+
+            _selectedDoc = page;
+
+            var parsedDocument = ParseFrontmatter(page.Content);
+            string? storagePath = null;
+            if (parsedDocument.Metadata.TryGetValue("storage_path", out var resolvedStoragePath)
+                && !string.IsNullOrWhiteSpace(resolvedStoragePath))
+            {
+                storagePath = resolvedStoragePath;
+            }
+            else if (parsedDocument.Metadata.TryGetValue("source_file", out var sourceFile)
+                     && !string.IsNullOrWhiteSpace(sourceFile))
+            {
+                storagePath = sourceFile;
+            }
+
+            if (!string.IsNullOrEmpty(storagePath))
+            {
+                _downloadUrl = await DocumentUiService.GetDownloadUrlAsync(storagePath, _disposeCts.Token);
+            }
+        }
+        catch (Exception ex)
+        {
+            _selectedDoc = null;
+            _pageError = $"Document load failed: {ex.Message}";
+        }
+        finally
+        {
+            _isPageLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private bool IsDocSelected(string slug)
+        => _selectedDoc is not null && string.Equals(_selectedDoc.Slug, slug, StringComparison.OrdinalIgnoreCase);
+
+    private string FormatDocSlug(string slug)
+    {
+        if (slug.StartsWith("doc/"))
+        {
+            return slug["doc/".Length..];
+        }
+        return slug;
+    }
+
+    private string GetCleanDocContent(string fullContent)
+        => ParseFrontmatter(fullContent).Body;
+
+    private string GetDocSourceFile()
+    {
+        if (_selectedDoc == null)
+        {
+            return "Unknown";
+        }
+
+        var parsedDocument = ParseFrontmatter(_selectedDoc.Content);
+        if (parsedDocument.Metadata.TryGetValue("source_file", out var sourcePath)
+            && !string.IsNullOrWhiteSpace(sourcePath))
+        {
+            return sourcePath;
+        }
+
+        if (parsedDocument.Metadata.TryGetValue("storage_path", out var storagePath)
+            && !string.IsNullOrWhiteSpace(storagePath))
+        {
+            return storagePath;
+        }
+
+        return "Unknown";
+    }
+
+    private void NavigateToWikiPage(string slug)
+    {
+        SetTab(TabMode.Wiki);
+        _ = OpenPageAsync(slug);
+    }
+
+    private void OpenUploadModal()
+    {
+        _uploadError = null;
+        _uploadTitle = string.Empty;
+        _uploadTagsString = string.Empty;
+        _selectedBrowserFile = null;
+        _isUploadOpen = true;
+    }
+
+    private void CloseUploadModal()
+    {
+        if (_isUploading)
+        {
+            return;
+        }
+        _isUploadOpen = false;
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedBrowserFile = e.File;
+        _uploadError = null;
+    }
+
+    private async Task UploadDocumentAsync()
+    {
+        if (IsUploadSubmitDisabled || _selectedBrowserFile is null)
+        {
+            return;
+        }
+
+        _isUploading = true;
+        _uploadError = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var tagsList = _uploadTagsString
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            using var stream = _selectedBrowserFile.OpenReadStream(15 * 1024 * 1024); // max 15MB file read
+            
+            var result = await DocumentUiService.IngestDocumentAsync(
+                _selectedBrowserFile.Name,
+                stream,
+                string.IsNullOrWhiteSpace(_uploadTitle) ? null : _uploadTitle,
+                tagsList,
+                _disposeCts.Token
+            );
+
+            _isUploadOpen = false;
+            _pageStatusMessage = $"Ingested '{result.Title}' successfully as '{result.PageSlug}'.";
+            
+            await LoadDocumentsAsync(selectFirst: false);
+            await OpenDocumentAsync(result.PageSlug);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "UI document upload and extraction failed.");
+            _uploadError = $"Ingestion failed: {ex.Message}";
+        }
+        finally
+        {
+            _isUploading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB" };
+        int counter = 0;
+        decimal number = bytes;
+        while (Math.Round(number / 1024) >= 1)
+        {
+            number /= 1024;
+            counter++;
+        }
+        return $"{number:n1} {suffixes[counter]}";
+    }
+
+    private static ParsedFrontmatter ParseFrontmatter(string? content)
+    {
+        var normalized = NormalizeNewLines(content);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return new ParsedFrontmatter(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                string.Empty);
+        }
+
+        if (!normalized.StartsWith("---\n", StringComparison.Ordinal))
+        {
+            return new ParsedFrontmatter(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                normalized.Trim());
+        }
+
+        var closingIndex = normalized.IndexOf("\n---\n", 4, StringComparison.Ordinal);
+        if (closingIndex < 0)
+        {
+            return new ParsedFrontmatter(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                normalized.Trim());
+        }
+
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var frontmatter = normalized[4..closingIndex];
+        foreach (var line in frontmatter.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (line.StartsWith('#'))
+            {
+                continue;
+            }
+
+            var separatorIndex = line.IndexOf(':');
+            if (separatorIndex <= 0)
+            {
+                continue;
+            }
+
+            var key = line[..separatorIndex].Trim();
+            var value = line[(separatorIndex + 1)..].Trim();
+            metadata[key] = UnquoteYaml(value);
+        }
+
+        return new ParsedFrontmatter(
+            metadata,
+            normalized[(closingIndex + 5)..].Trim());
+    }
+
+    private static string NormalizeNewLines(string? value)
+        => (value ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+
+    private static string UnquoteYaml(string value)
+    {
+        if (value.Length >= 2
+            && value[0] == '"'
+            && value[^1] == '"')
+        {
+            return value[1..^1]
+                .Replace("\\\"", "\"", StringComparison.Ordinal)
+                .Replace("\\\\", "\\", StringComparison.Ordinal);
+        }
+
+        return value;
+    }
+
+    private sealed record ParsedFrontmatter(
+        IReadOnlyDictionary<string, string> Metadata,
+        string Body);
 }

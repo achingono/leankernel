@@ -15,6 +15,7 @@ public static class ToolsServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddSingleton<DocumentLibraryService>();
         services.AddSingleton<ToolGovernancePolicy>();
         services.AddSingleton<IToolRegistry>(serviceProvider =>
         {
