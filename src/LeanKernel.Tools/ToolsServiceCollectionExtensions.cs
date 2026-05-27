@@ -1,3 +1,4 @@
+using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Tools.BuiltIn.Data;
@@ -5,7 +6,9 @@ using LeanKernel.Tools.BuiltIn.FileSystem;
 using LeanKernel.Tools.BuiltIn.Internet;
 using LeanKernel.Tools.BuiltIn.Knowledge;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools;
 
@@ -16,6 +19,10 @@ public static class ToolsServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton<DocumentLibraryService>();
+        services.AddSingleton<DocumentIngestionQueue>();
+        services.AddSingleton<IDocumentIngestionQueue>(sp => sp.GetRequiredService<DocumentIngestionQueue>());
+        services.AddHostedService<DocumentIngestionHostedService>();
+
         services.AddSingleton<ToolGovernancePolicy>();
         services.AddSingleton<IToolRegistry>(serviceProvider =>
         {

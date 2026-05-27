@@ -2,8 +2,10 @@
 @using System.Globalization
 @using System.Threading
 @using Microsoft.AspNetCore.Components.Web
+@using LeanKernel.Tools
 @inject KnowledgeUiService KnowledgeUiService
 @inject DocumentUiService DocumentUiService
+@inject IDocumentIngestionQueue DocumentIngestionQueue
 @inject ILogger<Knowledge> _logger
 @implements IAsyncDisposable
 @rendermode InteractiveServer
@@ -1246,24 +1248,27 @@
 
             using var stream = _selectedBrowserFile.OpenReadStream(15 * 1024 * 1024); // max 15MB file read
             
-            var result = await DocumentUiService.IngestDocumentAsync(
+            var queuedJob = DocumentIngestionQueue.Queue(
                 _selectedBrowserFile.Name,
                 stream,
                 string.IsNullOrWhiteSpace(_uploadTitle) ? null : _uploadTitle,
-                tagsList,
-                _disposeCts.Token
+                tagsList
             );
 
             _isUploadOpen = false;
-            _pageStatusMessage = $"Ingested '{result.Title}' successfully as '{result.PageSlug}'.";
+            _pageStatusMessage = $"Document queued for ingestion (Job ID: {queuedJob.JobId}). Processing will complete in the background.";
             
             await LoadDocumentsAsync(selectFirst: false);
-            await OpenDocumentAsync(result.PageSlug);
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogWarning(ex, "UI document upload cancelled.");
+            _uploadError = "Upload cancelled.";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "UI document upload and extraction failed.");
-            _uploadError = $"Ingestion failed: {ex.Message}";
+            _logger.LogError(ex, "UI document upload and queueing failed.");
+            _uploadError = $"Queueing failed: {ex.Message}";
         }
         finally
         {

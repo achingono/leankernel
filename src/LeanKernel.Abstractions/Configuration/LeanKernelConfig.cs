@@ -29,4 +29,9 @@ public sealed class LeanKernelConfig
     /// Gets or sets the scheduler configuration.
     /// </summary>
     public SchedulerConfig Scheduler { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets document ingestion configuration.
+    /// </summary>
+    public DocumentIngestionConfig? DocumentIngestion { get; set; }
 }
