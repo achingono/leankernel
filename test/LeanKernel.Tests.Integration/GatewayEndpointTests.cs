@@ -434,6 +434,9 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
         public Task PutPageAsync(string key, string content, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task DeletePageAsync(string key, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task<IReadOnlyList<RetrievalCandidate>> SearchAsync(string query, int maxResults = 10, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<RetrievalCandidate>>([]);
     }

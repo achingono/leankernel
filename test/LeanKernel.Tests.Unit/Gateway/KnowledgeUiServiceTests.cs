@@ -190,6 +190,9 @@ public class KnowledgeUiServiceTests
 
         public Task PutPageAsync(string key, string content, CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task DeletePageAsync(string key, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 
     private sealed class SequencedHttpMessageHandler(IReadOnlyList<HttpResponseMessage> responses) : HttpMessageHandler

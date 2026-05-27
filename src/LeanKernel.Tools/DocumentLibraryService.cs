@@ -79,6 +79,8 @@ public sealed class DocumentLibraryService
             .OrderBy(static tag => tag, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var importedAt = DateTimeOffset.UtcNow;
+        var wikiPageWritten = false;
+        var wikiPageAlreadyDeletedInCatch = false;
 
         try
         {
@@ -101,6 +103,7 @@ public sealed class DocumentLibraryService
 
             _logger.LogInformation("Writing compiled document page {Slug} to GBrain", pageSlug);
             await _knowledgeService.PutPageAsync(pageSlug, pendingContent, ct).ConfigureAwait(false);
+            wikiPageWritten = true;
 
             _logger.LogInformation("Uploading binary asset to GBrain files store and linking to {Slug}", pageSlug);
             var uploadResult = await _gBrainClient.CallToolAsync(
@@ -125,7 +128,24 @@ public sealed class DocumentLibraryService
                     importedAt,
                     extractedText);
 
-                await _knowledgeService.PutPageAsync(pageSlug, finalizedContent, ct).ConfigureAwait(false);
+                try
+                {
+                    await _knowledgeService.PutPageAsync(pageSlug, finalizedContent, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Second wiki write failed; cleaning up incomplete page {Slug}", pageSlug);
+                    try
+                    {
+                        await _knowledgeService.DeletePageAsync(pageSlug, ct).ConfigureAwait(false);
+                        wikiPageAlreadyDeletedInCatch = true;
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        _logger.LogWarning(deleteEx, "Failed to clean up wiki page {Slug} after failed update", pageSlug);
+                    }
+                    throw;
+                }
             }
 
             return new DocumentIngestionResult
@@ -140,6 +160,17 @@ public sealed class DocumentLibraryService
         catch
         {
             TryDeleteFile(targetFullPath);
+            if (wikiPageWritten && !wikiPageAlreadyDeletedInCatch)
+            {
+                try
+                {
+                    await _knowledgeService.DeletePageAsync(pageSlug, ct).ConfigureAwait(false);
+                }
+                catch (Exception deleteEx)
+                {
+                    _logger.LogWarning(deleteEx, "Failed to clean up wiki page {Slug} after ingest failure", pageSlug);
+                }
+            }
             throw;
         }
     }

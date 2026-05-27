@@ -82,5 +82,11 @@ public class CapabilityGapDetectionStepTests
             Pages[key] = content;
             return Task.CompletedTask;
         }
+
+        public Task DeletePageAsync(string key, CancellationToken ct = default)
+        {
+            Pages.Remove(key);
+            return Task.CompletedTask;
+        }
     }
 }

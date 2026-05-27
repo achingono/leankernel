@@ -131,6 +131,35 @@ public sealed class ResilientKnowledgeService(
         }
     }
 
+    /// <inheritdoc />
+    public async Task DeletePageAsync(string key, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        if (!IsProviderHealthy())
+        {
+            _logger.LogWarning("Skipping GBrain page delete for key {Key} because the provider is unhealthy", key);
+            _pageCache.TryRemove(key, out _); // Clear stale cache regardless
+            return;
+        }
+
+        try
+        {
+            await _innerService.DeletePageAsync(key, ct).ConfigureAwait(false);
+            _pageCache.TryRemove(key, out _);
+            _providerHealthTracker?.RecordProbeResult(ProviderNames.GBrain, ProviderProbeResult.Healthy("GBrain page delete succeeded."));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _providerHealthTracker?.RecordProbeResult(ProviderNames.GBrain, ProviderProbeResult.Unhealthy("GBrain page delete failed.", ex.Message));
+            _logger.LogWarning(ex, "Skipping GBrain page delete for key {Key} after provider failure", key);
+        }
+    }
+
     private bool IsProviderHealthy()
         => _providerHealthTracker?.GetStatus(ProviderNames.GBrain).IsHealthy ?? true;
 

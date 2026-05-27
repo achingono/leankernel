@@ -222,5 +222,8 @@ public class ScopedKnowledgeServiceTests
 
         public Task PutPageAsync(string key, string content, CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task DeletePageAsync(string key, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

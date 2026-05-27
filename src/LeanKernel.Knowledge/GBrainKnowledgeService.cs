@@ -92,6 +92,21 @@ public sealed class GBrainKnowledgeService(GBrainMcpClient client, ILogger<GBrai
         await _client.CallToolAsync("put_page", new { slug = key, content }, ct);
     }
 
+    /// <inheritdoc />
+    public async Task DeletePageAsync(string key, CancellationToken ct = default)
+    {
+        _logger.LogDebug("Knowledge delete_page: {Key}", key);
+        try
+        {
+            await _client.CallToolAsync("delete_page", new { slug = key }, ct);
+        }
+        catch (GBrainException ex) when (ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+        {
+            // Page already doesn't exist; treat as success for idempotency
+            _logger.LogDebug("Delete failed for non-existent page {Key}", key);
+        }
+    }
+
     private static IReadOnlyList<GBrainSearchItem> DeserializeSearchResults(JsonElement result)
     {
         if (result.ValueKind == JsonValueKind.Array)
