@@ -399,20 +399,13 @@ The rearchitecture plans additional UI, auth, and OpenAI-compatible surfaces, bu
 
 ## Plugin System
 
-Tools are discovered at compile time via Roslyn source generators. Add a tool by implementing `ITool` with the `[ToolMetadata]` attribute:
+Tools are registered in `AddLeanKernelTools` as `ToolDefinition` entries with scoped handlers. Add a tool by creating a built-in tool class and registering its `Create(...)` definition in the tools service collection extension.
 
-```csharp
-[ToolMetadata(
-    Name = "my_tool",
-    Description = "Does something useful",
-    Category = ToolCategory.Information)]
-public class MyTool : ITool
-{
-    public Task<ToolResult> ExecuteAsync(string input, CancellationToken ct) { ... }
-}
-```
-
-Built-in tools: `wiki_query`, `web_search`, `reminder`, `file_system`
+Built-in tools include:
+- `knowledge`: `wiki_search`, `wiki_read`, `wiki_write`
+- `internet`: `web_search`, `web_fetch`, `http_request`
+- `filesystem`: directory/file operations plus `extract_text`
+- `data`: `json_transform`, `csv_xlsx_read_write`, `database_query`
 
 ## Backup & Restore
 

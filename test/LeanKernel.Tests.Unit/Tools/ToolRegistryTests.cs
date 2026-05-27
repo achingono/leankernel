@@ -67,6 +67,10 @@ public class ToolRegistryTests
         var registry = provider.GetRequiredService<IToolRegistry>();
 
         registry.GetTool("wiki_search").Should().NotBeNull();
+        registry.GetTool("http_request").Should().NotBeNull();
+        registry.GetTool("json_transform").Should().NotBeNull();
+        registry.GetTool("csv_xlsx_read_write").Should().NotBeNull();
+        registry.GetTool("database_query").Should().NotBeNull();
         provider.GetRequiredService<IToolExecutor>().Should().BeOfType<ToolExecutor>();
     }
 

@@ -13,6 +13,7 @@ public sealed class LeanKernelConfig
     public GBrainConfig GBrain { get; set; } = new();
     public IdentityConfig Identity { get; set; } = new();
     public DatabaseConfig Database { get; set; } = new();
+    public DatabaseQueryConfig DatabaseQuery { get; set; } = new();
     public DiagnosticsConfig Diagnostics { get; set; } = new();
     public ChannelsConfig Channels { get; set; } = new();
     public EnhancementConfig Enhancement { get; set; } = new();

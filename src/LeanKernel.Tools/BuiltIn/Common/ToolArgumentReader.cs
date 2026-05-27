@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace LeanKernel.Tools.BuiltIn.Common;
 
@@ -65,6 +66,137 @@ internal static class ToolArgumentReader
         };
     }
 
+    public static JsonObject? GetJsonObjectOrNull(IDictionary<string, object?> arguments, string name)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        if (!arguments.TryGetValue(name, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            JsonObject jsonObject => jsonObject,
+            JsonNode jsonNode => jsonNode as JsonObject,
+            JsonElement element when element.ValueKind == JsonValueKind.Object => JsonNode.Parse(element.GetRawText()) as JsonObject,
+            string text when TryParseJsonNode(text, out var node) => node as JsonObject,
+            IDictionary<string, object?> map => JsonSerializer.SerializeToNode(map) as JsonObject,
+            IDictionary<string, string> map => JsonSerializer.SerializeToNode(map) as JsonObject,
+            _ => JsonSerializer.SerializeToNode(value) as JsonObject
+        };
+    }
+
+    public static JsonArray? GetJsonArrayOrNull(IDictionary<string, object?> arguments, string name)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        if (!arguments.TryGetValue(name, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            JsonArray jsonArray => jsonArray,
+            JsonNode jsonNode => jsonNode as JsonArray,
+            JsonElement element when element.ValueKind == JsonValueKind.Array => JsonNode.Parse(element.GetRawText()) as JsonArray,
+            string text when TryParseJsonNode(text, out var node) => node as JsonArray,
+            IEnumerable<object?> sequence => JsonSerializer.SerializeToNode(sequence) as JsonArray,
+            _ => JsonSerializer.SerializeToNode(value) as JsonArray
+        };
+    }
+
+    public static Dictionary<string, string> GetStringDictionary(IDictionary<string, object?> arguments, string name)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        if (!arguments.TryGetValue(name, out var value) || value is null)
+        {
+            return [];
+        }
+
+        if (value is IDictionary<string, string> textMap)
+        {
+            return new Dictionary<string, string>(textMap, StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (value is IDictionary<string, object?> objectMap)
+        {
+            return objectMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString() ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+        }
+
+        JsonObject? jsonObject = value switch
+        {
+            JsonObject obj => obj,
+            JsonElement element when element.ValueKind == JsonValueKind.Object => JsonNode.Parse(element.GetRawText()) as JsonObject,
+            string text when TryParseJsonNode(text, out var node) => node as JsonObject,
+            _ => JsonSerializer.SerializeToNode(value) as JsonObject
+        };
+
+        if (jsonObject is null)
+        {
+            return [];
+        }
+
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in jsonObject)
+        {
+            result[property.Key] = property.Value?.ToString() ?? string.Empty;
+        }
+
+        return result;
+    }
+
+    public static Dictionary<string, object?> GetObjectDictionary(IDictionary<string, object?> arguments, string name)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        if (!arguments.TryGetValue(name, out var value) || value is null)
+        {
+            return new Dictionary<string, object?>(StringComparer.Ordinal);
+        }
+
+        if (value is Dictionary<string, object?> dictionary)
+        {
+            return new Dictionary<string, object?>(dictionary, StringComparer.Ordinal);
+        }
+
+        if (value is IReadOnlyDictionary<string, object?> readOnlyDictionary)
+        {
+            return readOnlyDictionary.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        }
+
+        if (value is JsonElement element && element.ValueKind == JsonValueKind.Object)
+        {
+            var result = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var property in element.EnumerateObject())
+            {
+                result[property.Name] = property.Value.ValueKind switch
+                {
+                    JsonValueKind.String => property.Value.GetString(),
+                    JsonValueKind.Number => property.Value.TryGetInt64(out var int64Value)
+                        ? int64Value
+                        : property.Value.TryGetDouble(out var doubleValue)
+                            ? doubleValue
+                            : property.Value.GetRawText(),
+                    JsonValueKind.True => true,
+                    JsonValueKind.False => false,
+                    JsonValueKind.Null => null,
+                    _ => property.Value.GetRawText()
+                };
+            }
+
+            return result;
+        }
+
+        throw new ArgumentException($"Argument '{name}' must be an object map.");
+    }
+
     private static bool TryGetJsonInt32(JsonElement element, out int value)
     {
         if (element.ValueKind == JsonValueKind.Number)
@@ -101,6 +233,26 @@ internal static class ToolArgumentReader
         catch (OverflowException)
         {
             convertedValue = default;
+            return false;
+        }
+    }
+
+    private static bool TryParseJsonNode(string text, out JsonNode? node)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            node = null;
+            return false;
+        }
+
+        try
+        {
+            node = JsonNode.Parse(text);
+            return true;
+        }
+        catch (JsonException)
+        {
+            node = null;
             return false;
         }
     }

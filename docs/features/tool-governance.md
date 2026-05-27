@@ -7,7 +7,7 @@ LeanKernel keeps governance simple and explicit. The system does not rely on hid
 | `ToolGovernancePolicy` | Applies visibility rules for one `ToolVisibilityContext`. |
 | `ToolRegistry` | Stores tool definitions and returns the visible subset. |
 | `ToolExecutor` | Executes a resolved tool handler by name and arguments. |
-| Built-in wiki tools | Provide the initial Phase 1 tool surface. |
+| Built-in tools | Provide default wiki, internet, filesystem, and data tool surfaces. |
 ```mermaid
 flowchart LR
     C[ToolVisibilityContext] --> P[ToolGovernancePolicy]
@@ -28,11 +28,12 @@ The executor does **not** perform a second governance pass. If a deployment need
 - a singleton `ToolGovernancePolicy`
 - a singleton `IToolRegistry`
 - a singleton `IToolExecutor`
-The built-in registry is created from three tool definitions:
-- `wiki_search`
-- `wiki_read`
-- `wiki_write`
-All three are currently categorized as `knowledge`. The underlying `ToolRegistry` accepts `IEnumerable<ToolDefinition>`, so the runtime can be extended with more tool definitions without changing the policy class itself.
+The built-in registry is created in `AddLeanKernelTools` and currently includes:
+- `knowledge`: `wiki_search`, `wiki_read`, `wiki_write`
+- `internet`: `web_search`, `web_fetch`, `http_request`
+- `filesystem`: `directory_create`, `directory_list`, `extract_text`, `file_read`, `file_write`, `file_edit`, `file_copy`, `file_move`, `file_delete`, `file_search`, `file_stat`, `file_touch`, `file_chmod`
+- `data`: `json_transform`, `csv_xlsx_read_write`, `database_query`
+The underlying `ToolRegistry` accepts `IEnumerable<ToolDefinition>`, so the runtime can be extended with more tool definitions without changing the policy class itself.
 ## Visibility rules
 `ToolGovernancePolicy` uses three rules.
 | Rule | Effect |
@@ -55,12 +56,19 @@ The policy evaluates one `ToolVisibilityContext` at a time.
 | `AllowedToolNames` | Optional exact-name allow list. |
 In the current `TurnPipeline`, the runtime passes only `UserId`, so the default open-visibility path is used unless a caller builds a narrower context elsewhere.
 ## Built-in tools
-Phase 1 ships with wiki-oriented tools only.
+The current runtime ships with multi-category built-ins by default.
 | Tool | Category | What it does |
 | --- | --- | --- |
 | `wiki_search` | `knowledge` | Searches the knowledge wiki through `IKnowledgeService.SearchAsync`. |
 | `wiki_read` | `knowledge` | Reads a specific page through `IKnowledgeService.GetPageAsync`. |
 | `wiki_write` | `knowledge` | Creates or updates a page through `IKnowledgeService.PutPageAsync`. |
+| `web_search` | `internet` | Runs web search and returns summarized results. |
+| `web_fetch` | `internet` | Fetches URL content with SSRF checks and bounded extraction. |
+| `http_request` | `internet` | Executes bounded HTTP requests with optional headers/query/body. |
+| `extract_text` | `filesystem` | Extracts text from local files, including OCR-supported formats. |
+| `json_transform` | `data` | Applies deterministic JSON select/project/filter/sort/slice/flatten transforms. |
+| `csv_xlsx_read_write` | `data` | Reads and writes CSV/XLSX files within allowed filesystem root. |
+| `database_query` | `data` | Executes read-only, parameterized SQL against configured named connections. |
 These tools resolve `IKnowledgeService` through `IServiceScopeFactory` during execution. That avoids holding a transient knowledge service instance for the full process lifetime.
 ## How the turn pipeline uses governance
 `TurnPipeline` asks the registry for visible tools using a `ToolVisibilityContext` that includes the sender id:

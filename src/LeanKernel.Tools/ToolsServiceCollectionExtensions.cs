@@ -1,5 +1,6 @@
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
+using LeanKernel.Tools.BuiltIn.Data;
 using LeanKernel.Tools.BuiltIn.FileSystem;
 using LeanKernel.Tools.BuiltIn.Internet;
 using LeanKernel.Tools.BuiltIn.Knowledge;
@@ -36,11 +37,15 @@ public static class ToolsServiceCollectionExtensions
                 FileStatTool.Create(scopeFactory),
                 FileTouchTool.Create(scopeFactory),
                 FileChmodTool.Create(scopeFactory),
+                JsonTransformTool.Create(scopeFactory),
+                CsvXlsxReadWriteTool.Create(scopeFactory),
+                DatabaseQueryTool.Create(scopeFactory),
                 WikiSearchTool.Create(scopeFactory),
                 WikiReadTool.Create(scopeFactory),
                 WikiWriteTool.Create(scopeFactory),
                 WebSearchTool.Create(scopeFactory),
-                WebFetchTool.Create(scopeFactory)
+                WebFetchTool.Create(scopeFactory),
+                HttpRequestTool.Create(scopeFactory)
             ];
 
             return new ToolRegistry(policy, builtInTools, logger);
