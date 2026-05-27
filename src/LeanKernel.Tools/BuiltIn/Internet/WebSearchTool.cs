@@ -1,10 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
+using LeanKernel.Tools.BuiltIn.Common;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace LeanKernel.Tools.BuiltIn;
+namespace LeanKernel.Tools.BuiltIn.Internet;
 
 /// <summary>
 /// Built-in tool: searches the web via DuckDuckGo.
@@ -87,6 +89,7 @@ public static class WebSearchTool
         return GetBestDuckDuckGoAnswer(query, abstractText, answer);
     }
 
+    [SuppressMessage("Major Code Smell", "S3776", Justification = "Fallback search parsing is intentionally explicit.")]
     private static async Task<string> SearchWithBraveAsync(HttpClient client, string query, string apiKey, CancellationToken ct)
     {
         var encoded = Uri.EscapeDataString(query);

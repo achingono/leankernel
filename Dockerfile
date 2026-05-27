@@ -31,8 +31,14 @@ RUN dotnet publish LeanKernel.Gateway/LeanKernel.Gateway.csproj -c Release -o /a
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Install curl for health checks
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# Install curl for health checks and Python tooling for OCR-backed text extraction
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl python3 python3-pip python3-venv poppler-utils \
+    && python3 -m venv /opt/ocr-venv \
+    && /opt/ocr-venv/bin/pip install --no-cache-dir paddlepaddle paddleocr pdf2image \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV LeanKernel__FileSystem__PythonExecutable=/opt/ocr-venv/bin/python
 
 COPY --from=build /app/publish .
 

@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http.Headers;
 using FluentAssertions;
-using LeanKernel.Tools.BuiltIn;
+using LeanKernel.Abstractions.Configuration;
+using LeanKernel.Tools.BuiltIn.Internet;
 using Microsoft.Extensions.DependencyInjection;
-using Moq;
 
 namespace LeanKernel.Tests.Unit.Tools;
 
@@ -12,8 +12,7 @@ public class WebFetchToolTests
     [Fact]
     public async Task WebFetchTool_returns_validation_error_when_url_is_missing()
     {
-        var client = new HttpClient(new StubHttpMessageHandler(_ => throw new InvalidOperationException("Should not be called")));
-        var tool = WebFetchTool.Create(CreateScopeFactory(client));
+        var tool = WebFetchTool.Create(CreateScopeFactory(new HttpClient(new StubHttpMessageHandler(_ => throw new InvalidOperationException("Should not be called")))));
 
         var result = await tool.Handler!(new Dictionary<string, object?>(), CancellationToken.None);
 
@@ -24,8 +23,7 @@ public class WebFetchToolTests
     [Fact]
     public async Task WebFetchTool_returns_validation_error_when_url_is_invalid()
     {
-        var client = new HttpClient(new StubHttpMessageHandler(_ => throw new InvalidOperationException("Should not be called")));
-        var tool = WebFetchTool.Create(CreateScopeFactory(client));
+        var tool = WebFetchTool.Create(CreateScopeFactory(new HttpClient(new StubHttpMessageHandler(_ => throw new InvalidOperationException("Should not be called")))));
 
         var result = await tool.Handler!(new Dictionary<string, object?> { ["url"] = "not-a-url" }, CancellationToken.None);
 
@@ -36,8 +34,7 @@ public class WebFetchToolTests
     [Fact]
     public async Task WebFetchTool_blocks_localhost_urls()
     {
-        var client = new HttpClient(new StubHttpMessageHandler(_ => throw new InvalidOperationException("Should not be called")));
-        var tool = WebFetchTool.Create(CreateScopeFactory(client));
+        var tool = WebFetchTool.Create(CreateScopeFactory(new HttpClient(new StubHttpMessageHandler(_ => throw new InvalidOperationException("Should not be called")))));
 
         var result = await tool.Handler!(new Dictionary<string, object?> { ["url"] = "http://localhost:8080/test" }, CancellationToken.None);
 
@@ -77,88 +74,98 @@ public class WebFetchToolTests
     }
 
     [Fact]
-    public async Task WebFetchTool_rejects_non_text_content_types()
+    public async Task WebFetchTool_downloads_binary_content_and_extracts_text()
     {
-        var binary = new ByteArrayContent([1, 2, 3, 4]);
-        binary.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        var tempRoot = CreateTempDirectory();
+        var fakePython = CreateFakePythonScript(tempRoot, "OCR TEXT FROM DOWNLOAD");
 
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = binary
+            Content = CreateBinaryContent()
         });
-        var tool = WebFetchTool.Create(CreateScopeFactory(new HttpClient(handler)));
 
-        var result = await tool.Handler!(new Dictionary<string, object?> { ["url"] = "https://example.com/file.bin" }, CancellationToken.None);
+        var tool = WebFetchTool.Create(CreateScopeFactory(new HttpClient(handler), tempRoot, fakePython));
 
-        result.Success.Should().BeFalse();
-        result.Error.Should().Contain("Unsupported content type");
+        var result = await tool.Handler!(new Dictionary<string, object?> { ["url"] = "https://example.com/file.png" }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Output.Should().Contain("OCR TEXT FROM DOWNLOAD");
     }
 
     [Fact]
-    public async Task WebFetchTool_truncates_large_content_with_notice()
+    public async Task WebFetchTool_follows_redirects()
     {
-        var longContent = new string('a', 20_500);
-        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = new StubHttpMessageHandler(request =>
         {
-            Content = new StringContent(longContent)
+            if (request.RequestUri!.AbsoluteUri == "https://example.com/start")
+            {
+                return new HttpResponseMessage(HttpStatusCode.Redirect)
+                {
+                    Headers = { Location = new Uri("https://example.com/final") }
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("redirect target")
+            };
         });
+
         var tool = WebFetchTool.Create(CreateScopeFactory(new HttpClient(handler)));
 
-        var result = await tool.Handler!(new Dictionary<string, object?> { ["url"] = "https://example.com/large" }, CancellationToken.None);
+        var result = await tool.Handler!(new Dictionary<string, object?> { ["url"] = "https://example.com/start" }, CancellationToken.None);
 
         result.Success.Should().BeTrue();
-        result.Output.Should().NotBeNull();
-        result.Output!.Should().Contain("[Content truncated to 20000 characters.]");
-        result.Output!.Length.Should().BeGreaterThan(20_000);
+        result.Output.Should().Be("redirect target");
     }
 
-    private static IServiceScopeFactory CreateScopeFactory(HttpClient httpClient)
+    private static IServiceScopeFactory CreateScopeFactory(HttpClient httpClient, string? tempRoot = null, string? pythonExecutable = null)
     {
-        var serviceProvider = new Mock<IServiceProvider>();
-        serviceProvider
-            .Setup(mock => mock.GetService(typeof(HttpClient)))
-            .Returns(httpClient);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(httpClient);
+        services.Configure<LeanKernelConfig>(config =>
+        {
+            config.FileSystem.AllowedRoot = tempRoot ?? CreateTempDirectory();
+            config.FileSystem.ScratchRoot = Path.Combine(config.FileSystem.AllowedRoot, ".scratch");
+            if (!string.IsNullOrWhiteSpace(pythonExecutable))
+            {
+                config.FileSystem.PythonExecutable = pythonExecutable;
+            }
+        });
 
-        return new TestServiceScopeFactory(serviceProvider.Object);
+        var provider = services.BuildServiceProvider();
+        return provider.GetRequiredService<IServiceScopeFactory>();
     }
 
-    private sealed class TestServiceScopeFactory : IServiceScopeFactory
+    private static string CreateTempDirectory()
     {
-        private readonly IServiceProvider _serviceProvider;
-
-        public TestServiceScopeFactory(IServiceProvider serviceProvider)
-        {
-            _serviceProvider = serviceProvider;
-        }
-
-        public IServiceScope CreateScope()
-        {
-            return new TestServiceScope(_serviceProvider);
-        }
+        var path = Path.Combine(Path.GetTempPath(), "leankernel-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        return path;
     }
 
-    private sealed class TestServiceScope : IServiceScope
+    private static string CreateFakePythonScript(string tempRoot, string output)
     {
-        public TestServiceScope(IServiceProvider serviceProvider)
+        var scriptPath = Path.Combine(tempRoot, "fake-python.sh");
+        File.WriteAllText(scriptPath, $"#!/usr/bin/env bash\ncat >/dev/null\ncat <<'EOF'\n{output}\nEOF\n");
+        if (!OperatingSystem.IsWindows())
         {
-            ServiceProvider = serviceProvider;
+            File.SetUnixFileMode(scriptPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
-
-        public IServiceProvider ServiceProvider { get; }
-
-        public void Dispose()
-        {
-        }
+        return scriptPath;
     }
 
-    private sealed class StubHttpMessageHandler : HttpMessageHandler
+    private static HttpContent CreateBinaryContent()
     {
-        private readonly Func<HttpRequestMessage, HttpResponseMessage> _responseFactory;
+        var content = new ByteArrayContent([1, 2, 3, 4]);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        return content;
+    }
 
-        public StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
-        {
-            _responseFactory = responseFactory;
-        }
+    private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory) : HttpMessageHandler
+    {
+        private readonly Func<HttpRequestMessage, HttpResponseMessage> _responseFactory = responseFactory;
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {

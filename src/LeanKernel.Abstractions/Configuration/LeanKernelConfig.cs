@@ -17,6 +17,7 @@ public sealed class LeanKernelConfig
     public ChannelsConfig Channels { get; set; } = new();
     public EnhancementConfig Enhancement { get; set; } = new();
     public LearningConfig Learning { get; set; } = new();
+    public FileSystemConfig FileSystem { get; set; } = new();
 
     /// <summary>
     /// Gets or sets production-hardening configuration.

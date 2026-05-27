@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 
-namespace LeanKernel.Tools.BuiltIn;
+namespace LeanKernel.Tools.BuiltIn.Common;
 
 internal static class ToolArgumentReader
 {
@@ -44,6 +44,25 @@ internal static class ToolArgumentReader
         };
 
         return parsed;
+    }
+
+    public static bool GetBoolOrDefault(IDictionary<string, object?> arguments, string name, bool defaultValue)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        if (!arguments.TryGetValue(name, out var value) || value is null)
+        {
+            return defaultValue;
+        }
+
+        return value switch
+        {
+            bool boolValue => boolValue,
+            JsonElement element when element.ValueKind is JsonValueKind.True or JsonValueKind.False => element.GetBoolean(),
+            string text when bool.TryParse(text, out var stringValue) => stringValue,
+            _ => defaultValue
+        };
     }
 
     private static bool TryGetJsonInt32(JsonElement element, out int value)

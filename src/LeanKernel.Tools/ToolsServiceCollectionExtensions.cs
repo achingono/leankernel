@@ -1,6 +1,8 @@
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
-using LeanKernel.Tools.BuiltIn;
+using LeanKernel.Tools.BuiltIn.FileSystem;
+using LeanKernel.Tools.BuiltIn.Internet;
+using LeanKernel.Tools.BuiltIn.Knowledge;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -21,6 +23,19 @@ public static class ToolsServiceCollectionExtensions
 
             IReadOnlyList<ToolDefinition> builtInTools =
             [
+                DirectoryCreateTool.Create(scopeFactory),
+                DirectoryListTool.Create(scopeFactory),
+                ExtractTextTool.Create(scopeFactory),
+                FileReadTool.Create(scopeFactory),
+                FileWriteTool.Create(scopeFactory),
+                FileEditTool.Create(scopeFactory),
+                FileCopyTool.Create(scopeFactory),
+                FileMoveTool.Create(scopeFactory),
+                FileDeleteTool.Create(scopeFactory),
+                FileSearchTool.Create(scopeFactory),
+                FileStatTool.Create(scopeFactory),
+                FileTouchTool.Create(scopeFactory),
+                FileChmodTool.Create(scopeFactory),
                 WikiSearchTool.Create(scopeFactory),
                 WikiReadTool.Create(scopeFactory),
                 WikiWriteTool.Create(scopeFactory),

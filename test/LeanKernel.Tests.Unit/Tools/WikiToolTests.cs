@@ -2,7 +2,7 @@ using System.Text.Json;
 using FluentAssertions;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
-using LeanKernel.Tools.BuiltIn;
+using LeanKernel.Tools.BuiltIn.Knowledge;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 

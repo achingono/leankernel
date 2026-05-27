@@ -1,8 +1,9 @@
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
+using LeanKernel.Tools.BuiltIn.Common;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace LeanKernel.Tools.BuiltIn;
+namespace LeanKernel.Tools.BuiltIn.Knowledge;
 
 /// <summary>
 /// Built-in tool: writes or updates a wiki page in GBrain.
