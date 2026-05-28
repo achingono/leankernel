@@ -19,6 +19,7 @@ This section contains execution-ready product requirements documents (PRDs) for 
 | [budget-guardrails-fallback-prd.md](budget-guardrails-fallback-prd.md) | Implement budget enforcement with graceful fallback routing | Predictable spend with resilient answer quality |
 | [memory-hygiene-quality-prd.md](memory-hygiene-quality-prd.md) | Add memory hygiene and quality scoring pipelines | Higher retrieval accuracy and lower context pollution |
 | [wiki-extraction-store-prd.md](wiki-extraction-store-prd.md) | Replace deterministic wiki extraction and add indexed wiki storage | Human-readable wiki facts with indexed and Qdrant-ready retrieval |
+| [gbrain-embedding-dimension-prd.md](gbrain-embedding-dimension-prd.md) | Align GBrain embedding model dimensions with Postgres pgvector schema | Reliable GBrain page writes for learned facts and knowledge pages |
 | [benchmark-scenarios-prd.md](benchmark-scenarios-prd.md) | Publish benchmark scenarios with reproducible metrics | Clear ROI and objective quality tracking |
 | [p1-diagnostics-prd.md](p1-diagnostics-prd.md) | Implement the LeanKernel.Diagnostics rearchitecture slice for tracing, metrics, and log enrichment | Concrete observability package surface for the Phase 1 rearchitecture |
 | [p1-context-prd.md](p1-context-prd.md) | Implement the LeanKernel.Context rearchitecture slice for deterministic token estimation, deny-by-default gating, and prompt assembly | Concrete context selection and prompt-budget package surface for the Phase 1 rearchitecture |

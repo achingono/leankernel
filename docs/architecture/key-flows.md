@@ -13,19 +13,17 @@ sequenceDiagram
     participant Thinker as ThinkerService
     participant Archivist
     participant LiteLLM
-    participant Wiki as Wiki Store
-    participant Qdrant
+    participant GBrain
 
     Channel->>Commander: Raw channel message
     Commander->>Thinker: LeanKernelMessage (normalized)
     Thinker->>Archivist: Resolve session + build context
-    Archivist->>Wiki: Query relevant wiki facts
-    Archivist->>Qdrant: Knowledge search
+    Archivist->>GBrain: Query relevant wiki facts and semantic knowledge
     Archivist-->>Thinker: ContextBudget
     Thinker->>LiteLLM: Assembled prompt + tools
     LiteLLM-->>Thinker: Model response
     Thinker->>Archivist: Persist response to session
-    Thinker->>Wiki: Extract and write new wiki facts
+    Thinker->>GBrain: Extract and write new wiki facts
     Thinker-->>Channel: Enqueue response message
 ```
 
@@ -42,31 +40,30 @@ sequenceDiagram
 
 ---
 
-## Knowledge Indexing Flow
+## Knowledge Persistence Flow
 
-Documents and wiki entries are parsed, chunked, embedded, and stored as vectors for semantic retrieval.
+Knowledge pages and learned facts are written through GBrain. GBrain owns page persistence, embedding generation, and pgvector storage.
 
 ```mermaid
 sequenceDiagram
-    participant Indexer as LeanKernel-indexer (Python)
-    participant Unstructured as LeanKernel-unstructured
+    participant LeanKernel
+    participant GBrain
     participant LiteLLM
-    participant Qdrant
+    participant Postgres
 
-    Indexer->>Unstructured: Parse complex document
-    Unstructured-->>Indexer: Extracted text chunks
-    Indexer->>LiteLLM: Generate embeddings per chunk
-    LiteLLM-->>Indexer: Embedding vectors
-    Indexer->>Qdrant: Write vectors with agent-scope tags
+    LeanKernel->>GBrain: MCP put_page / search / get_page
+    GBrain->>LiteLLM: Generate embeddings
+    LiteLLM-->>GBrain: Embedding vectors
+    GBrain->>Postgres: Persist pages, chunks, and pgvector embeddings
 ```
 
 ### Steps
 
-1. The Python indexer watches wiki and agent document paths.
-2. Unstructured parses complex documents.
-3. LiteLLM generates embeddings.
-4. Qdrant stores tagged vectors in the unified collection.
-5. Archivist and knowledge tools query Qdrant with agent-scope tag filters.
+1. LeanKernel writes durable facts and knowledge pages through `IKnowledgeService`.
+2. `LeanKernel.Knowledge` calls GBrain MCP tools.
+3. GBrain generates embeddings through LiteLLM using its configured embedding model and dimensions.
+4. GBrain stores pages, chunks, and vectors in Postgres.
+5. Context retrieval and knowledge tools query GBrain rather than the legacy Python indexer/Qdrant path.
 
 ---
 

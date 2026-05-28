@@ -18,7 +18,10 @@ if [ -z "${OPENAI_API_KEY:-}" ] && [ -n "${LITELLM_API_KEY:-}" ]; then
   export OPENAI_API_KEY
 fi
 
-gbrain init --url "${db_url}" --embedding-model "${GBRAIN_EMBEDDING_MODEL:-openai:embedding-small}"
+gbrain init \
+  --url "${db_url}" \
+  --embedding-model "${GBRAIN_EMBEDDING_MODEL:-openai:embedding-small}" \
+  --embedding-dimensions "${GBRAIN_EMBEDDING_DIMENSIONS:-3072}"
 
 # Create a bearer token for the engine if one doesn't already exist
 TOKEN_FILE="/app/data/wiki/.engine-token"

@@ -168,12 +168,12 @@ accessCount: 12
 
 ### Shared Persistence and Memory Services
 
-The rearchitected local stack centers on a shared PostgreSQL instance for LeanKernel and LiteLLM plus a dedicated GBrain MCP service with its own embedded PGLite state instead of separate Qdrant, Unstructured, and indexer sidecars.
+The rearchitected local stack centers on a shared PostgreSQL instance for LeanKernel, LiteLLM, and the dedicated GBrain MCP service instead of separate Qdrant, Unstructured, and indexer sidecars.
 
 | Service | Role |
 |---------|------|
-| **PostgreSQL + pgvector** | Primary persistence for LeanKernel and LiteLLM plus vector-capable database extensions |
-| **GBrain** | Bun-hosted `garrytan/gbrain` wiki and memory MCP server, persisting its embedded PGLite brain in the `gbrain-data` Docker volume and serving HTTP MCP from the root endpoint |
+| **PostgreSQL + pgvector** | Primary persistence for LeanKernel, LiteLLM, and GBrain wiki/vector state |
+| **GBrain** | Bun-hosted `garrytan/gbrain` wiki and memory MCP server, persisting to the shared Postgres service and serving HTTP MCP from the root endpoint |
 | **LiteLLM** | Model proxy and routing surface for the engine |
 
 The engine connects to LiteLLM through `LEANKERNEL__LITELLM__BASEURL`, to GBrain through `LEANKERNEL__GBRAIN__BASEURL`, and to PostgreSQL through `LEANKERNEL__DATABASE__CONNECTIONSTRING`.
@@ -201,6 +201,7 @@ Spin up LeanKernel, complete guided onboarding, and run your first production-st
 cp .env.example .env
 # Add LiteLLM backend provider keys in .env as needed (for example OPENAI_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, AZURE_AI_API_KEY)
 # GBrain uses LITELLM_BASE_URL and LITELLM_API_KEY from the same root env file.
+# Keep GBRAIN_EMBEDDING_MODEL and GBRAIN_EMBEDDING_DIMENSIONS aligned with the GBrain pgvector schema.
 
 # 2) Start the supporting services
 # (Signal is optional and commented out by default in docker-compose.yml)
