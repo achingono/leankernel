@@ -95,7 +95,8 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - TZ=${TZ:-America/Toronto}
     volumes:
-      - gbrain-data:/app/data/wiki
+      - ./data/wiki:/app/data/wiki
+      - gbrain-data:/app/data/gbrain
     ports:
       - "${GBRAIN_PORT:-8789}:8789"
     depends_on:
@@ -142,6 +143,7 @@ services:
       - LEANKERNEL__GATEWAY__APIKEY=${GATEWAY_API_KEY:-}
       - TZ=${TZ:-America/Toronto}
     volumes:
+      - ./data/wiki:/app/data/wiki:ro
       - gbrain-data:/app/data/gbrain:ro
     ports:
       - "${ENGINE_PORT:-5080}:5080"

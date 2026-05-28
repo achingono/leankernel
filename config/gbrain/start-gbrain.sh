@@ -23,8 +23,10 @@ gbrain init \
   --embedding-model "${GBRAIN_EMBEDDING_MODEL:-openai:embedding-small}" \
   --embedding-dimensions "${GBRAIN_EMBEDDING_DIMENSIONS:-3072}"
 
-# Create a bearer token for the engine if one doesn't already exist
-TOKEN_FILE="/app/data/wiki/.engine-token"
+# Create a bearer token for the engine if one doesn't already exist.
+# The token is shared with the engine through a dedicated shared volume.
+TOKEN_FILE="/app/data/gbrain/.engine-token"
+mkdir -p "$(dirname "$TOKEN_FILE")"
 if [ ! -f "$TOKEN_FILE" ]; then
   token=$(gbrain auth create leankernel-engine --takes-holders world 2>&1 | grep "^  gbrain_" | tr -d ' ')
   if [ -n "$token" ]; then
