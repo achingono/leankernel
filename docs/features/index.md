@@ -27,6 +27,7 @@ Documentation for implemented features. Each file documents one major capability
 - [Learning Pipeline](learning-pipeline.md)
 - [Scheduler](scheduler.md)
 - [Production Operations](production-ops.md)
+- [Browser Automation Tool](browser-tool.md)
 
 ## Phase 4 — User Interface
 - [Chat UI](ui-chat.md)

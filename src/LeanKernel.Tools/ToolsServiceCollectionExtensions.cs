@@ -3,9 +3,11 @@ using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Tools.BuiltIn.Data;
 using LeanKernel.Tools.BuiltIn.FileSystem;
+using LeanKernel.Tools.BuiltIn.Browser;
 using LeanKernel.Tools.BuiltIn.Internet;
 using LeanKernel.Tools.BuiltIn.Knowledge;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -28,15 +30,17 @@ public static class ToolsServiceCollectionExtensions
         services.AddHostedService<DocumentIngestionHostedService>();
         services.AddHostedService<DocumentFolderIngestionHostedService>();
 
+        services.TryAddSingleton<IBrowserServiceClient, BrowserServiceClient>();
         services.AddSingleton<ToolGovernancePolicy>();
         services.AddSingleton<IToolRegistry>(serviceProvider =>
         {
             var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
             var policy = serviceProvider.GetRequiredService<ToolGovernancePolicy>();
             var logger = serviceProvider.GetRequiredService<ILogger<ToolRegistry>>();
+            var config = serviceProvider.GetService<IOptions<LeanKernelConfig>>()?.Value ?? new LeanKernelConfig();
 
-            IReadOnlyList<ToolDefinition> builtInTools =
-            [
+            var builtInTools = new List<ToolDefinition>
+            {
                 DirectoryCreateTool.Create(scopeFactory),
                 DirectoryListTool.Create(scopeFactory),
                 ExtractTextTool.Create(scopeFactory),
@@ -59,7 +63,15 @@ public static class ToolsServiceCollectionExtensions
                 WebSearchTool.Create(scopeFactory),
                 WebFetchTool.Create(scopeFactory),
                 HttpRequestTool.Create(scopeFactory)
-            ];
+            };
+
+            if (config.BrowserService.Enabled)
+            {
+                builtInTools.Add(BrowserToolDefinitions.CreateRunTaskTool(scopeFactory));
+                builtInTools.Add(BrowserToolDefinitions.CreateGetRunTool(scopeFactory));
+                builtInTools.Add(BrowserToolDefinitions.CreateGetArtifactTool(scopeFactory));
+                builtInTools.Add(BrowserToolDefinitions.CreateCancelRunTool(scopeFactory));
+            }
 
             return new ToolRegistry(policy, builtInTools, logger);
         });

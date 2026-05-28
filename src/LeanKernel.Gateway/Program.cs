@@ -144,6 +144,7 @@ static void ConfigureOpenTelemetry(WebApplicationBuilder builder, LeanKernelConf
             tracing
                 .AddSource("LeanKernel.Diagnostics")
                 .AddSource("LeanKernel.Persistence")
+                .AddSource("LeanKernel.Tools.Browser")
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation();
 

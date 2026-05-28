@@ -19,4 +19,9 @@ public static class ProviderNames
     /// The GBrain provider name.
     /// </summary>
     public const string GBrain = "gbrain";
+
+    /// <summary>
+    /// The browser automation sidecar provider name.
+    /// </summary>
+    public const string BrowserService = "browser-service";
 }

@@ -7,7 +7,7 @@ LeanKernel keeps governance simple and explicit. The system does not rely on hid
 | `ToolGovernancePolicy` | Applies visibility rules for one `ToolVisibilityContext`. |
 | `ToolRegistry` | Stores tool definitions and returns the visible subset. |
 | `ToolExecutor` | Executes a resolved tool handler by name and arguments. |
-| Built-in tools | Provide default wiki, internet, filesystem, and data tool surfaces. |
+| Built-in tools | Provide default wiki, internet, filesystem, data, and optional browser tool surfaces. |
 ```mermaid
 flowchart LR
     C[ToolVisibilityContext] --> P[ToolGovernancePolicy]
@@ -33,6 +33,7 @@ The built-in registry is created in `AddLeanKernelTools` and currently includes:
 - `internet`: `web_search`, `web_fetch`, `http_request`
 - `filesystem`: `directory_create`, `directory_list`, `extract_text`, `file_read`, `file_write`, `file_edit`, `file_copy`, `file_move`, `file_delete`, `file_search`, `file_stat`, `file_touch`, `file_chmod`
 - `data`: `json_transform`, `csv_xlsx_read_write`, `database_query`
+- `browser` when `LeanKernel:BrowserService:Enabled=true`: `browser_run_task`, `browser_get_run`, `browser_get_artifact`, `browser_cancel_run`
 The underlying `ToolRegistry` accepts `IEnumerable<ToolDefinition>`, so the runtime can be extended with more tool definitions without changing the policy class itself.
 ## Visibility rules
 `ToolGovernancePolicy` uses three rules.
@@ -69,6 +70,10 @@ The current runtime ships with multi-category built-ins by default.
 | `json_transform` | `data` | Applies deterministic JSON select/project/filter/sort/slice/flatten transforms. |
 | `csv_xlsx_read_write` | `data` | Reads and writes CSV/XLSX files within allowed filesystem root. |
 | `database_query` | `data` | Executes read-only, parameterized SQL against configured named connections. |
+| `browser_run_task` | `browser` | Submits an asynchronous Webwright browser task when browser automation is enabled. |
+| `browser_get_run` | `browser` | Polls browser task status and artifact manifest. |
+| `browser_get_artifact` | `browser` | Fetches a manifest-listed browser artifact as base64. |
+| `browser_cancel_run` | `browser` | Requests idempotent cancellation of a browser task. |
 These tools resolve `IKnowledgeService` through `IServiceScopeFactory` during execution. That avoids holding a transient knowledge service instance for the full process lifetime.
 ## How the turn pipeline uses governance
 `TurnPipeline` asks the registry for visible tools using a `ToolVisibilityContext` that includes the sender id:

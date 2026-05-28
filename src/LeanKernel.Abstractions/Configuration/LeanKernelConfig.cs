@@ -21,6 +21,11 @@ public sealed class LeanKernelConfig
     public FileSystemConfig FileSystem { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets optional browser automation sidecar configuration.
+    /// </summary>
+    public BrowserServiceConfig BrowserService { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets production-hardening configuration.
     /// </summary>
     public HardeningConfig Hardening { get; set; } = new();

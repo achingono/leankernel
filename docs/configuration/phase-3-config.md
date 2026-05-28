@@ -173,6 +173,23 @@ The shipped appsettings examples define two disabled-by-default worker shapes:
 | `LeanKernel:Hardening:Resilience:CircuitBreakerDurationSeconds` | integer | `30` | Reserved circuit-breaker open duration. |
 | `LeanKernel:Hardening:Resilience:TimeoutSeconds` | integer | `30` | Timeout budget used by health probes and resilient HTTP clients. |
 
+## LeanKernel:BrowserService
+
+Browser automation is disabled by default and requires the `browser-service` sidecar plus a shared bearer token.
+
+| Key | Type | Gateway default | Description |
+| --- | --- | --- | --- |
+| `LeanKernel:BrowserService:Enabled` | boolean | `false` | Registers the `browser` tool category and enables authenticated sidecar readiness probing. |
+| `LeanKernel:BrowserService:BaseUrl` | string | `http://browser-service:8000` | Root URL for the browser-service sidecar. |
+| `LeanKernel:BrowserService:ApiToken` | string | empty | Bearer token used for `/ready` and browser run endpoints. |
+| `LeanKernel:BrowserService:RequestTimeoutSeconds` | integer | `15` | HTTP timeout for sidecar requests. Browser tasks are asynchronous, so this is not the Webwright wall-clock limit. |
+| `LeanKernel:BrowserService:MaxArtifactBytes` | integer | `2000000` | Maximum artifact bytes returned through `browser_get_artifact`. |
+| `LeanKernel:BrowserService:MaxOutputChars` | integer | `12000` | Maximum intended browser tool output characters. |
+| `LeanKernel:BrowserService:DefaultModel` | string | `gpt-4o` | Default LiteLLM model alias forwarded to browser task submissions. |
+| `LeanKernel:BrowserService:HealthProbe:Enabled` | boolean | `true` | Enables authenticated `/ready` checks when the browser service is enabled. |
+
+Related Compose variables include `BROWSER_SERVICE_ENABLED`, `BROWSER_SERVICE_API_TOKEN`, `BROWSER_SERVICE_LITELLM_KEY`, `BROWSER_SERVICE_MODEL`, `BROWSER_SERVICE_DOMAIN_ALLOWLIST`, and `BROWSER_SERVICE_DOMAIN_DENYLIST`.
+
 ## Related Phase 3 operational keys outside LeanKernel:Hardening
 
 OpenTelemetry export is configured at the top level, not under `LeanKernel:Hardening`.
@@ -190,3 +207,4 @@ OpenTelemetry export is configured at the top level, not under `LeanKernel:Harde
 - [Response Enhancement](../features/response-enhancement.md)
 - [Scheduler](../features/scheduler.md)
 - [Production Operations](../features/production-ops.md)
+- [Browser Automation Tool](../features/browser-tool.md)

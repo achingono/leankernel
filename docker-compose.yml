@@ -111,6 +111,38 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Browser Automation Sidecar (Webwright + Playwright) ─────────
+  browser-service:
+    build:
+      context: .
+      dockerfile: config/browser-service/Dockerfile
+    container_name: leankernel-browser-service
+    environment:
+      - API_TOKEN=${BROWSER_SERVICE_API_TOKEN:-}
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${BROWSER_SERVICE_LITELLM_KEY:-}
+      - WEBWRIGHT_MODEL=${BROWSER_SERVICE_MODEL:-gpt-4o}
+      - MAX_CONCURRENT_RUNS=${BROWSER_SERVICE_MAX_CONCURRENT_RUNS:-2}
+      - MAX_QUEUE_DEPTH=${BROWSER_SERVICE_MAX_QUEUE_DEPTH:-20}
+      - RUN_WALL_CLOCK_SECONDS=${BROWSER_SERVICE_RUN_WALL_CLOCK_SECONDS:-600}
+      - ARTIFACT_TTL_HOURS=${BROWSER_SERVICE_ARTIFACT_TTL_HOURS:-24}
+      - DOMAIN_ALLOWLIST=${BROWSER_SERVICE_DOMAIN_ALLOWLIST:-}
+      - DOMAIN_DENYLIST=${BROWSER_SERVICE_DOMAIN_DENYLIST:-}
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - browserdata:/app/outputs
+    ports:
+      - "${BROWSER_SERVICE_PORT:-8000}:8000"
+    depends_on:
+      litellm:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=5).getcode() == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   # signal:
   #   image: bbernhard/signal-cli-rest-api:latest
   #   environment:
@@ -137,6 +169,9 @@ services:
       - LEANKERNEL__GBRAIN__BASEURL=http://gbrain:8789
       - LEANKERNEL__GBRAIN__AUTHTOKEN=${GBRAIN_AUTH_TOKEN:-}
       - LEANKERNEL__GBRAIN__TIMEOUTSECONDS=30
+      - LEANKERNEL__BROWSERSERVICE__ENABLED=${BROWSER_SERVICE_ENABLED:-false}
+      - LEANKERNEL__BROWSERSERVICE__BASEURL=http://browser-service:8000
+      - LEANKERNEL__BROWSERSERVICE__APITOKEN=${BROWSER_SERVICE_API_TOKEN:-}
       - LEANKERNEL__DATABASE__CONNECTIONSTRING=Host=database;Database=${POSTGRES_DB:-leankernel};Username=${POSTGRES_USER:-leankernel};Password=${POSTGRES_PASSWORD:-leankernel-dev-password}
       - LEANKERNEL__DIAGNOSTICS__ENABLED=true
       - LEANKERNEL__DIAGNOSTICS__PERSISTTODATABASE=true
@@ -161,6 +196,8 @@ services:
         condition: service_healthy
       gbrain:
         condition: service_healthy
+      browser-service:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5080/api/health"]
@@ -172,3 +209,4 @@ volumes:
   database-data:
   gbrain-data:
   document-managed-data:
+  browserdata:

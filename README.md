@@ -32,7 +32,7 @@ LeanKernel helps you turn AI from "interesting demos" into repeatable output wit
 - **Deterministic history shaping** -> recent turns stay verbatim while older turns compact into traceable summaries -> lower context spend without losing critical decisions.
 - **5W1H structured memory + durable retrieval** -> faster recall of past facts and decisions -> less repeated explaining and lower frustration.
 - **MAF multi-agent orchestration** -> specialized workers handle complex requests predictably -> more done per day with less manual juggling.
-- **Dockerized core stack (Gateway, LiteLLM, Postgres, GBrain, optional Signal)** -> reproducible local runtime with fewer moving parts -> lower ops anxiety and easier recovery.
+- **Dockerized core stack (Gateway, LiteLLM, Postgres, GBrain, optional browser service, optional Signal)** -> reproducible local runtime with fewer moving parts -> lower ops anxiety and easier recovery.
 - **Document folder import (`./data/documents`)** -> drop files anywhere under a local bind mount and have the engine queue them for GBrain-backed document ingestion while managed upload copies stay in a separate volume.
 - **Thin Gateway API + shared channel routing** -> API and Signal messages reuse one runtime path -> faster integration and clearer transport behavior during the rearchitecture.
 
@@ -176,8 +176,9 @@ The rearchitected local stack centers on a shared PostgreSQL instance for LeanKe
 | **PostgreSQL + pgvector** | Primary persistence for LeanKernel, LiteLLM, and GBrain wiki/vector state |
 | **GBrain** | Bun-hosted `garrytan/gbrain` wiki and memory MCP server, persisting to the shared Postgres service and serving HTTP MCP from the root endpoint |
 | **LiteLLM** | Model proxy and routing surface for the engine |
+| **Browser service** | Optional Webwright + Playwright sidecar for disabled-by-default browser automation tools |
 
-The engine connects to LiteLLM through `LEANKERNEL__LITELLM__BASEURL`, to GBrain through `LEANKERNEL__GBRAIN__BASEURL`, and to PostgreSQL through `LEANKERNEL__DATABASE__CONNECTIONSTRING`.
+The engine connects to LiteLLM through `LEANKERNEL__LITELLM__BASEURL`, to GBrain through `LEANKERNEL__GBRAIN__BASEURL`, to the optional browser sidecar through `LEANKERNEL__BROWSERSERVICE__BASEURL`, and to PostgreSQL through `LEANKERNEL__DATABASE__CONNECTIONSTRING`.
 
 ## Stack
 
@@ -190,6 +191,7 @@ The engine connects to LiteLLM through `LEANKERNEL__LITELLM__BASEURL`, to GBrain
 | LLM Proxy | LiteLLM | `main-latest` |
 | Persistence | PostgreSQL + pgvector | 16 |
 | Wiki/Memory MCP | GBrain | `garrytan/gbrain` via Bun |
+| Browser automation | Webwright + Playwright | `webwright==0.0.7` |
 | Logging | Serilog | 9.0.0 |
 | Containers | Docker Compose | v2 |
 
@@ -203,6 +205,8 @@ cp .env.example .env
 # Add LiteLLM backend provider keys in .env as needed (for example OPENAI_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, AZURE_AI_API_KEY)
 # GBrain uses LITELLM_BASE_URL and LITELLM_API_KEY from the same root env file.
 # Keep GBRAIN_EMBEDDING_MODEL and GBRAIN_EMBEDDING_DIMENSIONS aligned with the GBrain pgvector schema.
+# Browser automation is disabled by default; set BROWSER_SERVICE_ENABLED=true plus a random
+# BROWSER_SERVICE_API_TOKEN and scoped BROWSER_SERVICE_LITELLM_KEY to enable browser tools.
 
 # 2) Start the supporting services
 # (Signal is optional and commented out by default in docker-compose.yml)
@@ -307,6 +311,8 @@ All configuration is via `appsettings.json` or environment variables (using `__`
 LEANKERNEL__LITELLM__BASEURL=http://litellm:4000
 LEANKERNEL__LITELLM__DEFAULTMODEL=gpt-4o-mini
 LEANKERNEL__GBRAIN__BASEURL=http://gbrain:8789
+LEANKERNEL__BROWSERSERVICE__ENABLED=false
+LEANKERNEL__BROWSERSERVICE__BASEURL=http://browser-service:8000
 LEANKERNEL__IDENTITY__USERPREFERENCEPAGEKEY=identity-user-default
 LEANKERNEL__IDENTITY__ENABLEIDENTITYEXTRACTION=true
 LEANKERNEL__DATABASE__CONNECTIONSTRING=Host=database;Database=leankernel;Username=leankernel;Password=leankernel-dev-password
@@ -355,6 +361,12 @@ OLLAMA_BASE_URL=http://host.docker.internal:11434
 ```
 
 You can keep extending `config/litellm/config.yaml` with additional providers, aliases, and routing policies as needed.
+
+### Browser service configuration
+
+Browser automation is exposed through four optional tools: `browser_run_task`, `browser_get_run`, `browser_get_artifact`, and `browser_cancel_run`. The tools register only when `LeanKernel:BrowserService:Enabled=true`, and Webwright model calls route through LiteLLM using the sidecar's `BROWSER_SERVICE_LITELLM_KEY`.
+
+Keep `BROWSER_SERVICE_API_TOKEN` blank until you intentionally enable the sidecar, then set it to a random secret and pass the same value to `LeanKernel:BrowserService:ApiToken`.
 
 ## Multi-Agent System
 
@@ -408,6 +420,7 @@ Built-in tools include:
 - `internet`: `web_search`, `web_fetch`, `http_request`
 - `filesystem`: directory/file operations plus `extract_text`
 - `data`: `json_transform`, `csv_xlsx_read_write`, `database_query`
+- `browser`: `browser_run_task`, `browser_get_run`, `browser_get_artifact`, `browser_cancel_run` when `LeanKernel:BrowserService:Enabled=true`
 
 ## Backup & Restore
 
@@ -430,6 +443,7 @@ Built-in tools include:
 | LiteLLM | `4000` | Model proxy |
 | PostgreSQL + pgvector | `5432` | Shared persistence for the stack |
 | GBrain | `8789` | Wiki and memory MCP service |
+| Browser service | `8000` | Optional Webwright/Playwright sidecar |
 
 ## Logging
 
