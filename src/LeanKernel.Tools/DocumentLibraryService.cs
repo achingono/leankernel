@@ -279,33 +279,3 @@ public sealed class DocumentLibraryService
     }
 }
 
-/// <summary>
-/// Represents the outcome of a document ingestion operation.
-/// </summary>
-public sealed class DocumentIngestionResult
-{
-    /// <summary>
-    /// Gets the compiled page slug inside the wiki knowledge base.
-    /// </summary>
-    public required string PageSlug { get; init; }
-
-    /// <summary>
-    /// Gets the human-readable document title.
-    /// </summary>
-    public required string Title { get; init; }
-
-    /// <summary>
-    /// Gets the length of the extracted text.
-    /// </summary>
-    public int ExtractedLength { get; init; }
-
-    /// <summary>
-    /// Gets the file path relative to the AllowedRoot.
-    /// </summary>
-    public required string RelativeFilePath { get; init; }
-
-    /// <summary>
-    /// Gets the internal storage path inside GBrain storage.
-    /// </summary>
-    public required string FileStoragePath { get; init; }
-}

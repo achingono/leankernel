@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace LeanKernel.Tools;
+namespace LeanKernel.Abstractions.Models;
 
 /// <summary>
 /// Represents a document queued for background ingestion.
@@ -62,6 +62,11 @@ public sealed class DocumentIngestionJob
     /// Gets when processing completed or failed.
     /// </summary>
     public DateTimeOffset? CompletedAt { get; set; }
+
+    /// <summary>
+    /// Gets or sets the number of retry attempts.
+    /// </summary>
+    public int RetryCount { get; set; }
 }
 
 /// <summary>
@@ -83,4 +88,35 @@ public enum DocumentIngestionStatus
 
     /// <summary>Job was cancelled.</summary>
     Cancelled
+}
+
+/// <summary>
+/// Represents the result of a successful document ingestion.
+/// </summary>
+public sealed class DocumentIngestionResult
+{
+    /// <summary>
+    /// Gets the compiled page slug inside the wiki knowledge base.
+    /// </summary>
+    public required string PageSlug { get; init; }
+
+    /// <summary>
+    /// Gets the human-readable document title.
+    /// </summary>
+    public required string Title { get; init; }
+
+    /// <summary>
+    /// Gets the length of the extracted text.
+    /// </summary>
+    public int ExtractedLength { get; init; }
+
+    /// <summary>
+    /// Gets the file path relative to the AllowedRoot.
+    /// </summary>
+    public required string RelativeFilePath { get; init; }
+
+    /// <summary>
+    /// Gets the internal storage path inside GBrain storage.
+    /// </summary>
+    public required string FileStoragePath { get; init; }
 }

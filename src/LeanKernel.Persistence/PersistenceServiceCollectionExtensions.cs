@@ -39,6 +39,8 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<ISessionStore>(provider => provider.GetRequiredService<PostgresSessionStore>());
         services.AddSingleton<PostgresDiagnosticsSink>();
         services.AddSingleton<IDiagnosticsSink>(provider => provider.GetRequiredService<PostgresDiagnosticsSink>());
+        services.AddScoped<DocumentIngestionJobRepository>();
+        services.AddScoped<IDocumentIngestionJobRepository>(provider => provider.GetRequiredService<DocumentIngestionJobRepository>());
 
         return services;
     }

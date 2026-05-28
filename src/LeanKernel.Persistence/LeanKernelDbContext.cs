@@ -38,6 +38,11 @@ public sealed class LeanKernelDbContext(DbContextOptions<LeanKernelDbContext> op
     /// </summary>
     public DbSet<ScheduledJobEntity> ScheduledJobExecutions => Set<ScheduledJobEntity>();
 
+    /// <summary>
+    /// Gets the persisted document ingestion jobs.
+    /// </summary>
+    public DbSet<DocumentIngestionJobEntity> DocumentIngestionJobs => Set<DocumentIngestionJobEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -87,6 +92,14 @@ public sealed class LeanKernelDbContext(DbContextOptions<LeanKernelDbContext> op
             entity.HasIndex(x => x.JobName);
             entity.HasIndex(x => new { x.JobName, x.ScheduledAt });
             entity.HasIndex(x => x.StartedAt);
+        });
+
+        modelBuilder.Entity<DocumentIngestionJobEntity>(entity =>
+        {
+            entity.HasKey(x => x.JobId);
+            entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => x.CreatedAt);
+            entity.HasIndex(x => x.CompletedAt);
         });
 
         base.OnModelCreating(modelBuilder);
