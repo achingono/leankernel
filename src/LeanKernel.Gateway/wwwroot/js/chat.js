@@ -40,12 +40,28 @@ window.leanKernelChat = window.leanKernelChat || {
             return;
         }
 
-        textarea.dataset.lkComposerBound = "true";
-        textarea.addEventListener("keydown", function (event) {
-            if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
+        const submitOnEnter = function (event) {
+            if (event.key !== "Enter" || event.shiftKey || event.isComposing) {
+                return;
+            }
+
+            event.preventDefault();
+            if (!button.hasAttribute("disabled")) {
                 button.click();
             }
+        };
+
+        textarea.dataset.lkComposerBound = "true";
+        textarea.addEventListener("keydown", submitOnEnter);
+
+        window.requestAnimationFrame(() => {
+            const innerTextArea = textarea.shadowRoot?.querySelector("textarea");
+            if (!innerTextArea || innerTextArea.dataset.lkComposerBound === "true") {
+                return;
+            }
+
+            innerTextArea.dataset.lkComposerBound = "true";
+            innerTextArea.addEventListener("keydown", submitOnEnter);
         });
     }
 };

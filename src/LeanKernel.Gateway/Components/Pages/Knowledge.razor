@@ -15,7 +15,7 @@
 <FluentStack Orientation="Orientation.Vertical" Class="lk-page">
     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-page-header">
         <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-            <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Knowledge</FluentLabel>
+            <h1 class="lk-page-title">Knowledge</h1>
             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Browse GBrain wiki pages, inspect linked knowledge, and curate durable context.</FluentLabel>
         </FluentStack>
         @if (_currentTab == TabMode.Wiki)
@@ -28,14 +28,14 @@
         }
     </FluentStack>
 
-    <FluentStack Orientation="Orientation.Horizontal" Class="lk-tab-toggle-group" Style="background: rgba(255, 255, 255, 0.05); padding: 4px; border-radius: 8px; width: fit-content; gap: 4px; margin-bottom: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.1);">
+    <FluentStack Orientation="Orientation.Horizontal" Class="lk-tab-toggle-group">
         <FluentButton Appearance="@(_currentTab == TabMode.Wiki ? Appearance.Accent : Appearance.Neutral)" 
-                      Style="border-radius: 6px; font-weight: bold; border: none; height: 32px;"
+                      Class="lk-tab-toggle"
                       @onclick="() => SetTab(TabMode.Wiki)">
             Wiki Pages
         </FluentButton>
         <FluentButton Appearance="@(_currentTab == TabMode.Documents ? Appearance.Accent : Appearance.Neutral)" 
-                      Style="border-radius: 6px; font-weight: bold; border: none; height: 32px;"
+                      Class="lk-tab-toggle"
                       @onclick="() => SetTab(TabMode.Documents)">
             Document Library
         </FluentButton>
@@ -117,8 +117,8 @@
             </FluentStack>
         </FluentCard>
 
-        <FluentStack Orientation="Orientation.Horizontal" Style="gap: var(--lk-space-l); align-items: flex-start; flex-wrap: wrap;">
-            <FluentCard aria-labelledby="knowledge-browse-title" Style="width: 320px; flex: 0 0 320px;">
+        <div class="lk-split-panel" style="--lk-sidebar-width: 340px;">
+            <FluentCard aria-labelledby="knowledge-browse-title" Class="lk-responsive-card">
                 <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
                     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Class="lk-card-header">
                         <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
@@ -164,7 +164,7 @@
                     {
                         <FluentCard Class="lk-empty-state">
                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No pages available</FluentLabel>
-                            <FluentCard Typo="Typography.Body" Color="Color.Neutral">Use search or create a new page to start building knowledge.</FluentCard>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Use search or create a new page to start building knowledge.</FluentLabel>
                         </FluentCard>
                     }
                     else
@@ -204,7 +204,7 @@
                 </FluentStack>
             </FluentCard>
 
-            <FluentCard aria-busy="@(_isPageLoading || _isSaving || _isCreating)" Style="flex: 1 1 720px; min-width: 320px;">
+            <FluentCard aria-busy="@(_isPageLoading || _isSaving || _isCreating)" Class="lk-responsive-card">
                 <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
                     @if (!string.IsNullOrWhiteSpace(_pageError))
                     {
@@ -259,8 +259,8 @@
                                 </FluentStack>
                             </FluentStack>
 
-                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
-                                <FluentCard Style="flex: 1 1 420px; min-width: 320px;">
+                            <div class="lk-split-panel" style="--lk-sidebar-width: 320px;">
+                                <FluentCard Class="lk-responsive-card">
                                     <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
                                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Page content</FluentLabel>
@@ -283,7 +283,7 @@
                                     </FluentStack>
                                 </FluentCard>
 
-                                <FluentStack Orientation="Orientation.Vertical" Style="flex: 0 1 320px; min-width: 280px; gap: 1rem;">
+                                <FluentStack Orientation="Orientation.Vertical" Class="lk-responsive-card" Style="gap: 1rem;">
                                     <FluentCard>
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
@@ -365,12 +365,12 @@
                                         </FluentStack>
                                     </FluentCard>
                                 </FluentStack>
-                            </FluentStack>
+                            </div>
                         </FluentStack>
                     }
                 </FluentStack>
             </FluentCard>
-        </FluentStack>
+        </div>
 
         <FluentDialog @bind-Hidden:get="@(!_isCreateOpen)"
                       @bind-Hidden:set="@(value => { if (value) CloseCreateModal(); })"
@@ -429,9 +429,9 @@
     }
     else
     {
-        <FluentStack Orientation="Orientation.Horizontal" Style="gap: var(--lk-space-l); align-items: flex-start; flex-wrap: wrap; width: 100%;">
+        <div class="lk-split-panel" style="--lk-sidebar-width: 340px;">
             <!-- Left panel: Browse documents -->
-            <FluentCard aria-labelledby="documents-browse-title" Style="width: 320px; flex: 0 0 320px;">
+            <FluentCard aria-labelledby="documents-browse-title" Class="lk-responsive-card">
                 <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
                     <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
                         <FluentLabel Id="documents-browse-title" Typo="Typography.Subject" Weight="FontWeight.Bold">Browse documents</FluentLabel>
@@ -492,7 +492,7 @@
             </FluentCard>
 
             <!-- Right panel: Document Details -->
-            <FluentCard aria-busy="@(_isPageLoading || _isUploading)" Style="flex: 1 1 720px; min-width: 320px;">
+            <FluentCard aria-busy="@(_isPageLoading || _isUploading)" Class="lk-responsive-card">
                 <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
                     @if (!string.IsNullOrWhiteSpace(_pageError))
                     {
@@ -538,9 +538,9 @@
                                 </FluentStack>
                             </FluentStack>
 
-                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+                            <div class="lk-split-panel" style="--lk-sidebar-width: 320px;">
                                 <!-- Extracted text viewer -->
-                                <FluentCard Style="flex: 1 1 420px; min-width: 320px;">
+                                <FluentCard Class="lk-responsive-card">
                                     <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
                                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Extracted AI memory index</FluentLabel>
@@ -554,7 +554,7 @@
                                 </FluentCard>
 
                                 <!-- Details sidebar -->
-                                <FluentStack Orientation="Orientation.Vertical" Style="flex: 0 1 320px; min-width: 280px; gap: 1rem;">
+                                <FluentStack Orientation="Orientation.Vertical" Class="lk-responsive-card" Style="gap: 1rem;">
                                     <FluentCard>
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
@@ -607,12 +607,12 @@
                                         </FluentStack>
                                     </FluentCard>
                                 </FluentStack>
-                            </FluentStack>
+                            </div>
                         </FluentStack>
                     }
                 </FluentStack>
             </FluentCard>
-        </FluentStack>
+        </div>
 
         <!-- Document Upload Dialog -->
         <FluentDialog @bind-Hidden:get="@(!_isUploadOpen)"

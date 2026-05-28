@@ -140,10 +140,51 @@ public class ChatPageTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            var heading = page.Locator("h2.chat-heading");
+            var heading = page.Locator("h1.chat-heading");
             await Assertions.Expect(heading).ToBeVisibleAsync();
             var text = await heading.TextContentAsync();
             Assert.Equal("Chat", text);
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
+    public async Task ChatPage_KeyboardTypingEnablesSendButton()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+            var composer = page.Locator("#chat-composer-input");
+            var sendButton = page.Locator("#chat-send-button");
+
+            await composer.ClickAsync();
+            await page.Keyboard.TypeAsync("Hello from keyboard", new() { Delay = 10 });
+
+            await Assertions.Expect(sendButton).ToBeEnabledAsync();
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
+    public async Task ChatPage_ShiftEnterAddsNewlineWithoutSending()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+            var composer = page.Locator("#chat-composer-input");
+            await composer.ClickAsync();
+            await page.Keyboard.TypeAsync("First line", new() { Delay = 10 });
+            await page.Keyboard.PressAsync("Shift+Enter");
+            await page.Keyboard.TypeAsync("Second line", new() { Delay = 10 });
+
+            var value = await composer.EvaluateAsync<string>("element => element.value");
+            Assert.Contains("\n", value, StringComparison.Ordinal);
+            Assert.Contains("Second line", value, StringComparison.Ordinal);
+            Assert.DoesNotContain("LeanKernel is thinking", await page.Locator("body").InnerTextAsync(), StringComparison.Ordinal);
         }
         finally { await page.CloseAsync(); }
     }

@@ -25,14 +25,14 @@
 }
 else
 {
-    <FluentStack Orientation="Orientation.Vertical" Class="lk-page">
+    <FluentStack Orientation="Orientation.Vertical" Class="lk-page lk-page-wide">
         <FluentCard>
             <FluentStack Orientation="Orientation.Horizontal"
                          VerticalAlignment="VerticalAlignment.Center"
                          Wrap="true"
                          Class="lk-card-header">
                 <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy" Style="max-width: 720px;">
-                    <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Guided setup</FluentLabel>
+                    <h1 class="lk-page-title">Guided setup</h1>
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tell LeanKernel how to address you, what domains matter most, and what outcomes you want help with.</FluentLabel>
                 </FluentStack>
                 <FluentBadge Appearance="Appearance.Accent">Step @(CurrentStepIndex + 1) of @Steps.Count</FluentBadge>
@@ -53,9 +53,9 @@ else
             </FluentMessageBar>
         }
 
-        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="align-items: flex-start; gap: 1rem;">
-            <FluentCard Style="flex: 1 1 720px; padding: 1.5rem;" aria-busy="@_isSaving">
-                <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
+        <div class="lk-split-panel" style="--lk-sidebar-width: 320px;">
+            <FluentCard Class="lk-responsive-card lk-overflow-visible lk-onboarding-wizard-card" aria-busy="@_isSaving">
+                <FluentStack Orientation="Orientation.Vertical" Style="gap: var(--lk-space-s);">
                     @if (_saveCompleted)
                     {
                         <FluentCard Style="padding: 1.25rem;">
@@ -73,8 +73,7 @@ else
                     {
                         <FluentWizard Value="@CurrentStepIndex"
                                       ValueChanged="OnWizardStepChangedAsync"
-                                      StepperPosition="StepperPosition.Left"
-                                      StepperSize="220px"
+                                      StepperPosition="StepperPosition.Top"
                                       StepSequence="WizardStepSequence.Any"
                                       Width="100%">
                             <Steps>
@@ -82,29 +81,19 @@ else
                                 <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
                                     <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
                                         <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Welcome to LeanKernel</FluentLabel>
-                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">This guided setup creates durable identity pages so LeanKernel can personalize retrieval, tone, and follow-up support without asking you to repeat yourself every session.</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Create durable identity pages so LeanKernel can personalize retrieval, tone, and follow-up support.</FluentLabel>
                                     </FluentStack>
 
-                                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem; align-items: stretch;">
-                                        <div class="lk-panel" style="flex: 1 1 280px;">
-                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
-                                                <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">What we capture</FluentLabel>
-                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">• How you want LeanKernel to address and respond to you</FluentLabel>
-                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">• Knowledge domains that should shape retrieval and memory</FluentLabel>
-                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">• Goals that help prioritize future support</FluentLabel>
+                                    <div class="lk-panel">
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: var(--lk-space-xs);">
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">What we capture</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Name and tone preferences, important knowledge domains, and goals that guide future support.</FluentLabel>
+                                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Class="lk-badge-group">
+                                                <FluentBadge Appearance="Appearance.Neutral">@LeanKernel.Gateway.Services.OnboardingService.UserProfilePageKey</FluentBadge>
+                                                <FluentBadge Appearance="Appearance.Neutral">@LeanKernel.Gateway.Services.OnboardingService.UserGoalsPageKey</FluentBadge>
                                             </FluentStack>
-                                        </div>
-
-                                        <div class="lk-panel" style="flex: 1 1 280px;">
-                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
-                                                <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">What gets written</FluentLabel>
-                                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
-                                                    <FluentBadge Appearance="Appearance.Neutral">@LeanKernel.Gateway.Services.OnboardingService.UserProfilePageKey</FluentBadge>
-                                                    <FluentBadge Appearance="Appearance.Neutral">@LeanKernel.Gateway.Services.OnboardingService.UserGoalsPageKey</FluentBadge>
-                                                </FluentStack>
-                                            </FluentStack>
-                                        </div>
-                                    </FluentStack>
+                                        </FluentStack>
+                                    </div>
                                 </FluentStack>
                             </FluentWizardStep>
 
@@ -444,7 +433,7 @@ else
                 </FluentStack>
             </FluentCard>
 
-            <FluentStack Orientation="Orientation.Vertical" Style="flex: 0 1 320px; gap: 1rem;">
+            <FluentStack Orientation="Orientation.Vertical" Class="lk-responsive-card" Style="gap: 1rem;">
                 <FluentCard Style="padding: 1rem;" aria-label="Profile guidance">
                     <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                         <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Identity gaps</FluentLabel>
@@ -483,7 +472,7 @@ else
                     </FluentStack>
                 </FluentCard>
             </FluentStack>
-        </FluentStack>
+        </div>
     </FluentStack>
 }
 

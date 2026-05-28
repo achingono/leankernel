@@ -20,7 +20,7 @@
     <FluentStack Orientation="Orientation.Vertical" Class="chat-main">
         <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-header-row">
             <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-                <h2 class="chat-heading">Chat</h2>
+                <h1 class="chat-heading">Chat</h1>
                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetHeaderSubtitle()</FluentLabel>
             </FluentStack>
             <FluentButton Appearance="Appearance.Outline" OnClick="StartNewSessionAsync">New session</FluentButton>
@@ -68,6 +68,7 @@
         <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell">
             <FluentTextArea Id="chat-composer-input"
                            @bind-Value="ChatService.ComposerText"
+                           Immediate="true"
                            Rows="4"
                            Maxlength="12000"
                            Placeholder="Ask LeanKernel anything…"

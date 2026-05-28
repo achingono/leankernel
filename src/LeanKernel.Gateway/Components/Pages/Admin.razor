@@ -6,10 +6,10 @@
 
 <PageTitle>LeanKernel Admin</PageTitle>
 
-<FluentStack Orientation="Orientation.Vertical" Class="lk-page">
+<FluentStack Orientation="Orientation.Vertical" Class="lk-page lk-page-wide">
     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-page-header">
         <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-            <FluentLabel Typo="Typography.PageTitle" Weight="FontWeight.Bold">Admin Console</FluentLabel>
+            <h1 class="lk-page-title">Admin Console</h1>
             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Govern provider health, model routing, tool access, spend, and scheduled jobs from one runtime surface.</FluentLabel>
         </FluentStack>
         <FluentStack Orientation="Orientation.Vertical" Style="align-items: flex-end; gap: var(--lk-space-xs);">
@@ -65,10 +65,10 @@
                 }
                 else
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: var(--lk-space-l);">
+                    <div class="lk-auto-grid" style="--lk-grid-min: 260px;">
                         @foreach (var provider in _dashboard.ProviderHealth)
                         {
-                            <FluentCard Style="flex: 1 1 240px; min-width: 240px;">
+                            <FluentCard Class="lk-responsive-card">
                                 <FluentStack Orientation="Orientation.Vertical" Class="lk-section">
                                     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-card-header">
                                         <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
@@ -94,7 +94,7 @@
                                 </FluentStack>
                             </FluentCard>
                         }
-                    </FluentStack>
+                    </div>
                 }
             </FluentStack>
         </FluentCard>
@@ -120,19 +120,21 @@
                 }
                 else
                 {
-                    <FluentDataGrid Items="@(_dashboard.RoutingRules.AsQueryable())" TGridItem="AdminRoutingRule" Style="width: 100%;" GridTemplateColumns="1fr 2fr 2fr 1fr 1fr">
-                        <PropertyColumn Property="@(rule => rule.Tier)" Title="Tier" Sortable="true" />
-                        <TemplateColumn Title="Model">
-                            <FluentBadge Appearance="Appearance.Neutral">@context.Model</FluentBadge>
-                        </TemplateColumn>
-                        <TemplateColumn Title="Fallback model">
-                            <FluentBadge Appearance="Appearance.Neutral">@context.FallbackModel</FluentBadge>
-                        </TemplateColumn>
-                        <PropertyColumn Property="@(rule => rule.MaxTokens)" Title="Max tokens" Sortable="true" Format="N0" Align="Align.End" />
-                        <TemplateColumn Title="Cost / 1k" Align="Align.End">
-                            @FormatCurrency(context.CostPer1K)
-                        </TemplateColumn>
-                    </FluentDataGrid>
+                    <div class="lk-scroll-region" style="--lk-table-min-width: 760px;">
+                        <FluentDataGrid Items="@(_dashboard.RoutingRules.AsQueryable())" TGridItem="AdminRoutingRule" Style="width: 100%;" GridTemplateColumns="1fr 2fr 2fr 1fr 1fr">
+                            <PropertyColumn Property="@(rule => rule.Tier)" Title="Tier" Sortable="true" />
+                            <TemplateColumn Title="Model">
+                                <FluentBadge Appearance="Appearance.Neutral">@context.Model</FluentBadge>
+                            </TemplateColumn>
+                            <TemplateColumn Title="Fallback model">
+                                <FluentBadge Appearance="Appearance.Neutral">@context.FallbackModel</FluentBadge>
+                            </TemplateColumn>
+                            <PropertyColumn Property="@(rule => rule.MaxTokens)" Title="Max tokens" Sortable="true" Format="N0" Align="Align.End" />
+                            <TemplateColumn Title="Cost / 1k" Align="Align.End">
+                                @FormatCurrency(context.CostPer1K)
+                            </TemplateColumn>
+                        </FluentDataGrid>
+                    </div>
                 }
             </FluentStack>
         </FluentCard>
@@ -170,20 +172,22 @@
                 }
                 else
                 {
-                    <FluentDataGrid Items="@(FilteredTools.AsQueryable())" TGridItem="AdminToolGovernanceItem" Style="width: 100%;" GridTemplateColumns="2fr 1fr auto 1fr 3fr">
-                        <PropertyColumn Property="@(tool => tool.Name)" Title="Name" Sortable="true" />
-                        <PropertyColumn Property="@(tool => tool.Category)" Title="Category" Sortable="true" />
-                        <TemplateColumn Title="Enabled">
-                            <FluentSwitch Value="@context.Enabled"
-                                          ValueChanged="@(async enabled => await OnToolToggleChangedAsync(context.Name, new ChangeEventArgs { Value = enabled }))"
-                                          Disabled="@(_isLoading || !string.IsNullOrWhiteSpace(_updatingToolName))"
-                                          AriaLabel="@GetToggleAriaLabel(context)" />
-                        </TemplateColumn>
-                        <PropertyColumn Property="@(tool => tool.VisibilityScope)" Title="Visibility scope" Sortable="true" />
-                        <TemplateColumn Title="Description">
-                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@context.Description</FluentLabel>
-                        </TemplateColumn>
-                    </FluentDataGrid>
+                    <div class="lk-scroll-region" style="--lk-table-min-width: 920px;">
+                        <FluentDataGrid Items="@(FilteredTools.AsQueryable())" TGridItem="AdminToolGovernanceItem" Style="width: 100%;" GridTemplateColumns="2fr 1fr auto 1fr 3fr">
+                            <PropertyColumn Property="@(tool => tool.Name)" Title="Name" Sortable="true" />
+                            <PropertyColumn Property="@(tool => tool.Category)" Title="Category" Sortable="true" />
+                            <TemplateColumn Title="Enabled">
+                                <FluentSwitch Value="@context.Enabled"
+                                              ValueChanged="@(async enabled => await OnToolToggleChangedAsync(context.Name, new ChangeEventArgs { Value = enabled }))"
+                                              Disabled="@(_isLoading || !string.IsNullOrWhiteSpace(_updatingToolName))"
+                                              AriaLabel="@GetToggleAriaLabel(context)" />
+                            </TemplateColumn>
+                            <PropertyColumn Property="@(tool => tool.VisibilityScope)" Title="Visibility scope" Sortable="true" />
+                            <TemplateColumn Title="Description">
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@context.Description</FluentLabel>
+                            </TemplateColumn>
+                        </FluentDataGrid>
+                    </div>
                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tool toggles update in-memory governance state for the current session.</FluentLabel>
                 }
             </FluentStack>
@@ -207,7 +211,7 @@
                 }
                 else
                 {
-                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: var(--lk-space-l);">
+                    <div class="lk-auto-grid" style="--lk-grid-min: 180px;">
                         <FluentCard Class="lk-stat-card">
                             <FluentStack Orientation="Orientation.Vertical" Class="lk-stat-card-content">
                                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Today</FluentLabel>
@@ -232,10 +236,10 @@
                                 <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">@GetBudgetSummary()</FluentLabel>
                             </FluentStack>
                         </FluentCard>
-                    </FluentStack>
+                    </div>
 
-                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem; align-items: stretch;">
-                        <FluentCard Style="flex: 2 1 420px; min-width: 320px;">
+                    <div class="lk-split-panel" style="--lk-sidebar-width: 320px;">
+                        <FluentCard Class="lk-responsive-card">
                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem; height: 100%;">
                                 <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
                                     <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Last 7 days</FluentLabel>
@@ -266,7 +270,7 @@
                             </FluentStack>
                         </FluentCard>
 
-                        <FluentCard Style="flex: 1 1 280px; min-width: 280px;">
+                        <FluentCard Class="lk-responsive-card">
                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem; height: 100%;">
                                 <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
                                     <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Budget limit</FluentLabel>
@@ -275,7 +279,7 @@
 
                                 @if (_dashboard.Spend.MonthlyBudgetLimit is decimal monthlyBudgetLimit)
                                 {
-                                    <FluentProgress Min="0" Max="100" Value="@((int)GetBudgetUsagePercentage())" Style="width: 100%;" />
+                                    <FluentProgress Min="0" Max="100" Value="@((int)GetBudgetUsagePercentage())" Style="display: block; visibility: visible; width: 100%; min-width: 160px; min-height: 4px;" />
                                     <FluentLabel Typo="Typography.Body">@FormatCurrency(_dashboard.Spend.MonthSpend) of @FormatCurrency(monthlyBudgetLimit) used this month.</FluentLabel>
                                 }
                                 else
@@ -284,7 +288,7 @@
                                 }
                             </FluentStack>
                         </FluentCard>
-                    </FluentStack>
+                    </div>
                 }
             </FluentStack>
         </FluentCard>
@@ -307,23 +311,25 @@
                 }
                 else
                 {
-                    <FluentDataGrid Items="@(_dashboard.ScheduledJobs.AsQueryable())" TGridItem="AdminScheduledJob" Style="width: 100%;" GridTemplateColumns="2fr 1.5fr 1.5fr 1.5fr auto">
-                        <PropertyColumn Property="@(job => job.Name)" Title="Name" Sortable="true" />
-                        <TemplateColumn Title="Schedule">
-                            <code>@context.Schedule</code>
-                        </TemplateColumn>
-                        <TemplateColumn Title="Last run">
-                            <time datetime="@FormatTimestampAttribute(context.LastRunAt)">@FormatDateTime(context.LastRunAt)</time>
-                        </TemplateColumn>
-                        <TemplateColumn Title="Next run">
-                            <time datetime="@FormatTimestampAttribute(context.NextRunAt)">@FormatDateTime(context.NextRunAt)</time>
-                        </TemplateColumn>
-                        <TemplateColumn Title="Status">
-                            <FluentBadge Appearance="@(context.Status == AdminJobStatus.Running ? Appearance.Accent : context.Status == AdminJobStatus.Idle ? Appearance.Neutral : Appearance.Lightweight)">
-                                @GetJobStatusLabel(context.Status)
-                            </FluentBadge>
-                        </TemplateColumn>
-                    </FluentDataGrid>
+                    <div class="lk-scroll-region" style="--lk-table-min-width: 840px;">
+                        <FluentDataGrid Items="@(_dashboard.ScheduledJobs.AsQueryable())" TGridItem="AdminScheduledJob" Style="width: 100%;" GridTemplateColumns="2fr 1.5fr 1.5fr 1.5fr auto">
+                            <PropertyColumn Property="@(job => job.Name)" Title="Name" Sortable="true" />
+                            <TemplateColumn Title="Schedule">
+                                <code>@context.Schedule</code>
+                            </TemplateColumn>
+                            <TemplateColumn Title="Last run">
+                                <time datetime="@FormatTimestampAttribute(context.LastRunAt)">@FormatDateTime(context.LastRunAt)</time>
+                            </TemplateColumn>
+                            <TemplateColumn Title="Next run">
+                                <time datetime="@FormatTimestampAttribute(context.NextRunAt)">@FormatDateTime(context.NextRunAt)</time>
+                            </TemplateColumn>
+                            <TemplateColumn Title="Status">
+                                <FluentBadge Appearance="@(context.Status == AdminJobStatus.Running ? Appearance.Accent : context.Status == AdminJobStatus.Idle ? Appearance.Neutral : Appearance.Lightweight)">
+                                    @GetJobStatusLabel(context.Status)
+                                </FluentBadge>
+                            </TemplateColumn>
+                        </FluentDataGrid>
+                    </div>
                 }
             </FluentStack>
         </FluentCard>

@@ -192,6 +192,27 @@ public class AdminPageTests
     }
 
     [Fact]
+    public async Task AdminPage_ToolSwitchesUseTouchFriendlyTargets()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/admin", new() { WaitUntil = WaitUntilState.NetworkIdle });
+            var switches = page.Locator("section[aria-labelledby='admin-tools-heading'] fluent-switch");
+            var count = await switches.CountAsync();
+            Assert.True(count > 0, "Tool governance should have toggle switches");
+
+            for (var index = 0; index < Math.Min(count, 5); index++)
+            {
+                var box = await switches.Nth(index).BoundingBoxAsync();
+                Assert.NotNull(box);
+                Assert.True(box.Height >= 44, $"Switch {index} should expose at least a 44px high hit target.");
+            }
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
     public async Task AdminPage_NoMockBackedPreviewBadge()
     {
         var page = await _fixture.Context.NewPageAsync();

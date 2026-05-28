@@ -16,6 +16,8 @@
     --lk-radius-s: 6px;
     --lk-radius-m: 12px;
     --lk-radius-l: 16px;
+    --lk-touch-target-min: 44px;
+    --lk-focus-ring: 3px solid var(--accent-fill-rest);
 
     /* Theme colors & gradients */
     --lk-glow-indigo: rgba(99, 102, 241, 0.15);
@@ -58,8 +60,12 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: -0.025em;
 }
 
-/* ── FluentUI Base Card Overrides (Glassmorphism) ──────────────── */
-fluent-card, .fluent-card, .lk-glass-panel {
+/* ── Intentional Panel Surfaces ────────────────────────────────── */
+.lk-glass-panel,
+.lk-panel,
+.lk-empty-state,
+.lk-stat-card,
+.lk-surface-card {
     background: var(--lk-glass-bg) !important;
     backdrop-filter: blur(16px) saturate(120%);
     -webkit-backdrop-filter: blur(16px) saturate(120%);
@@ -68,6 +74,56 @@ fluent-card, .fluent-card, .lk-glass-panel {
     box-shadow: var(--lk-card-shadow) !important;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
     padding: var(--lk-space-m);
+}
+
+fluent-card {
+    border-radius: var(--lk-radius-m);
+    box-sizing: border-box;
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+}
+
+.lk-page > fluent-card,
+.lk-page > section,
+.lk-page > section > fluent-card {
+    width: 100%;
+}
+
+/* ── Accessible Interaction Baseline ───────────────────────────── */
+button,
+[role="button"],
+fluent-button,
+fluent-nav-link,
+a.fluent-nav-link,
+fluent-switch,
+fluent-text-field,
+fluent-text-area,
+fluent-search,
+fluent-select {
+    min-height: var(--lk-touch-target-min);
+}
+
+button,
+[role="button"],
+fluent-button,
+a.fluent-nav-link {
+    touch-action: manipulation;
+}
+
+a.fluent-nav-link {
+    display: flex;
+    align-items: center;
+}
+
+fluent-switch {
+    align-items: center;
+}
+
+:focus-visible {
+    outline: var(--lk-focus-ring);
+    outline-offset: 2px;
 }
 
 /* ── Interactive Cards & Hover Transitions ──────────────────────── */
@@ -88,7 +144,7 @@ fluent-card, .fluent-card, .lk-glass-panel {
 }
 
 .lk-card-interactive:focus-visible {
-    outline: 3px solid var(--accent-fill-rest);
+    outline: var(--lk-focus-ring);
     outline-offset: 2px;
 }
 
@@ -160,11 +216,24 @@ fluent-card, .fluent-card, .lk-glass-panel {
     background: var(--neutral-layer-2);
 }
 
+.lk-main-content {
+    min-height: 100%;
+    outline: none;
+}
+
 /* ── Standard Page Spacing ─────────────────────────────────────── */
 .lk-page {
     gap: var(--lk-space-m);
     display: flex;
     flex-direction: column;
+    width: 100%;
+    max-width: min(100%, 1180px);
+    margin-inline: auto;
+    box-sizing: border-box;
+}
+
+.lk-page-wide {
+    max-width: min(100%, 1360px);
 }
 
 .lk-page-header {
@@ -179,10 +248,79 @@ fluent-card, .fluent-card, .lk-glass-panel {
     gap: var(--lk-space-xxs);
 }
 
+.lk-page-title,
+.chat-heading {
+    margin: 0;
+    color: var(--neutral-foreground-rest);
+    font-size: clamp(1.75rem, 1.35rem + 1.25vw, 2.5rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+}
+
 .lk-page-body {
     gap: var(--lk-space-m);
     display: flex;
     flex-direction: column;
+}
+
+.lk-auto-grid {
+    --lk-grid-min: 240px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--lk-grid-min), 100%), 1fr));
+    gap: var(--lk-space-l);
+    align-items: stretch;
+}
+
+.lk-auto-grid > * {
+    min-width: 0;
+    height: 100%;
+}
+
+.lk-split-panel {
+    --lk-sidebar-width: 320px;
+    display: grid;
+    grid-template-columns: minmax(260px, var(--lk-sidebar-width)) minmax(0, 1fr);
+    gap: var(--lk-space-l);
+    align-items: start;
+}
+
+.lk-split-panel > * {
+    min-width: 0;
+}
+
+.lk-responsive-card {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+fluent-progress,
+.lk-responsive-card fluent-progress {
+    display: block;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-width: 160px;
+    min-height: 4px;
+}
+
+.lk-onboarding-wizard-card {
+    max-height: none;
+}
+
+.lk-overflow-visible {
+    overflow: visible !important;
+}
+
+.lk-scroll-region {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.lk-scroll-region fluent-data-grid {
+    min-width: var(--lk-table-min-width, 720px);
 }
 
 /* ── Internal Card Details ─────────────────────────────────────── */
@@ -227,6 +365,18 @@ fluent-card, .fluent-card, .lk-glass-panel {
     display: flex;
     flex-direction: row;
     align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.lk-form-group > * {
+    min-width: 0;
+}
+
+.lk-form-row fluent-text-field,
+.lk-form-row fluent-search,
+.lk-form-row fluent-select,
+.lk-form-row fluent-text-area {
+    flex: 1 1 260px;
 }
 
 .lk-form-field {
@@ -293,6 +443,25 @@ fluent-card, .fluent-card, .lk-glass-panel {
     flex-wrap: wrap;
 }
 
+.lk-tab-toggle-group {
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+    gap: var(--lk-space-xxs);
+    margin-bottom: var(--lk-space-l);
+    padding: var(--lk-space-xxs);
+    border: 1px solid var(--neutral-stroke-divider-rest);
+    border-radius: var(--lk-radius-m);
+    background: var(--neutral-layer-2);
+}
+
+.lk-tab-toggle {
+    min-height: var(--lk-touch-target-min);
+    border: 0;
+    border-radius: var(--lk-radius-s);
+    font-weight: 700;
+}
+
 /* ── High-Fidelity Chat Specifics ─────────────────────────────── */
 .chat-page {
     height: 100%;
@@ -327,10 +496,7 @@ fluent-card, .fluent-card, .lk-glass-panel {
 }
 
 .chat-heading {
-    margin: 0;
-    font-size: 1.75rem;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
+    font-size: clamp(1.75rem, 1.45rem + 1vw, 2.25rem);
 }
 
 .chat-message-list {
@@ -357,6 +523,7 @@ fluent-card, .fluent-card, .lk-glass-panel {
 
 .chat-composer-input {
     width: 100%;
+    min-height: 7rem;
 }
 
 .chat-composer-footer {
@@ -488,8 +655,67 @@ code {
 
 /* ── Responsive breakpoints ────────────────────────────────────── */
 @media (max-width: 900px) {
+    .main-layout-navmenu {
+        width: 64px !important;
+        min-width: 64px !important;
+        flex: 0 0 64px !important;
+    }
+
+    .main-layout-navmenu .fluent-nav-text {
+        max-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+    }
+
+    .lk-shell-content {
+        padding: var(--lk-space-s);
+    }
+
+    .lk-page {
+        max-width: 100%;
+    }
+
+    .lk-page-header {
+        align-items: flex-start;
+    }
+
+    .lk-split-panel {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .lk-auto-grid {
+        --lk-grid-min: 220px;
+        gap: var(--lk-space-m);
+    }
+
+    .lk-form-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .lk-form-row fluent-button,
+    .lk-form-row fluent-text-field,
+    .lk-form-row fluent-search,
+    .lk-form-row fluent-select,
+    .lk-form-row fluent-text-area {
+        width: 100% !important;
+        flex: 1 1 auto !important;
+    }
+
+    .lk-tab-toggle-group {
+        flex-wrap: wrap !important;
+        width: 100%;
+        overflow-x: visible;
+    }
+
+    .lk-onboarding-wizard-card {
+        max-height: none;
+    }
+
     .chat-page {
         flex-direction: column !important;
+        height: auto;
+        min-height: 100%;
     }
     
     .chat-sessions-panel {
@@ -498,9 +724,60 @@ code {
         max-height: 200px;
     }
 
+    .chat-main {
+        min-height: auto;
+        overflow: visible;
+    }
+
+    .chat-message-list {
+        flex: 0 1 auto;
+        min-height: 280px;
+        max-height: none;
+    }
+
+    .chat-composer-shell {
+        position: static;
+        z-index: 10;
+    }
+
+    .chat-composer-footer fluent-button {
+        width: 100%;
+    }
+
     .lk-chat-bubble-user,
     .lk-chat-bubble-assistant {
         margin-left: 0 !important;
         margin-right: 0 !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .lk-shell-content {
+        padding: var(--lk-space-xs);
+    }
+
+    .lk-page {
+        gap: var(--lk-space-s);
+    }
+
+    .lk-card-content,
+    .lk-section {
+        gap: var(--lk-space-s);
+    }
+
+    .lk-tab-toggle-group fluent-button,
+    .lk-tab-toggle {
+        flex: 1 1 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
     }
 }

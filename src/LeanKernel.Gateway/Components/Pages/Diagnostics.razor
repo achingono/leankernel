@@ -9,12 +9,12 @@
 
 <FluentStack Orientation="Orientation.Vertical" Class="lk-page">
     <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-        <FluentLabel Typo="Typography.PageTitle">Diagnostics explorer</FluentLabel>
+        <h1 class="lk-page-title">Diagnostics explorer</h1>
         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Inspect the latest persisted context audit, budget usage, history shaping, and routing decisions for any session.</FluentLabel>
     </FluentStack>
 
     <FluentCard>
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Class="lk-form-group">
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Class="lk-form-group lk-form-row">
             <FluentTextField @bind-Value="_sessionId"
                              Label="Session ID"
                              Placeholder="Enter a session id"
@@ -94,7 +94,7 @@
                     }
                 </FluentStack>
 
-                <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem;">
+                <div class="lk-split-panel" style="--lk-sidebar-width: 50%;">
                     <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.5rem;">
                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Admitted</FluentLabel>
                         @if (AdmittedItems.Count == 0)
@@ -144,7 +144,7 @@
                             }
                         }
                     </FluentStack>
-                </FluentStack>
+                </div>
 
                 @if (_model.Context?.RetrievalDiagnostics is { } retrieval)
                 {
@@ -275,7 +275,7 @@
                         <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Reason</FluentLabel>
                         <FluentLabel Typo="Typography.Body">@routing.Reason</FluentLabel>
 
-                        <FluentStack Orientation="Orientation.Horizontal" Style="gap: 2rem; margin-top: 1rem;">
+                        <div class="lk-split-panel" style="--lk-sidebar-width: 50%; margin-top: 1rem;">
                             <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.25rem;">
                                 <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Decision factors</FluentLabel>
                                 @if (routing.Factors.Count == 0)
@@ -310,7 +310,7 @@
                                     }
                                 }
                             </FluentStack>
-                        </FluentStack>
+                        </div>
                     }
 
                     @if (_model.QualityGate is { } qualityGate)

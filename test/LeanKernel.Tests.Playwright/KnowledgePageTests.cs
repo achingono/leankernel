@@ -119,14 +119,17 @@ public class KnowledgePageTests
     }
 
     [Fact]
-    public async Task KnowledgePage_ShowsPageDetailEmptyState()
+    public async Task KnowledgePage_ShowsPageDetailPanel()
     {
         var page = await _fixture.Context.NewPageAsync();
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/knowledge", new() { WaitUntil = WaitUntilState.NetworkIdle });
             var content = await page.ContentAsync();
-            Assert.Contains("Select a page", content);
+            Assert.True(
+                content.Contains("Select a page", StringComparison.OrdinalIgnoreCase)
+                || content.Contains("Page content", StringComparison.OrdinalIgnoreCase),
+                "Knowledge page should show either the empty detail state or the selected page detail panel.");
         }
         finally { await page.CloseAsync(); }
     }
@@ -141,6 +144,47 @@ public class KnowledgePageTests
             var content = await page.ContentAsync();
             Assert.Contains("Previous", content);
             Assert.Contains("Next", content);
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
+    public async Task KnowledgePage_SearchAcceptsNaturalKeyboardInput()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/knowledge", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+            var searchInput = page.Locator("#knowledge-search-input");
+            await searchInput.ClickAsync();
+            await page.Keyboard.TypeAsync("learning", new() { Delay = 10 });
+
+            var value = await searchInput.EvaluateAsync<string>("element => element.value");
+            Assert.Equal("learning", value);
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
+    public async Task KnowledgePage_CreateDialogOpensAndCloses()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/knowledge", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+            await page.GetByText("Create new page", new() { Exact = true }).ClickAsync();
+            var slug = page.Locator("#knowledge-create-slug");
+            await Assertions.Expect(slug).ToBeVisibleAsync();
+
+            await slug.ClickAsync();
+            await page.Keyboard.TypeAsync("playwright-ux-audit-temp", new() { Delay = 10 });
+            var value = await slug.EvaluateAsync<string>("element => element.value");
+            Assert.Equal("playwright-ux-audit-temp", value);
+
+            await page.GetByText("Cancel", new() { Exact = true }).Last.ClickAsync();
+            await Assertions.Expect(slug).ToBeHiddenAsync();
         }
         finally { await page.CloseAsync(); }
     }

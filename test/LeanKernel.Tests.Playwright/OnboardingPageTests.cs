@@ -159,4 +159,46 @@ public class OnboardingPageTests
         }
         finally { await page.CloseAsync(); }
     }
+
+    [Fact]
+    public async Task OnboardingPage_WizardNextButtonMovesToIdentityStep()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/onboarding", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+            await ClickWizardNextAsync(page);
+            var displayName = page.Locator("#onboarding-display-name");
+            await Assertions.Expect(displayName).ToBeVisibleAsync();
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
+    public async Task OnboardingPage_FormFieldsAcceptKeyboardInput()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/onboarding", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+            await ClickWizardNextAsync(page);
+            var displayName = page.Locator("#onboarding-display-name");
+            await displayName.ClickAsync();
+            await page.Keyboard.TypeAsync("Playwright UX Reviewer", new() { Delay = 10 });
+
+            var value = await displayName.EvaluateAsync<string>("element => element.value");
+            Assert.Equal("Playwright UX Reviewer", value);
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    private static async Task ClickWizardNextAsync(IPage page)
+    {
+        var next = page.Locator("fluent-button[aria-label='Continue to the next onboarding step']");
+        await next.ScrollIntoViewIfNeededAsync();
+        await next.ClickAsync(new() { Force = true });
+    }
+
 }
