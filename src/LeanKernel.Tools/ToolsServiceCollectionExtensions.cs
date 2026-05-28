@@ -19,9 +19,14 @@ public static class ToolsServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton<DocumentLibraryService>();
-        services.AddSingleton<DocumentIngestionQueue>();
+        services.AddSingleton(sp =>
+        {
+            var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value.DocumentIngestion;
+            return new DocumentIngestionQueue(config?.MaxQueuedDocuments ?? 100);
+        });
         services.AddSingleton<IDocumentIngestionQueue>(sp => sp.GetRequiredService<DocumentIngestionQueue>());
         services.AddHostedService<DocumentIngestionHostedService>();
+        services.AddHostedService<DocumentFolderIngestionHostedService>();
 
         services.AddSingleton<ToolGovernancePolicy>();
         services.AddSingleton<IToolRegistry>(serviceProvider =>

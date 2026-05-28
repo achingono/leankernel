@@ -46,15 +46,29 @@ public sealed class DocumentIngestionQueue : IDocumentIngestionQueue
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        _jobs.TryAdd(job.JobId, job);
-        var enqueued = _channel.Writer.TryWrite(job);
-        if (!enqueued)
-        {
-            _jobs.TryRemove(job.JobId, out _);
-            throw new InvalidOperationException($"Document ingestion queue is full. Queue size limit: {_channel.Reader.Count}");
-        }
+        return Enqueue(job);
+    }
 
-        return job;
+    /// <inheritdoc />
+    public PathDocumentIngestionJob QueuePath(
+        string sourcePath,
+        string? title,
+        List<string> tags)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ArgumentNullException.ThrowIfNull(tags);
+
+        var job = new PathDocumentIngestionJob
+        {
+            Filename = Path.GetFileName(sourcePath),
+            SourcePath = sourcePath,
+            Title = title,
+            Tags = tags,
+            Status = DocumentIngestionStatus.Queued,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        return (PathDocumentIngestionJob)Enqueue(job);
     }
 
     /// <inheritdoc />
@@ -72,4 +86,17 @@ public sealed class DocumentIngestionQueue : IDocumentIngestionQueue
     /// Gets the internal channel reader for consuming jobs.
     /// </summary>
     internal ChannelReader<DocumentIngestionJob> Reader => _channel.Reader;
+
+    private DocumentIngestionJob Enqueue(DocumentIngestionJob job)
+    {
+        _jobs.TryAdd(job.JobId, job);
+        var enqueued = _channel.Writer.TryWrite(job);
+        if (!enqueued)
+        {
+            _jobs.TryRemove(job.JobId, out _);
+            throw new InvalidOperationException($"Document ingestion queue is full. Queue size limit: {_channel.Reader.Count}");
+        }
+
+        return job;
+    }
 }

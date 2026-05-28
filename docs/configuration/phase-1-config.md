@@ -89,6 +89,23 @@ This reference lists the configuration currently used by the implemented Phase 1
 | `LeanKernel:Gateway:ApiKey` | string | empty | Single accepted API key for chat and diagnostics endpoints. Empty means development-mode open access. |
 | `LeanKernel:Gateway:ApiKeys` | string array | empty | Optional array form for multi-value environment overrides. When present, any listed key is accepted. |
 
+## LeanKernel:DocumentIngestion
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `LeanKernel:DocumentIngestion:Enabled` | boolean | `true` | Enables document ingestion workers. |
+| `LeanKernel:DocumentIngestion:MaxConcurrentJobs` | integer | `3` | Maximum background ingestion jobs processed concurrently. |
+| `LeanKernel:DocumentIngestion:MaxQueuedDocuments` | integer | `100` | Maximum queued ingestion jobs before enqueue fails. |
+| `LeanKernel:DocumentIngestion:WatchFolderEnabled` | boolean | `false` (`true` in Docker Compose) | Enables automatic import from a filesystem folder. |
+| `LeanKernel:DocumentIngestion:WatchFolderPath` | string | `/app/data/documents` | Folder monitored for dropped document imports. In Compose this is the `./data/documents` bind mount. |
+| `LeanKernel:DocumentIngestion:WatchFilter` | string | `*.*` | File pattern watched and scanned. |
+| `LeanKernel:DocumentIngestion:WatchIncludeSubdirectories` | boolean | `true` | Includes subdirectories in event monitoring and polling when enabled. |
+| `LeanKernel:DocumentIngestion:WatchStartupScanEnabled` | boolean | `false` | Imports files already present at startup. Keep disabled unless duplicate imports are acceptable. |
+| `LeanKernel:DocumentIngestion:WatchSettleDelaySeconds` | integer | `2` | Delay used to wait for file size and timestamp stability before queueing. |
+| `LeanKernel:DocumentIngestion:WatchPollingIntervalSeconds` | integer | `30` | Polling fallback interval for bind-mounted folders; set `0` to disable. |
+| `LeanKernel:DocumentIngestion:WatchDefaultTags` | string array | `["auto-import"]` | Tags added to documents imported from the watched folder. |
+| `LeanKernel:DocumentIngestion:ManagedStoragePath` | string | `/app/data/managed-documents` | Service-owned storage path for UI/API uploaded document copies. In Compose this is backed by `document-managed-data` and is not watched. |
+
 ## Related documentation
 
 - [Gateway API](../features/gateway-api.md)

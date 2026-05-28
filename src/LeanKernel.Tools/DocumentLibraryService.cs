@@ -60,18 +60,22 @@ public sealed class DocumentLibraryService
         ArgumentNullException.ThrowIfNull(tags);
 
         var fileSystemConfig = _config.FileSystem;
-        var documentsDir = Path.Combine(fileSystemConfig.AllowedRoot, "documents");
-        Directory.CreateDirectory(documentsDir);
+        var allowedRoot = Path.GetFullPath(fileSystemConfig.AllowedRoot);
+        var managedStorageDir = Path.GetFullPath(_config.DocumentIngestion?.ManagedStoragePath ?? Path.Combine(fileSystemConfig.AllowedRoot, "managed-documents"));
+        if (!IsPathUnderDirectory(managedStorageDir, allowedRoot))
+        {
+            throw new InvalidOperationException($"Managed document storage path must be under the configured allowed root: {allowedRoot}");
+        }
+
+        Directory.CreateDirectory(managedStorageDir);
 
         var cleanFilename = Path.GetFileName(filename);
         var finalTitle = NormalizeYamlScalar(string.IsNullOrWhiteSpace(title) ? Path.GetFileNameWithoutExtension(cleanFilename) : title);
         var baseSlug = BuildBaseSlug(finalTitle);
-        var pageSlug = await ResolveUniquePageSlugAsync(baseSlug, ct).ConfigureAwait(false);
-
         var extension = Path.GetExtension(cleanFilename);
         var uniqueFilename = $"{baseSlug}-{Guid.NewGuid().ToString("N")[..8]}{extension}".ToLowerInvariant();
-        var targetFullPath = Path.Combine(documentsDir, uniqueFilename);
-        var relativePath = Path.Combine("documents", uniqueFilename).Replace("\\", "/", StringComparison.Ordinal);
+        var targetFullPath = Path.Combine(managedStorageDir, uniqueFilename);
+        var relativePath = Path.GetRelativePath(allowedRoot, targetFullPath).Replace("\\", "/", StringComparison.Ordinal);
         var cleanTags = tags
             .Select(static tag => NormalizeYamlScalar(tag))
             .Where(static tag => !string.IsNullOrWhiteSpace(tag))
@@ -79,8 +83,6 @@ public sealed class DocumentLibraryService
             .OrderBy(static tag => tag, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var importedAt = DateTimeOffset.UtcNow;
-        var wikiPageWritten = false;
-        var wikiPageAlreadyDeletedInCatch = false;
 
         try
         {
@@ -90,8 +92,111 @@ public sealed class DocumentLibraryService
                 await fileStream.CopyToAsync(writeStream, ct).ConfigureAwait(false);
             }
 
-            _logger.LogInformation("Invoking text extraction pipeline for: {Path}", targetFullPath);
-            var extractedText = await TextExtractionHelper.ExtractAsync(targetFullPath, fileSystemConfig, ct).ConfigureAwait(false);
+            return await IngestStoredDocumentAsync(
+                targetFullPath,
+                relativePath,
+                finalTitle,
+                cleanTags,
+                importedAt,
+                ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            TryDeleteFile(targetFullPath);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Ingests an existing document already stored under the configured document folder.
+    /// </summary>
+    public Task<DocumentIngestionResult> IngestExistingDocumentAsync(
+        string sourcePath,
+        string? title,
+        List<string> tags,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ArgumentNullException.ThrowIfNull(tags);
+
+        var fileSystemConfig = _config.FileSystem;
+        var allowedRoot = Path.GetFullPath(fileSystemConfig.AllowedRoot);
+        var documentsDir = Path.GetFullPath(Path.Combine(fileSystemConfig.AllowedRoot, "documents"));
+        Directory.CreateDirectory(documentsDir);
+
+        var sourceFullPath = Path.GetFullPath(sourcePath);
+        if (!IsPathUnderDirectory(sourceFullPath, documentsDir))
+        {
+            throw new InvalidOperationException($"Document import path must be under the configured documents directory: {documentsDir}");
+        }
+
+        if (!File.Exists(sourceFullPath))
+        {
+            throw new FileNotFoundException("Document import file was not found.", sourceFullPath);
+        }
+
+        return IngestExistingDocumentCoreAsync(sourceFullPath, allowedRoot, title, tags, ct);
+    }
+
+    private async Task<DocumentIngestionResult> IngestExistingDocumentCoreAsync(
+        string sourceFullPath,
+        string allowedRoot,
+        string? title,
+        List<string> tags,
+        CancellationToken ct)
+    {
+        var cleanFilename = Path.GetFileName(sourceFullPath);
+        var finalTitle = NormalizeYamlScalar(string.IsNullOrWhiteSpace(title) ? Path.GetFileNameWithoutExtension(cleanFilename) : title);
+        var relativePath = Path.GetRelativePath(allowedRoot, sourceFullPath).Replace("\\", "/", StringComparison.Ordinal);
+        var cleanTags = tags
+            .Select(static tag => NormalizeYamlScalar(tag))
+            .Where(static tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static tag => tag, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return await IngestStoredDocumentAsync(
+            sourceFullPath,
+            relativePath,
+            finalTitle,
+            cleanTags,
+            DateTimeOffset.UtcNow,
+            ct).ConfigureAwait(false);
+    }
+
+    private async Task<string> ResolveUniquePageSlugAsync(string baseSlug, CancellationToken ct)
+    {
+        for (var attempt = 1; attempt <= 100; attempt++)
+        {
+            var suffix = attempt == 1 ? string.Empty : $"-{attempt}";
+            var slug = $"doc/{baseSlug}{suffix}";
+            var existingPage = await _knowledgeService.GetPageAsync(slug, ct).ConfigureAwait(false);
+            if (existingPage is null)
+            {
+                return slug;
+            }
+        }
+
+        throw new InvalidOperationException($"Unable to allocate a unique document slug for base '{baseSlug}'.");
+    }
+
+    private async Task<DocumentIngestionResult> IngestStoredDocumentAsync(
+        string fullPath,
+        string relativePath,
+        string finalTitle,
+        IReadOnlyList<string> cleanTags,
+        DateTimeOffset importedAt,
+        CancellationToken ct)
+    {
+        var baseSlug = BuildBaseSlug(finalTitle);
+        var pageSlug = await ResolveUniquePageSlugAsync(baseSlug, ct).ConfigureAwait(false);
+        var wikiPageWritten = false;
+        var wikiPageAlreadyDeletedInCatch = false;
+
+        try
+        {
+            _logger.LogInformation("Invoking text extraction pipeline for: {Path}", fullPath);
+            var extractedText = await TextExtractionHelper.ExtractAsync(fullPath, _config.FileSystem, ct).ConfigureAwait(false);
 
             var pendingContent = BuildMarkdownContent(
                 finalTitle,
@@ -110,7 +215,7 @@ public sealed class DocumentLibraryService
                 "file_upload",
                 new
                 {
-                    path = targetFullPath,
+                    path = fullPath,
                     page_slug = pageSlug
                 },
                 ct).ConfigureAwait(false);
@@ -159,7 +264,6 @@ public sealed class DocumentLibraryService
         }
         catch
         {
-            TryDeleteFile(targetFullPath);
             if (wikiPageWritten && !wikiPageAlreadyDeletedInCatch)
             {
                 try
@@ -173,22 +277,6 @@ public sealed class DocumentLibraryService
             }
             throw;
         }
-    }
-
-    private async Task<string> ResolveUniquePageSlugAsync(string baseSlug, CancellationToken ct)
-    {
-        for (var attempt = 1; attempt <= 100; attempt++)
-        {
-            var suffix = attempt == 1 ? string.Empty : $"-{attempt}";
-            var slug = $"doc/{baseSlug}{suffix}";
-            var existingPage = await _knowledgeService.GetPageAsync(slug, ct).ConfigureAwait(false);
-            if (existingPage is null)
-            {
-                return slug;
-            }
-        }
-
-        throw new InvalidOperationException($"Unable to allocate a unique document slug for base '{baseSlug}'.");
     }
 
     private static string BuildBaseSlug(string title)
@@ -261,6 +349,13 @@ public sealed class DocumentLibraryService
         return null;
     }
 
+    private static bool IsPathUnderDirectory(string path, string directory)
+    {
+        var normalizedDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
+        var normalizedPath = Path.GetFullPath(path);
+        return normalizedPath.StartsWith(normalizedDirectory, StringComparison.Ordinal);
+    }
+
     private void TryDeleteFile(string path)
     {
         if (!File.Exists(path))
@@ -278,4 +373,3 @@ public sealed class DocumentLibraryService
         }
     }
 }
-

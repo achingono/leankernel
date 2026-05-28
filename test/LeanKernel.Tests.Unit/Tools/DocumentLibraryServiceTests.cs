@@ -39,7 +39,7 @@ public class DocumentLibraryServiceTests
             result.PageSlug.Should().Be("doc/report-2");
             knowledgeService.PutCalls.Should().HaveCount(2);
             knowledgeService.PutCalls[^1].Content.Should().Contain("storage_path: \"files/report-asset.txt\"");
-            knowledgeService.PutCalls[^1].Content.Should().Contain("source_file: \"documents/report-");
+            knowledgeService.PutCalls[^1].Content.Should().Contain("source_file: \"managed-documents/report-");
         }
         finally
         {
@@ -67,7 +67,7 @@ public class DocumentLibraryServiceTests
             var act = () => service.IngestDocumentAsync("report.txt", contentStream, "Report", []);
 
             await act.Should().ThrowAsync<GBrainException>();
-            Directory.GetFiles(Path.Combine(tempRoot, "documents")).Should().BeEmpty();
+            Directory.GetFiles(Path.Combine(tempRoot, "managed-documents")).Should().BeEmpty();
             knowledgeService.DeleteCalls.Should().HaveCount(1);
         }
         finally
@@ -108,6 +108,68 @@ public class DocumentLibraryServiceTests
         }
     }
 
+    [Fact]
+    public async Task IngestExistingDocumentAsync_ingests_file_in_place_without_deleting_source()
+    {
+        var tempRoot = CreateTempRoot();
+        try
+        {
+            var documentsDir = Path.Combine(tempRoot, "documents", "projects");
+            Directory.CreateDirectory(documentsDir);
+            var sourcePath = Path.Combine(documentsDir, "report.txt");
+            await File.WriteAllTextAsync(sourcePath, "hello from watched doc");
+
+            var knowledgeService = new RecordingKnowledgeService();
+            var gBrainClient = CreateGBrainClient(new RecordingHttpMessageHandler((_, _) => CreateJsonResponse(new
+            {
+                jsonrpc = "2.0",
+                id = 1,
+                result = new
+                {
+                    path = "files/watched-report.txt"
+                }
+            })));
+            var service = CreateService(tempRoot, knowledgeService, gBrainClient);
+
+            var result = await service.IngestExistingDocumentAsync(sourcePath, null, ["auto-import"]);
+
+            result.PageSlug.Should().Be("doc/report");
+            result.RelativeFilePath.Should().Be("documents/projects/report.txt");
+            File.Exists(sourcePath).Should().BeTrue();
+            knowledgeService.PutCalls.Should().HaveCount(2);
+            knowledgeService.PutCalls[^1].Content.Should().Contain("source_file: \"documents/projects/report.txt\"");
+            knowledgeService.PutCalls[^1].Content.Should().Contain("tags: [\"auto-import\"]");
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task IngestExistingDocumentAsync_rejects_files_outside_documents_directory()
+    {
+        var tempRoot = CreateTempRoot();
+        try
+        {
+            var sourcePath = Path.Combine(tempRoot, "outside.txt");
+            await File.WriteAllTextAsync(sourcePath, "not in documents");
+            var service = CreateService(
+                tempRoot,
+                new RecordingKnowledgeService(),
+                CreateGBrainClient(new RecordingHttpMessageHandler((_, _) => CreateJsonResponse(new { jsonrpc = "2.0", id = 1, result = new { path = "files/outside.txt" } }))));
+
+            var act = () => service.IngestExistingDocumentAsync(sourcePath, null, []);
+
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*documents directory*");
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static string CreateTempRoot()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"lk-doclib-tests-{Guid.NewGuid():N}");
@@ -126,6 +188,10 @@ public class DocumentLibraryServiceTests
             {
                 AllowedRoot = allowedRoot,
                 MaxExtractedCharacters = 10_000
+            },
+            DocumentIngestion = new DocumentIngestionConfig
+            {
+                ManagedStoragePath = Path.Combine(allowedRoot, "managed-documents")
             }
         };
 

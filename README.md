@@ -33,6 +33,7 @@ LeanKernel helps you turn AI from "interesting demos" into repeatable output wit
 - **5W1H structured memory + durable retrieval** -> faster recall of past facts and decisions -> less repeated explaining and lower frustration.
 - **MAF multi-agent orchestration** -> specialized workers handle complex requests predictably -> more done per day with less manual juggling.
 - **Dockerized core stack (Gateway, LiteLLM, Postgres, GBrain, optional Signal)** -> reproducible local runtime with fewer moving parts -> lower ops anxiety and easier recovery.
+- **Document folder import (`./data/documents`)** -> drop files anywhere under a local bind mount and have the engine queue them for GBrain-backed document ingestion while managed upload copies stay in a separate volume.
 - **Thin Gateway API + shared channel routing** -> API and Signal messages reuse one runtime path -> faster integration and clearer transport behavior during the rearchitecture.
 
 ## Main Pain Points with Existing AI Agents (Online Signals)

@@ -140,10 +140,17 @@ services:
       - LEANKERNEL__DATABASE__CONNECTIONSTRING=Host=database;Database=${POSTGRES_DB:-leankernel};Username=${POSTGRES_USER:-leankernel};Password=${POSTGRES_PASSWORD:-leankernel-dev-password}
       - LEANKERNEL__DIAGNOSTICS__ENABLED=true
       - LEANKERNEL__DIAGNOSTICS__PERSISTTODATABASE=true
+      - LEANKERNEL__DOCUMENTINGESTION__WATCHFOLDERENABLED=true
+      - LEANKERNEL__DOCUMENTINGESTION__WATCHFOLDERPATH=/app/data/documents
+      - LEANKERNEL__DOCUMENTINGESTION__WATCHINCLUDESUBDIRECTORIES=true
+      - LEANKERNEL__DOCUMENTINGESTION__WATCHPOLLINGINTERVALSECONDS=30
+      - LEANKERNEL__DOCUMENTINGESTION__MANAGEDSTORAGEPATH=/app/data/managed-documents
       - LEANKERNEL__GATEWAY__APIKEY=${GATEWAY_API_KEY:-}
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./data/wiki:/app/data/wiki:ro
+      - ./data/documents:/app/data/documents
+      - document-managed-data:/app/data/managed-documents
       - gbrain-data:/app/data/gbrain:ro
     ports:
       - "${ENGINE_PORT:-5080}:5080"
@@ -164,3 +171,4 @@ services:
 volumes:
   database-data:
   gbrain-data:
+  document-managed-data:

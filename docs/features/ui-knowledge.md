@@ -67,11 +67,14 @@ This keeps creation, inspection, and editing in one flow.
 
 The page has no dedicated UI-only configuration block. It depends on the configured knowledge provider and the services registered in `Program.cs`.
 
+Document ingestion can also monitor a filesystem document tree. In Docker Compose, `./data/documents` is bind-mounted to `/app/data/documents`, and the engine enables a recursive watcher for `/app/data/documents`. Drop files anywhere under `./data/documents` to queue automatic imports. UI/API upload copies are stored separately in the `document-managed-data` volume at `/app/data/managed-documents`, so service-managed files do not loop back through the watcher. The watcher uses filesystem events plus a polling fallback; startup scan is disabled by default to avoid re-importing every existing file after a restart.
+
 Important runtime dependencies:
 
 - `IKnowledgeService` for search, read, and write operations
 - `GBrainMcpClient` for optional `list_pages` and `get_page` enrichment
 - the configured GBrain connection under the normal LeanKernel knowledge settings
+- `LeanKernel:DocumentIngestion` for upload and folder import behavior
 
 If GBrain listing is unavailable, browsing degrades to pages discovered through fallback search and in-session cache state. If metadata enrichment fails, the page still uses the base knowledge-service result.
 

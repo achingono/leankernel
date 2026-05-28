@@ -213,4 +213,37 @@ public class DocumentIngestionQueueTests
         Assert.Contains("tag2", job.Tags);
         Assert.Contains("tag3", job.Tags);
     }
+
+    [Fact]
+    public void QueuePath_creates_path_job_with_queued_status()
+    {
+        // Arrange
+        var queue = new DocumentIngestionQueue(maxQueuedJobs: 100);
+        var sourcePath = Path.Combine(Path.GetTempPath(), "report.txt");
+
+        // Act
+        var job = queue.QueuePath(sourcePath, "Report", ["auto-import"]);
+
+        // Assert
+        Assert.NotNull(job);
+        Assert.Equal("report.txt", job.Filename);
+        Assert.Equal(sourcePath, job.SourcePath);
+        Assert.Equal("Report", job.Title);
+        Assert.Single(job.Tags);
+        Assert.Equal("auto-import", job.Tags[0]);
+        Assert.Equal(DocumentIngestionStatus.Queued, job.Status);
+        Assert.Null(job.FileContent);
+    }
+
+    [Fact]
+    public void QueuePath_throws_on_empty_source_path()
+    {
+        // Arrange
+        var queue = new DocumentIngestionQueue(maxQueuedJobs: 100);
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() =>
+            queue.QueuePath("", null, [])
+        );
+    }
 }

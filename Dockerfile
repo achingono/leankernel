@@ -42,7 +42,9 @@ ENV LeanKernel__FileSystem__PythonExecutable=/opt/ocr-venv/bin/python
 
 COPY --from=build /app/publish .
 
-RUN useradd -m -s /bin/bash leankernel && chown -R leankernel:leankernel /app
+RUN useradd -m -s /bin/bash leankernel \
+    && mkdir -p /app/data/documents /app/data/managed-documents \
+    && chown -R leankernel:leankernel /app
 USER leankernel
 
 ENV ASPNETCORE_URLS=http://+:5080

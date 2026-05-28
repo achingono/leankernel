@@ -5,7 +5,7 @@ namespace LeanKernel.Abstractions.Models;
 /// <summary>
 /// Represents a document queued for background ingestion.
 /// </summary>
-public sealed class DocumentIngestionJob
+public class DocumentIngestionJob
 {
     /// <summary>
     /// Gets the unique job identifier.
@@ -21,7 +21,7 @@ public sealed class DocumentIngestionJob
     /// Gets the document content stream (temporary, processed during ingestion).
     /// </summary>
     [JsonIgnore]
-    public Stream FileContent { get; init; } = null!;
+    public Stream? FileContent { get; init; }
 
     /// <summary>
     /// Gets the optional document title.
@@ -67,6 +67,17 @@ public sealed class DocumentIngestionJob
     /// Gets or sets the number of retry attempts.
     /// </summary>
     public int RetryCount { get; set; }
+}
+
+/// <summary>
+/// Represents a document queued from an existing filesystem path.
+/// </summary>
+public sealed class PathDocumentIngestionJob : DocumentIngestionJob
+{
+    /// <summary>
+    /// Gets the existing source file path to ingest.
+    /// </summary>
+    public required string SourcePath { get; init; }
 }
 
 /// <summary>

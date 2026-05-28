@@ -47,7 +47,7 @@ public sealed class DocumentIngestionHostedService(
         }
 
         _logger.LogInformation("Stopping document ingestion background service with {PendingCount} pending jobs", _queue.PendingCount);
-        
+
         try
         {
             _shutdownCts.Cancel();
@@ -124,12 +124,21 @@ public sealed class DocumentIngestionHostedService(
             job.Status = DocumentIngestionStatus.Processing;
             job.StartedAt = DateTimeOffset.UtcNow;
 
-            var result = await _libraryService.IngestDocumentAsync(
-                job.Filename,
-                job.FileContent,
-                job.Title,
-                job.Tags,
-                ct).ConfigureAwait(false);
+            var result = job switch
+            {
+                PathDocumentIngestionJob pathJob => await _libraryService.IngestExistingDocumentAsync(
+                    pathJob.SourcePath,
+                    pathJob.Title,
+                    pathJob.Tags,
+                    ct).ConfigureAwait(false),
+                { FileContent: { } fileContent } => await _libraryService.IngestDocumentAsync(
+                    job.Filename,
+                    fileContent,
+                    job.Title,
+                    job.Tags,
+                    ct).ConfigureAwait(false),
+                _ => throw new InvalidOperationException($"Document ingestion job {job.JobId} did not include a stream or source path.")
+            };
 
             job.Status = DocumentIngestionStatus.Completed;
             job.Result = result;
@@ -154,7 +163,10 @@ public sealed class DocumentIngestionHostedService(
         {
             try
             {
-                await job.FileContent.DisposeAsync().ConfigureAwait(false);
+                if (job.FileContent is not null)
+                {
+                    await job.FileContent.DisposeAsync().ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {

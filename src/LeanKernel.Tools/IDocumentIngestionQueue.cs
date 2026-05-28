@@ -22,6 +22,18 @@ public interface IDocumentIngestionQueue
         List<string> tags);
 
     /// <summary>
+    /// Queues an existing file path for background ingestion and returns the job.
+    /// </summary>
+    /// <param name="sourcePath">The existing document path.</param>
+    /// <param name="title">The optional document title.</param>
+    /// <param name="tags">The document tags.</param>
+    /// <returns>The queued job with JobId and status.</returns>
+    PathDocumentIngestionJob QueuePath(
+        string sourcePath,
+        string? title,
+        List<string> tags);
+
+    /// <summary>
     /// Gets the status and result of a previously queued job.
     /// </summary>
     /// <param name="jobId">The job identifier.</param>
