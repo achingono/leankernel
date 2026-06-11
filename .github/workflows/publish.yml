@@ -64,51 +64,6 @@ jobs:
             type=sha,prefix=sha-,enable=${{ github.ref_type == 'tag' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Get previous release tag
-        id: prev_release
-        if: ${{ github.ref_type == 'tag' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
-          # Releases are returned newest-first; pick the first one that isn't the current tag.
-          prev_tag=$(curl -sS -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "$api" \
-            | jq -r --arg cur "${GITHUB_REF_NAME}" '[.[] | select(.tag_name != $cur)][0].tag_name // empty')
-          echo "prev_tag=${prev_tag}" >> "$GITHUB_OUTPUT"
-
-      - name: Generate release notes
-        id: release_notes
-        if: ${{ github.ref_type == 'tag' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          cur_tag="${GITHUB_REF_NAME}"
-          prev_tag="${{ steps.prev_release.outputs.prev_tag }}"
-
-          if [ -z "$prev_tag" ]; then
-            echo "notes=No previous release found; showing recent commits." >> "$GITHUB_OUTPUT"
-            notes=$(git log -n 50 --pretty=format:'- %s (%h)' )
-            echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-            echo "$notes" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # Use compare API to get commit list between tags.
-          compare="https://api.github.com/repos/${GITHUB_REPOSITORY}/compare/${prev_tag}...${cur_tag}"
-          commits=$(curl -sS -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "$compare" \
-            | jq -r '.commits[]? | "- \(.commit.message) (\(.sha[0:7]))"')
-
-          if [ -z "$commits" ]; then
-            commits="- No commits found between ${prev_tag} and ${cur_tag}."
-          fi
-
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$commits" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
@@ -121,8 +76,76 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: ${{ matrix.platforms }}
 
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: ${{ github.ref_type == 'tag' }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Get previous release tag
+        id: prev_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
+          # Releases are returned newest-first; pick the first one that isn't the current tag.
+          prev_tag=$(curl -sS -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "$api" \
+            | jq -r --arg cur "${GITHUB_REF_NAME}" '[.[] | select(.tag_name != $cur)][0].tag_name // empty')
+          echo "prev_tag=${prev_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: release_notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cur_tag="${GITHUB_REF_NAME}"
+          prev_tag="${{ steps.prev_release.outputs.prev_tag }}"
+
+          if [ -z "$prev_tag" ]; then
+            commits=$(curl -sS -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits?sha=${cur_tag}&per_page=50" \
+              | jq -r '.[]? | "- \(.commit.message | split("\n")[0]) (\(.sha[0:7]))"')
+          else
+            compare="https://api.github.com/repos/${GITHUB_REPOSITORY}/compare/${prev_tag}...${cur_tag}"
+            commits=$(curl -sS -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "$compare" \
+              | jq -r '.commits[]? | "- \(.commit.message | split("\n")[0]) (\(.sha[0:7]))"')
+          fi
+
+          if [ -z "$commits" ]; then
+            commits="- No commits found for this release."
+          fi
+
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$commits" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Generate image tags
+        id: image_tags
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          major="${version%%.*}"
+          minor="${version%.*}"
+          short_sha="${GITHUB_SHA:0:7}"
+          registry_repo="ghcr.io/${GITHUB_REPOSITORY}"
+
+          {
+            echo "tags<<EOF"
+            for image in engine gbrain browser-service; do
+              echo "${registry_repo}/${image}:${version}"
+              echo "${registry_repo}/${image}:${minor}"
+              echo "${registry_repo}/${image}:${major}"
+              echo "${registry_repo}/${image}:sha-${short_sha}"
+            done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release (with image tags)
-        if: ${{ github.ref_type == 'tag' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -132,6 +155,6 @@ jobs:
             ${{ steps.release_notes.outputs.notes }}
 
             Docker image tags:
-            ${{ steps.meta.outputs.tags }}
+            ${{ steps.image_tags.outputs.tags }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
