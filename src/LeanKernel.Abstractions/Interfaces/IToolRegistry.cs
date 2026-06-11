@@ -6,4 +6,5 @@ public interface IToolRegistry
 {
     IReadOnlyList<ToolDefinition> GetVisibleTools(ToolVisibilityContext context);
     ToolDefinition? GetTool(string name);
+    void AddTools(IEnumerable<ToolDefinition> tools);
 }

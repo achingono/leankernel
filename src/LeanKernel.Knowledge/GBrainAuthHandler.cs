@@ -11,6 +11,8 @@ namespace LeanKernel.Knowledge;
 /// </summary>
 public sealed class GBrainAuthHandler : DelegatingHandler
 {
+    private static readonly string[] TokenFileCandidates = [TokenFilePath, "/run/secrets/gbrain_auth_token"];
+
     private readonly GBrainConfig _config;
     private readonly ILogger<GBrainAuthHandler> _logger;
     private string? _cachedToken;
@@ -43,6 +45,17 @@ public sealed class GBrainAuthHandler : DelegatingHandler
 
     private string? ResolveToken()
     {
+        // Prefer the shared token file first so the engine follows the same
+        // credential source as the gbrain runtime.
+        foreach (var tokenPath in TokenFileCandidates)
+        {
+            var token = TryReadTokenFile(tokenPath);
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                return token;
+            }
+        }
+
         // Prefer explicit config
         if (!string.IsNullOrWhiteSpace(_config.AuthToken))
         {
@@ -55,21 +68,37 @@ public sealed class GBrainAuthHandler : DelegatingHandler
             return _cachedToken;
         }
 
-        // Try reading from shared volume token file
+        return null;
+    }
+
+    private string? TryReadTokenFile(string path)
+    {
+        if (_cachedToken is not null)
+        {
+            return _cachedToken;
+        }
+
         try
         {
-            if (File.Exists(TokenFilePath))
+            if (!File.Exists(path))
             {
-                _cachedToken = File.ReadAllText(TokenFilePath).Trim();
-                _logger.LogInformation("Loaded GBrain auth token from shared volume");
-                return _cachedToken;
+                return null;
             }
+
+            var token = File.ReadAllText(path).Trim();
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return null;
+            }
+
+            _cachedToken = token;
+            _logger.LogInformation("Loaded GBrain auth token from {Path}", path);
+            return _cachedToken;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to read GBrain token file at {Path}", TokenFilePath);
+            _logger.LogWarning(ex, "Failed to read GBrain token file at {Path}", path);
+            return null;
         }
-
-        return null;
     }
 }

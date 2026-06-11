@@ -56,4 +56,19 @@ public sealed class ToolRegistry : IToolRegistry
         _tools.TryGetValue(name, out var tool);
         return tool;
     }
+
+    public void AddTools(IEnumerable<ToolDefinition> tools)
+    {
+        ArgumentNullException.ThrowIfNull(tools);
+
+        var count = 0;
+        foreach (var tool in tools)
+        {
+            if (_tools.TryAdd(tool.Name, tool))
+                count++;
+        }
+
+        if (count > 0)
+            _logger.LogInformation("Tool registry added {Count} new tools (total: {Total})", count, _tools.Count);
+    }
 }

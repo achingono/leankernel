@@ -153,6 +153,27 @@ services:
   #     - "8080:8080"
   #   restart: unless-stopped
 
+  # emanate (social media automation) — uncomment to enable local dev
+  # Build: cd ../emanate && docker compose build
+  # emanate:
+  #   image: ghcr.io/achingono/emanate-api:latest
+  #   container_name: leankernel-emanate
+  #   environment:
+  #     PORT: "3000"
+  #     NODE_ENV: production
+  #     DATABASE_URL: postgresql://leankernel:leankernel-dev-password@database:5432/emanate
+  #     LITELLM_URL: http://litellm:4000
+  #     LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-leankernel-local}
+  #     PLAYWRIGHT_WS_ENDPOINT: ""
+  #     HEADLESS: "true"
+  #     LOG_LEVEL: info
+  #   ports:
+  #     - "${EMANATE_PORT:-3000}:3000"
+  #   depends_on:
+  #     database:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
   # ── LeanKernel Engine (Core Application) ──────────────────────
   engine:
     build:
@@ -183,6 +204,7 @@ services:
       - LEANKERNEL__GATEWAY__APIKEY=${GATEWAY_API_KEY:-}
       - TZ=${TZ:-America/Toronto}
     volumes:
+      - ./data/skills:/app/data/skills:ro
       - ./data/wiki:/app/data/wiki:ro
       - ./data/documents:/app/data/documents
       - document-managed-data:/app/data/managed-documents

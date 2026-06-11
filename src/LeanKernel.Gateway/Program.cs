@@ -13,6 +13,7 @@ using LeanKernel.Knowledge;
 using LeanKernel.Learning;
 using LeanKernel.Persistence;
 using LeanKernel.Scheduler;
+using LeanKernel.Plugins;
 using LeanKernel.Tools;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Logs;
@@ -61,6 +62,7 @@ try
     builder.Services.AddLeanKernelContext(leanKernelConfig);
     builder.Services.AddLeanKernelIdentity(leanKernelConfig.Identity);
     builder.Services.AddLeanKernelTools();
+    builder.Services.AddLeanKernelSkills();
     builder.Services.AddLeanKernelAgents(leanKernelConfig);
     builder.Services.AddLeanKernelDiagnostics(leanKernelConfig.Diagnostics);
     builder.Services.AddLeanKernelChannels(leanKernelConfig.Channels);

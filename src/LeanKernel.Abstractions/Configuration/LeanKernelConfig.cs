@@ -39,4 +39,22 @@ public sealed class LeanKernelConfig
     /// Gets or sets document ingestion configuration.
     /// </summary>
     public DocumentIngestionConfig? DocumentIngestion { get; set; }
+
+    /// <summary>
+    /// Gets or sets dynamic skill configuration.
+    /// </summary>
+    public SkillsConfig Skills { get; set; } = new();
+}
+
+public sealed class SkillsConfig
+{
+    /// <summary>
+    /// Gets or sets the list of base paths to scan for SKILL.md files.
+    /// </summary>
+    public List<string> BasePaths { get; set; } = new() { "/app/data/skills" };
+
+    /// <summary>
+    /// Gets or sets a value indicating whether dynamic skill loading is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
 }
