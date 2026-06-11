@@ -52,8 +52,8 @@ jobs:
           node-version: 18
 
       # This action automatically installs the required browsers and OS system dependencies
-      - name: Ensure Playwright Browsers and Deps are Installed
-        uses: microsoft/playwright-github-action@v1
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
 
       - name: Install Action Dependencies
         working-directory: .github/actions/test-reporter
