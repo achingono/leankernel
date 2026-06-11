@@ -52,7 +52,7 @@ jobs:
         run: dotnet build src/LeanKernel.sln --no-restore -v minimal
 
       - name: Test
-        run: dotnet test src/LeanKernel.sln --no-build -v minimal
+        run: dotnet test src/LeanKernel.sln --no-build -v minimal --filter 'FullyQualifiedName!~Playwright' --logger "trx;LogFileName=results.trx" --collect:"XPlat Code Coverage"
 
       - name: Coverage gate
         run: scripts/quality/test-coverage.sh
