@@ -1,0 +1,58 @@
+name: Build and Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'docker-compose*.yml'
+      - 'scripts/**'
+      - '.github/workflows/build-and-test.yml'
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'docker-compose*.yml'
+      - 'scripts/**'
+      - '.github/workflows/build-and-test.yml'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore src/LeanKernel.sln
+
+      - name: Build
+        run: dotnet build src/LeanKernel.sln --no-restore -v minimal
+
+      - name: Test
+        run: dotnet test src/LeanKernel.sln --no-build -v minimal
+
+      - name: Coverage gate
+        run: scripts/quality/test-coverage.sh
