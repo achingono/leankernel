@@ -45,6 +45,32 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # Ensure Node.js is available as the Playwright CLI requires it
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # This action automatically installs the required browsers and OS system dependencies
+      - name: Ensure Playwright Browsers and Deps are Installed
+        uses: microsoft/playwright-github-action@v1
+
+      - name: Install Action Dependencies
+        working-directory: .github/actions/test-reporter
+        run: |
+          npm config set strict-ssl false
+          max_attempts=3
+          attempt=1
+          until timeout 300 npm install; do
+            if [ $attempt -ge $max_attempts ]; then
+              echo "Action dependency install failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            echo "Action dependency install timed out or failed (attempt $attempt/${max_attempts}), retrying in 10s..."
+            attempt=$((attempt + 1))
+            sleep 10
+          done          
+
       - name: Restore
         run: dotnet restore src/LeanKernel.sln
 
