@@ -64,6 +64,7 @@ public sealed class PromptAssembler
         if (context.ActiveToolNames.Count > 0)
         {
             parts.Add($"\n## Available Tools: {string.Join(", ", context.ActiveToolNames)}");
+            parts.Add("You have access to the functions listed above. When a user asks you to do something that requires a tool, use the function call mechanism rather than describing what you would do. If you're unsure which tool to use, think step by step and call the appropriate function with the correct parameters.");
         }
 
         var assembled = string.Join("\n", parts);

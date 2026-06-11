@@ -40,7 +40,8 @@ internal static class AgentInvocationBuilder
 
         return new ChatOptions
         {
-            Tools = [.. context.Tools]
+            Tools = [.. context.Tools],
+            ToolMode = ChatToolMode.Auto
         };
     }
 }
