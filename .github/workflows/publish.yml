@@ -112,7 +112,7 @@ jobs:
               | jq -r '.[]? | "- \(.commit.message | split("\n")[0]) (\(.sha[0:7]))"')
           else
             compare="https://api.github.com/repos/${GITHUB_REPOSITORY}/compare/${prev_tag}...${cur_tag}"
-            commits=$(curl -sS -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "$compare" \
+            commits=$(curl -sS --fail -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "$compare" \
               | jq -r '.commits[]? | "- \(.commit.message | split("\n")[0]) (\(.sha[0:7]))"')
           fi
 
