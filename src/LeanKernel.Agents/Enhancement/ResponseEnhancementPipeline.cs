@@ -78,6 +78,28 @@ public sealed class ResponseEnhancementPipeline(
             {
                 stepStopwatch.Stop();
                 stopwatch.Stop();
+
+                // If the pipeline's internal timeout token triggered, treat this as a timeout and
+                // discard any partial step output.
+                if (timeoutCts.IsCancellationRequested)
+                {
+                    stepResults.Add(new EnhancementStepResult
+                    {
+                        StepName = step.Name,
+                        Applied = false,
+                        Modified = false,
+                        Reason = "Enhancement timed out before completion.",
+                        Duration = stepStopwatch.Elapsed
+                    });
+
+                    _logger.LogWarning(
+                        "Response enhancement timed out after {DurationMs:0}ms on step {StepName}",
+                        stopwatch.Elapsed.TotalMilliseconds,
+                        step.Name);
+
+                    return CreateResult(input.Response, input.Response, stepResults, stopwatch.Elapsed);
+                }
+
                 stepResults.Add(new EnhancementStepResult
                 {
                     StepName = step.Name,
