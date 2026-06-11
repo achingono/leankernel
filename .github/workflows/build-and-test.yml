@@ -56,3 +56,31 @@ jobs:
 
       - name: Coverage gate
         run: scripts/quality/test-coverage.sh
+    
+      - name: Check results
+        if: always()
+        id: check-results
+        run: |
+          if find . \( -name "results-*.xml" -o -name "*.trx" \) -type f 2>/dev/null | grep -q .; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        
+      - name: Report Results
+        if: always() && steps.check-results.outputs.exists == 'true'
+        uses: ./.github/actions/test-reporter
+        with:
+          test-results-path: '**/results-*.{xml,trx}'
+          coverage-path: '**/coverage.*.xml'
+          name: Test Results
+          fail-on-error: false
+
+      - name: Upload results
+        if: always() && steps.check-results.outputs.exists == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            **/results-*.{xml,trx}
+            **/coverage.*.xml

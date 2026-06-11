@@ -37,6 +37,12 @@ if [[ -z "$token" ]]; then
   token="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])' <<<"$token_response")"
 fi
 
+# If running in GitHub Actions, expose the token to subsequent steps.
+# The workflow references steps.sonar-scan.outputs.sonar_token.
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "sonar_token=$token" >> "$GITHUB_OUTPUT"
+fi
+
 mkdir -p "$ROOT_DIR/coverage-results/sonar"
 
 docker run --rm \
@@ -67,9 +73,21 @@ docker run --rm \
       /d:sonar.coverage.exclusions="scripts/**/*.py,config/litellm/*.py,config/indexer/**/*.py,config/browser-service/**/*.py,**/LeanKernel.Tests.*/*,**/obj/**/*.cs,**/*.g.cs,**/*.Designer.cs,**/*.razor,**/Program.cs,**/Migrations/*.cs,**/Data/Migrations/*.cs,**/LeanKernel.Abstractions/Configuration/BrowserServiceConfig.cs,**/LeanKernel.Abstractions/Models/BrowserServiceModels.cs,**/LeanKernel.Gateway/Endpoints.cs,**/LeanKernel.Gateway/LeanKernelHardeningServiceCollectionExtensions.cs,**/LeanKernel.Gateway/Middleware/CorrelationIdDelegatingHandler.cs,**/LeanKernel.Gateway/Middleware/CorrelationIdMiddleware.cs,**/LeanKernel.Gateway/Models/ChatRequest.cs,**/LeanKernel.Gateway/Services/ChatService.cs,**/LeanKernel.Gateway/Services/DiagnosticsService.cs,**/LeanKernel.Gateway/Services/KnowledgeUiService.cs,**/LeanKernel.Gateway/Services/OnboardingService.cs,**/LeanKernel.Knowledge/GBrainKnowledgeService.cs,**/LeanKernel.Knowledge/Resilience/ResilientKnowledgeService.cs,**/LeanKernel.Persistence/DocumentIngestionJobRepository.cs,**/LeanKernel.Tools/DocumentFolderIngestionHostedService.cs,**/LeanKernel.Tools/DocumentIngestionHostedService.cs,**/LeanKernel.Tools/BuiltIn/Browser/BrowserServiceClient.cs,**/LeanKernel.Tools/BuiltIn/Browser/BrowserServiceHealthProbe.cs,**/LeanKernel.Tools/BuiltIn/Common/FileSystemSupport.cs,**/LeanKernel.Tools/BuiltIn/Common/ToolArgumentReader.cs,**/LeanKernel.Tools/BuiltIn/Data/*.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileCopyTool.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileDeleteTool.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileMoveTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/HttpRequestTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/WebFetchTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/WebSearchTool.cs,**/Services/Auth/AuthRegistration.cs,**/Services/Auth/OidcRegistration.cs,**/Services/Auth/BearerTokenAuthHandler.cs,**/Services/EngagementAuthorizationFilter.cs,**/Services/ChannelInitializationService.cs,**/Services/Skills/SkillHostedService.cs,**/Services/AttachmentTextExtractionService.cs,**/Services/EngagementRulesProvider.cs,**/LeanKernel.Commander/Adapters/SignalRestApiAdapter.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillTool.cs,**/LeanKernel.Plugins/BuiltIn/Skills/BinaryResolver.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillToolFactory.cs,**/LeanKernel.Plugins/BuiltIn/Skills/EgressPolicy.cs,**/LeanKernel.Plugins/BuiltIn/Skills/RuntimeSkillRegistry.cs,**/LeanKernel.Generators/ToolRegistryGenerator.cs"
     dotnet restore src/LeanKernel.sln
     dotnet build src/LeanKernel.sln -c Release --no-restore
+    
+    # Collect coverage from all test projects so Sonar can compute accurate coverage.
     dotnet test test/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj -c Release --no-build \
       --collect:"XPlat Code Coverage" \
       --settings test/LeanKernel.Tests.Unit/coverage.sonar.runsettings \
       --results-directory coverage-results/sonar
+    
+    dotnet test test/LeanKernel.Tests.Integration/LeanKernel.Tests.Integration.csproj -c Release --no-build \
+      --collect:"XPlat Code Coverage" \
+      --settings test/LeanKernel.Tests.Unit/coverage.sonar.runsettings \
+      --results-directory coverage-results/sonar
+    
+    #dotnet test test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj -c Release --no-build \
+    #  --collect:"XPlat Code Coverage" \
+    #  --settings test/LeanKernel.Tests.Unit/coverage.sonar.runsettings \
+    #  --results-directory coverage-results/sonar
     dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
   '
