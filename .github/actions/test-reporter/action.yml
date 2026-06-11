@@ -1,0 +1,31 @@
+name: 'Test Results Reporter'
+description: 'Parse JUnit/TRX test results and create annotations'
+inputs:
+  test-results-path:
+    description: 'Path to test results file(s) - supports glob patterns'
+    required: true
+  coverage-path:
+    description: 'Path to code coverage file(s) in Cobertura XML format - supports glob patterns'
+    required: false
+    default: ''
+  name:
+    description: 'Name for the test report'
+    required: false
+    default: 'Test Results'
+  fail-on-error:
+    description: 'Fail the action if tests failed'
+    required: false
+    default: 'false'
+runs:
+  using: 'composite'
+  steps:
+    - name: Parse and Report Test Results
+      shell: bash
+      env:
+        TEST_RESULTS_PATH: ${{ inputs.test-results-path }}
+        COVERAGE_PATH: ${{ inputs.coverage-path }}
+        REPORT_NAME: ${{ inputs.name }}
+        FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        node ${{ github.action_path }}/report-tests.js

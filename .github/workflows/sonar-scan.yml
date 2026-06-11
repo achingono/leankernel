@@ -41,16 +41,63 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run SonarQube scan
+      - name: Run scan
+        id: sonar-scan
         run: scripts/quality/sonarqube-scan.sh
 
-      - name: Upload Sonar results artifact
+      - name: Build summary
+        if: always()
+        env:
+          SONAR_TOKEN: ${{ steps.sonar-scan.outputs.sonar_token }}
+        run: scripts/quality/sonarqube-summary.sh
+
+      - name: Annotate PR with Sonar summary
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          if [ ! -f sonar-reports/pr-comment.md ]; then
+            echo "::notice title=SonarQube PR annotation skipped::No summary comment file found"
+            exit 0
+          fi
+
+          marker="<!-- sonar-scan-summary -->"
+          comments_url="${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments"
+          auth_header="Authorization: Bearer ${GITHUB_TOKEN}"
+          accept_header="Accept: application/vnd.github+json"
+
+          existing_comment_id=$(curl -fsS \
+            -H "${auth_header}" \
+            -H "${accept_header}" \
+            "${comments_url}?per_page=100" | jq -r \
+            ".[] | select(.user.login==\"github-actions[bot]\") | select(.body | contains(\"${marker}\")) | .id" | head -n 1)
+
+          body_json=$(jq -Rs '{body: .}' sonar-reports/pr-comment.md)
+
+          if [ -n "${existing_comment_id}" ] && [ "${existing_comment_id}" != "null" ]; then
+            curl -fsS \
+              -X PATCH \
+              -H "${auth_header}" \
+              -H "${accept_header}" \
+              -H "Content-Type: application/json" \
+              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/issues/comments/${existing_comment_id}" \
+              -d "${body_json}" >/dev/null
+          else
+            curl -fsS \
+              -X POST \
+              -H "${auth_header}" \
+              -H "${accept_header}" \
+              -H "Content-Type: application/json" \
+              "${comments_url}" \
+              -d "${body_json}" >/dev/null
+          fi
+
+      - name: Upload Sonar reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sonar-scan-results
-          path: |
-            coverage-results/sonar
-            docs/sonar-prds
-          if-no-files-found: ignore
+          name: sonar-reports
+          path: sonar-reports/
           retention-days: 14
