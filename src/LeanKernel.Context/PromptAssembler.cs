@@ -67,6 +67,13 @@ public sealed class PromptAssembler
             parts.Add("You have access to the functions listed above. When a user asks you to do something that requires a tool, use the function call mechanism rather than describing what you would do. If you're unsure which tool to use, think step by step and call the appropriate function with the correct parameters.");
         }
 
+        var hasKnowledge = context.WikiFacts.Count > 0 || context.RetrievedKnowledge.Count > 0;
+        if (hasKnowledge || context.ActiveToolNames.Any(n => n.StartsWith("wiki_", StringComparison.Ordinal)))
+        {
+            parts.Add("\n## Knowledge-First Policy");
+            parts.Add("Always check your available knowledge before asking the user for information they may have already provided. First, review the knowledge sections above — the answer may already be there. If not, use wiki_search or wiki_read to look it up. Only ask the user for clarification if you cannot find the information anywhere in your knowledge base.");
+        }
+
         var assembled = string.Join("\n", parts);
         var tokens = _tokenEstimator.EstimateTokens(assembled);
 
