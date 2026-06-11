@@ -64,6 +64,51 @@ jobs:
             type=sha,prefix=sha-,enable=${{ github.ref_type == 'tag' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Get previous release tag
+        id: prev_release
+        if: ${{ github.ref_type == 'tag' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
+          # Releases are returned newest-first; pick the first one that isn't the current tag.
+          prev_tag=$(curl -sS -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "$api" \
+            | jq -r --arg cur "${GITHUB_REF_NAME}" '[.[] | select(.tag_name != $cur)][0].tag_name // empty')
+          echo "prev_tag=${prev_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: release_notes
+        if: ${{ github.ref_type == 'tag' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cur_tag="${GITHUB_REF_NAME}"
+          prev_tag="${{ steps.prev_release.outputs.prev_tag }}"
+
+          if [ -z "$prev_tag" ]; then
+            echo "notes=No previous release found; showing recent commits." >> "$GITHUB_OUTPUT"
+            notes=$(git log -n 50 --pretty=format:'- %s (%h)' )
+            echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$notes" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Use compare API to get commit list between tags.
+          compare="https://api.github.com/repos/${GITHUB_REPOSITORY}/compare/${prev_tag}...${cur_tag}"
+          commits=$(curl -sS -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "$compare" \
+            | jq -r '.commits[]? | "- \(.commit.message) (\(.sha[0:7]))"')
+
+          if [ -z "$commits" ]; then
+            commits="- No commits found between ${prev_tag} and ${cur_tag}."
+          fi
+
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$commits" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
@@ -75,3 +120,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: ${{ matrix.platforms }}
+
+      - name: Create GitHub Release (with image tags)
+        if: ${{ github.ref_type == 'tag' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            Release notes since last release:
+            ${{ steps.release_notes.outputs.notes }}
+
+            Docker image tags:
+            ${{ steps.meta.outputs.tags }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
