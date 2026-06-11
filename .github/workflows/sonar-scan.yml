@@ -49,7 +49,7 @@ jobs:
         if: always()
         env:
           SONAR_TOKEN: ${{ steps.sonar-scan.outputs.sonar_token }}
-        run: scripts/quality/sonarqube-summary.sh
+        run: bash scripts/quality/sonarqube-summary.sh
 
       - name: Annotate PR with Sonar summary
         if: always() && github.event_name == 'pull_request'
