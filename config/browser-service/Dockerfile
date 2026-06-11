@@ -7,6 +7,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY config/browser-service/requirements.txt /app/requirements.txt
+
+# Pre-install CPU-only PyTorch to prevent webwright's transitive dependencies
+# from pulling in large NVIDIA GPU packages (torch, nvidia-cuda-*, etc.).
+# This significantly reduces image size and avoids CI disk-space exhaustion.
+RUN pip install --no-cache-dir torch torchvision \
+    --index-url https://download.pytorch.org/whl/cpu
+
 RUN pip install --no-cache-dir -r /app/requirements.txt \
     && python -m playwright install firefox
 
