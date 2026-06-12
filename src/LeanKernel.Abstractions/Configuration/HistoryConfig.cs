@@ -7,7 +7,7 @@ public sealed class HistoryConfig
     public int SummarizedTurnsMax { get; set; } = 20;
     public bool EnableCompaction { get; set; } = true;
     public bool EnableSummarization { get; set; } = true;
-    public string CompactionModel { get; set; } = "gpt-4o-mini";
+    public string CompactionModel { get; set; } = "small";
     public double CompactionTemperature { get; set; } = 0.1;
     public int MaxSummaryTokens { get; set; } = 200;
     public bool PersistCompactionMarkers { get; set; } = true;

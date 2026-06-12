@@ -16,9 +16,9 @@ public sealed class RoutingConfig
     ];
     public bool ShadowRoutingEnabled { get; set; } = false;
     public string ShadowModel { get; set; } = string.Empty;
-    public ModelTierConfig Economy { get; set; } = new() { Model = "gpt-4o-mini", MaxTokens = 4096 };
-    public ModelTierConfig Standard { get; set; } = new() { Model = "gpt-4o", MaxTokens = 8192 };
-    public ModelTierConfig Premium { get; set; } = new() { Model = "claude-sonnet-4-20250514", MaxTokens = 16384 };
+    public ModelTierConfig Economy { get; set; } = new() { Model = "small", MaxTokens = 4096 };
+    public ModelTierConfig Standard { get; set; } = new() { Model = "medium", MaxTokens = 8192 };
+    public ModelTierConfig Premium { get; set; } = new() { Model = "large", MaxTokens = 16384 };
     public ComplexityScoringConfig Scoring { get; set; } = new();
 }
 

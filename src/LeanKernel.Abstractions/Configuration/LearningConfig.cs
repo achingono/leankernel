@@ -38,7 +38,7 @@ public sealed class LearningConfig
     /// <summary>
     /// Gets or sets the model used for fact extraction.
     /// </summary>
-    public string ExtractionModel { get; set; } = "gpt-4o-mini";
+    public string ExtractionModel { get; set; } = "small";
 
     /// <summary>
     /// Gets or sets the temperature used for fact extraction.

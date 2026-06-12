@@ -4,6 +4,6 @@ public sealed class LiteLlmConfig
 {
     public string BaseUrl { get; set; } = "http://litellm:4000";
     public string ApiKey { get; set; } = string.Empty;
-    public string DefaultModel { get; set; } = "gpt-4o-mini";
+    public string DefaultModel { get; set; } = "tool";
     public int ContextWindowTokens { get; set; } = 128_000;
 }

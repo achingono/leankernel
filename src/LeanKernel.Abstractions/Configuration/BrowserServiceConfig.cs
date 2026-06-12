@@ -38,7 +38,7 @@ public sealed class BrowserServiceConfig
     /// <summary>
     /// Gets or sets the default LiteLLM model alias used by browser tasks.
     /// </summary>
-    public string DefaultModel { get; set; } = "gpt-4o";
+    public string DefaultModel { get; set; } = "tool";
 
     /// <summary>
     /// Gets or sets browser-service health probe configuration.

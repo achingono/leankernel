@@ -49,7 +49,7 @@ public sealed class WorkerDefinition
     /// <summary>
     /// Gets or sets the model used when the worker executes.
     /// </summary>
-    public string Model { get; set; } = "gpt-4o-mini";
+    public string Model { get; set; } = "small";
 
     /// <summary>
     /// Gets or sets the worker system prompt.
