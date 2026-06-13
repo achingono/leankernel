@@ -3,13 +3,14 @@ using LeanKernel.Abstractions.Models;
 
 namespace LeanKernel.Persistence.Resilience;
 
-/// <summary>
-/// Stores fallback session and history data while the database is degraded.
-/// </summary>
-public sealed class DegradedSessionBuffer
-{
-    private readonly ConcurrentDictionary<string, string> _sessionIds = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<ConversationTurn>> _histories = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// Stores fallback session and history data while the database is degraded.
+    /// </summary>
+    public sealed class DegradedSessionBuffer
+    {
+        private readonly ConcurrentDictionary<string, string> _sessionIds = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, string> _sessionOwnerMap = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, ConcurrentQueue<ConversationTurn>> _histories = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Gets or creates a fallback session identifier.
@@ -22,7 +23,18 @@ public sealed class DegradedSessionBuffer
         ArgumentException.ThrowIfNullOrWhiteSpace(channelId);
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
 
-        return _sessionIds.GetOrAdd($"{channelId}\u001f{userId}", _ => Guid.NewGuid().ToString("N"));
+        var sessionId = _sessionIds.GetOrAdd($"{channelId}\u001f{userId}", _ => Guid.NewGuid().ToString("N"));
+        _sessionOwnerMap.TryAdd(sessionId, userId);
+        return sessionId;
+    }
+
+    public bool SessionBelongsToUser(string sessionId, string userId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        return _sessionOwnerMap.TryGetValue(sessionId, out var owner)
+            && string.Equals(owner, userId, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

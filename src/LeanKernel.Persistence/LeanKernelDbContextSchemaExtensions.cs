@@ -48,4 +48,19 @@ public static class LeanKernelDbContextSchemaExtensions
             """CREATE INDEX IF NOT EXISTS "IX_ScheduledJobExecutions_StartedAt" ON engine."ScheduledJobExecutions" ("StartedAt")""",
             ct).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Ensures an index on <c>SessionEntity.UserId</c> for user-scoped session queries and migration lookups.
+    /// </summary>
+    /// <param name="dbContext">The database context to initialize.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>A task that completes when the index is present.</returns>
+    public static async Task EnsureUserIdIndexAsync(this LeanKernelDbContext dbContext, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(dbContext);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """CREATE INDEX IF NOT EXISTS "IX_Sessions_UserId" ON engine."Sessions" ("UserId")""",
+            ct).ConfigureAwait(false);
+    }
 }

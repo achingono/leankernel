@@ -29,18 +29,28 @@ public sealed class ChatService(
     public string? ErrorMessage { get; private set; }
     public List<ChatSessionSummary> Sessions { get; } = [];
     public List<ChatMessageViewModel> Messages { get; } = [];
+    public bool IsAuthenticated { get; private set; }
 
     public async Task InitializeAsync(
         string ownerId,
         IReadOnlyList<ChatSessionSummary>? cachedSessions,
         string? requestedSessionId,
+        string? legacyOwnerId = null,
+        bool isAuthenticated = false,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
 
         OwnerId = ownerId;
+        IsAuthenticated = isAuthenticated;
         IsInitialized = true;
         ErrorMessage = null;
+
+        if (isAuthenticated && !string.IsNullOrWhiteSpace(legacyOwnerId)
+            && !string.Equals(legacyOwnerId, ownerId, StringComparison.Ordinal))
+        {
+            await MigrateUserSessionsAsync(legacyOwnerId, ownerId, ct).ConfigureAwait(false);
+        }
 
         ReplaceSessions(cachedSessions ?? []);
         await RefreshSessionsAsync(ct).ConfigureAwait(false);
@@ -64,6 +74,79 @@ public sealed class ChatService(
         }
 
         ClearConversation();
+    }
+
+    private async Task MigrateUserSessionsAsync(string legacyOwnerId, string newOwnerId, CancellationToken ct)
+    {
+        if (_dbContextFactory is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await _dbContextFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+
+            var sessionsToMigrate = await db.Sessions
+                .Where(s => s.UserId == legacyOwnerId && s.ChannelId.StartsWith(ChannelPrefix + ":"))
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            if (sessionsToMigrate.Count == 0)
+            {
+                return;
+            }
+
+            var legacyChannelIds = sessionsToMigrate
+                .Select(s => s.ChannelId)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            // Preload conflicts in one query to avoid N+1 AnyAsync calls.
+            var conflictingChannelIds = await db.Sessions
+                .AsNoTracking()
+                .Where(s => s.UserId == newOwnerId && legacyChannelIds.Contains(s.ChannelId))
+                .Select(s => s.ChannelId)
+                .Distinct()
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            var conflictingChannelIdSet = new HashSet<string>(conflictingChannelIds, StringComparer.Ordinal);
+
+            var migratedCount = 0;
+            foreach (var session in sessionsToMigrate)
+            {
+                if (conflictingChannelIdSet.Contains(session.ChannelId))
+                {
+                    _logger.LogInformation(
+                        "Skipping migration of session {SessionId}: channel {ChannelId} already owned by {NewOwnerId}",
+                        session.Id, session.ChannelId, newOwnerId);
+                    continue;
+                }
+
+                session.UserId = newOwnerId;
+                migratedCount++;
+            }
+
+            if (migratedCount > 0)
+            {
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+
+            _logger.LogInformation(
+                "Migrated {MigratedCount} of {TotalCount} sessions from legacy owner {LegacyOwnerId} to {NewOwnerId}",
+                migratedCount, sessionsToMigrate.Count, legacyOwnerId, newOwnerId);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Legacy session migration from {LegacyOwnerId} to {NewOwnerId} failed; continuing with new identity",
+                legacyOwnerId, newOwnerId);
+        }
     }
 
     public async Task<string> CreateNewSessionAsync(CancellationToken ct = default)
@@ -99,6 +182,13 @@ public sealed class ChatService(
         EnsureReady();
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
+        if (!await VerifySessionOwnershipAsync(sessionId, ct).ConfigureAwait(false))
+        {
+            ClearConversation();
+            ErrorMessage = "The requested session could not be found.";
+            return;
+        }
+
         var cached = Sessions.FirstOrDefault(session => string.Equals(session.SessionId, sessionId, StringComparison.Ordinal));
         var channelId = cached?.ChannelId ?? await ResolveChannelIdAsync(sessionId, ct).ConfigureAwait(false);
 
@@ -114,6 +204,24 @@ public sealed class ChatService(
         ErrorMessage = null;
 
         await LoadHistoryAsync(sessionId, ct).ConfigureAwait(false);
+    }
+
+    private async Task<bool> VerifySessionOwnershipAsync(string sessionId, CancellationToken ct)
+    {
+        if (!IsAuthenticated && !string.IsNullOrWhiteSpace(OwnerId))
+        {
+            return true;
+        }
+
+        try
+        {
+            return await _sessionStore.SessionBelongsToUserAsync(sessionId, OwnerId!, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Session ownership verification failed for {SessionId}; denying access", sessionId);
+            return false;
+        }
     }
 
     public async Task<bool> SendAsync(CancellationToken ct = default)
@@ -137,6 +245,14 @@ public sealed class ChatService(
 
         CurrentSessionId = sessionId;
         CurrentChannelId ??= BuildChannelId(sessionId!);
+
+        if (!await VerifySessionOwnershipAsync(sessionId!, ct).ConfigureAwait(false))
+        {
+            ClearConversation();
+            ErrorMessage = "The requested session could not be found.";
+            IsLoading = false;
+            return false;
+        }
 
         var pendingMessage = CreatePendingUserMessage(content);
         Messages.Add(pendingMessage);

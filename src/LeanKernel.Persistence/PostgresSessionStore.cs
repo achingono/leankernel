@@ -122,6 +122,20 @@ public sealed class PostgresSessionStore(
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public async Task<bool> SessionBelongsToUserAsync(string sessionId, string userId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        await using var db = await _dbFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
+
+        return await db.Sessions
+            .AsNoTracking()
+            .AnyAsync(s => s.Id == sessionId && s.UserId == userId, ct)
+            .ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Gets the most recent conversation history for a session in chronological order.
     /// </summary>

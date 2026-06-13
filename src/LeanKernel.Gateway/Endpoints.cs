@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
+using LeanKernel.Gateway.Auth;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LeanKernel.Gateway;
@@ -21,7 +23,8 @@ public static class Endpoints
             .WithTags("Gateway")
             .WithSummary("Get gateway health and service wiring status.")
             .Produces(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status503ServiceUnavailable);
+            .Produces(StatusCodes.Status503ServiceUnavailable)
+            .AllowAnonymous();
 
         app.MapGet("/api/diagnostics/{sessionId}", HandleDiagnosticsAsync)
             .WithName("GetSessionDiagnostics")
@@ -72,15 +75,64 @@ public static class Endpoints
             return Results.BadRequest(new { error = "Message is required" });
         }
 
-        var senderId = string.IsNullOrWhiteSpace(request.UserId)
-            ? "api-user"
-            : request.UserId;
+        var authenticatedUserKey = GetAuthenticatedUserKey(httpContext);
+        var isAuthenticated = !string.IsNullOrWhiteSpace(authenticatedUserKey);
+
+        var forwardedAuthOptions = httpContext.RequestServices
+            .GetService<Microsoft.Extensions.Options.IOptionsMonitor<ForwardedAuthOptions>>()
+            ?.Get(ForwardedAuthHandler.SchemeName);
+
+        var forwardedAuthEnabled = forwardedAuthOptions?.Enabled == true;
+        var forwardedAuthRequiresAuth = forwardedAuthOptions?.RequireAuthenticatedUser == true;
+
+        string senderId;
+        if (isAuthenticated)
+        {
+            senderId = authenticatedUserKey!;
+            if (!string.IsNullOrWhiteSpace(request.UserId)
+                && !string.Equals(request.UserId, authenticatedUserKey, StringComparison.Ordinal))
+            {
+                var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogWarning(
+                    "API chat request supplied UserId '{RequestUserId}' but authenticated user is '{AuthUserId}'; using authenticated identity",
+                    request.UserId, authenticatedUserKey);
+            }
+        }
+        else
+        {
+            // If forwarded auth is enabled and requires an authenticated identity,
+            // do not accept caller-controlled request.UserId.
+            if (forwardedAuthEnabled && forwardedAuthRequiresAuth)
+            {
+                return Results.Unauthorized();
+            }
+
+            senderId = string.IsNullOrWhiteSpace(request.UserId)
+                ? "api-user"
+                : request.UserId;
+        }
+
         var channelId = string.IsNullOrWhiteSpace(request.ChannelId)
             ? "api"
             : request.ChannelId;
-        var sessionId = string.IsNullOrWhiteSpace(request.SessionId)
-            ? await sessionStore.GetOrCreateSessionIdAsync(channelId, senderId, ct).ConfigureAwait(false)
-            : request.SessionId;
+
+        string sessionId;
+        if (string.IsNullOrWhiteSpace(request.SessionId))
+        {
+            sessionId = await sessionStore.GetOrCreateSessionIdAsync(channelId, senderId, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            if (isAuthenticated)
+            {
+                var belongs = await sessionStore.SessionBelongsToUserAsync(request.SessionId, senderId, ct).ConfigureAwait(false);
+                if (!belongs)
+                {
+                    return Results.NotFound(new { error = "Session not found" });
+                }
+            }
+            sessionId = request.SessionId;
+        }
 
         var message = new LeanKernelMessage
         {
@@ -98,6 +150,29 @@ public static class Endpoints
             Response = response,
             SessionId = message.SessionId
         });
+    }
+
+    private static string? GetAuthenticatedUserKey(HttpContext httpContext)
+    {
+        var user = httpContext.User;
+        if (user.Identity?.IsAuthenticated != true
+            || !string.Equals(user.Identity.AuthenticationType, ForwardedAuthHandler.SchemeName, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var sub = user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrWhiteSpace(sub))
+            return sub;
+
+        var email = user.FindFirst(ClaimTypes.Email)?.Value
+                 ?? user.FindFirst("email")?.Value;
+        if (!string.IsNullOrWhiteSpace(email))
+            return email;
+
+        return user.FindFirst(ClaimTypes.Name)?.Value
+            ?? user.FindFirst("name")?.Value
+            ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     }
 
     private static async Task<IResult> HandleHealthAsync(IServiceProvider services, CancellationToken ct)

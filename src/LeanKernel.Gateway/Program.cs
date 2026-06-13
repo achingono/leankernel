@@ -1,5 +1,6 @@
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Agents;
+using LeanKernel.Gateway.Auth;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.FluentUI.AspNetCore.Components;
 using LeanKernel.Channels;
@@ -43,6 +44,16 @@ try
     builder.Services.AddScoped<DocumentUiService>();
     builder.Services.AddScoped<AdminService>();
 
+    builder.Services.Configure<ForwardedAuthOptions>(
+        ForwardedAuthHandler.SchemeName,
+        builder.Configuration.GetSection("LeanKernel:ForwardedAuth").Bind);
+
+    builder.Services.AddAuthentication(ForwardedAuthHandler.SchemeName)
+        .AddScheme<ForwardedAuthOptions, ForwardedAuthHandler>(ForwardedAuthHandler.SchemeName, null);
+
+    builder.Services.AddAuthorization();
+    builder.Services.AddCascadingAuthenticationState();
+
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
@@ -83,12 +94,12 @@ try
             .FirstOrDefaultAsync().ConfigureAwait(false);
         if (hasSessionsTable == 0)
         {
-            // Drop partial schema state from previous failed initializations
             await dbContext.Database.ExecuteSqlRawAsync("""DROP TABLE IF EXISTS engine."ScheduledJobExecutions" CASCADE""").ConfigureAwait(false);
             var script = dbContext.Database.GenerateCreateScript();
             await dbContext.Database.ExecuteSqlRawAsync(script).ConfigureAwait(false);
         }
         await dbContext.EnsureSchedulerSchemaAsync().ConfigureAwait(false);
+        await dbContext.EnsureUserIdIndexAsync().ConfigureAwait(false);
     }
     catch (Exception ex)
     {
@@ -99,6 +110,8 @@ try
     app.UseMiddleware<RateLimitingMiddleware>();
     app.UseStaticFiles();
     app.UseAntiforgery();
+    app.UseAuthentication();
+    app.UseAuthorization();
     app.MapStaticAssets();
 
     if (app.Environment.IsDevelopment())
@@ -106,7 +119,8 @@ try
         app.MapOpenApi();
     }
 
-    app.MapHealthChecks("/healthz");
+    app.MapHealthChecks("/healthz").AllowAnonymous();
+
     app.MapEndpoints();
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();

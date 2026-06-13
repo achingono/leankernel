@@ -4,6 +4,7 @@
 @inject ChatService ChatService
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 @rendermode InteractiveServer
 
@@ -114,11 +115,47 @@
     {
         if (firstRender)
         {
-            var ownerId = await GetOrCreateOwnerIdAsync();
-            var cachedSessions = await LoadCachedSessionsAsync();
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var isAuthenticated = user.Identity?.IsAuthenticated == true
+                && string.Equals(user.Identity.AuthenticationType, LeanKernel.Gateway.Auth.ForwardedAuthHandler.SchemeName, StringComparison.Ordinal);
+            var authenticatedUserKey = isAuthenticated
+                ? GetUserKey(authState.User)
+                : null;
 
-            await ChatService.InitializeAsync(ownerId, cachedSessions, SessionId, _disposeCts.Token);
-            await PersistSessionCacheAsync();
+            var legacyOwnerId = await GetLegacyOwnerIdAsync();
+
+            string ownerId;
+            string? legacyForMigration = null;
+            bool authFlag;
+
+            if (isAuthenticated && !string.IsNullOrWhiteSpace(authenticatedUserKey))
+            {
+                ownerId = authenticatedUserKey!;
+                legacyForMigration = legacyOwnerId;
+                authFlag = true;
+            }
+            else
+            {
+                ownerId = legacyOwnerId ?? Guid.NewGuid().ToString("N");
+                if (legacyOwnerId is null)
+                {
+                    await JS.InvokeVoidAsync("leanKernelChat.storage.set", OwnerStorageKey, ownerId);
+                }
+                authFlag = false;
+            }
+
+            var cacheKey = authFlag ? $"{SessionCacheStorageKey}.{GetCacheKeySuffix(ownerId)}" : SessionCacheStorageKey;
+            var cachedSessions = await LoadCachedSessionsAsync(cacheKey);
+
+            await ChatService.InitializeAsync(ownerId, cachedSessions, SessionId, legacyForMigration, authFlag, _disposeCts.Token);
+
+            if (legacyForMigration is not null && authFlag)
+            {
+                await JS.InvokeVoidAsync("leanKernelChat.storage.remove", OwnerStorageKey);
+            }
+
+            await PersistSessionCacheAsync(cacheKey);
             await JS.InvokeVoidAsync("leanKernelChat.registerComposer", "chat-composer-input", "chat-send-button");
 
             _initialized = true;
@@ -134,10 +171,40 @@
         }
     }
 
+    private static string GetUserKey(ClaimsPrincipal user)
+    {
+        var sub = user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrWhiteSpace(sub))
+            return sub;
+
+        var email = user.FindFirst(ClaimTypes.Email)?.Value
+                 ?? user.FindFirst("email")?.Value;
+        if (!string.IsNullOrWhiteSpace(email))
+            return email;
+
+        return user.FindFirst(ClaimTypes.Name)?.Value
+            ?? user.FindFirst("name")?.Value
+            ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? "unknown-user";
+    }
+
+    private static string GetCacheKeySuffix(string key)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(key));
+        return Convert.ToHexString(hash).ToLowerInvariant()[..16];
+    }
+
+    private async Task<string?> GetLegacyOwnerIdAsync()
+    {
+        return await JS.InvokeAsync<string?>("leanKernelChat.storage.get", OwnerStorageKey);
+    }
+
     private async Task SendAsync()
     {
         var sent = await ChatService.SendAsync(_disposeCts.Token);
-        await PersistSessionCacheAsync();
+        var cacheKey = GetCurrentCacheKey();
+        await PersistSessionCacheAsync(cacheKey);
 
         if (!sent)
         {
@@ -155,7 +222,8 @@
     private async Task StartNewSessionAsync()
     {
         var sessionId = await ChatService.CreateNewSessionAsync(_disposeCts.Token);
-        await PersistSessionCacheAsync();
+        var cacheKey = GetCurrentCacheKey();
+        await PersistSessionCacheAsync(cacheKey);
         _shouldScroll = true;
         Navigation.NavigateTo($"/chat/{sessionId}");
     }
@@ -168,27 +236,27 @@
         }
 
         await ChatService.OpenSessionAsync(sessionId, _disposeCts.Token);
-        await PersistSessionCacheAsync();
+        var cacheKey = GetCurrentCacheKey();
+        await PersistSessionCacheAsync(cacheKey);
         _shouldScroll = true;
         Navigation.NavigateTo($"/chat/{sessionId}");
     }
 
-    private async Task<string> GetOrCreateOwnerIdAsync()
+    private string GetCurrentCacheKey()
     {
-        var existingOwnerId = await JS.InvokeAsync<string?>("leanKernelChat.storage.get", OwnerStorageKey);
-        if (!string.IsNullOrWhiteSpace(existingOwnerId))
-        {
-            return existingOwnerId;
-        }
-
-        var ownerId = Guid.NewGuid().ToString("N");
-        await JS.InvokeVoidAsync("leanKernelChat.storage.set", OwnerStorageKey, ownerId);
-        return ownerId;
+        return ChatService.IsAuthenticated && !string.IsNullOrWhiteSpace(ChatService.OwnerId)
+            ? $"{SessionCacheStorageKey}.{GetCacheKeySuffix(ChatService.OwnerId)}"
+            : SessionCacheStorageKey;
     }
 
-    private async Task<IReadOnlyList<ChatSessionSummary>> LoadCachedSessionsAsync()
+    private async Task<IReadOnlyList<ChatSessionSummary>> LoadCachedSessionsAsync(string cacheKey)
     {
-        var json = await JS.InvokeAsync<string?>("leanKernelChat.storage.get", SessionCacheStorageKey);
+        var json = await JS.InvokeAsync<string?>("leanKernelChat.storage.get", cacheKey);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            json = await JS.InvokeAsync<string?>("leanKernelChat.storage.get", SessionCacheStorageKey);
+        }
+
         if (string.IsNullOrWhiteSpace(json))
         {
             return [];
@@ -204,10 +272,10 @@
         }
     }
 
-    private Task PersistSessionCacheAsync()
+    private Task PersistSessionCacheAsync(string? cacheKey = null)
         => JS.InvokeVoidAsync(
             "leanKernelChat.storage.set",
-            SessionCacheStorageKey,
+            cacheKey ?? GetCurrentCacheKey(),
             JsonSerializer.Serialize(ChatService.Sessions)).AsTask();
 
     private string GetHeaderSubtitle()

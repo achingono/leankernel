@@ -138,6 +138,43 @@ public class PostgresSessionStoreTests
         provider.GetRequiredService<IDiagnosticsSink>().Should().BeOfType<PostgresDiagnosticsSink>();
     }
 
+    [Fact]
+    public async Task SessionBelongsToUserAsync_returns_true_when_session_belongs_to_user()
+    {
+        var factory = CreateFactory();
+        var store = CreateStore(factory);
+
+        var sessionId = await store.GetOrCreateSessionIdAsync("channel-1", "user-1");
+
+        var belongs = await store.SessionBelongsToUserAsync(sessionId, "user-1");
+
+        belongs.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SessionBelongsToUserAsync_returns_false_when_session_belongs_to_different_user()
+    {
+        var factory = CreateFactory();
+        var store = CreateStore(factory);
+
+        var sessionId = await store.GetOrCreateSessionIdAsync("channel-1", "user-1");
+
+        var belongs = await store.SessionBelongsToUserAsync(sessionId, "user-2");
+
+        belongs.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SessionBelongsToUserAsync_returns_false_for_nonexistent_session()
+    {
+        var factory = CreateFactory();
+        var store = CreateStore(factory);
+
+        var belongs = await store.SessionBelongsToUserAsync("nonexistent-session", "user-1");
+
+        belongs.Should().BeFalse();
+    }
+
     private static PostgresSessionStore CreateStore(TestDbContextFactory factory)
         => new(factory, NullLogger<PostgresSessionStore>.Instance);
 

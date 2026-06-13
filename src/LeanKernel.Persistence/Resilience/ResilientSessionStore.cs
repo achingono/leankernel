@@ -60,6 +60,27 @@ public sealed class ResilientSessionStore(
     }
 
     /// <inheritdoc />
+    public async Task<bool> SessionBelongsToUserAsync(string sessionId, string userId, CancellationToken ct = default)
+    {
+        try
+        {
+            var belongs = await _innerStore.SessionBelongsToUserAsync(sessionId, userId, ct).ConfigureAwait(false);
+            _providerHealthTracker?.RecordProbeResult(ProviderNames.Database, ProviderProbeResult.Healthy("Database session ownership check succeeded."));
+            return belongs;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _providerHealthTracker?.RecordProbeResult(ProviderNames.Database, ProviderProbeResult.Unhealthy("Database session ownership check failed.", ex.Message));
+            _logger.LogWarning(ex, "Session ownership check for {SessionId} fell back to in-memory storage", sessionId);
+            return _degradedSessionBuffer.SessionBelongsToUser(sessionId, userId);
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ConversationTurn>> GetHistoryAsync(string sessionId, int maxTurns = 50, CancellationToken ct = default)
     {
         try

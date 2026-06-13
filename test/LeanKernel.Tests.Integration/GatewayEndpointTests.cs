@@ -135,17 +135,113 @@ public class GatewayEndpointTests
         Assert.Equal("Diagnostics sink not configured", payload?["message"]?.GetValue<string>());
         Assert.Equal(0, payload?["entries"]?.AsArray().Count ?? -1);
     }
+
+    [Fact]
+    public async Task Chat_endpoint_uses_forwarded_auth_identity_when_authenticated()
+    {
+        await using var factory = new GatewayTestApplicationFactory(apiKey: "secret-key", enableForwardedAuth: true);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", "secret-key");
+        client.DefaultRequestHeaders.Add("X-Auth-Request-User", "auth-user-42");
+        client.DefaultRequestHeaders.Add("X-Auth-Request-Email", "user@example.com");
+
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest
+        {
+            Message = "Hello",
+            UserId = "attacker-supplied-id",
+            SessionId = "session-123",
+            ChannelId = "api"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = JsonNode.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("stub-response", payload?["response"]?.GetValue<string>());
+        Assert.Equal("auth-user-42", factory.Runtime.LastMessage?.SenderId);
+        Assert.Equal("session-123", factory.Runtime.LastMessage?.SessionId);
+    }
+
+    [Fact]
+    public async Task Chat_endpoint_ignores_spoofed_user_id_when_forwarded_auth_is_active()
+    {
+        await using var factory = new GatewayTestApplicationFactory(apiKey: "secret-key", enableForwardedAuth: true);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", "secret-key");
+        client.DefaultRequestHeaders.Add("X-Auth-Request-User", "real-user");
+        client.DefaultRequestHeaders.Add("X-Auth-Request-Email", "real@example.com");
+
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest
+        {
+            Message = "Test",
+            UserId = "spoofed-user",
+            SessionId = "session-123"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("real-user", factory.Runtime.LastMessage?.SenderId);
+    }
+
+    [Fact]
+    public async Task Chat_endpoint_returns_404_for_unowned_session_when_authenticated()
+    {
+        await using var factory = new GatewayTestApplicationFactory(apiKey: "secret-key", enableForwardedAuth: true);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", "secret-key");
+        client.DefaultRequestHeaders.Add("X-Auth-Request-User", "user-without-session");
+        factory.SessionStore.OwnedSessionIdsByUser.Clear();
+
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest
+        {
+            Message = "Hello",
+            SessionId = "session-123"
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Chat_endpoint_rejects_unauthenticated_requests_when_forwarded_auth_requires_auth()
+    {
+        await using var factory = new GatewayTestApplicationFactory(
+            apiKey: "secret-key",
+            enableForwardedAuth: true,
+            forwardedAuthRequireAuthenticatedUser: true);
+
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", "secret-key");
+
+        factory.SessionStore.OwnedSessionIdsByUser.Remove("attacker-supplied-id");
+
+        // No X-Auth-Request-* headers.
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest
+        {
+            Message = "Hello",
+            SessionId = "session-123",
+            ChannelId = "api",
+            UserId = "attacker-supplied-id"
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }
 
 public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string? _apiKey;
     private readonly bool _registerDiagnosticsSink;
+    private readonly bool _enableForwardedAuth;
+    private readonly bool _forwardedAuthRequireAuthenticatedUser;
 
-    public GatewayTestApplicationFactory(string? apiKey = null, bool registerDiagnosticsSink = true)
+    public GatewayTestApplicationFactory(
+        string? apiKey = null,
+        bool registerDiagnosticsSink = true,
+        bool enableForwardedAuth = false,
+        bool forwardedAuthRequireAuthenticatedUser = false)
     {
         _apiKey = apiKey;
         _registerDiagnosticsSink = registerDiagnosticsSink;
+        _enableForwardedAuth = enableForwardedAuth;
+        _forwardedAuthRequireAuthenticatedUser = forwardedAuthRequireAuthenticatedUser;
     }
 
     public RecordingAgentRuntime Runtime { get; } = new();
@@ -157,7 +253,7 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
         builder.UseEnvironment("Development");
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            var configValues = new Dictionary<string, string?>
             {
                 ["LeanKernel:Gateway:ApiKey"] = _apiKey ?? string.Empty,
                 ["LeanKernel:Database:ConnectionString"] = "Host=localhost;Database=leankernel;Username=leankernel;Password=leankernel",
@@ -170,8 +266,12 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
                 ["LeanKernel:Diagnostics:Enabled"] = "true",
                 ["LeanKernel:Diagnostics:PersistToDatabase"] = "true",
                 ["LeanKernel:Diagnostics:ContextDiagnosticsEnabled"] = "true",
-                ["LeanKernel:Diagnostics:MaxDiagnosticsPerSession"] = "100"
-            });
+                ["LeanKernel:Diagnostics:MaxDiagnosticsPerSession"] = "100",
+                ["LeanKernel:ForwardedAuth:Enabled"] = _enableForwardedAuth ? "true" : "false",
+                ["LeanKernel:ForwardedAuth:RequireAuthenticatedUser"] = (_enableForwardedAuth && _forwardedAuthRequireAuthenticatedUser) ? "true" : "false",
+            };
+
+            configuration.AddInMemoryCollection(configValues);
         });
         builder.ConfigureServices(services =>
         {
@@ -207,6 +307,12 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
     public sealed class RecordingSessionStore : ISessionStore
     {
         public string GeneratedSessionId { get; set; } = "generated-api-session";
+        public Dictionary<string, HashSet<string>> OwnedSessionIdsByUser { get; set; } = new(StringComparer.Ordinal)
+        {
+            ["user-42"] = new HashSet<string>(StringComparer.Ordinal) { "session-123" },
+            ["auth-user-42"] = new HashSet<string>(StringComparer.Ordinal) { "session-123" },
+            ["real-user"] = new HashSet<string>(StringComparer.Ordinal) { "session-123" },
+        };
 
         public Task<string> GetOrCreateSessionIdAsync(string channelId, string userId, CancellationToken ct = default)
             => Task.FromResult(GeneratedSessionId);
@@ -216,6 +322,10 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
 
         public Task<IReadOnlyList<ConversationTurn>> GetHistoryAsync(string sessionId, int maxTurns = 50, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ConversationTurn>>([]);
+
+        public Task<bool> SessionBelongsToUserAsync(string sessionId, string userId, CancellationToken ct = default)
+            => Task.FromResult(OwnedSessionIdsByUser.TryGetValue(userId, out var owned)
+                && owned.Contains(sessionId));
     }
 
     public sealed class StubContextDiagnosticsService : IContextDiagnosticsService
