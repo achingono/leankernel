@@ -1,5 +1,4 @@
-# Webwright is the Microsoft Research browser automation engine required by the PRD.
-webwright==0.0.7
+# FastAPI service + Playwright client
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4

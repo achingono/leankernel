@@ -13,8 +13,25 @@ COPY config/webwright/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir torch==2.10.0+cpu torchvision==0.25.0+cpu \
     --index-url https://download.pytorch.org/whl/cpu
 
-# Install Python dependencies (playwright API is needed for WS connection,
-# but no browser binaries — the service connects to a remote Playwright run-server)
+# Install webwright (browser automation engine) without its broken playsound dep
+RUN pip install --no-cache-dir webwright==0.0.7 --no-deps && \
+    pip install --no-cache-dir \
+        gitpython \
+        prompt-toolkit \
+        beautifulsoup4 \
+        coolname \
+        pygments \
+        openai \
+        tenacity \
+        anthropic \
+        Halo \
+        PyGithub \
+        google-generativeai \
+        unidiff \
+        patch \
+        cowsay
+
+# Install remaining Python dependencies
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY config/webwright/app /app/app
