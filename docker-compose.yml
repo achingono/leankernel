@@ -111,30 +111,50 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Browser Automation Sidecar (Webwright + Playwright) ─────────
-  browser-service:
+  playwright:
+    image: mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION:-1.60.0}-noble
+    container_name: leankernel-playwright
+    environment:
+      - TZ=${TZ:-America/Toronto}
+      - PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION:-1.60.0}
+    command: ["/bin/sh", "-c", "npx -y playwright@${PLAYWRIGHT_VERSION:-1.60.0} run-server --port 6000 --host 0.0.0.0"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - browserdata:/home/pwuser/outputs
+    shm_size: 1gb
+    restart: unless-stopped
+
+  # ── Browser Automation Sidecar (Webwright) ─────────
+  webwright:
     build:
       context: .
-      dockerfile: config/browser-service/Dockerfile
-    container_name: leankernel-browser-service
+      dockerfile: config/webwright/Dockerfile
+    container_name: leankernel-webwright
     environment:
-      - API_TOKEN=${BROWSER_SERVICE_API_TOKEN:-}
+      - API_TOKEN=${WEBWRIGHT_API_TOKEN:-}
       - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${BROWSER_SERVICE_LITELLM_KEY:-}
-      - WEBWRIGHT_MODEL=${BROWSER_SERVICE_MODEL:-tool}
-      - MAX_CONCURRENT_RUNS=${BROWSER_SERVICE_MAX_CONCURRENT_RUNS:-2}
-      - MAX_QUEUE_DEPTH=${BROWSER_SERVICE_MAX_QUEUE_DEPTH:-20}
-      - RUN_WALL_CLOCK_SECONDS=${BROWSER_SERVICE_RUN_WALL_CLOCK_SECONDS:-600}
-      - ARTIFACT_TTL_HOURS=${BROWSER_SERVICE_ARTIFACT_TTL_HOURS:-24}
-      - DOMAIN_ALLOWLIST=${BROWSER_SERVICE_DOMAIN_ALLOWLIST:-}
-      - DOMAIN_DENYLIST=${BROWSER_SERVICE_DOMAIN_DENYLIST:-}
+      - LITELLM_API_KEY=${WEBWRIGHT_LITELLM_KEY:-}
+      - WEBWRIGHT_MODEL=${WEBWRIGHT_MODEL:-tool}
+      - MAX_CONCURRENT_RUNS=${WEBWRIGHT_MAX_CONCURRENT_RUNS:-2}
+      - MAX_QUEUE_DEPTH=${WEBWRIGHT_MAX_QUEUE_DEPTH:-20}
+      - RUN_WALL_CLOCK_SECONDS=${WEBWRIGHT_RUN_WALL_CLOCK_SECONDS:-600}
+      - ARTIFACT_TTL_HOURS=${WEBWRIGHT_ARTIFACT_TTL_HOURS:-24}
+      - DOMAIN_ALLOWLIST=${WEBWRIGHT_DOMAIN_ALLOWLIST:-}
+      - DOMAIN_DENYLIST=${WEBWRIGHT_DOMAIN_DENYLIST:-}
       - TZ=${TZ:-America/Toronto}
+      - PLAYWRIGHT_WS_ENDPOINT=ws://playwright:6000/
     volumes:
       - browserdata:/app/outputs
     ports:
-      - "${BROWSER_SERVICE_PORT:-8000}:8000"
+      - "${WEBWRIGHT_PORT:-8000}:8000"
     depends_on:
       litellm:
+        condition: service_healthy
+      playwright:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -195,10 +215,10 @@ services:
       - LEANKERNEL__GBRAIN__BASEURL=http://gbrain:8789
       - LEANKERNEL__GBRAIN__AUTHTOKEN=${GBRAIN_AUTH_TOKEN:-}
       - LEANKERNEL__GBRAIN__TIMEOUTSECONDS=30
-      - LEANKERNEL__BROWSERSERVICE__ENABLED=${BROWSER_SERVICE_ENABLED:-false}
-      - LEANKERNEL__BROWSERSERVICE__BASEURL=http://browser-service:8000
-      - LEANKERNEL__BROWSERSERVICE__DEFAULTMODEL=${BROWSER_SERVICE_MODEL:-tool}
-      - LEANKERNEL__BROWSERSERVICE__APITOKEN=${BROWSER_SERVICE_API_TOKEN:-}
+      - LEANKERNEL__WEBWRIGHT__ENABLED=${WEBWRIGHT_ENABLED:-false}
+      - LEANKERNEL__WEBWRIGHT__BASEURL=http://webwright:8000
+      - LEANKERNEL__WEBWRIGHT__DEFAULTMODEL=${WEBWRIGHT_MODEL:-tool}
+      - LEANKERNEL__WEBWRIGHT__APITOKEN=${WEBWRIGHT_API_TOKEN:-}
       - LEANKERNEL__DATABASE__CONNECTIONSTRING=Host=database;Database=${POSTGRES_DB:-leankernel};Username=${POSTGRES_USER:-leankernel};Password=${POSTGRES_PASSWORD:-leankernel-dev-password}
       - LEANKERNEL__DIAGNOSTICS__ENABLED=true
       - LEANKERNEL__DIAGNOSTICS__PERSISTTODATABASE=true
@@ -224,7 +244,7 @@ services:
         condition: service_healthy
       gbrain:
         condition: service_healthy
-      browser-service:
+      webwright:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

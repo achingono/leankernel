@@ -68,7 +68,7 @@ public static class BrowserToolDefinitions
 
                 using var scope = scopeFactory.CreateScope();
                 var config = GetBrowserConfig(scope.ServiceProvider);
-                var client = scope.ServiceProvider.GetRequiredService<IBrowserServiceClient>();
+                var client = scope.ServiceProvider.GetRequiredService<IWebwrightClient>();
                 var request = new BrowserRunTaskRequest(
                     task.Trim(),
                     startUrl,
@@ -117,7 +117,7 @@ public static class BrowserToolDefinitions
                 }
 
                 using var scope = scopeFactory.CreateScope();
-                var client = scope.ServiceProvider.GetRequiredService<IBrowserServiceClient>();
+                var client = scope.ServiceProvider.GetRequiredService<IWebwrightClient>();
                 return await ExecuteAsync(
                     "browser_get_run",
                     () => client.GetRunAsync(runId.Trim(), ct)).ConfigureAwait(false);
@@ -143,7 +143,7 @@ public static class BrowserToolDefinitions
             [
                 new ToolParameter { Name = "run_id", Type = "string", Description = "Browser run identifier", Required = true },
                 new ToolParameter { Name = "artifact_id", Type = "string", Description = "Opaque artifact id from browser_get_run manifest", Required = true },
-                new ToolParameter { Name = "max_bytes", Type = "integer", Description = "Maximum bytes to return; defaults to BrowserService:MaxArtifactBytes", Required = false }
+                new ToolParameter { Name = "max_bytes", Type = "integer", Description = "Maximum bytes to return; defaults to Webwright:MaxArtifactBytes", Required = false }
             ],
             Handler = async (args, ct) =>
             {
@@ -169,7 +169,7 @@ public static class BrowserToolDefinitions
                 }
 
                 var maxBytes = Math.Min(requestedBytes, Math.Max(1, config.MaxArtifactBytes));
-                var client = scope.ServiceProvider.GetRequiredService<IBrowserServiceClient>();
+                var client = scope.ServiceProvider.GetRequiredService<IWebwrightClient>();
                 return await ExecuteArtifactAsync(
                     "browser_get_artifact",
                     () => client.GetArtifactAsync(runId.Trim(), artifactId.Trim(), maxBytes, ct)).ConfigureAwait(false);
@@ -205,7 +205,7 @@ public static class BrowserToolDefinitions
                 }
 
                 using var scope = scopeFactory.CreateScope();
-                var client = scope.ServiceProvider.GetRequiredService<IBrowserServiceClient>();
+                var client = scope.ServiceProvider.GetRequiredService<IWebwrightClient>();
                 return await ExecuteAsync(
                     "browser_cancel_run",
                     () => client.CancelRunAsync(runId.Trim(), ct)).ConfigureAwait(false);
@@ -225,7 +225,7 @@ public static class BrowserToolDefinitions
                 Output = Truncate(JsonSerializer.Serialize(response, JsonOptions))
             };
         }
-        catch (BrowserServiceException ex)
+        catch (WebwrightException ex)
         {
             return Failed(toolName, FormatError(ex));
         }
@@ -252,7 +252,7 @@ public static class BrowserToolDefinitions
                 Output = Truncate(JsonSerializer.Serialize(output, JsonOptions))
             };
         }
-        catch (BrowserServiceException ex)
+        catch (WebwrightException ex)
         {
             return Failed(toolName, FormatError(ex));
         }
@@ -265,14 +265,14 @@ public static class BrowserToolDefinitions
         Error = error
     };
 
-    private static string FormatError(BrowserServiceException ex)
+    private static string FormatError(WebwrightException ex)
     {
-        var payload = new BrowserServiceError(ex.Code, ex.Message, ex.Details);
+        var payload = new WebwrightError(ex.Code, ex.Message, ex.Details);
         return JsonSerializer.Serialize(payload, JsonOptions);
     }
 
-    private static BrowserServiceConfig GetBrowserConfig(IServiceProvider serviceProvider)
-        => serviceProvider.GetService<IOptions<LeanKernelConfig>>()?.Value.BrowserService ?? new BrowserServiceConfig();
+    private static WebwrightConfig GetBrowserConfig(IServiceProvider serviceProvider)
+        => serviceProvider.GetService<IOptions<LeanKernelConfig>>()?.Value.Webwright ?? new WebwrightConfig();
 
     private static string? NormalizeOptional(string value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

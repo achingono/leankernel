@@ -8,22 +8,22 @@ namespace LeanKernel.Tools.BuiltIn.Browser;
 /// <summary>
 /// HTTP client for the browser automation sidecar.
 /// </summary>
-public sealed class BrowserServiceClient : IBrowserServiceClient
+public sealed class WebwrightClient : IWebwrightClient
 {
     /// <summary>
-    /// The named HTTP client used for browser-service operational calls.
+    /// The named HTTP client used for webwright operational calls.
     /// </summary>
-    public const string HttpClientName = "LeanKernel.BrowserService";
+    public const string HttpClientName = "LeanKernel.Webwright";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IHttpClientFactory _httpClientFactory;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="BrowserServiceClient"/> class.
+    /// Initializes a new instance of the <see cref="WebwrightClient"/> class.
     /// </summary>
     /// <param name="httpClientFactory">The HTTP client factory.</param>
-    public BrowserServiceClient(IHttpClientFactory httpClientFactory)
+    public WebwrightClient(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     }
@@ -88,7 +88,7 @@ public sealed class BrowserServiceClient : IBrowserServiceClient
 
         if (!IsTextContent(contentType))
         {
-            throw new BrowserServiceException(
+            throw new WebwrightException(
                 "LIMIT_EXCEEDED",
                 $"Artifact '{artifactId}' exceeds the configured limit of {maxBytes} bytes.",
                 details: new Dictionary<string, object?> { ["maxBytes"] = maxBytes });
@@ -115,22 +115,22 @@ public sealed class BrowserServiceClient : IBrowserServiceClient
         }
 
         var result = await response.Content.ReadFromJsonAsync<T>(JsonOptions, ct).ConfigureAwait(false);
-        return result ?? throw new BrowserServiceException("INTERNAL_ERROR", "Browser service returned an empty response.", (int)response.StatusCode);
+        return result ?? throw new WebwrightException("INTERNAL_ERROR", "Browser service returned an empty response.", (int)response.StatusCode);
     }
 
     private HttpClient CreateClient() => _httpClientFactory.CreateClient(HttpClientName);
 
-    private static async Task<BrowserServiceException> CreateExceptionAsync(HttpResponseMessage response, CancellationToken ct)
+    private static async Task<WebwrightException> CreateExceptionAsync(HttpResponseMessage response, CancellationToken ct)
     {
         var content = response.Content is null ? string.Empty : await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(content))
         {
             try
             {
-                var error = JsonSerializer.Deserialize<BrowserServiceError>(content, JsonOptions);
+                var error = JsonSerializer.Deserialize<WebwrightError>(content, JsonOptions);
                 if (error is not null && !string.IsNullOrWhiteSpace(error.Code))
                 {
-                    return new BrowserServiceException(error.Code, error.Message, (int)response.StatusCode, error.Details);
+                    return new WebwrightException(error.Code, error.Message, (int)response.StatusCode, error.Details);
                 }
             }
             catch (JsonException)
@@ -149,7 +149,7 @@ public sealed class BrowserServiceClient : IBrowserServiceClient
             503 => "SERVICE_UNAVAILABLE",
             _ => "INTERNAL_ERROR"
         };
-        return new BrowserServiceException(code, $"Browser service returned {(int)response.StatusCode} ({response.ReasonPhrase}).", (int)response.StatusCode);
+        return new WebwrightException(code, $"Browser service returned {(int)response.StatusCode} ({response.ReasonPhrase}).", (int)response.StatusCode);
     }
 
     private static async Task<byte[]> ReadBoundedBytesAsync(HttpContent content, int maxBytes, CancellationToken ct)

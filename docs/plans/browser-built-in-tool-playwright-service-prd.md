@@ -54,14 +54,14 @@ Trade-offs accepted:
 │ LeanKernel (engine container)                                  │
 │                                                                │
 │  browser_run_task ──┐                                          │
-│  browser_get_run ───┼──► IBrowserServiceClient (HttpClient)    │
+│  browser_get_run ───┼──► IWebwrightClient (HttpClient)    │
 │  browser_get_artifact│                                         │
 │                     │                                          │
 └─────────────────────┼──────────────────────────────────────────┘
                       │ HTTP + Bearer + correlation
                       ▼
 ┌────────────────────────────────────────────────────────────────┐
-│ browser-service container (Python + Webwright + Playwright)    │
+│ webwright container (Python + Webwright + Playwright)    │
 │                                                                │
 │  FastAPI app                                                   │
 │   POST /runs ─────► RunManager (queue, semaphore)              │
@@ -99,7 +99,7 @@ Webwright CLI is a blocking process that may run 30s–10min. The sidecar runs i
 - Agents poll `browser_get_run` until terminal state.
 
 ### C. LLM routing and spend governance — Webwright → LiteLLM
-The browser-service container ships a Webwright config that pins the OpenAI backend's `base_url` to LeanKernel's LiteLLM (`http://litellm:4000`). This means:
+The webwright container ships a Webwright config that pins the OpenAI backend's `base_url` to LeanKernel's LiteLLM (`http://litellm:4000`). This means:
 - Every Webwright LLM call is routed/budgeted/observed by LiteLLM.
 - Model choice (`gpt-4o`, `claude-sonnet`, etc.) is controlled centrally.
 - Provider API keys remain centralized in LiteLLM; the browser service receives a dedicated LiteLLM virtual key, not provider keys and not the LiteLLM master key.
@@ -111,7 +111,7 @@ Config injected at container start:
 model:
   backend: openai
   base_url: ${LITELLM_BASE_URL}        # http://litellm:4000
-  api_key:  ${LITELLM_API_KEY}         # scoped virtual key for browser-service
+  api_key:  ${LITELLM_API_KEY}         # scoped virtual key for webwright
   model:    ${WEBWRIGHT_MODEL}         # e.g. gpt-4o
 ```
 
@@ -126,7 +126,7 @@ Webwright writes to `outputs/<task_id>/final_runs/run_<n>/`. The sidecar exposes
 - `GET /runs/{runId}/artifacts/{artifactId}` streams the file with correct `Content-Type`; `browser_get_artifact` base64-encodes binaries.
 
 ### F. Service ownership and image
-Service lives in this repository under `services/browser-service/`:
+Service lives in this repository under `services/webwright/`:
 - Base image: `mcr.microsoft.com/playwright/python:v1.49.1-jammy` (matches Webwright's Playwright pin).
 - Dependencies: `webwright==<pinned>`, `fastapi`, `uvicorn`.
 - Webwright installed via `pip install webwright` (or git pin) plus `playwright install firefox`.
@@ -151,12 +151,12 @@ On sidecar startup, the service reconciles the output directory with in-memory s
 - queued work without a started subprocess may be requeued only if the persisted payload is complete and idempotency checks pass.
 
 ### J. Authentication
-Static `Bearer` token, env var `LEANKERNEL__BROWSERSERVICE__APITOKEN`. mTLS deferred. `/health` is unauthenticated and liveness-only so container health checks work without secrets; operational endpoints and `/ready` require bearer auth.
+Static `Bearer` token, env var `LEANKERNEL__WEBWRIGHT__APITOKEN`. mTLS deferred. `/health` is unauthenticated and liveness-only so container health checks work without secrets; operational endpoints and `/ready` require bearer auth.
 
 ### K. Observability
 - Browser-service HTTP client registered via `IHttpClientFactory` → `CorrelationIdDelegatingHandler` auto-applies.
 - Tool handlers emit traces under `ActivitySource("LeanKernel.Tools.Browser")`.
-- `BrowserServiceHealthProbe : IProviderHealthProbe` hits authenticated `/ready`, registered alongside existing probes.
+- `WebwrightHealthProbe : IProviderHealthProbe` hits authenticated `/ready`, registered alongside existing probes.
 - Sidecar logs Webwright stdout/stderr with run-id prefix; correlation ID propagated as `X-Correlation-Id` and embedded in subprocess env.
 
 ## Tool Contracts (LeanKernel side)
@@ -248,7 +248,7 @@ Codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT`, `TIMEOUT`, `
 
 ## Security and Governance
 - **LeanKernel side:**
-  - Tools registered under `Category = "browser"` only when `BrowserService.Enabled` is true. Default is disabled because browser automation is high-risk.
+  - Tools registered under `Category = "browser"` only when `Webwright.Enabled` is true. Default is disabled because browser automation is high-risk.
   - Operators still allowlist browser tools explicitly via `ToolVisibilityContext`; enabling the service does not imply every agent can use it.
   - `task` size cap (4 KB) prevents prompt smuggling at the boundary.
   - `start_url` validated as absolute http/https before forwarding (reuse `web_fetch` URL guards).
@@ -265,13 +265,13 @@ Codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT`, `TIMEOUT`, `
 - **Network/auth:** static `Bearer` token, env-injected.
 
 ## Configuration
-Add `BrowserServiceConfig` to `LeanKernel.Abstractions/Configuration/` and reference from `LeanKernelConfig`.
+Add `WebwrightConfig` to `LeanKernel.Abstractions/Configuration/` and reference from `LeanKernelConfig`.
 
 ```json
 "LeanKernel": {
-  "BrowserService": {
+  "Webwright": {
     "Enabled": false,
-    "BaseUrl": "http://browser-service:8000",
+    "BaseUrl": "http://webwright:8000",
     "ApiToken": "",
     "RequestTimeoutSeconds": 15,
     "MaxArtifactBytes": 2000000,
@@ -283,9 +283,9 @@ Add `BrowserServiceConfig` to `LeanKernel.Abstractions/Configuration/` and refer
 ```
 
 Browser-service env vars:
-- `API_TOKEN` — must match LeanKernel's `BrowserService:ApiToken`.
+- `API_TOKEN` — must match LeanKernel's `Webwright:ApiToken`.
 - `LITELLM_BASE_URL` — e.g. `http://litellm:4000`.
-- `LITELLM_API_KEY` — dedicated LiteLLM virtual key for browser-service with its own budget, model allowlist, tags, and metadata; do not use the LiteLLM master key.
+- `LITELLM_API_KEY` — dedicated LiteLLM virtual key for webwright with its own budget, model allowlist, tags, and metadata; do not use the LiteLLM master key.
 - `WEBWRIGHT_MODEL` — default model alias.
 - `MAX_CONCURRENT_RUNS` (default 2).
 - `MAX_QUEUE_DEPTH` (default 20).
@@ -298,12 +298,12 @@ Add to `docker-compose.yml`:
 
 ```yaml
 services:
-  browser-service:
-    build: ./services/browser-service
+  webwright:
+    build: ./services/webwright
     environment:
-      - API_TOKEN=${BROWSER_SERVICE_API_TOKEN}
+      - API_TOKEN=${WEBWRIGHT_API_TOKEN}
       - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${BROWSER_SERVICE_LITELLM_KEY}
+      - LITELLM_API_KEY=${WEBWRIGHT_LITELLM_KEY}
       - WEBWRIGHT_MODEL=gpt-4o
       - MAX_CONCURRENT_RUNS=2
       - MAX_QUEUE_DEPTH=20
@@ -323,19 +323,19 @@ volumes:
   browserdata:
 ```
 
-The `engine` service gains `depends_on: browser-service` and env:
-- `LEANKERNEL__BROWSERSERVICE__ENABLED=true`
-- `LEANKERNEL__BROWSERSERVICE__BASEURL=http://browser-service:8000`
-- `LEANKERNEL__BROWSERSERVICE__APITOKEN=${BROWSER_SERVICE_API_TOKEN}`
+The `engine` service gains `depends_on: webwright` and env:
+- `LEANKERNEL__WEBWRIGHT__ENABLED=true`
+- `LEANKERNEL__WEBWRIGHT__BASEURL=http://webwright:8000`
+- `LEANKERNEL__WEBWRIGHT__APITOKEN=${WEBWRIGHT_API_TOKEN}`
 
 ## Implementation Plan
-1. Add `BrowserServiceConfig` and bind it in `LeanKernelConfig`.
+1. Add `WebwrightConfig` and bind it in `LeanKernelConfig`.
 2. Add typed sidecar client + DTOs in `LeanKernel.Tools/BuiltIn/Browser/`:
-   - `IBrowserServiceClient`, `BrowserServiceClient`,
+   - `IWebwrightClient`, `WebwrightClient`,
    - request/response models, error mapper.
 3. Add four tool definitions (`BrowserRunTaskTool`, `BrowserGetRunTool`, `BrowserGetArtifactTool`, `BrowserCancelRunTool`).
-4. Register tools conditionally in `ToolsServiceCollectionExtensions.AddLeanKernelTools` only when `BrowserServiceConfig.Enabled` is true; register named `HttpClient` (Bearer + base URL) and `BrowserServiceHealthProbe` in `LeanKernelHardeningServiceCollectionExtensions`.
-5. Build `services/browser-service/`:
+4. Register tools conditionally in `ToolsServiceCollectionExtensions.AddLeanKernelTools` only when `WebwrightConfig.Enabled` is true; register named `HttpClient` (Bearer + base URL) and `WebwrightHealthProbe` in `LeanKernelHardeningServiceCollectionExtensions`.
+5. Build `services/webwright/`:
    - `Dockerfile` based on `mcr.microsoft.com/playwright/python:v1.49.1-jammy`,
    - `pip install webwright==<pin> fastapi uvicorn`,
    - `playwright install firefox`,
@@ -346,7 +346,7 @@ The `engine` service gains `depends_on: browser-service` and env:
 7. Tests:
    - **Unit** (`test/LeanKernel.Tests.Unit/Tools/Browser/`): validation, JSON output mapping, `browser_cancel_run` triggers `DELETE`, best-effort submit cancellation, error envelope mapping.
    - **Integration** (`test/LeanKernel.Tests.Integration/`): tool ↔ stub HTTP server.
-   - **End-to-end** (`test/LeanKernel.Tests.Playwright/`): real `browser-service` container against a local fixture HTML page using a stub LiteLLM that returns a canned script.
+   - **End-to-end** (`test/LeanKernel.Tests.Playwright/`): real `webwright` container against a local fixture HTML page using a stub LiteLLM that returns a canned script.
 8. Update docs: `README.md`, new `docs/features/browser-tool.md`, configuration reference, and bump the `docs/plans/index.md` entry to reflect Webwright integration.
 
 ## Validation Plan
@@ -358,7 +358,7 @@ This validation sequence applies to the future implementation, not to documentat
 - `scripts/quality/test-coverage.sh`
 - `scripts/quality/sonarqube-scan.sh`
 - `docker compose build`
-- `docker compose up -d browser-service && curl -fsS http://localhost:8000/health`
+- `docker compose up -d webwright && curl -fsS http://localhost:8000/health`
 - authenticated readiness check against `GET /ready`
 
 ## Risks and Mitigations
@@ -367,7 +367,7 @@ This validation sequence applies to the future implementation, not to documentat
 - **Long-running runs:** browser tasks can exceed any reasonable HTTP timeout.
   - Async submit-then-poll is the primary mitigation; subprocess wall-clock cap prevents zombies.
 - **Cost surprise:** Webwright's loop can make many LLM calls per task.
-  - All calls go through LiteLLM with a browser-service virtual key budget and model allowlist; `model` param lets callers pick an approved cheaper alias.
+  - All calls go through LiteLLM with a webwright virtual key budget and model allowlist; `model` param lets callers pick an approved cheaper alias.
 - **Navigation abuse:** untrusted sites, exfiltration.
   - Sidecar-enforced domain/IP allow/deny across top-level navigation, redirects, subresources, downloads, WebSockets, and generated-script fetches.
 - **Cancellation leaks:** abandoned tool calls leave Firefox processes.
@@ -382,9 +382,9 @@ This validation sequence applies to the future implementation, not to documentat
 ## Acceptance Criteria
 - Four browser tools register and execute through `IToolExecutor`.
 - `browser_run_task` against a sandbox HTML fixture produces a completed run with a `final_script.py`, at least one screenshot, and a non-null `finalDatum`.
-- All Webwright LLM calls observed in LiteLLM logs under the browser-service virtual key (proves routing and budget attribution).
+- All Webwright LLM calls observed in LiteLLM logs under the webwright virtual key (proves routing and budget attribution).
 - `browser_cancel_run` propagates from tool to subprocess, and submit-time cancellation attempts best-effort cleanup when a `runId` is known.
-- `BrowserServiceHealthProbe` reports readiness through `/api/health`.
+- `WebwrightHealthProbe` reports readiness through `/api/health`.
 - Domain denylist and private-IP protections block forbidden navigation and subresource fetches (verified via integration test).
 - Tests and quality gates pass under repository validation sequence.
 
@@ -392,12 +392,12 @@ This validation sequence applies to the future implementation, not to documentat
 - Webwright version pin — confirm at implementation start.
 - Whether to expose `task_showcase.yaml` mode (produces structured `report.json`) as a tool flag — likely useful, defer to v1.1.
 - Default `MAX_CONCURRENT_RUNS` — 2 is conservative for an 8 GB container; tune after profiling.
-- Whether to import browser-service LiteLLM usage into LeanKernel's `ISpendTracker` for unified in-app spend views (v1 enforcement is the LiteLLM virtual-key budget).
+- Whether to import webwright LiteLLM usage into LeanKernel's `ISpendTracker` for unified in-app spend views (v1 enforcement is the LiteLLM virtual-key budget).
 
 ## Independent Plan Review Notes
 - The non-negotiable v1 choices are: (1) Webwright as engine, (2) async submit-then-poll, (3) Webwright LLM routed through LiteLLM, (4) single-purpose tools.
 - Keep the sidecar API engine-agnostic so a future v2 could swap Webwright for an alternate engine without breaking LeanKernel tool contracts.
 - Avoid leaking Webwright-specific concepts (`final_script.py`, `task_showcase`) into tool parameter names beyond what's already in the artifact manifest.
-- Review update: browser tools must be disabled by default through `BrowserService.Enabled`, then explicitly allowed through tool governance for trusted agents/operators.
-- Review update: browser-service spend is enforced at LiteLLM virtual-key scope; LeanKernel's in-process spend tracker does not automatically account for Webwright's direct LiteLLM calls.
+- Review update: browser tools must be disabled by default through `Webwright.Enabled`, then explicitly allowed through tool governance for trusted agents/operators.
+- Review update: webwright spend is enforced at LiteLLM virtual-key scope; LeanKernel's in-process spend tracker does not automatically account for Webwright's direct LiteLLM calls.
 - Review update: artifact access must use manifest-derived opaque IDs and canonical path checks; the API must not accept raw artifact paths.

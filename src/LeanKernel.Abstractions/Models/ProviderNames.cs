@@ -23,5 +23,5 @@ public static class ProviderNames
     /// <summary>
     /// The browser automation sidecar provider name.
     /// </summary>
-    public const string BrowserService = "browser-service";
+    public const string Webwright = "webwright";
 }

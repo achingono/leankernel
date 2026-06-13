@@ -9,22 +9,22 @@ namespace LeanKernel.Tools.BuiltIn.Browser;
 /// <summary>
 /// Probes authenticated readiness for the browser automation sidecar.
 /// </summary>
-public sealed class BrowserServiceHealthProbe : IProviderHealthProbe
+public sealed class WebwrightHealthProbe : IProviderHealthProbe
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly LeanKernelConfig _config;
-    private readonly ILogger<BrowserServiceHealthProbe> _logger;
+    private readonly ILogger<WebwrightHealthProbe> _logger;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="BrowserServiceHealthProbe"/> class.
+    /// Initializes a new instance of the <see cref="WebwrightHealthProbe"/> class.
     /// </summary>
     /// <param name="httpClientFactory">The HTTP client factory.</param>
     /// <param name="config">The LeanKernel configuration.</param>
     /// <param name="logger">The logger.</param>
-    public BrowserServiceHealthProbe(
+    public WebwrightHealthProbe(
         IHttpClientFactory httpClientFactory,
         IOptions<LeanKernelConfig> config,
-        ILogger<BrowserServiceHealthProbe> logger)
+        ILogger<WebwrightHealthProbe> logger)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _config = (config ?? throw new ArgumentNullException(nameof(config))).Value;
@@ -32,19 +32,19 @@ public sealed class BrowserServiceHealthProbe : IProviderHealthProbe
     }
 
     /// <inheritdoc />
-    public string ProviderName => ProviderNames.BrowserService;
+    public string ProviderName => ProviderNames.Webwright;
 
     /// <inheritdoc />
     public async Task<ProviderProbeResult> ProbeAsync(CancellationToken ct = default)
     {
-        if (!_config.BrowserService.Enabled || !_config.BrowserService.HealthProbe.Enabled)
+        if (!_config.Webwright.Enabled || !_config.Webwright.HealthProbe.Enabled)
         {
             return ProviderProbeResult.Healthy("Browser service health probe is disabled.");
         }
 
         try
         {
-            using var response = await _httpClientFactory.CreateClient(BrowserServiceClient.HttpClientName)
+            using var response = await _httpClientFactory.CreateClient(WebwrightClient.HttpClientName)
                 .GetAsync("ready", ct)
                 .ConfigureAwait(false);
 
@@ -58,7 +58,7 @@ public sealed class BrowserServiceHealthProbe : IProviderHealthProbe
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Browser service health probe failed against {BaseUrl}", _config.BrowserService.BaseUrl);
+            _logger.LogWarning(ex, "Browser service health probe failed against {BaseUrl}", _config.Webwright.BaseUrl);
             return ProviderProbeResult.Unhealthy("Browser service health probe failed.", ex.Message);
         }
     }

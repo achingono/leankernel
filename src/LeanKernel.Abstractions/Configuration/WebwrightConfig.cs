@@ -3,7 +3,7 @@ namespace LeanKernel.Abstractions.Configuration;
 /// <summary>
 /// Configures LeanKernel's optional browser automation sidecar service.
 /// </summary>
-public sealed class BrowserServiceConfig
+public sealed class WebwrightConfig
 {
     /// <summary>
     /// Gets or sets a value indicating whether browser tools and sidecar integration are enabled.
@@ -11,17 +11,17 @@ public sealed class BrowserServiceConfig
     public bool Enabled { get; set; }
 
     /// <summary>
-    /// Gets or sets the browser-service root URL.
+    /// Gets or sets the webwright root URL.
     /// </summary>
-    public string BaseUrl { get; set; } = Uri.UriSchemeHttp + "://browser-service:8000";
+    public string BaseUrl { get; set; } = Uri.UriSchemeHttp + "://webwright:8000";
 
     /// <summary>
-    /// Gets or sets the bearer token used for browser-service operational endpoints.
+    /// Gets or sets the bearer token used for webwright operational endpoints.
     /// </summary>
     public string ApiToken { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the browser-service HTTP request timeout in seconds.
+    /// Gets or sets the webwright HTTP request timeout in seconds.
     /// </summary>
     public int RequestTimeoutSeconds { get; set; } = 15;
 
@@ -41,18 +41,18 @@ public sealed class BrowserServiceConfig
     public string DefaultModel { get; set; } = "tool";
 
     /// <summary>
-    /// Gets or sets browser-service health probe configuration.
+    /// Gets or sets webwright health probe configuration.
     /// </summary>
-    public BrowserServiceHealthProbeConfig HealthProbe { get; set; } = new();
+    public WebwrightHealthProbeConfig HealthProbe { get; set; } = new();
 }
 
 /// <summary>
 /// Configures health tracking for the browser automation sidecar.
 /// </summary>
-public sealed class BrowserServiceHealthProbeConfig
+public sealed class WebwrightHealthProbeConfig
 {
     /// <summary>
-    /// Gets or sets a value indicating whether authenticated browser-service readiness probing is enabled.
+    /// Gets or sets a value indicating whether authenticated webwright readiness probing is enabled.
     /// </summary>
     public bool Enabled { get; set; } = true;
 }

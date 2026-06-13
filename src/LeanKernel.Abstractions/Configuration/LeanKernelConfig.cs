@@ -23,7 +23,7 @@ public sealed class LeanKernelConfig
     /// <summary>
     /// Gets or sets optional browser automation sidecar configuration.
     /// </summary>
-    public BrowserServiceConfig BrowserService { get; set; } = new();
+    public WebwrightConfig Webwright { get; set; } = new();
 
     /// <summary>
     /// Gets or sets production-hardening configuration.

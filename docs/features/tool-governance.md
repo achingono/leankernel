@@ -33,7 +33,7 @@ The built-in registry is created in `AddLeanKernelTools` and currently includes:
 - `internet`: `web_search`, `web_fetch`, `http_request`
 - `filesystem`: `directory_create`, `directory_list`, `extract_text`, `file_read`, `file_write`, `file_edit`, `file_copy`, `file_move`, `file_delete`, `file_search`, `file_stat`, `file_touch`, `file_chmod`
 - `data`: `json_transform`, `csv_xlsx_read_write`, `database_query`
-- `browser` when `LeanKernel:BrowserService:Enabled=true`: `browser_run_task`, `browser_get_run`, `browser_get_artifact`, `browser_cancel_run`
+- `browser` when `LeanKernel:Webwright:Enabled=true`: `browser_run_task`, `browser_get_run`, `browser_get_artifact`, `browser_cancel_run`
 The underlying `ToolRegistry` accepts `IEnumerable<ToolDefinition>`, so the runtime can be extended with more tool definitions without changing the policy class itself.
 ## Visibility rules
 `ToolGovernancePolicy` uses three rules.

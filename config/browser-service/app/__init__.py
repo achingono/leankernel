@@ -1,1 +1,0 @@
-"""LeanKernel browser-service sidecar."""

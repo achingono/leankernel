@@ -25,8 +25,8 @@ jobs:
             dockerfile: config/gbrain/Dockerfile
             context: .
             platforms: linux/amd64,linux/arm64
-          - image: browser-service
-            dockerfile: config/browser-service/Dockerfile
+          - image: webwright
+            dockerfile: config/webwright/Dockerfile
             context: .
             platforms: linux/amd64,linux/arm64
 
@@ -145,7 +145,7 @@ jobs:
 
           {
             echo "tags<<EOF"
-            for image in engine gbrain browser-service; do
+            for image in engine gbrain webwright; do
               echo "${registry_repo}/${image}:${version}"
               echo "${registry_repo}/${image}:${minor}"
               echo "${registry_repo}/${image}:${major}"

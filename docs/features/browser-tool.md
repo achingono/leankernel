@@ -4,7 +4,7 @@ LeanKernel can expose an optional browser automation tool family backed by a Web
 
 ## Tools
 
-Browser tools register only when `LeanKernel:BrowserService:Enabled` is `true`. They still participate in normal tool governance, so trusted callers should allow the `browser` category or specific tool names explicitly.
+Browser tools register only when `LeanKernel:Webwright:Enabled` is `true`. They still participate in normal tool governance, so trusted callers should allow the `browser` category or specific tool names explicitly.
 
 | Tool | Purpose |
 | --- | --- |
@@ -17,17 +17,17 @@ Browser tools register only when `LeanKernel:BrowserService:Enabled` is `true`. 
 
 ## Sidecar service
 
-The sidecar lives under `config/browser-service/` and is built by Docker Compose as `browser-service`. It provides:
+The sidecar lives under `config/webwright/` and is built by Docker Compose as `webwright`. It provides:
 
 - `GET /health` unauthenticated liveness for Compose.
 - `GET /ready` authenticated readiness for LeanKernel provider health tracking.
 - `POST /runs`, `GET /runs/{runId}`, `GET /runs/{runId}/artifacts/{artifactId}`, and `DELETE /runs/{runId}` for operational browser runs.
 
-Webwright model calls route through LiteLLM using `LITELLM_BASE_URL` and `LITELLM_API_KEY` inside the sidecar container. Use a dedicated LiteLLM virtual key for `BROWSER_SERVICE_LITELLM_KEY` so browser spend can have its own budget and model allowlist.
+Webwright model calls route through LiteLLM using `LITELLM_BASE_URL` and `LITELLM_API_KEY` inside the sidecar container. Use a dedicated LiteLLM virtual key for `WEBWRIGHT_LITELLM_KEY` so browser spend can have its own budget and model allowlist.
 
 ## Security defaults
 
-Browser automation is disabled by default. To enable it, set a random `BROWSER_SERVICE_API_TOKEN`, provide a scoped `BROWSER_SERVICE_LITELLM_KEY`, then set `BROWSER_SERVICE_ENABLED=true`.
+Browser automation is disabled by default. To enable it, set a random `WEBWRIGHT_API_TOKEN`, provide a scoped `WEBWRIGHT_LITELLM_KEY`, then set `WEBWRIGHT_ENABLED=true`.
 
 The sidecar validates task size, start URLs, bearer auth, queue limits, domain allow/deny policy, private IP ranges, and artifact confinement. Artifacts are available only through opaque IDs from the run manifest; callers cannot pass raw file paths.
 
@@ -35,9 +35,9 @@ The sidecar validates task size, start URLs, bearer auth, queue limits, domain a
 
 ```json
 "LeanKernel": {
-  "BrowserService": {
+  "Webwright": {
     "Enabled": false,
-    "BaseUrl": "http://browser-service:8000",
+    "BaseUrl": "http://webwright:8000",
     "ApiToken": "",
     "RequestTimeoutSeconds": 15,
     "MaxArtifactBytes": 2000000,
@@ -52,11 +52,11 @@ Compose environment variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `BROWSER_SERVICE_ENABLED` | Enables LeanKernel browser tools when `true`. |
-| `BROWSER_SERVICE_API_TOKEN` | Shared bearer token for engine-to-sidecar calls. Leave blank until configured. |
-| `BROWSER_SERVICE_LITELLM_KEY` | Dedicated LiteLLM virtual key used by Webwright. |
-| `BROWSER_SERVICE_MODEL` | Default Webwright model alias. |
-| `BROWSER_SERVICE_DOMAIN_ALLOWLIST` / `BROWSER_SERVICE_DOMAIN_DENYLIST` | Optional comma-separated host policies. |
+| `WEBWRIGHT_ENABLED` | Enables LeanKernel browser tools when `true`. |
+| `WEBWRIGHT_API_TOKEN` | Shared bearer token for engine-to-sidecar calls. Leave blank until configured. |
+| `WEBWRIGHT_LITELLM_KEY` | Dedicated LiteLLM virtual key used by Webwright. |
+| `WEBWRIGHT_MODEL` | Default Webwright model alias. |
+| `WEBWRIGHT_DOMAIN_ALLOWLIST` / `WEBWRIGHT_DOMAIN_DENYLIST` | Optional comma-separated host policies. |
 
 ## Related documentation
 

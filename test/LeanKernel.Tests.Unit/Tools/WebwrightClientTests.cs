@@ -11,7 +11,7 @@ using Moq;
 
 namespace LeanKernel.Tests.Unit.Tools;
 
-public class BrowserServiceClientTests
+public class WebwrightClientTests
 {
     [Fact]
     public async Task SubmitRunAsync_posts_to_runs_endpoint()
@@ -58,7 +58,7 @@ public class BrowserServiceClientTests
 
         Func<Task> act = () => client.GetRunAsync("run-1");
 
-        var assertion = await act.Should().ThrowAsync<BrowserServiceException>();
+        var assertion = await act.Should().ThrowAsync<WebwrightException>();
         assertion.Which.Code.Should().Be("CONFLICT");
         assertion.Which.Message.Should().Be("Idempotency mismatch.");
         assertion.Which.StatusCode.Should().Be(409);
@@ -91,12 +91,12 @@ public class BrowserServiceClientTests
 
         Func<Task> act = () => client.GetArtifactAsync("run-1", "screenshot-1", maxBytes: 5);
 
-        var assertion = await act.Should().ThrowAsync<BrowserServiceException>();
+        var assertion = await act.Should().ThrowAsync<WebwrightException>();
         assertion.Which.Code.Should().Be("LIMIT_EXCEEDED");
     }
 
     [Fact]
-    public async Task BrowserServiceHealthProbe_returns_healthy_when_disabled()
+    public async Task WebwrightHealthProbe_returns_healthy_when_disabled()
     {
         var probe = CreateHealthProbe(
             browserEnabled: false,
@@ -108,7 +108,7 @@ public class BrowserServiceClientTests
     }
 
     [Fact]
-    public async Task BrowserServiceHealthProbe_checks_authenticated_ready_endpoint()
+    public async Task WebwrightHealthProbe_checks_authenticated_ready_endpoint()
     {
         HttpRequestMessage? capturedRequest = null;
         var probe = CreateHealthProbe(
@@ -126,7 +126,7 @@ public class BrowserServiceClientTests
     }
 
     [Fact]
-    public async Task BrowserServiceHealthProbe_returns_unhealthy_for_failed_ready_endpoint()
+    public async Task WebwrightHealthProbe_returns_unhealthy_for_failed_ready_endpoint()
     {
         var probe = CreateHealthProbe(
             browserEnabled: true,
@@ -137,38 +137,38 @@ public class BrowserServiceClientTests
         result.IsHealthy.Should().BeFalse();
     }
 
-    private static BrowserServiceClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
+    private static WebwrightClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
     {
         var services = new ServiceCollection();
         services
-            .AddHttpClient(BrowserServiceClient.HttpClientName, client => client.BaseAddress = new Uri("https://browser.test/"))
+            .AddHttpClient(WebwrightClient.HttpClientName, client => client.BaseAddress = new Uri("https://browser.test/"))
             .ConfigurePrimaryHttpMessageHandler(() => new StubHttpMessageHandler(responseFactory));
         var provider = services.BuildServiceProvider();
-        return new BrowserServiceClient(provider.GetRequiredService<IHttpClientFactory>());
+        return new WebwrightClient(provider.GetRequiredService<IHttpClientFactory>());
     }
 
-    private static BrowserServiceHealthProbe CreateHealthProbe(
+    private static WebwrightHealthProbe CreateHealthProbe(
         bool browserEnabled,
         Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
     {
         var services = new ServiceCollection();
         services
-            .AddHttpClient(BrowserServiceClient.HttpClientName, client => client.BaseAddress = new Uri("https://browser.test/"))
+            .AddHttpClient(WebwrightClient.HttpClientName, client => client.BaseAddress = new Uri("https://browser.test/"))
             .ConfigurePrimaryHttpMessageHandler(() => new StubHttpMessageHandler(responseFactory));
         var provider = services.BuildServiceProvider();
         var config = Options.Create(new LeanKernelConfig
         {
-            BrowserService = new BrowserServiceConfig
+            Webwright = new WebwrightConfig
             {
                 Enabled = browserEnabled,
-                HealthProbe = new BrowserServiceHealthProbeConfig { Enabled = true },
+                HealthProbe = new WebwrightHealthProbeConfig { Enabled = true },
                 BaseUrl = "https://browser.test"
             }
         });
-        return new BrowserServiceHealthProbe(
+        return new WebwrightHealthProbe(
             provider.GetRequiredService<IHttpClientFactory>(),
             config,
-            Mock.Of<ILogger<BrowserServiceHealthProbe>>());
+            Mock.Of<ILogger<WebwrightHealthProbe>>());
     }
 
     private static HttpResponseMessage JsonResponse(HttpStatusCode statusCode, string json) => new(statusCode)

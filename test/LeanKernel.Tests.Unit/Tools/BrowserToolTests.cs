@@ -42,7 +42,7 @@ public class BrowserToolTests
     [Fact]
     public async Task BrowserRunTask_rejects_missing_task()
     {
-        var fakeClient = new FakeBrowserServiceClient();
+        var fakeClient = new FakeWebwrightClient();
         var tool = BrowserToolDefinitions.CreateRunTaskTool(CreateScopeFactory(fakeClient));
 
         var result = await tool.Handler!(new Dictionary<string, object?>(), CancellationToken.None);
@@ -54,7 +54,7 @@ public class BrowserToolTests
     [Fact]
     public async Task BrowserRunTask_rejects_non_http_start_url()
     {
-        var fakeClient = new FakeBrowserServiceClient();
+        var fakeClient = new FakeWebwrightClient();
         var tool = BrowserToolDefinitions.CreateRunTaskTool(CreateScopeFactory(fakeClient));
 
         var result = await tool.Handler!(new Dictionary<string, object?>
@@ -70,7 +70,7 @@ public class BrowserToolTests
     [Fact]
     public async Task BrowserRunTask_submits_request_and_serializes_run_id()
     {
-        var fakeClient = new FakeBrowserServiceClient
+        var fakeClient = new FakeWebwrightClient
         {
             Submission = new BrowserRunSubmissionResponse("run-123", "queued", DateTimeOffset.Parse("2026-05-28T09:00:00Z"), 1)
         };
@@ -97,7 +97,7 @@ public class BrowserToolTests
     [Fact]
     public async Task BrowserGetRun_rejects_wait_seconds_in_v1()
     {
-        var fakeClient = new FakeBrowserServiceClient();
+        var fakeClient = new FakeWebwrightClient();
         var tool = BrowserToolDefinitions.CreateGetRunTool(CreateScopeFactory(fakeClient));
 
         var result = await tool.Handler!(new Dictionary<string, object?>
@@ -113,7 +113,7 @@ public class BrowserToolTests
     [Fact]
     public async Task BrowserGetArtifact_returns_base64_content()
     {
-        var fakeClient = new FakeBrowserServiceClient
+        var fakeClient = new FakeWebwrightClient
         {
             Artifact = new BrowserArtifactContent("run-123", "script-abc", "text/x-python", "print('ok')"u8.ToArray(), false)
         };
@@ -134,7 +134,7 @@ public class BrowserToolTests
     [Fact]
     public async Task BrowserCancelRun_calls_client_delete_contract()
     {
-        var fakeClient = new FakeBrowserServiceClient
+        var fakeClient = new FakeWebwrightClient
         {
             CancelResponse = new BrowserCancelRunResponse("run-123", "cancelled", "Cancellation requested.")
         };
@@ -151,28 +151,28 @@ public class BrowserToolTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddOptions();
-        services.Configure<LeanKernelConfig>(config => config.BrowserService.Enabled = browserEnabled);
+        services.Configure<LeanKernelConfig>(config => config.Webwright.Enabled = browserEnabled);
         services.AddSingleton(Mock.Of<IKnowledgeService>());
-        services.AddSingleton<IBrowserServiceClient, FakeBrowserServiceClient>();
+        services.AddSingleton<IWebwrightClient, FakeWebwrightClient>();
         services.AddLeanKernelTools();
         return services;
     }
 
-    private static IServiceScopeFactory CreateScopeFactory(FakeBrowserServiceClient fakeClient)
+    private static IServiceScopeFactory CreateScopeFactory(FakeWebwrightClient fakeClient)
     {
         var services = new ServiceCollection();
         services.AddOptions();
         services.Configure<LeanKernelConfig>(config =>
         {
-            config.BrowserService.Enabled = true;
-            config.BrowserService.MaxArtifactBytes = 128;
-            config.BrowserService.DefaultModel = "gpt-4o";
+            config.Webwright.Enabled = true;
+            config.Webwright.MaxArtifactBytes = 128;
+            config.Webwright.DefaultModel = "gpt-4o";
         });
-        services.AddSingleton<IBrowserServiceClient>(fakeClient);
+        services.AddSingleton<IWebwrightClient>(fakeClient);
         return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
     }
 
-    private sealed class FakeBrowserServiceClient : IBrowserServiceClient
+    private sealed class FakeWebwrightClient : IWebwrightClient
     {
         public BrowserRunTaskRequest? LastRunRequest { get; private set; }
         public string? CancelledRunId { get; private set; }

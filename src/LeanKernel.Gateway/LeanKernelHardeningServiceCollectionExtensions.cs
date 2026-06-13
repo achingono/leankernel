@@ -50,7 +50,7 @@ public static class LeanKernelHardeningServiceCollectionExtensions
         services.AddSingleton<IProviderHealthProbe, DatabaseHealthProbe>();
         services.AddSingleton<IProviderHealthProbe, LiteLlmHealthProbe>();
         services.AddSingleton<IProviderHealthProbe, GBrainHealthProbe>();
-        services.AddSingleton<IProviderHealthProbe, BrowserServiceHealthProbe>();
+        services.AddSingleton<IProviderHealthProbe, WebwrightHealthProbe>();
         services.AddHealthChecks().AddCheck<ProviderHealthCheck>("providers");
 
         services.AddHttpClient(LiteLlmHealthProbe.HttpClientName, (provider, client) =>
@@ -77,9 +77,9 @@ public static class LeanKernelHardeningServiceCollectionExtensions
             }
         });
 
-        services.AddHttpClient(BrowserServiceClient.HttpClientName, (provider, client) =>
+        services.AddHttpClient(WebwrightClient.HttpClientName, (provider, client) =>
         {
-            var resolvedConfig = provider.GetRequiredService<IOptions<LeanKernelConfig>>().Value.BrowserService;
+            var resolvedConfig = provider.GetRequiredService<IOptions<LeanKernelConfig>>().Value.Webwright;
             client.BaseAddress = new Uri(EnsureTrailingSlash(resolvedConfig.BaseUrl), UriKind.Absolute);
             client.Timeout = TimeSpan.FromSeconds(Math.Max(1, resolvedConfig.RequestTimeoutSeconds));
 

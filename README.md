@@ -178,7 +178,7 @@ The rearchitected local stack centers on a shared PostgreSQL instance for LeanKe
 | **LiteLLM** | Model proxy and routing surface for the engine |
 | **Browser service** | Optional Webwright + Playwright sidecar for disabled-by-default browser automation tools |
 
-The engine connects to LiteLLM through `LEANKERNEL__LITELLM__BASEURL`, to GBrain through `LEANKERNEL__GBRAIN__BASEURL`, to the optional browser sidecar through `LEANKERNEL__BROWSERSERVICE__BASEURL`, and to PostgreSQL through `LEANKERNEL__DATABASE__CONNECTIONSTRING`.
+The engine connects to LiteLLM through `LEANKERNEL__LITELLM__BASEURL`, to GBrain through `LEANKERNEL__GBRAIN__BASEURL`, to the optional browser sidecar through `LEANKERNEL__WEBWRIGHT__BASEURL`, and to PostgreSQL through `LEANKERNEL__DATABASE__CONNECTIONSTRING`.
 
 ## Stack
 
@@ -205,8 +205,8 @@ cp .env.example .env
 # Add LiteLLM backend provider keys in .env as needed (for example OPENAI_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, AZURE_AI_API_KEY)
 # GBrain uses LITELLM_BASE_URL and LITELLM_API_KEY from the same root env file.
 # Keep GBRAIN_EMBEDDING_MODEL and GBRAIN_EMBEDDING_DIMENSIONS aligned with the GBrain pgvector schema.
-# Browser automation is disabled by default; set BROWSER_SERVICE_ENABLED=true plus a random
-# BROWSER_SERVICE_API_TOKEN and scoped BROWSER_SERVICE_LITELLM_KEY to enable browser tools.
+# Browser automation is disabled by default; set WEBWRIGHT_ENABLED=true plus a random
+# WEBWRIGHT_API_TOKEN and scoped WEBWRIGHT_LITELLM_KEY to enable browser tools.
 
 # 2) Start the supporting services
 # (Signal is optional and commented out by default in docker-compose.yml)
@@ -311,8 +311,8 @@ All configuration is via `appsettings.json` or environment variables (using `__`
 LEANKERNEL__LITELLM__BASEURL=http://litellm:4000
 LEANKERNEL__LITELLM__DEFAULTMODEL=gpt-4o-mini
 LEANKERNEL__GBRAIN__BASEURL=http://gbrain:8789
-LEANKERNEL__BROWSERSERVICE__ENABLED=false
-LEANKERNEL__BROWSERSERVICE__BASEURL=http://browser-service:8000
+LEANKERNEL__WEBWRIGHT__ENABLED=false
+LEANKERNEL__WEBWRIGHT__BASEURL=http://webwright:8000
 LEANKERNEL__IDENTITY__USERPREFERENCEPAGEKEY=identity-user-default
 LEANKERNEL__IDENTITY__ENABLEIDENTITYEXTRACTION=true
 LEANKERNEL__DATABASE__CONNECTIONSTRING=Host=database;Database=leankernel;Username=leankernel;Password=leankernel-dev-password
@@ -364,9 +364,9 @@ You can keep extending `config/litellm/config.yaml` with additional providers, a
 
 ### Browser service configuration
 
-Browser automation is exposed through four optional tools: `browser_run_task`, `browser_get_run`, `browser_get_artifact`, and `browser_cancel_run`. The tools register only when `LeanKernel:BrowserService:Enabled=true`, and Webwright model calls route through LiteLLM using the sidecar's `BROWSER_SERVICE_LITELLM_KEY`.
+Browser automation is exposed through four optional tools: `browser_run_task`, `browser_get_run`, `browser_get_artifact`, and `browser_cancel_run`. The tools register only when `LeanKernel:Webwright:Enabled=true`, and Webwright model calls route through LiteLLM using the sidecar's `WEBWRIGHT_LITELLM_KEY`.
 
-Keep `BROWSER_SERVICE_API_TOKEN` blank until you intentionally enable the sidecar, then set it to a random secret and pass the same value to `LeanKernel:BrowserService:ApiToken`.
+Keep `WEBWRIGHT_API_TOKEN` blank until you intentionally enable the sidecar, then set it to a random secret and pass the same value to `LeanKernel:Webwright:ApiToken`.
 
 ## Multi-Agent System
 
@@ -420,7 +420,7 @@ Built-in tools include:
 - `internet`: `web_search`, `web_fetch`, `http_request`
 - `filesystem`: directory/file operations plus `extract_text`
 - `data`: `json_transform`, `csv_xlsx_read_write`, `database_query`
-- `browser`: `browser_run_task`, `browser_get_run`, `browser_get_artifact`, `browser_cancel_run` when `LeanKernel:BrowserService:Enabled=true`
+- `browser`: `browser_run_task`, `browser_get_run`, `browser_get_artifact`, `browser_cancel_run` when `LeanKernel:Webwright:Enabled=true`
 
 ## Backup & Restore
 

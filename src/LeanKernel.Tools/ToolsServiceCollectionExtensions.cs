@@ -30,7 +30,7 @@ public static class ToolsServiceCollectionExtensions
         services.AddHostedService<DocumentIngestionHostedService>();
         services.AddHostedService<DocumentFolderIngestionHostedService>();
 
-        services.TryAddSingleton<IBrowserServiceClient, BrowserServiceClient>();
+        services.TryAddSingleton<IWebwrightClient, WebwrightClient>();
         services.AddSingleton<ToolGovernancePolicy>();
         services.AddSingleton<IToolRegistry>(serviceProvider =>
         {
@@ -65,7 +65,7 @@ public static class ToolsServiceCollectionExtensions
                 HttpRequestTool.Create(scopeFactory)
             };
 
-            if (config.BrowserService.Enabled)
+            if (config.Webwright.Enabled)
             {
                 builtInTools.Add(BrowserToolDefinitions.CreateRunTaskTool(scopeFactory));
                 builtInTools.Add(BrowserToolDefinitions.CreateGetRunTool(scopeFactory));

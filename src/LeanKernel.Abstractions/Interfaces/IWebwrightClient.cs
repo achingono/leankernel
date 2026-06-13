@@ -5,7 +5,7 @@ namespace LeanKernel.Abstractions.Interfaces;
 /// <summary>
 /// Client abstraction for LeanKernel's browser automation sidecar.
 /// </summary>
-public interface IBrowserServiceClient
+public interface IWebwrightClient
 {
     /// <summary>
     /// Submits a browser automation run.

@@ -4,7 +4,7 @@
 - Failing run: `Build and Publish Images` (`run_id=27319577798`, `job_id=80707537714`, job `Build gbrain`).
 - The failing step is `Create GitHub Release (with image tags)` in matrix job `build-images`.
 - Log evidence: `403 Resource not accessible by integration` from `softprops/action-gh-release@v2` while creating release for `v0.0.1`.
-- Current workflow executes release creation once per matrix entry (`engine`, `gbrain`, `browser-service`), so failure in one matrix leg cancels siblings.
+- Current workflow executes release creation once per matrix entry (`engine`, `gbrain`, `webwright`), so failure in one matrix leg cancels siblings.
 
 ## Goal
 - Ensure image builds complete first for all matrix images.
@@ -36,7 +36,7 @@ Review conclusions incorporated:
 ## Acceptance Criteria
 - `Build and Publish Images` run no longer fails at `Build gbrain` due to release creation.
 - Release creation occurs once after all image builds pass.
-- Generated release body includes notes and image tags for `engine`, `gbrain`, and `browser-service`.
+- Generated release body includes notes and image tags for `engine`, `gbrain`, and `webwright`.
 
 ## Rollback
 - Revert `.github/workflows/publish.yml` to prior revision.

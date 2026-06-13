@@ -49,7 +49,7 @@ public sealed record BrowserRunStatusResponse(
     int? ExitCode,
     string? FinalDatum,
     IReadOnlyList<BrowserArtifactManifestItem> Artifacts,
-    BrowserServiceError? Error);
+    WebwrightError? Error);
 
 /// <summary>
 /// Describes one browser run artifact exposed by the sidecar manifest.
@@ -98,7 +98,7 @@ public sealed record BrowserCancelRunResponse(
 /// <param name="Code">The stable error code.</param>
 /// <param name="Message">The human-readable error message.</param>
 /// <param name="Details">Optional structured details.</param>
-public sealed record BrowserServiceError(
+public sealed record WebwrightError(
     string Code,
     string Message,
     IReadOnlyDictionary<string, object?>? Details = null);
@@ -107,16 +107,16 @@ public sealed record BrowserServiceError(
 /// Exception raised when the browser sidecar returns an error envelope.
 /// </summary>
 [SuppressMessage("Major Code Smell", "S3925", Justification = "Browser service exceptions are not serialized across process boundaries.")]
-public sealed class BrowserServiceException : Exception
+public sealed class WebwrightException : Exception
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="BrowserServiceException"/> class.
+    /// Initializes a new instance of the <see cref="WebwrightException"/> class.
     /// </summary>
     /// <param name="code">The stable sidecar error code.</param>
     /// <param name="message">The error message.</param>
     /// <param name="statusCode">The optional HTTP status code.</param>
     /// <param name="details">Optional structured details.</param>
-    public BrowserServiceException(
+    public WebwrightException(
         string code,
         string message,
         int? statusCode = null,
