@@ -148,6 +148,8 @@
             var cacheKey = authFlag ? $"{SessionCacheStorageKey}.{GetCacheKeySuffix(ownerId)}" : SessionCacheStorageKey;
             var cachedSessions = await LoadCachedSessionsAsync(cacheKey);
 
+            Console.WriteLine($"[Chat.OnAfterRenderAsync] ownerId={ownerId}, isAuthenticated={authFlag}, cachedSessions={cachedSessions.Count}, legacyOwnerId={legacyForMigration}, SessionId={SessionId}");
+
             await ChatService.InitializeAsync(ownerId, cachedSessions, SessionId, legacyForMigration, authFlag, _disposeCts.Token);
 
             if (legacyForMigration is not null && authFlag)
@@ -173,14 +175,14 @@
 
     private static string GetUserKey(ClaimsPrincipal user)
     {
-        var sub = user.FindFirst("sub")?.Value;
-        if (!string.IsNullOrWhiteSpace(sub))
-            return sub;
-
         var email = user.FindFirst(ClaimTypes.Email)?.Value
                  ?? user.FindFirst("email")?.Value;
         if (!string.IsNullOrWhiteSpace(email))
             return email;
+
+        var sub = user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrWhiteSpace(sub))
+            return sub;
 
         return user.FindFirst(ClaimTypes.Name)?.Value
             ?? user.FindFirst("name")?.Value

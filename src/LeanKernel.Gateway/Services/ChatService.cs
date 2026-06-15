@@ -41,6 +41,10 @@ public sealed class ChatService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
 
+        _logger.LogInformation(
+            "InitializeAsync called. ownerId={OwnerId}, isAuthenticated={IsAuthenticated}, legacyOwnerId={LegacyOwnerId}, requestedSessionId={RequestedSessionId}, cachedSessionsCount={CachedCount}",
+            ownerId, isAuthenticated, legacyOwnerId, requestedSessionId, cachedSessions?.Count ?? 0);
+
         OwnerId = ownerId;
         IsAuthenticated = isAuthenticated;
         IsInitialized = true;
@@ -324,6 +328,8 @@ public sealed class ChatService(
     {
         if (string.IsNullOrWhiteSpace(OwnerId) || _dbContextFactory is null)
         {
+            _logger.LogWarning("RefreshSessionsAsync: skipped. OwnerId={OwnerId}, dbContextFactory is null={IsNull}",
+                OwnerId, _dbContextFactory is null);
             return;
         }
 
@@ -343,6 +349,10 @@ public sealed class ChatService(
                     session.UpdatedAt))
                 .ToListAsync(ct)
                 .ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "RefreshSessionsAsync: found {Count} persisted sessions for OwnerId={OwnerId}",
+                persistedSessions.Count, OwnerId);
 
             if (persistedSessions.Count == 0)
             {
@@ -382,7 +392,7 @@ public sealed class ChatService(
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Loading Blazor chat sessions from persistence failed; using cached summaries only");
+            _logger.LogError(ex, "RefreshSessionsAsync: failed loading sessions for OwnerId={OwnerId}", OwnerId);
         }
     }
 

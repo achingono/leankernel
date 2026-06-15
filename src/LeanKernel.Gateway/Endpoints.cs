@@ -161,14 +161,14 @@ public static class Endpoints
             return null;
         }
 
-        var sub = user.FindFirst("sub")?.Value;
-        if (!string.IsNullOrWhiteSpace(sub))
-            return sub;
-
         var email = user.FindFirst(ClaimTypes.Email)?.Value
                  ?? user.FindFirst("email")?.Value;
         if (!string.IsNullOrWhiteSpace(email))
             return email;
+
+        var sub = user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrWhiteSpace(sub))
+            return sub;
 
         return user.FindFirst(ClaimTypes.Name)?.Value
             ?? user.FindFirst("name")?.Value

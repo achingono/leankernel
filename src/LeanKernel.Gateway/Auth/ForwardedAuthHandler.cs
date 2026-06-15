@@ -48,7 +48,8 @@ public sealed class ForwardedAuthHandler : AuthenticationHandler<ForwardedAuthOp
 
         if (!string.IsNullOrWhiteSpace(forwardedUser))
         {
-            return Authenticate(forwardedUser);
+            var forwardedEmail = Context.Request.Headers["X-Forwarded-Email"].FirstOrDefault();
+            return Authenticate(forwardedUser, forwardedEmail);
         }
 
         if (!Options.RequireUserHeader)
@@ -56,11 +57,11 @@ public sealed class ForwardedAuthHandler : AuthenticationHandler<ForwardedAuthOp
             var email = Context.Request.Headers["X-Auth-Request-Email"].FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(email))
             {
-                return Authenticate(email);
+                return Authenticate(email, null);
             }
         }
 
-        Logger.LogDebug(
+        Logger.LogInformation(
             "Forwarded auth identity not found. UserHeader={UserHeader}, FallbackUserHeader={FallbackUserHeader}, RequireAuthenticatedUser={RequireAuthenticatedUser}",
             Options.UserHeader,
             Options.FallbackUserHeader,
@@ -74,14 +75,17 @@ public sealed class ForwardedAuthHandler : AuthenticationHandler<ForwardedAuthOp
         return Task.FromResult(AuthenticateResult.NoResult());
     }
 
-    private Task<AuthenticateResult> Authenticate(string userKey)
+    private Task<AuthenticateResult> Authenticate(string userKey, string? forwardedEmail)
     {
+        var email = !string.IsNullOrWhiteSpace(forwardedEmail) ? forwardedEmail : userKey;
+
         var claims = new[]
         {
             new Claim("sub", userKey),
-            new Claim(ClaimTypes.NameIdentifier, userKey),
-            new Claim(ClaimTypes.Name, userKey),
-            new Claim(ClaimTypes.Email, userKey),
+            new Claim(ClaimTypes.NameIdentifier, email),
+            new Claim(ClaimTypes.Name, email),
+            new Claim(ClaimTypes.Email, email),
+            new Claim("email", email),
         };
 
         var identity = new ClaimsIdentity(claims, SchemeName);
