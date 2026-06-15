@@ -8,9 +8,17 @@ public sealed class ForwardedAuthOptions : AuthenticationSchemeOptions
     public bool Enabled { get; set; }
     public bool RequireAuthenticatedUser { get; set; } = true;
 
-    // When true, the handler will only accept X-Auth-Request-User.
+    // When true, the handler will only accept X-Auth-Request-User / X-Forwarded-User.
     // This avoids ambiguity when multiple forwarded identity headers are present.
     public bool RequireUserHeader { get; set; } = true;
+
+    // Name of the request header carrying the authenticated user identity.
+    // Default checks both oauth2-proxy reverse-proxy (X-Forwarded-User)
+    // and forward-auth (X-Auth-Request-User) modes.
+    public string UserHeader { get; set; } = "X-Forwarded-User";
+
+    // Fallback header checked when UserHeader yields no value.
+    public string? FallbackUserHeader { get; set; } = "X-Auth-Request-User";
 }
 
 public sealed class ForwardedAuthHandler : AuthenticationHandler<ForwardedAuthOptions>
@@ -32,7 +40,12 @@ public sealed class ForwardedAuthHandler : AuthenticationHandler<ForwardedAuthOp
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var forwardedUser = Context.Request.Headers["X-Auth-Request-User"].FirstOrDefault();
+        var forwardedUser = Context.Request.Headers[Options.UserHeader].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(forwardedUser) && !string.IsNullOrWhiteSpace(Options.FallbackUserHeader))
+        {
+            forwardedUser = Context.Request.Headers[Options.FallbackUserHeader].FirstOrDefault();
+        }
+
         if (!string.IsNullOrWhiteSpace(forwardedUser))
         {
             return Authenticate(forwardedUser);
@@ -48,8 +61,9 @@ public sealed class ForwardedAuthHandler : AuthenticationHandler<ForwardedAuthOp
         }
 
         Logger.LogDebug(
-            "Forwarded auth identity not found. RequireUserHeader={RequireUserHeader}, RequireAuthenticatedUser={RequireAuthenticatedUser}",
-            Options.RequireUserHeader,
+            "Forwarded auth identity not found. UserHeader={UserHeader}, FallbackUserHeader={FallbackUserHeader}, RequireAuthenticatedUser={RequireAuthenticatedUser}",
+            Options.UserHeader,
+            Options.FallbackUserHeader,
             Options.RequireAuthenticatedUser);
 
         if (Options.RequireAuthenticatedUser)
@@ -64,8 +78,10 @@ public sealed class ForwardedAuthHandler : AuthenticationHandler<ForwardedAuthOp
     {
         var claims = new[]
         {
+            new Claim("sub", userKey),
             new Claim(ClaimTypes.NameIdentifier, userKey),
             new Claim(ClaimTypes.Name, userKey),
+            new Claim(ClaimTypes.Email, userKey),
         };
 
         var identity = new ClaimsIdentity(claims, SchemeName);

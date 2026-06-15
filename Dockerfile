@@ -45,7 +45,13 @@ COPY --from=build /app/publish .
 
 RUN useradd -m -s /bin/bash leankernel \
     && mkdir -p /app/data/documents /app/data/managed-documents \
-    && chown -R leankernel:leankernel /app
+    && mkdir -p /home/leankernel/.ms-todo-cli \
+    && mkdir -p /home/leankernel/.simplefin-cli \
+    && mkdir -p /home/leankernel/.local/share/signal-cli \
+    && chown -R leankernel:leankernel /app \
+    && chown -R leankernel:leankernel /home/leankernel/.ms-todo-cli \
+    && chown -R leankernel:leankernel /home/leankernel/.simplefin-cli \
+    && chown -R leankernel:leankernel /home/leankernel/.local
 USER leankernel
 
 ENV ASPNETCORE_URLS=http://+:5080
