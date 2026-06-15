@@ -90,7 +90,7 @@ public static class DynamicSkillTool
             {
                 if (method is "GET" or "DELETE")
                 {
-                    queryParams.Add($"{Uri.EscapeDataString(flagName)}={Uri.EscapeDataString(kvp.Value.ToString()!)}");
+                    queryParams.Add($"{Uri.EscapeDataString(flagName)}={Uri.EscapeDataString(SerializeScalarValue(kvp.Value))}");
                 }
                 else
                 {
@@ -111,7 +111,7 @@ public static class DynamicSkillTool
                 var placeholder = "{" + kvp.Key + "}";
                 if (url.Contains(placeholder, StringComparison.OrdinalIgnoreCase))
                 {
-                    url = url.Replace(placeholder, Uri.EscapeDataString(kvp.Value.ToString()!));
+                    url = url.Replace(placeholder, Uri.EscapeDataString(SerializeScalarValue(kvp.Value)));
                 }
             }
         }
@@ -179,8 +179,18 @@ public static class DynamicSkillTool
             if (kvp.Value is null) continue;
             if (flags.TryGetValue(kvp.Key, out var flagName))
             {
+                if (TryGetBooleanLikeValue(kvp.Value, out var boolValue))
+                {
+                    if (boolValue)
+                    {
+                        psi.ArgumentList.Add(flagName);
+                    }
+
+                    continue;
+                }
+
                 psi.ArgumentList.Add(flagName);
-                psi.ArgumentList.Add(kvp.Value.ToString()!);
+                psi.ArgumentList.Add(SerializeScalarValue(kvp.Value));
             }
         }
 
@@ -282,6 +292,108 @@ public static class DynamicSkillTool
         }
 
         return parameters;
+    }
+
+    private static string SerializeScalarValue(object? value)
+    {
+        if (value is null)
+        {
+            return string.Empty;
+        }
+
+        if (TryGetBooleanLikeValue(value, out var boolValue))
+        {
+            return boolValue ? "true" : "false";
+        }
+
+        return value switch
+        {
+            JsonElement element when element.ValueKind == JsonValueKind.String => element.GetString() ?? string.Empty,
+            JsonElement element => element.GetRawText(),
+            _ => value.ToString() ?? string.Empty
+        };
+    }
+
+    private static bool TryGetBooleanLikeValue(object? value, out bool result)
+    {
+        switch (value)
+        {
+            case bool boolValue:
+                result = boolValue;
+                return true;
+            case JsonElement element when element.ValueKind is JsonValueKind.True or JsonValueKind.False:
+                result = element.GetBoolean();
+                return true;
+            case JsonElement element when element.ValueKind == JsonValueKind.String:
+                return TryParseBooleanString(element.GetString(), out result);
+            case JsonElement element when element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var longValue):
+                if (longValue is 0 or 1)
+                {
+                    result = longValue == 1;
+                    return true;
+                }
+
+                break;
+            case int intValue when intValue is 0 or 1:
+                result = intValue == 1;
+                return true;
+            case long longValue when longValue is 0 or 1:
+                result = longValue == 1;
+                return true;
+            case short shortValue when shortValue is 0 or 1:
+                result = shortValue == 1;
+                return true;
+            case byte byteValue when byteValue is 0 or 1:
+                result = byteValue == 1;
+                return true;
+            case sbyte sbyteValue when sbyteValue is 0 or 1:
+                result = sbyteValue == 1;
+                return true;
+            case uint uintValue when uintValue is 0 or 1:
+                result = uintValue == 1;
+                return true;
+            case ulong ulongValue when ulongValue is 0 or 1:
+                result = ulongValue == 1;
+                return true;
+            case ushort ushortValue when ushortValue is 0 or 1:
+                result = ushortValue == 1;
+                return true;
+            case string text:
+                return TryParseBooleanString(text, out result);
+        }
+
+        result = default;
+        return false;
+    }
+
+    private static bool TryParseBooleanString(string? text, out bool result)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            result = default;
+            return false;
+        }
+
+        var normalized = text.Trim();
+        if (bool.TryParse(normalized, out result))
+        {
+            return true;
+        }
+
+        if (normalized == "1" || normalized.Equals("yes", StringComparison.OrdinalIgnoreCase) || normalized.Equals("y", StringComparison.OrdinalIgnoreCase) || normalized.Equals("on", StringComparison.OrdinalIgnoreCase))
+        {
+            result = true;
+            return true;
+        }
+
+        if (normalized == "0" || normalized.Equals("no", StringComparison.OrdinalIgnoreCase) || normalized.Equals("n", StringComparison.OrdinalIgnoreCase) || normalized.Equals("off", StringComparison.OrdinalIgnoreCase))
+        {
+            result = false;
+            return true;
+        }
+
+        result = default;
+        return false;
     }
 
     private static ToolResult Failed(string toolName, string error) => new()
