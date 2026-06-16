@@ -47,11 +47,28 @@ html, body {
     margin: 0;
     padding: 0;
     height: 100%;
+    overflow: hidden;
     font-family: 'Outfit', var(--body-font), system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     background-color: var(--neutral-layer-1);
     color: var(--neutral-foreground-rest);
     scroll-behavior: smooth;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.03;
+    background-image: none;
+}
+
+@media (min-width: 900px) and (prefers-reduced-motion: no-preference) {
+    body::before {
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
 }
 
 /* Global Typography Tweaks */
@@ -72,7 +89,7 @@ h1, h2, h3, h4, h5, h6 {
     border: 1px solid var(--lk-glass-border) !important;
     border-radius: var(--lk-radius-m) !important;
     box-shadow: var(--lk-card-shadow) !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
     padding: var(--lk-space-m);
 }
 
@@ -132,7 +149,7 @@ fluent-switch {
 }
 
 .lk-card-interactive:hover {
-    transform: translateY(-2px);
+    transform: translate3d(0, -2px, 0) scale(1.01);
     box-shadow: var(--lk-card-hover-shadow) !important;
     border-color: var(--accent-fill-hover) !important;
 }
@@ -566,7 +583,7 @@ code {
     border: 0;
     padding: 0;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, filter 0.2s ease;
 }
 
 .lk-spend-bar-container:hover {

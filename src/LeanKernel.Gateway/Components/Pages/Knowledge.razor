@@ -13,18 +13,28 @@
 <PageTitle>LeanKernel Knowledge</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" Class="lk-page">
-    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-page-header">
+    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-page-header">
         <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
             <h1 class="lk-page-title">Knowledge</h1>
             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Browse GBrain wiki pages, inspect linked knowledge, and curate durable context.</FluentLabel>
         </FluentStack>
         @if (_currentTab == TabMode.Wiki)
         {
-            <FluentButton Appearance="Appearance.Accent" @onclick="OpenCreateModal">Create new page</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" @onclick="OpenCreateModal" AriaLabel="Create new page" id="knowledge-create-button">
+                <FluentIcon Value="@(new Icons.Regular.Size16.DocumentAdd())" />
+            </FluentButton>
+            <FluentTooltip Anchor="knowledge-create-button" Position="TooltipPosition.Top" Delay="150">
+                Create new page
+            </FluentTooltip>
         }
         else
         {
-            <FluentButton Appearance="Appearance.Accent" @onclick="OpenUploadModal">Upload document</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" @onclick="OpenUploadModal" AriaLabel="Upload document" id="knowledge-upload-button">
+                <FluentIcon Value="@(new Icons.Regular.Size16.ArrowUpload())" />
+            </FluentButton>
+            <FluentTooltip Anchor="knowledge-upload-button" Position="TooltipPosition.Top" Delay="150">
+                Upload document
+            </FluentTooltip>
         }
     </FluentStack>
 
@@ -81,17 +91,17 @@
                 <FluentStack Orientation="Orientation.Vertical" Class="lk-section" aria-live="polite">
                     @if (string.IsNullOrWhiteSpace(_searchText) && _searchResults.Count == 0 && !_isSearching)
                     {
-                        <FluentCard Class="lk-empty-state">
+                        <div class="lk-empty-state">
                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Start with a question</FluentLabel>
                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Search by topic, slug, or relationship to jump directly into the knowledge base.</FluentLabel>
-                        </FluentCard>
+                        </div>
                     }
                     else if (_searchResults.Count == 0 && !_isSearching)
                     {
-                        <FluentCard Class="lk-empty-state">
+                        <div class="lk-empty-state">
                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No matches found</FluentLabel>
                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Try another keyword or create a new page for this topic.</FluentLabel>
-                        </FluentCard>
+                        </div>
                     }
                     else
                     {
@@ -162,10 +172,10 @@
                     }
                     else if (_browseItems.Count == 0)
                     {
-                        <FluentCard Class="lk-empty-state">
+                        <div class="lk-empty-state">
                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No pages available</FluentLabel>
                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Use search or create a new page to start building knowledge.</FluentLabel>
-                        </FluentCard>
+                        </div>
                     }
                     else
                     {
@@ -229,10 +239,10 @@
                     }
                     else if (_selectedPage is null)
                     {
-                        <FluentCard Class="lk-empty-state">
+                        <div class="lk-empty-state">
                             <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Select a page</FluentLabel>
                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Choose a browse result or run a search to inspect wiki content, metadata, and linked relationships.</FluentLabel>
-                        </FluentCard>
+                        </div>
                     }
                     else
                     {
@@ -260,7 +270,7 @@
                             </FluentStack>
 
                             <div class="lk-split-panel" style="--lk-sidebar-width: 320px;">
-                                <FluentCard Class="lk-responsive-card">
+                                <div class="lk-panel">
                                     <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
                                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Page content</FluentLabel>
@@ -281,10 +291,10 @@
                                             </FluentLabel>
                                         }
                                     </FluentStack>
-                                </FluentCard>
+                                </div>
 
                                 <FluentStack Orientation="Orientation.Vertical" Class="lk-responsive-card" Style="gap: 1rem;">
-                                    <FluentCard>
+                                    <div class="lk-panel">
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
                                                 <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Metadata</FluentLabel>
@@ -334,9 +344,9 @@
                                                 </FluentStack>
                                             </FluentStack>
                                         </FluentStack>
-                                    </FluentCard>
+                                    </div>
 
-                                    <FluentCard role="group" aria-label="Knowledge graph">
+                                    <div class="lk-panel" role="group" aria-label="Knowledge graph">
                                         <FluentStack Orientation="Orientation.Vertical" Class="lk-graph-shell">
                                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
                                                 <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Relationship graph</FluentLabel>
@@ -363,7 +373,7 @@
                                                 }
                                             </FluentStack>
                                         </FluentStack>
-                                    </FluentCard>
+                                    </div>
                                 </FluentStack>
                             </div>
                         </FluentStack>
@@ -457,10 +467,10 @@
                     }
                     else if (_documentsList.Count == 0)
                     {
-                        <FluentCard Class="lk-empty-state" Style="border: none; box-shadow: none;">
+                        <div class="lk-empty-state">
                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">No documents found</FluentLabel>
                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Upload a PDF, image, or text file to start building your AI memory index.</FluentLabel>
-                        </FluentCard>
+                        </div>
                     }
                     else
                     {
@@ -517,10 +527,10 @@
                     }
                     else if (_selectedDoc is null)
                     {
-                        <FluentCard Class="lk-empty-state">
+                        <div class="lk-empty-state">
                             <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Select a document</FluentLabel>
                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Choose a document from the left browser to view its details, tags, and extracted text index.</FluentLabel>
-                        </FluentCard>
+                        </div>
                     }
                     else
                     {
@@ -540,7 +550,7 @@
 
                             <div class="lk-split-panel" style="--lk-sidebar-width: 320px;">
                                 <!-- Extracted text viewer -->
-                                <FluentCard Class="lk-responsive-card">
+                                <div class="lk-panel">
                                     <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
                                             <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Extracted AI memory index</FluentLabel>
@@ -551,11 +561,11 @@
                                             @GetCleanDocContent(_selectedDoc.Content)
                                         </FluentLabel>
                                     </FluentStack>
-                                </FluentCard>
+                                </div>
 
                                 <!-- Details sidebar -->
                                 <FluentStack Orientation="Orientation.Vertical" Class="lk-responsive-card" Style="gap: 1rem;">
-                                    <FluentCard>
+                                    <div class="lk-panel">
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
                                                 <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Document info</FluentLabel>
@@ -605,7 +615,7 @@
                                                 </FluentStack>
                                             </FluentStack>
                                         </FluentStack>
-                                    </FluentCard>
+                                    </div>
                                 </FluentStack>
                             </div>
                         </FluentStack>

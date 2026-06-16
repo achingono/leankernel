@@ -8,27 +8,41 @@
 <PageTitle>LeanKernel Diagnostics</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" Class="lk-page">
-    <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-        <h1 class="lk-page-title">Diagnostics explorer</h1>
-        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Inspect the latest persisted context audit, budget usage, history shaping, and routing decisions for any session.</FluentLabel>
+    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-page-header">
+        <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
+            <h1 class="lk-page-title">Diagnostics explorer</h1>
+            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Inspect the latest persisted context audit, budget usage, history shaping, and routing decisions for any session.</FluentLabel>
+        </FluentStack>
     </FluentStack>
 
     <FluentCard>
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Class="lk-form-group lk-form-row">
-            <FluentTextField @bind-Value="_sessionId"
-                             Label="Session ID"
-                             Placeholder="Enter a session id"
-                             Disabled="@_isLoading"
-                             Style="flex: 1;" />
-            <FluentButton Appearance="Appearance.Accent"
-                          OnClick="LoadDiagnosticsAsync"
-                          Disabled="@IsLoadDisabled">
-                @(_isLoading ? "Loading…" : "Load")
-            </FluentButton>
+        <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Bottom" Class="lk-form-group lk-form-row">
+                <FluentTextField @bind-Value="_sessionId"
+                                 Label="Session ID"
+                                 Placeholder="Enter a session id"
+                                 Disabled="@_isLoading"
+                                 Style="flex: 1;" />
+                <FluentButton Appearance="Appearance.Accent"
+                              OnClick="LoadDiagnosticsAsync"
+                              Disabled="@IsLoadDisabled"
+                              Title="Search session"
+                              AriaLabel="@(_isLoading ? "Searching session" : "Search session")"
+                              aria-busy="@_isLoading">
+                    @if (_isLoading)
+                    {
+                        <FluentProgressRing Style="width: 16px; height: 16px;" />
+                    }
+                    else
+                    {
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Search())" />
+                    }
+                </FluentButton>
+            </FluentStack>
+            <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-top: var(--lk-space-xs);">
+                The latest persisted turn is loaded unless a turn-specific diagnostics record is the only one available.
+            </FluentLabel>
         </FluentStack>
-        <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-top: var(--lk-space-xs);">
-            The latest persisted turn is loaded unless a turn-specific diagnostics record is the only one available.
-        </FluentLabel>
     </FluentCard>
 
     @if (!string.IsNullOrWhiteSpace(_errorMessage))
@@ -59,12 +73,12 @@
     }
     else if (_model is null)
     {
-        <FluentCard Class="lk-empty-state">
+        <div class="lk-empty-state">
             <FluentLabel Typo="Typography.Subject">Load a session to inspect turn diagnostics</FluentLabel>
             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">
                 Use a persisted session id to view context admission decisions, budget usage, history shaping, and model routing telemetry.
             </FluentLabel>
-        </FluentCard>
+        </div>
     }
     else
     {
@@ -80,313 +94,321 @@
         <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
             @* Context Audit Card *@
             <FluentCard>
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 1rem;">
-                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                        <FluentLabel Typo="Typography.Subject">Context audit</FluentLabel>
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Review what the context gate admitted into the prompt versus what it excluded.</FluentLabel>
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 1rem;">
+                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                            <FluentLabel Typo="Typography.Subject">Context audit</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Review what the context gate admitted into the prompt versus what it excluded.</FluentLabel>
+                        </FluentStack>
+                        @if (_model.Context is not null)
+                        {
+                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 0.5rem;">
+                                <FluentBadge Appearance="Appearance.Accent">@_model.Context.TotalAdmitted admitted</FluentBadge>
+                                <FluentBadge Appearance="Appearance.Neutral">@_model.Context.TotalExcluded excluded</FluentBadge>
+                            </FluentStack>
+                        }
                     </FluentStack>
-                    @if (_model.Context is not null)
+
+                    <div class="lk-split-panel" style="--lk-sidebar-width: 50%;">
+                        <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.5rem;">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Admitted</FluentLabel>
+                            @if (AdmittedItems.Count == 0)
+                            {
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No admitted context items were recorded for this turn.</FluentLabel>
+                            }
+                            else
+                            {
+                                @foreach (var item in AdmittedItems)
+                                {
+                                    <div class="lk-list-item lk-card-interactive">
+                                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Key</FluentLabel>
+                                            <FluentBadge Appearance="Appearance.Accent">@GetCategoryLabel(item.Source)</FluentBadge>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; margin-top: 0.25rem;">
+                                            <FluentLabel Typo="Typography.Body">Score: @FormatScore(item.Score)</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body">Tokens: @item.TokenCount</FluentLabel>
+                                        </FluentStack>
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetAuditReason(item)</FluentLabel>
+                                    </div>
+                                }
+                            }
+                        </FluentStack>
+
+                        <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.5rem;">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Excluded</FluentLabel>
+                            @if (ExcludedItems.Count == 0)
+                            {
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No exclusions were recorded for this turn.</FluentLabel>
+                            }
+                            else
+                            {
+                                @foreach (var item in ExcludedItems)
+                                {
+                                    <div class="lk-list-item lk-card-interactive">
+                                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Key</FluentLabel>
+                                            <FluentBadge Appearance="Appearance.Neutral">@GetCategoryLabel(item.Source)</FluentBadge>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; margin-top: 0.25rem;">
+                                            <FluentLabel Typo="Typography.Body">Score: @FormatScore(item.Score)</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body">Tokens: @item.TokenCount</FluentLabel>
+                                        </FluentStack>
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetAuditReason(item)</FluentLabel>
+                                    </div>
+                                }
+                            }
+                        </FluentStack>
+                    </div>
+
+                    @if (_model.Context?.RetrievalDiagnostics is { } retrieval)
                     {
-                        <FluentStack Orientation="Orientation.Horizontal" Style="gap: 0.5rem;">
-                            <FluentBadge Appearance="Appearance.Accent">@_model.Context.TotalAdmitted admitted</FluentBadge>
-                            <FluentBadge Appearance="Appearance.Neutral">@_model.Context.TotalExcluded excluded</FluentBadge>
+                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--neutral-stroke-rest);">
+                            <FluentBadge Appearance="Appearance.Accent">Scope: @retrieval.EffectiveScope</FluentBadge>
+                            <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalConsidered candidates</FluentBadge>
+                            <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalAdmitted admitted</FluentBadge>
+                            <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalExcludedByScope scope-filtered</FluentBadge>
+                            <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalExcludedByScore score-filtered</FluentBadge>
                         </FluentStack>
                     }
                 </FluentStack>
-
-                <div class="lk-split-panel" style="--lk-sidebar-width: 50%;">
-                    <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.5rem;">
-                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Admitted</FluentLabel>
-                        @if (AdmittedItems.Count == 0)
-                        {
-                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No admitted context items were recorded for this turn.</FluentLabel>
-                        }
-                        else
-                        {
-                            @foreach (var item in AdmittedItems)
-                            {
-                                <div class="lk-list-item lk-card-interactive">
-                                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
-                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Key</FluentLabel>
-                                        <FluentBadge Appearance="Appearance.Accent">@GetCategoryLabel(item.Source)</FluentBadge>
-                                    </FluentStack>
-                                    <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; margin-top: 0.25rem;">
-                                        <FluentLabel Typo="Typography.Body">Score: @FormatScore(item.Score)</FluentLabel>
-                                        <FluentLabel Typo="Typography.Body">Tokens: @item.TokenCount</FluentLabel>
-                                    </FluentStack>
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetAuditReason(item)</FluentLabel>
-                                </div>
-                            }
-                        }
-                    </FluentStack>
-
-                    <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.5rem;">
-                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Excluded</FluentLabel>
-                        @if (ExcludedItems.Count == 0)
-                        {
-                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No exclusions were recorded for this turn.</FluentLabel>
-                        }
-                        else
-                        {
-                            @foreach (var item in ExcludedItems)
-                            {
-                                <div class="lk-list-item lk-card-interactive">
-                                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
-                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Key</FluentLabel>
-                                        <FluentBadge Appearance="Appearance.Neutral">@GetCategoryLabel(item.Source)</FluentBadge>
-                                    </FluentStack>
-                                    <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; margin-top: 0.25rem;">
-                                        <FluentLabel Typo="Typography.Body">Score: @FormatScore(item.Score)</FluentLabel>
-                                        <FluentLabel Typo="Typography.Body">Tokens: @item.TokenCount</FluentLabel>
-                                    </FluentStack>
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetAuditReason(item)</FluentLabel>
-                                </div>
-                            }
-                        }
-                    </FluentStack>
-                </div>
-
-                @if (_model.Context?.RetrievalDiagnostics is { } retrieval)
-                {
-                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--neutral-stroke-rest);">
-                        <FluentBadge Appearance="Appearance.Accent">Scope: @retrieval.EffectiveScope</FluentBadge>
-                        <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalConsidered candidates</FluentBadge>
-                        <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalAdmitted admitted</FluentBadge>
-                        <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalExcludedByScope scope-filtered</FluentBadge>
-                        <FluentBadge Appearance="Appearance.Neutral">@retrieval.TotalExcludedByScore score-filtered</FluentBadge>
-                    </FluentStack>
-                }
             </FluentCard>
 
             @* Budget Usage Card *@
             <FluentCard>
-                <FluentLabel Typo="Typography.Subject">Budget usage</FluentLabel>
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-bottom: 1rem;">Compare token usage against each context budget and the reserved response headroom.</FluentLabel>
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                    <FluentLabel Typo="Typography.Subject">Budget usage</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-bottom: 1rem;">Compare token usage against each context budget and the reserved response headroom.</FluentLabel>
 
-                @if (BudgetMetrics.Count == 0)
-                {
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No budget telemetry is available for this turn.</FluentLabel>
-                }
-                else
-                {
-                    @foreach (var metric in BudgetMetrics)
+                    @if (BudgetMetrics.Count == 0)
                     {
-                        <div class="@($"lk-budget-metric lk-budget-{GetBudgetModifier(metric)}")" role="group" aria-label="@GetBudgetTooltip(metric)">
-                            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
-                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: var(--lk-space-xs);">
-                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: var(--lk-space-xs);">
-                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@metric.Label</FluentLabel>
-                                            @if (metric.IsOverBudget)
-                                            {
-                                                <FluentBadge Appearance="Appearance.Lightweight">Over budget</FluentBadge>
-                                            }
-                                        </FluentStack>
-                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@metric.Description</FluentLabel>
-                                    </FluentStack>
-                                    <FluentLabel Typo="Typography.Body">@metric.Used / @metric.Allocated (@metric.UtilizationLabel)</FluentLabel>
-                                </FluentStack>
-                                <FluentProgress Class="@($"lk-budget-progress{(metric.IsOverBudget ? " lk-budget-progress-over" : string.Empty)}")"
-                                                Min="0"
-                                                Max="@metric.Allocated"
-                                                Value="@metric.Used"
-                                                Style="width: 100%;" />
-                                @if (metric.IsOverBudget)
-                                {
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Error">Over budget by @(metric.Used - metric.Allocated) tokens.</FluentLabel>
-                                }
-                            </FluentStack>
-                        </div>
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No budget telemetry is available for this turn.</FluentLabel>
                     }
-                }
+                    else
+                    {
+                        @foreach (var metric in BudgetMetrics)
+                        {
+                            <div class="@($"lk-budget-metric lk-budget-{GetBudgetModifier(metric)}")" role="group" aria-label="@GetBudgetTooltip(metric)">
+                                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-compact">
+                                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: var(--lk-space-xs);">
+                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: var(--lk-space-xs);">
+                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@metric.Label</FluentLabel>
+                                                @if (metric.IsOverBudget)
+                                                {
+                                                    <FluentBadge Appearance="Appearance.Lightweight">Over budget</FluentBadge>
+                                                }
+                                            </FluentStack>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@metric.Description</FluentLabel>
+                                        </FluentStack>
+                                        <FluentLabel Typo="Typography.Body">@metric.Used / @metric.Allocated (@metric.UtilizationLabel)</FluentLabel>
+                                    </FluentStack>
+                                    <FluentProgress Class="@($"lk-budget-progress{(metric.IsOverBudget ? " lk-budget-progress-over" : string.Empty)}")"
+                                                    Min="0"
+                                                    Max="@metric.Allocated"
+                                                    Value="@metric.Used"
+                                                    Style="width: 100%;" />
+                                    @if (metric.IsOverBudget)
+                                    {
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Error">Over budget by @(metric.Used - metric.Allocated) tokens.</FluentLabel>
+                                    }
+                                </FluentStack>
+                            </div>
+                        }
+                    }
+                </FluentStack>
             </FluentCard>
 
             @* History Shaping Card *@
             <FluentCard>
-                <FluentLabel Typo="Typography.Subject">History shaping</FluentLabel>
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-bottom: 1rem;">See how earlier turns were kept verbatim, compacted, summarized, or dropped to fit budget.</FluentLabel>
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                    <FluentLabel Typo="Typography.Subject">History shaping</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-bottom: 1rem;">See how earlier turns were kept verbatim, compacted, summarized, or dropped to fit budget.</FluentLabel>
 
-                @if (_model.History is null)
-                {
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No history shaping telemetry is available for this turn.</FluentLabel>
-                }
-                else
-                {
-                    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem; margin-bottom: 1rem;">
-                        <FluentBadge Appearance="Appearance.Accent">@_model.History.VerbatimTurns verbatim</FluentBadge>
-                        <FluentBadge Appearance="Appearance.Neutral">@_model.History.CompactedTurns compacted</FluentBadge>
-                        <FluentBadge Appearance="Appearance.Neutral">@_model.History.SummarizedTurns summarized</FluentBadge>
-                        <FluentBadge Appearance="Appearance.Lightweight">@_model.History.DroppedTurns dropped</FluentBadge>
-                        <FluentBadge Appearance="Appearance.Neutral">Saved @_model.History.TokensSaved tokens</FluentBadge>
-                    </FluentStack>
-
-                    @if (HistoryTimeline.Count == 0)
+                    @if (_model.History is null)
                     {
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">History shaping counts were recorded, but no timeline markers were persisted.</FluentLabel>
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No history shaping telemetry is available for this turn.</FluentLabel>
                     }
                     else
                     {
-                        @foreach (var item in HistoryTimeline)
+                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 0.5rem; margin-bottom: 1rem;">
+                            <FluentBadge Appearance="Appearance.Accent">@_model.History.VerbatimTurns verbatim</FluentBadge>
+                            <FluentBadge Appearance="Appearance.Neutral">@_model.History.CompactedTurns compacted</FluentBadge>
+                            <FluentBadge Appearance="Appearance.Neutral">@_model.History.SummarizedTurns summarized</FluentBadge>
+                            <FluentBadge Appearance="Appearance.Lightweight">@_model.History.DroppedTurns dropped</FluentBadge>
+                            <FluentBadge Appearance="Appearance.Neutral">Saved @_model.History.TokensSaved tokens</FluentBadge>
+                        </FluentStack>
+
+                        @if (HistoryTimeline.Count == 0)
                         {
-                            <div class="lk-timeline-item">
-                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
-                                    <FluentBadge Appearance="Appearance.Accent">@item.Index.ToString("00")</FluentBadge>
-                                    <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0;">
-                                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Label</FluentLabel>
-                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@item.Summary</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">History shaping counts were recorded, but no timeline markers were persisted.</FluentLabel>
+                        }
+                        else
+                        {
+                            @foreach (var item in HistoryTimeline)
+                            {
+                                <div class="lk-timeline-item">
+                                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
+                                        <FluentBadge Appearance="Appearance.Accent">@item.Index.ToString("00")</FluentBadge>
+                                        <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0;">
+                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@item.Label</FluentLabel>
+                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@item.Summary</FluentLabel>
+                                        </FluentStack>
+                                        <FluentLabel Typo="Typography.Body">@item.CompressionLabel</FluentLabel>
                                     </FluentStack>
-                                    <FluentLabel Typo="Typography.Body">@item.CompressionLabel</FluentLabel>
-                                </FluentStack>
-                                <FluentProgress Min="0" Max="100" Value="@((int)item.CompressionPercent)" Style="width: 100%; margin-top: 0.25rem;" />
-                            </div>
+                                    <FluentProgress Min="0" Max="100" Value="@((int)item.CompressionPercent)" Style="width: 100%; margin-top: 0.25rem;" />
+                                </div>
+                            }
                         }
                     }
-                }
+                </FluentStack>
             </FluentCard>
 
             @* Routing Decisions Card *@
             <FluentCard>
-                <FluentLabel Typo="Typography.Subject">Routing decisions</FluentLabel>
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-bottom: 1rem;">Inspect the selected model, complexity score, alternatives considered, and quality-gate result.</FluentLabel>
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+                    <FluentLabel Typo="Typography.Subject">Routing decisions</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-bottom: 1rem;">Inspect the selected model, complexity score, alternatives considered, and quality-gate result.</FluentLabel>
 
-                @if (_model.RoutingDecision is null && _model.QualityGate is null && _model.ShadowRouting is null)
-                {
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No model-routing diagnostics were recorded for this turn.</FluentLabel>
-                }
-                else
-                {
-                    @if (_model.RoutingDecision is { } routing)
+                    @if (_model.RoutingDecision is null && _model.QualityGate is null && _model.ShadowRouting is null)
                     {
-                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem; margin-bottom: 1rem;">
-                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Model</FluentLabel>
-                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@routing.SelectedModel</FluentLabel>
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No model-routing diagnostics were recorded for this turn.</FluentLabel>
+                    }
+                    else
+                    {
+                        @if (_model.RoutingDecision is { } routing)
+                        {
+                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem; margin-bottom: 1rem;">
+                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Model</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@routing.SelectedModel</FluentLabel>
+                                </FluentStack>
+                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tier</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@routing.SelectedTier</FluentLabel>
+                                </FluentStack>
+                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Complexity</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@routing.ComplexityScore.ToString("0.00", CultureInfo.InvariantCulture)</FluentLabel>
+                                </FluentStack>
                             </FluentStack>
-                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tier</FluentLabel>
-                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@routing.SelectedTier</FluentLabel>
-                            </FluentStack>
-                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Complexity</FluentLabel>
-                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@routing.ComplexityScore.ToString("0.00", CultureInfo.InvariantCulture)</FluentLabel>
-                            </FluentStack>
-                        </FluentStack>
 
-                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Reason</FluentLabel>
-                        <FluentLabel Typo="Typography.Body">@routing.Reason</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Reason</FluentLabel>
+                            <FluentLabel Typo="Typography.Body">@routing.Reason</FluentLabel>
 
-                        <div class="lk-split-panel" style="--lk-sidebar-width: 50%; margin-top: 1rem;">
-                            <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.25rem;">
-                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Decision factors</FluentLabel>
-                                @if (routing.Factors.Count == 0)
-                                {
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No routing factors were persisted.</FluentLabel>
-                                }
-                                else
-                                {
-                                    <ul style="margin: 0; padding-left: 1.25rem;">
-                                        @foreach (var factor in routing.Factors)
+                            <div class="lk-split-panel" style="--lk-sidebar-width: 50%; margin-top: 1rem;">
+                                <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.25rem;">
+                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Decision factors</FluentLabel>
+                                    @if (routing.Factors.Count == 0)
+                                    {
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No routing factors were persisted.</FluentLabel>
+                                    }
+                                    else
+                                    {
+                                        <ul style="margin: 0; padding-left: 1.25rem;">
+                                            @foreach (var factor in routing.Factors)
+                                            {
+                                                <li>@factor</li>
+                                            }
+                                        </ul>
+                                    }
+                                </FluentStack>
+
+                                <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.25rem;">
+                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Alternatives considered</FluentLabel>
+                                    @if (RoutingAlternatives.Count == 0)
+                                    {
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No alternative routing paths were recorded.</FluentLabel>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var alternative in RoutingAlternatives)
                                         {
-                                            <li>@factor</li>
-                                        }
-                                    </ul>
-                                }
-                            </FluentStack>
-
-                            <FluentStack Orientation="Orientation.Vertical" Style="flex: 1; gap: 0.25rem;">
-                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Alternatives considered</FluentLabel>
-                                @if (RoutingAlternatives.Count == 0)
-                                {
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No alternative routing paths were recorded.</FluentLabel>
-                                }
-                                else
-                                {
-                                    @foreach (var alternative in RoutingAlternatives)
-                                    {
-                                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@alternative.Title</FluentLabel>
-                                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@alternative.Detail</FluentLabel>
-                                        </FluentStack>
-                                    }
-                                }
-                            </FluentStack>
-                        </div>
-                    }
-
-                    @if (_model.QualityGate is { } qualityGate)
-                    {
-                        <div class="lk-inline-panel">
-                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.5rem;">
-                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Quality gate</FluentLabel>
-                                <FluentBadge Appearance="@(qualityGate.Passed ? Appearance.Accent : Appearance.Lightweight)">@GetQualityLabel(qualityGate)</FluentBadge>
-                            </FluentStack>
-                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; margin-bottom: 0.5rem;">
-                                <FluentLabel Typo="Typography.Body">Score: @qualityGate.OverallScore.ToString("0.00", CultureInfo.InvariantCulture)</FluentLabel>
-                                <FluentLabel Typo="Typography.Body">Status: @(qualityGate.Passed ? "Passed" : "Needs escalation")</FluentLabel>
-                            </FluentStack>
-                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@(qualityGate.FailureReason ?? "The response cleared all configured checks.")</FluentLabel>
-
-                            @if (qualityGate.Checks.Count > 0)
-                            {
-                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; margin-top: 0.5rem;">
-                                    @foreach (var check in qualityGate.Checks)
-                                    {
-                                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
-                                            <FluentStack Orientation="Orientation.Horizontal" Style="gap: 0.5rem;">
-                                                <FluentBadge Appearance="@(check.Passed ? Appearance.Accent : Appearance.Lightweight)">@(check.Passed ? "✓" : "✗")</FluentBadge>
-                                                <FluentLabel Typo="Typography.Body">@check.CheckName</FluentLabel>
-                                                @if (!string.IsNullOrWhiteSpace(check.Details))
-                                                {
-                                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@check.Details</FluentLabel>
-                                                }
+                                            <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@alternative.Title</FluentLabel>
+                                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@alternative.Detail</FluentLabel>
                                             </FluentStack>
-                                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@check.Score.ToString("0.00", CultureInfo.InvariantCulture)</FluentLabel>
-                                        </FluentStack>
+                                        }
                                     }
                                 </FluentStack>
-                            }
-                        </div>
-                    }
+                            </div>
+                        }
 
-                    @if (_model.ShadowRouting is { } shadow)
-                    {
-                        <div class="lk-inline-panel">
-                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold" Style="margin-bottom: 0.5rem;">Shadow comparison</FluentLabel>
-                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem;">
-                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Primary model</FluentLabel>
-                                    <FluentLabel Typo="Typography.Body">@shadow.PrimaryModel</FluentLabel>
+                        @if (_model.QualityGate is { } qualityGate)
+                        {
+                            <div class="lk-inline-panel">
+                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.5rem;">
+                                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Quality gate</FluentLabel>
+                                    <FluentBadge Appearance="@(qualityGate.Passed ? Appearance.Accent : Appearance.Lightweight)">@GetQualityLabel(qualityGate)</FluentBadge>
                                 </FluentStack>
-                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Shadow model</FluentLabel>
-                                    <FluentLabel Typo="Typography.Body">@shadow.ShadowModel</FluentLabel>
+                                <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem; margin-bottom: 0.5rem;">
+                                    <FluentLabel Typo="Typography.Body">Score: @qualityGate.OverallScore.ToString("0.00", CultureInfo.InvariantCulture)</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body">Status: @(qualityGate.Passed ? "Passed" : "Needs escalation")</FluentLabel>
                                 </FluentStack>
-                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Primary tokens</FluentLabel>
-                                    <FluentLabel Typo="Typography.Body">@shadow.PrimaryTokensUsed</FluentLabel>
-                                </FluentStack>
-                                <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Shadow tokens</FluentLabel>
-                                    <FluentLabel Typo="Typography.Body">@shadow.ShadowTokensUsed</FluentLabel>
-                                </FluentStack>
-                            </FluentStack>
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@(qualityGate.FailureReason ?? "The response cleared all configured checks.")</FluentLabel>
 
-                            @if (shadow.Comparison is { } comparison)
-                            {
-                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-top: 0.5rem;">
-                                    Length ratio: @comparison.LengthRatio.ToString("0.00", CultureInfo.InvariantCulture) ·
-                                    Primary refusal: @(comparison.PrimaryRefusal ? "Yes" : "No") ·
-                                    Shadow refusal: @(comparison.ShadowRefusal ? "Yes" : "No")
-                                </FluentLabel>
-
-                                @if (!string.IsNullOrWhiteSpace(comparison.Notes))
+                                @if (qualityGate.Checks.Count > 0)
                                 {
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@comparison.Notes</FluentLabel>
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; margin-top: 0.5rem;">
+                                        @foreach (var check in qualityGate.Checks)
+                                        {
+                                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between;">
+                                                <FluentStack Orientation="Orientation.Horizontal" Style="gap: 0.5rem;">
+                                                    <FluentBadge Appearance="@(check.Passed ? Appearance.Accent : Appearance.Lightweight)">@(check.Passed ? "✓" : "✗")</FluentBadge>
+                                                    <FluentLabel Typo="Typography.Body">@check.CheckName</FluentLabel>
+                                                    @if (!string.IsNullOrWhiteSpace(check.Details))
+                                                    {
+                                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@check.Details</FluentLabel>
+                                                    }
+                                                </FluentStack>
+                                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">@check.Score.ToString("0.00", CultureInfo.InvariantCulture)</FluentLabel>
+                                            </FluentStack>
+                                        }
+                                    </FluentStack>
                                 }
-                            }
-                        </div>
+                            </div>
+                        }
+
+                        @if (_model.ShadowRouting is { } shadow)
+                        {
+                            <div class="lk-inline-panel">
+                                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold" Style="margin-bottom: 0.5rem;">Shadow comparison</FluentLabel>
+                                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem;">
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Primary model</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body">@shadow.PrimaryModel</FluentLabel>
+                                    </FluentStack>
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Shadow model</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body">@shadow.ShadowModel</FluentLabel>
+                                    </FluentStack>
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Primary tokens</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body">@shadow.PrimaryTokensUsed</FluentLabel>
+                                    </FluentStack>
+                                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Shadow tokens</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body">@shadow.ShadowTokensUsed</FluentLabel>
+                                    </FluentStack>
+                                </FluentStack>
+
+                                @if (shadow.Comparison is { } comparison)
+                                {
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="margin-top: 0.5rem;">
+                                        Length ratio: @comparison.LengthRatio.ToString("0.00", CultureInfo.InvariantCulture) ·
+                                        Primary refusal: @(comparison.PrimaryRefusal ? "Yes" : "No") ·
+                                        Shadow refusal: @(comparison.ShadowRefusal ? "Yes" : "No")
+                                    </FluentLabel>
+
+                                    @if (!string.IsNullOrWhiteSpace(comparison.Notes))
+                                    {
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@comparison.Notes</FluentLabel>
+                                    }
+                                }
+                            </div>
+                        }
                     }
-                }
+                </FluentStack>
             </FluentCard>
         </FluentStack>
     }

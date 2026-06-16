@@ -24,12 +24,14 @@
     </FluentStack>
 
     <FluentCard>
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-card-header">
-            <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
-                <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Runtime governance</FluentLabel>
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@(_statusMessage ?? "Tool governance and health data are sourced from the live runtime. Spend tracking uses projected estimates until the accounting API is available.")</FluentLabel>
+        <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-card-header">
+                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
+                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Runtime governance</FluentLabel>
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@(_statusMessage ?? "Tool governance and health data are sourced from the live runtime. Spend tracking uses projected estimates until the accounting API is available.")</FluentLabel>
+                </FluentStack>
+                <FluentBadge Appearance="Appearance.Neutral">Session-scoped toggles</FluentBadge>
             </FluentStack>
-            <FluentBadge Appearance="Appearance.Neutral">Session-scoped toggles</FluentBadge>
         </FluentStack>
     </FluentCard>
 
@@ -51,8 +53,9 @@
                     <FluentButton Appearance="Appearance.Outline"
                                   OnClick="RefreshProviderHealthAsync"
                                   Disabled="@(_isLoading || _isRefreshingHealth)"
-                                  Title="Refresh provider health checks">
-                        @(_isRefreshingHealth ? "Re-checking…" : "Refresh checks")
+                                  Title="Refresh provider health checks"
+                                  AriaLabel="Refresh provider health checks">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.ArrowClockwise())" />
                     </FluentButton>
                 </FluentStack>
 
@@ -68,7 +71,7 @@
                     <div class="lk-auto-grid" style="--lk-grid-min: 260px;">
                         @foreach (var provider in _dashboard.ProviderHealth)
                         {
-                            <FluentCard Class="lk-responsive-card">
+                            <div class="lk-panel lk-responsive-card">
                                 <FluentStack Orientation="Orientation.Vertical" Class="lk-section">
                                     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-card-header">
                                         <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy">
@@ -92,7 +95,7 @@
                                         </FluentStack>
                                     </FluentStack>
                                 </FluentStack>
-                            </FluentCard>
+                            </div>
                         }
                     </div>
                 }
@@ -239,7 +242,7 @@
                     </div>
 
                     <div class="lk-split-panel" style="--lk-sidebar-width: 320px;">
-                        <FluentCard Class="lk-responsive-card">
+                        <div class="lk-panel lk-responsive-card">
                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem; height: 100%;">
                                 <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
                                     <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Last 7 days</FluentLabel>
@@ -268,9 +271,9 @@
                                     }
                                 </div>
                             </FluentStack>
-                        </FluentCard>
+                        </div>
 
-                        <FluentCard Class="lk-responsive-card">
+                        <div class="lk-panel lk-responsive-card">
                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem; height: 100%;">
                                 <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
                                     <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Budget limit</FluentLabel>
@@ -287,7 +290,7 @@
                                     <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No budget limit is configured for this environment yet.</FluentLabel>
                                 }
                             </FluentStack>
-                        </FluentCard>
+                        </div>
                     </div>
                 }
             </FluentStack>

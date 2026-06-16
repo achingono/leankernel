@@ -19,9 +19,9 @@
     </FluentCard>
 
     <FluentStack Orientation="Orientation.Vertical" Class="chat-main">
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-header-row">
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-page-header">
             <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-                <h1 class="chat-heading">Chat</h1>
+                <h1 class="lk-page-title">Chat</h1>
                 <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetHeaderSubtitle()</FluentLabel>
             </FluentStack>
             <FluentButton Appearance="Appearance.Outline" OnClick="StartNewSessionAsync">New session</FluentButton>
@@ -80,8 +80,10 @@
                 <FluentButton Id="chat-send-button"
                               Appearance="Appearance.Accent"
                               OnClick="SendAsync"
-                              Disabled="@IsSendDisabled">
-                    Send
+                              Disabled="@IsSendDisabled"
+                              Title="Send message"
+                              AriaLabel="Send message">
+                    <FluentIcon Value="@(new Icons.Regular.Size16.Send())" />
                 </FluentButton>
             </FluentStack>
         </FluentStack>

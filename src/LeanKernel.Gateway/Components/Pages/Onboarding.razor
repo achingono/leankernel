@@ -104,7 +104,7 @@ else
                                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Give LeanKernel the core profile details it should use across future conversations.</FluentLabel>
                                     </FluentStack>
 
-                                    <EditForm EditContext="_editContext">
+                                    <FluentEditForm EditContext="_editContext">
                                         <DataAnnotationsValidator />
 
                                         <FluentStack Orientation="Orientation.Vertical" Style="gap: 1rem;">
@@ -153,7 +153,7 @@ else
                                                                  Style="flex: 1 1 260px; min-width: 260px;" />
                                             </FluentStack>
 
-                                            <ValidationMessage For="@(() => _draft.DisplayName)" />
+                                            <FluentValidationMessage For="@(() => _draft.DisplayName)" />
 
                                             <div class="lk-panel">
                                                 <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
@@ -174,7 +174,7 @@ else
                                                 </FluentStack>
                                             </div>
                                         </FluentStack>
-                                    </EditForm>
+                                    </FluentEditForm>
                                 </FluentStack>
                             </FluentWizardStep>
 
@@ -200,8 +200,10 @@ else
                                                                  Style="flex: 1 1 280px; min-width: 280px;" />
                                                 <FluentButton Appearance="Appearance.Outline"
                                                               OnClick="AddDomainAsync"
-                                                              Disabled="@string.IsNullOrWhiteSpace(_domainInput)">
-                                                    Add
+                                                              Disabled="@string.IsNullOrWhiteSpace(_domainInput)"
+                                                              Title="Add domain"
+                                                              AriaLabel="Add domain">
+                                                    <FluentIcon Value="@(new Icons.Regular.Size16.Add())" />
                                                 </FluentButton>
                                             </FluentStack>
                                             <FluentLabel Typo="Typography.Body" Color="Color.Neutral">At least one domain is recommended to improve retrieval quality.</FluentLabel>
@@ -217,8 +219,9 @@ else
                                                     <FluentBadge Appearance="Appearance.Accent">@domain</FluentBadge>
                                                     <FluentButton Appearance="Appearance.Outline"
                                                                   OnClick="@(() => RemoveDomainAsync(domain))"
-                                                                  Title="@($"Remove {domain} domain")">
-                                                        Remove
+                                                                  Title="@($"Remove {domain} domain")"
+                                                                  AriaLabel="@($"Remove {domain} domain")">
+                                                        <FluentIcon Value="@(new Icons.Regular.Size16.Dismiss())" />
                                                     </FluentButton>
                                                 </FluentStack>
                                             }
@@ -273,8 +276,9 @@ else
                                                     <FluentBadge Appearance="Appearance.Accent">@goal</FluentBadge>
                                                     <FluentButton Appearance="Appearance.Outline"
                                                                   OnClick="@(() => RemoveGoalAsync(goal))"
-                                                                  Title="@($"Remove {goal} goal")">
-                                                        Remove
+                                                                  Title="@($"Remove {goal} goal")"
+                                                                  AriaLabel="@($"Remove {goal} goal")">
+                                                        <FluentIcon Value="@(new Icons.Regular.Size16.Dismiss())" />
                                                     </FluentButton>
                                                 </FluentStack>
                                             }
@@ -302,7 +306,7 @@ else
                                     </FluentStack>
 
                                     <FluentStack Orientation="Orientation.Horizontal" Wrap="true" Style="gap: 1rem; align-items: stretch;">
-                                        <FluentCard Style="flex: 1 1 260px; padding: 1rem;">
+                                        <div class="lk-panel" style="flex: 1 1 260px;">
                                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                                                 <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Identity</FluentLabel>
                                                 <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.5rem;">
@@ -328,9 +332,9 @@ else
                                                     </FluentStack>
                                                 </FluentStack>
                                             </FluentStack>
-                                        </FluentCard>
+                                        </div>
 
-                                        <FluentCard Style="flex: 1 1 220px; padding: 1rem;">
+                                        <div class="lk-panel" style="flex: 1 1 220px;">
                                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                                                 <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Domains</FluentLabel>
                                                 @if (_draft.Domains.Count == 0)
@@ -347,9 +351,9 @@ else
                                                     </FluentStack>
                                                 }
                                             </FluentStack>
-                                        </FluentCard>
+                                        </div>
 
-                                        <FluentCard Style="flex: 1 1 260px; padding: 1rem;">
+                                        <div class="lk-panel" style="flex: 1 1 260px;">
                                             <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                                                 <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Goals</FluentLabel>
                                                 @if (_draft.Goals.Count == 0 && string.IsNullOrWhiteSpace(_draft.OtherGoals))
@@ -371,7 +375,7 @@ else
                                                     }
                                                 }
                                             </FluentStack>
-                                        </FluentCard>
+                                        </div>
                                     </FluentStack>
                                 </FluentStack>
                             </FluentWizardStep>
@@ -434,7 +438,7 @@ else
             </FluentCard>
 
             <FluentStack Orientation="Orientation.Vertical" Class="lk-responsive-card" Style="gap: 1rem;">
-                <FluentCard Style="padding: 1rem;" aria-label="Profile guidance">
+                <div class="lk-panel" aria-label="Profile guidance">
                     <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                         <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Identity gaps</FluentLabel>
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">These suggestions reflect the profile fields this wizard uses to improve personalization quality.</FluentLabel>
@@ -461,16 +465,16 @@ else
                             </FluentStack>
                         }
                     </FluentStack>
-                </FluentCard>
+                </div>
 
-                <FluentCard Style="padding: 1rem;">
+                <div class="lk-panel">
                     <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.75rem;">
                         <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Recommended next context</FluentLabel>
                         <FluentLabel Typo="Typography.Body">• @GetDomainRecommendation()</FluentLabel>
                         <FluentLabel Typo="Typography.Body">• @GetGoalRecommendation()</FluentLabel>
                         <FluentLabel Typo="Typography.Body">• Re-open setup any time to keep your profile current as your work evolves.</FluentLabel>
                     </FluentStack>
-                </FluentCard>
+                </div>
             </FluentStack>
         </div>
     </FluentStack>
