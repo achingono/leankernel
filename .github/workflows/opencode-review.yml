@@ -26,7 +26,7 @@ jobs:
           AZURE_RESOURCE_NAME: ${{ secrets.AZURE_RESOURCE_NAME }}
           AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
         with:
-          model: azure/gpt-5.2-chat
+          model: azure/gpt-5.3-codex
           prompt: |
             Review this pull request:
             - Check for code quality issues
