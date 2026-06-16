@@ -6,6 +6,7 @@ using LeanKernel.Abstractions.Models;
 using LeanKernel.Agents.Orchestration;
 using LeanKernel.Agents.Routing;
 using LeanKernel.Agents.Strategies;
+using LeanKernel.Agents.ToolSelection;
 using LeanKernel.Context;
 using LeanKernel.Context.Identity;
 using LeanKernel.Diagnostics;
@@ -45,6 +46,7 @@ public sealed class TurnPipeline : ITurnPipeline
     private readonly IProviderHealthTracker? _providerHealthTracker;
     private readonly TaskComplexityScorer? _taskComplexityScorer;
     private readonly PolicyModelSelector? _policyModelSelector;
+    private readonly IToolSelector _toolSelector;
 
     public TurnPipeline(
         IContextGatekeeper gatekeeper,
@@ -66,7 +68,8 @@ public sealed class TurnPipeline : ITurnPipeline
         LeanKernelMetrics? metrics = null,
         IProviderHealthTracker? providerHealthTracker = null,
         TaskComplexityScorer? taskComplexityScorer = null,
-        PolicyModelSelector? policyModelSelector = null)
+        PolicyModelSelector? policyModelSelector = null,
+        IToolSelector? toolSelector = null)
     {
         ArgumentNullException.ThrowIfNull(gatekeeper);
         ArgumentNullException.ThrowIfNull(sessions);
@@ -96,6 +99,7 @@ public sealed class TurnPipeline : ITurnPipeline
         _providerHealthTracker = providerHealthTracker;
         _taskComplexityScorer = taskComplexityScorer;
         _policyModelSelector = policyModelSelector;
+        _toolSelector = toolSelector ?? NullToolSelector.Instance;
     }
 
     public async Task<string> ProcessAsync(LeanKernelMessage message, CancellationToken ct = default)
@@ -134,6 +138,28 @@ public sealed class TurnPipeline : ITurnPipeline
             {
                 UserId = turnScopedMessage.SenderId
             });
+
+            var maxTools = _config.LiteLlm.MaxTools;
+            if (visibleTools.Count > maxTools)
+            {
+                _logger.LogWarning(
+                    "Tool count {Count} exceeds MaxTools ({MaxTools}). Selecting relevant subset.",
+                    visibleTools.Count,
+                    maxTools);
+                visibleTools = await _toolSelector.SelectToolsAsync(
+                    turnScopedMessage.Content,
+                    visibleTools,
+                    maxTools,
+                    ct).ConfigureAwait(false);
+            }
+            else if (visibleTools.Count >= maxTools * 0.9)
+            {
+                _logger.LogInformation(
+                    "Tool count {Count} approaching MaxTools ({MaxTools}) threshold.",
+                    visibleTools.Count,
+                    maxTools);
+            }
+
             var visibleToolNames = MergeToolNames(gatedContext.ActiveToolNames, visibleTools.Select(tool => tool.Name));
 
             _logger.LogDebug(

@@ -5,6 +5,7 @@ using LeanKernel.Agents.Orchestration;
 using LeanKernel.Agents.Quality;
 using LeanKernel.Agents.Routing;
 using LeanKernel.Agents.Strategies;
+using LeanKernel.Agents.ToolSelection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -67,6 +68,7 @@ public static class AgentsServiceCollectionExtensions
                 provider.GetRequiredService<ILogger<ShadowRoutingStrategy>>(),
                 provider.GetService<IDiagnosticsSink>());
         });
+        services.AddSingleton<IToolSelector, ToolSelector>();
         services.AddScoped<ITurnPipeline, TurnPipeline>();
         services.AddScoped<IAgentRuntime, AgentRuntime>();
 
