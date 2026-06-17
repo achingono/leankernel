@@ -27,8 +27,15 @@ GENERAL_SETTINGS_DEFAULT = {
 LITELLM_SETTINGS_DEFAULT = {
     "drop_params": True,
     "set_verbose": False,
-    "cache": False,
-    "callbacks": ["leankernel_litellm_callbacks.proxy_handler_instance"],
+    "cache": True,
+    "enable_redis_auth_cache": True,
+    "cache_params": {
+        "type": "redis",
+        "host": "redis",
+        "port": 6379,
+        "password": "os.environ/REDIS_PASSWORD",
+    },
+    "callbacks": ["litellm_callbacks.proxy_handler_instance"],
 }
 
 ROUTER_SETTINGS_DEFAULT = {
@@ -43,6 +50,28 @@ ROUTER_SETTINGS_DEFAULT = {
 
 class SpecValidationError(ValueError):
     pass
+
+
+def load_env_file(filepath: str | None) -> None:
+    if not filepath or not os.path.isfile(filepath):
+        return
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                k, v = line.split("=", 1)
+                if k.strip() not in os.environ:
+                    os.environ[k.strip()] = v.strip()
+
+
+def load_secret_to_env(name: str) -> None:
+    if name not in os.environ:
+        path = f"/run/secrets/{name}"
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                os.environ[name] = f.read().strip()
 
 
 def has_value(name: str) -> bool:
@@ -70,6 +99,12 @@ def ensure_string(value: Any, path: str) -> str:
 def ensure_number(value: Any, path: str) -> int | float:
     if not isinstance(value, (int, float)):
         raise SpecValidationError(f"{path} must be numeric")
+    return value
+
+
+def ensure_int(value: Any, path: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise SpecValidationError(f"{path} must be an integer")
     return value
 
 
@@ -116,9 +151,14 @@ def merge_callbacks(defaults: list[str], overrides: Any, path: str) -> list[str]
 def parse_env_ref(value: Any, path: str) -> str:
     env_ref = ensure_mapping(value, path)
     source = ensure_string(env_ref.get("source"), f"{path}.source")
-    if source != "env":
-        raise SpecValidationError(f"{path}.source must be 'env'")
-    return ensure_string(env_ref.get("name"), f"{path}.name")
+    name = ensure_string(env_ref.get("name"), f"{path}.name")
+    
+    if source == "secret":
+        load_secret_to_env(name)
+    elif source != "env":
+        raise SpecValidationError(f"{path}.source must be 'env' or 'secret'")
+        
+    return name
 
 
 def infer_provider_prefix(provider_name: str, provider_spec: dict[str, Any]) -> str:
@@ -148,7 +188,11 @@ def parse_provider_models(provider_name: str, provider_spec: dict[str, Any]) -> 
             dimensions = model_spec.get("dimensions")
             if dimensions is None:
                 raise SpecValidationError(f"{model_path}.dimensions is required for embedding models")
-            model_info = {"mode": "embedding", "dimensions": ensure_number(dimensions, f"{model_path}.dimensions")}
+            model_info = {"mode": "embedding", "dimensions": ensure_int(dimensions, f"{model_path}.dimensions")}
+        elif mode == "image_generation":
+            # LiteLLM uses `model_info.mode` to select /v1/images/* endpoints.
+            # Image generation models don't require chat max_tokens/dimensions.
+            model_info = {"mode": "image_generation"}
         else:
             max_tokens = model_spec.get("max_tokens", model_spec.get("context_window", 8192))
             model_info = {
@@ -201,10 +245,12 @@ def provider_key_entry(
     api_base_env_name = provider_key_base_env(provider_name, key_spec, key_path, base_urls, idx)
 
     required_env = [api_key_env]
-    litellm_params: dict[str, Any] = {"api_key": f"os.environ/{api_key_env}"}
+    api_key_val = os.getenv(api_key_env)
+    litellm_params: dict[str, Any] = {"api_key": api_key_val} if api_key_val else {"api_key": f"os.environ/{api_key_env}"}
     if api_base_env_name:
         required_env.append(api_base_env_name)
-        litellm_params["api_base"] = f"os.environ/{api_base_env_name}"
+        api_base_val = os.getenv(api_base_env_name)
+        litellm_params["api_base"] = api_base_val if api_base_val else f"os.environ/{api_base_env_name}"
 
     return f"{prefix}{idx}", {
         "provider": provider_name,
@@ -241,7 +287,8 @@ def provider_base_url_entry(
     base_ref: Any,
 ) -> tuple[str, dict[str, Any]]:
     base_env = parse_env_ref(base_ref, f"providers.{provider_name}.base_url[{idx-1}]")
-    litellm_params: dict[str, Any] = {"api_base": f"os.environ/{base_env}"}
+    base_val = os.getenv(base_env)
+    litellm_params: dict[str, Any] = {"api_base": base_val} if base_val else {"api_base": f"os.environ/{base_env}"}
     if provider_name in {"ollama", "local"}:
         litellm_params["api_key"] = "local"
     return f"{prefix}{idx}", {
@@ -424,11 +471,17 @@ def route_key_deployment(
     }
 
 
+def _deployment_key(entry: dict[str, Any]) -> tuple:
+    lp = entry["litellm_params"]
+    return (entry["model_name"], lp["model"], lp.get("api_base", ""), lp.get("api_key", ""))
+
+
 def add_alias_deployments(
     aliases: dict[str, Any],
     route_deployments: dict[str, list[dict[str, Any]]],
     model_list: list[dict[str, Any]],
 ) -> dict[str, str]:
+    existing = {_deployment_key(m) for m in model_list}
     alias_map: dict[str, str] = {}
     for alias_name, route_name in aliases.items():
         alias = ensure_string(alias_name, "aliases key")
@@ -439,7 +492,15 @@ def add_alias_deployments(
         for deployment in route_deployments[route]:
             alias_deployment = copy.deepcopy(deployment)
             alias_deployment["model_name"] = alias
-            model_list.append(alias_deployment)
+            key = _deployment_key(alias_deployment)
+            if key not in existing:
+                existing.add(key)
+                model_list.append(alias_deployment)
+            else:
+                print(
+                    f"Warning: skipped duplicate alias deployment "
+                    f"{alias_deployment['model_name']}/{alias_deployment['litellm_params']['model']}"
+                )
 
     return alias_map
 
@@ -470,8 +531,6 @@ def build_router_settings(
         if key in router:
             router_settings[key] = router[key]
     router_settings["fallbacks"] = route_fallbacks + alias_fallbacks
-    router_settings["model_group_alias"] = alias_map
-
     return router_settings
 
 
@@ -489,6 +548,11 @@ def build_general_settings(router: dict[str, Any], spec_general_settings: Any) -
 
 def build_litellm_settings(spec_litellm_settings: Any) -> dict[str, Any]:
     litellm_settings = merge_settings(LITELLM_SETTINGS_DEFAULT, spec_litellm_settings, "litellm_settings")
+    litellm_settings["cache_params"] = merge_settings(
+        LITELLM_SETTINGS_DEFAULT["cache_params"],
+        litellm_settings.get("cache_params"),
+        "litellm_settings.cache_params",
+    )
     litellm_settings["callbacks"] = merge_callbacks(
         LITELLM_SETTINGS_DEFAULT.get("callbacks", []),
         litellm_settings.get("callbacks"),
@@ -540,6 +604,8 @@ def render_config(spec_path: Path, output_path: Path) -> None:
 
 
 def main() -> int:
+    load_env_file(os.getenv("LITELLM_KEYS_FILE"))
+    
     spec_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/litellm_spec.yaml")
     output_path = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("/tmp/litellm_config.yaml")
     try:

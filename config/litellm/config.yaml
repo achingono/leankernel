@@ -17,6 +17,8 @@ providers:
       name: GEMINI_API_KEY_2
     - source: env
       name: GEMINI_API_KEY_3
+    - source: env
+      name: GEMINI_API_KEY_4
     models:
     - id: flash
       name: gemini-2.5-flash
@@ -25,8 +27,9 @@ providers:
     - id: embedding_2
       name: gemini-embedding-2
       mode: embedding
-      dimensions: 1536
+      dimensions: 3072
   azure:
+    litellm_provider: azure
     keys:
     - source: env
       name: AZURE_AI_API_KEY
@@ -34,30 +37,31 @@ providers:
     - source: env
       name: AZURE_AI_API_KEY_2
       api_base_env: AZURE_AI_API_BASE_2
-      enabled: false
+      enabled: true
+    - source: env
+      name: AZURE_AI_API_KEY_3
+      api_base_env: AZURE_AI_API_BASE_3
+      enabled: true
     models:
     - id: kimi_k2_6
-      name: kimi-k2.6
+      name: kimi-K2.6
       max_tokens: 8192
-    - id: deepseek_v3_2
-      name: DeepSeek-V3.2
+    - id: deepseek_v4_pro
+      name: DeepSeek-V4-Pro
       max_tokens: 8192
     - id: gpt_5_4_1
       name: gpt-5.4-1
       max_tokens: 32768
-      use_responses_api: true
     - id: gpt_5_4_mini_1
       name: gpt-5.4-mini-1
       max_tokens: 32768
-      use_responses_api: true
     - id: gpt_5_4_nano_1
       name: gpt-5.4-nano-1
       max_tokens: 32768
-      use_responses_api: true
     - id: embedding_3_large
       name: text-embedding-3-large-1
       mode: embedding
-      dimensions: 1536
+      dimensions: 3072
   github_copilot:
     keys:
     - source: env
@@ -75,14 +79,7 @@ providers:
     - id: gemma4_26b
       name: gemma4:26b
       max_tokens: 32768
-    - id: qwen3_embedding_4b
-      name: qwen3-embedding:4b
-      mode: embedding
-      dimensions: 2560
-    - id: qwen3_embedding_8b
-      name: qwen3-embedding:8b
-      mode: embedding
-      dimensions: 4096
+
   nvidia:
     litellm_provider: openai
     keys:
@@ -105,15 +102,25 @@ providers:
     - id: llama_3_3_70b
       name: meta/llama-3.3-70b-instruct
       max_tokens: 32768
-  openai:
+
+  blackforestlabs:
+    # Azure AI Foundry FLUX.2-pro image generation via LiteLLM.
+    litellm_provider: azure_ai
     keys:
     - source: env
-      name: OPENAI_API_KEY
+      name: FLUX_API_KEY
+      api_base_env: FLUX_API_BASE
+    - source: env
+      name: FLUX_API_KEY_2
+      api_base_env: FLUX_API_BASE_2
+      enabled: true
     models:
-    - id: text_embedding_3_small
-      name: text-embedding-3-small
-      mode: embedding
-      dimensions: 1536
+    - id: flux_2_pro
+      name: flux.2-pro
+      mode: image_generation
+      litellm_params:
+        api_version: preview
+
 routes:
   small:
   - provider: azure
@@ -121,105 +128,60 @@ routes:
     keys:
     - azure1
     - azure2
+    - azure3
     order: 1
-  - provider: groq
-    model: scout
-    keys:
-    - groq1
-    - groq2
-    order: 2
-  - provider: nvidia
-    model: llama_3_2_3b
-    keys:
-    - nvidia1
-    order: 3
   - provider: gemini
     model: flash
     keys:
     - gemini1
     - gemini2
     - gemini3
-    order: 4
-  - provider: azure
-    model: kimi_k2_6
+    - gemini4
+    order: 2
+  - provider: groq
+    model: scout
     keys:
-    - azure1
-    - azure2
-    order: 5
-  - provider: azure
-    model: deepseek_v3_2
-    keys:
-    - azure1
-    - azure2
-    order: 6
+    - groq1
+    - groq2
+    order: 3
   - provider: ollama
     model: gemma4_26b
     keys:
     - ollama1
-    order: 8
-  - provider: github_copilot
-    model: gpt_4o
-    keys:
-    - github_copilot1
-    order: 9
+    order: 4
   medium:
-  - provider: nvidia
-    model: llama_4_maverick
-    keys:
-    - nvidia1
-    order: 1
-  - provider: nvidia
-    model: mistral_small_4
-    keys:
-    - nvidia1
-    order: 1
   - provider: azure
     model: gpt_5_4_mini_1
     keys:
     - azure1
     - azure2
-    order: 2
+    - azure3
+    order: 1
   - provider: gemini
     model: flash
     keys:
     - gemini1
     - gemini2
     - gemini3
+    - gemini4
+    order: 2
+  - provider: nvidia
+    model: mistral_small_4
+    keys:
+    - nvidia1
     order: 3
-  - provider: azure
-    model: deepseek_v3_2
-    keys:
-    - azure1
-    - azure2
-    order: 4
-  - provider: azure
-    model: kimi_k2_6
-    keys:
-    - azure1
-    - azure2
-    order: 5
-  - provider: groq
-    model: scout
-    keys:
-    - groq1
-    - groq2
-    order: 6
   - provider: ollama
     model: gemma4_26b
     keys:
     - ollama1
-    order: 8
-  - provider: github_copilot
-    model: gpt_4o
-    keys:
-    - github_copilot1
-    order: 9
+    order: 4
   large:
   - provider: azure
     model: gpt_5_4_1
     keys:
     - azure1
     - azure2
+    - azure3
     order: 1
   - provider: nvidia
     model: llama_3_3_70b
@@ -230,76 +192,66 @@ routes:
     model: nemotron_super_49b
     keys:
     - nvidia1
-    order: 2
-  - provider: azure
-    model: deepseek_v3_2
-    keys:
-    - azure1
-    - azure2
     order: 3
-  - provider: azure
-    model: kimi_k2_6
-    keys:
-    - azure1
-    - azure2
-    order: 4
   - provider: gemini
     model: flash
     keys:
     - gemini1
     - gemini2
     - gemini3
-    order: 5
-  - provider: groq
-    model: scout
-    keys:
-    - groq1
-    - groq2
-    order: 6
+    - gemini4
+    order: 4
   - provider: ollama
     model: gemma4_26b
     keys:
     - ollama1
-    order: 8
+    order: 5
+  embedding:
+  - provider: azure
+    model: embedding_3_large
+    keys:
+    - azure1
+    - azure2
+    - azure3
+    order: 1
+  - provider: gemini
+    model: embedding_2
+    keys:
+    - gemini1
+    - gemini2
+    - gemini3
+    - gemini4
+    order: 2
+
+  tool:
+  - provider: azure
+    model: gpt_5_4_mini_1
+    keys:
+    - azure1
+    - azure2
+    - azure3
+    order: 1
+  - provider: gemini
+    model: flash
+    keys:
+    - gemini1
+    - gemini2
+    - gemini3
+    - gemini4
+    order: 2
   - provider: github_copilot
     model: gpt_4o
     keys:
     - github_copilot1
-    order: 9
-  embedding-small:
-  - provider: gemini
-    model: embedding_2
+    order: 3
+
+  image:
+  - provider: blackforestlabs
+    model: flux_2_pro
     keys:
-    - gemini1
-    - gemini2
-    - gemini3
+    - blackforestlabs1
+    - blackforestlabs2
     order: 1
-  - provider: ollama
-    model: qwen3_embedding_8b
-    keys:
-    - ollama1
-    order: 2
-  embedding-large:
-  - provider: azure
-    model: embedding_3_large
-    keys:
-    - azure2
-    order: 1
-  - provider: gemini
-    model: embedding_2
-    keys:
-    - gemini1
-    - gemini2
-    - gemini3
-    order: 2
-aliases:
-  gpt-4o-mini: small
-  gpt-4o: medium
-  gpt-5.4: large
-  gpt-5.4-mini: medium
-  gpt-5.4-nano: small
-  gpt-5-nano: small
-  gpt-5-mini: medium
 router:
   routing_strategy: least-busy
   enable_pre_call_checks: true
@@ -324,27 +276,8 @@ router:
     large:
     - medium
     - small
-    embedding-small:
-    - embedding-large
-  alias_fallbacks:
-    gpt-4o-mini:
+    embedding: []
+    image: []
+    tool:
     - medium
-    - large
-    gpt-4o:
-    - small
-    - large
-    gpt-5.4:
-    - medium
-    - small
-    gpt-5.4-mini:
-    - small
-    - large
-    gpt-5.4-nano:
-    - medium
-    - large
-    gpt-5-nano:
-    - medium
-    - large
-    gpt-5-mini:
-    - small
     - large
