@@ -26,18 +26,12 @@
 else
 {
     <FluentStack Orientation="Orientation.Vertical" Class="lk-page lk-page-wide">
-        <FluentCard>
-            <FluentStack Orientation="Orientation.Horizontal"
-                         VerticalAlignment="VerticalAlignment.Center"
-                         Wrap="true"
-                         Class="lk-card-header">
-                <FluentStack Orientation="Orientation.Vertical" Class="lk-card-header-copy" Style="max-width: 720px;">
-                    <h1 class="lk-page-title">Guided setup</h1>
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Tell LeanKernel how to address you, what domains matter most, and what outcomes you want help with.</FluentLabel>
-                </FluentStack>
+        <PageHeader Title="Guided setup"
+                    Subtitle="Tell LeanKernel how to address you, what domains matter most, and what outcomes you want help with.">
+            <Actions>
                 <FluentBadge Appearance="Appearance.Accent">Step @(CurrentStepIndex + 1) of @Steps.Count</FluentBadge>
-            </FluentStack>
-        </FluentCard>
+            </Actions>
+        </PageHeader>
 
         @if (!string.IsNullOrWhiteSpace(_errorMessage))
         {

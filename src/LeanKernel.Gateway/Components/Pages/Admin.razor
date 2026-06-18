@@ -7,21 +7,19 @@
 <PageTitle>LeanKernel Admin</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" Class="lk-page lk-page-wide">
-    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-page-header">
-        <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-            <h1 class="lk-page-title">Admin Console</h1>
-            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Govern provider health, model routing, tool access, spend, and scheduled jobs from one runtime surface.</FluentLabel>
-        </FluentStack>
-        <FluentStack Orientation="Orientation.Vertical" Style="align-items: flex-end; gap: var(--lk-space-xs);">
-            <FluentBadge Appearance="Appearance.Accent">Live</FluentBadge>
-            @if (_dashboard is not null)
-            {
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">
-                    <time datetime="@FormatTimestampAttribute(_dashboard.GeneratedAt)">Updated @FormatDateTime(_dashboard.GeneratedAt)</time>
-                </FluentLabel>
-            }
-        </FluentStack>
-    </FluentStack>
+    <PageHeader Title="Admin Console" Subtitle="Govern provider health, model routing, tool access, spend, and scheduled jobs from one runtime surface.">
+        <Actions>
+            <FluentStack Orientation="Orientation.Vertical" Style="align-items: flex-end; gap: var(--lk-space-xs);">
+                <FluentBadge Appearance="Appearance.Accent">Live</FluentBadge>
+                @if (_dashboard is not null)
+                {
+                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">
+                        <time datetime="@FormatTimestampAttribute(_dashboard.GeneratedAt)">Updated @FormatDateTime(_dashboard.GeneratedAt)</time>
+                    </FluentLabel>
+                }
+            </FluentStack>
+        </Actions>
+    </PageHeader>
 
     <FluentCard>
         <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
@@ -51,6 +49,7 @@
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Provider reachability, routing readiness, and the latest heartbeat checks.</FluentLabel>
                     </FluentStack>
                     <FluentButton Appearance="Appearance.Outline"
+                                  Id="admin-refresh-health"
                                   OnClick="RefreshProviderHealthAsync"
                                   Disabled="@(_isLoading || _isRefreshingHealth)"
                                   Title="Refresh provider health checks"

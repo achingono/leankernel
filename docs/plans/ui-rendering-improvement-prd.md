@@ -4,6 +4,20 @@
 
 The goal of this initiative is to review, standardize, and improve the UI rendering across the `fluentui-blazor` pages of the LeanKernel Gateway application. Currently, pages such as Admin, Chat, Diagnostics, Knowledge, and Onboarding use inconsistent layout paradigms, custom CSS structures, and varied component nesting. This PRD outlines the requirements to achieve a highly polished, cohesive, and immersive user experience.
 
+### 1.1 Version Scope (Locked)
+
+This PRD is explicitly scoped to the current project UI stack:
+
+- `Microsoft.FluentUI.AspNetCore.Components` **v4.14.2**
+- `Microsoft.FluentUI.AspNetCore.Components.Icons` **v4.14.2**
+
+Implementation must use Fluent UI Blazor v4 component patterns and naming.
+
+- Keep v4 navigation/layout/input primitives already present in the app (`FluentMainLayout`, `FluentNavMenu`, `FluentNavGroup`, `FluentNavLink`, `FluentTextField`, `FluentSearch`, `FluentProgressRing`).
+- Do **not** introduce v5-only replacements in this PRD (`FluentNav`, `FluentNavCategory`, `FluentNavItem`, `FluentTextInput`, `FluentSpinner`, `FluentLayout`/`FluentLayoutItem`, `FluentField`-based migration patterns).
+
+Any future v4→v5 migration will be handled in a separate migration PRD after v5 adoption is approved for this repository.
+
 ## 2. Core Principles & Global Standards
 
 ### 2.1 Global Layout Standards

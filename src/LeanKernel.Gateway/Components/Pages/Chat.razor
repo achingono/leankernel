@@ -10,22 +10,13 @@
 
 <PageTitle>LeanKernel Chat</PageTitle>
 
-<FluentStack Orientation="Orientation.Vertical" Class="chat-page">
-    <FluentCard Class="chat-sessions-panel">
-        <SessionList Sessions="ChatService.Sessions"
-                     ActiveSessionId="ChatService.CurrentSessionId"
-                     OnNewSession="StartNewSessionAsync"
-                     OnSelectSession="SelectSessionAsync" />
-    </FluentCard>
-
+<FluentStack Orientation="Orientation.Vertical" Class="lk-page lk-page-wide chat-page">
     <FluentStack Orientation="Orientation.Vertical" Class="chat-main">
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-page-header">
-            <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-                <h1 class="lk-page-title">Chat</h1>
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetHeaderSubtitle()</FluentLabel>
-            </FluentStack>
-            <FluentButton Appearance="Appearance.Outline" OnClick="StartNewSessionAsync">New session</FluentButton>
-        </FluentStack>
+        <PageHeader Title="Chat" Subtitle="@GetHeaderSubtitle()">
+            <Actions>
+                <FluentButton Id="chat-new-session-button" Appearance="Appearance.Outline" OnClick="StartNewSessionAsync">New session</FluentButton>
+            </Actions>
+        </PageHeader>
 
         @if (!string.IsNullOrWhiteSpace(ChatService.ErrorMessage))
         {
@@ -66,7 +57,7 @@
             }
         </div>
 
-        <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell">
+        <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell" Style="flex-shrink: 0;">
             <FluentTextArea Id="chat-composer-input"
                            @bind-Value="ChatService.ComposerText"
                            Immediate="true"
@@ -232,20 +223,6 @@
         Navigation.NavigateTo($"/chat/{sessionId}");
     }
 
-    private async Task SelectSessionAsync(string sessionId)
-    {
-        if (string.Equals(sessionId, ChatService.CurrentSessionId, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        await ChatService.OpenSessionAsync(sessionId, _disposeCts.Token);
-        var cacheKey = GetCurrentCacheKey();
-        await PersistSessionCacheAsync(cacheKey);
-        _shouldScroll = true;
-        Navigation.NavigateTo($"/chat/{sessionId}");
-    }
-
     private string GetCurrentCacheKey()
     {
         return ChatService.IsAuthenticated && !string.IsNullOrWhiteSpace(ChatService.OwnerId)
@@ -286,7 +263,7 @@
     {
         if (string.IsNullOrWhiteSpace(ChatService.CurrentSessionId))
         {
-            return "Create a session or pick a recent conversation from the rail.";
+            return "Create a session or pick a recent conversation from navigation.";
         }
 
         var session = ChatService.Sessions.FirstOrDefault(item => string.Equals(item.SessionId, ChatService.CurrentSessionId, StringComparison.Ordinal));

@@ -28,7 +28,7 @@ public class OrchestratedAgentStrategyTests
 
         response.Should().Be("Static response.");
         context.OrchestrationResult.Should().BeNull();
-        context.ModelUsed.Should().Be("gpt-4o-mini");
+        context.ModelUsed.Should().Be(new LiteLlmConfig().DefaultModel);
         coordinatorClient.InvocationCount.Should().Be(1);
     }
 

@@ -49,8 +49,8 @@ public class AgentRuntimeTests
         var factory = new AgentFactory(chatClient.Object, NullLogger<AgentFactory>.Instance);
 
         factory.ChatClient.Should().BeOfType<FunctionInvokingChatClient>();
-        factory.GetChatClientForModel("gpt-4o-mini").Should().BeOfType<FunctionInvokingChatClient>();
-        factory.DefaultModel.Should().Be("gpt-4o-mini");
+        factory.GetChatClientForModel(factory.DefaultModel).Should().BeOfType<FunctionInvokingChatClient>();
+        factory.DefaultModel.Should().Be(new LiteLlmConfig().DefaultModel);
     }
 
     [Fact]

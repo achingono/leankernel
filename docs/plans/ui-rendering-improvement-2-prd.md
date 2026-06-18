@@ -6,6 +6,41 @@ The first UI rendering initiative (`ui-rendering-improvement-prd.md`) establishe
 
 This second initiative targets the **Chat experience** (the app's primary user-facing surface) and **cross-page layout consistency**. Key gaps: the session list is a standalone sidebar disconnected from the app's navigation system, Markdown rendering is limited to regex patterns, the message composer scrolls off-screen, and each page uses a slightly different layout shell.
 
+### 1.1 Supersession And Scope
+
+This PRD extends `ui-rendering-improvement-prd.md` and also **supersedes** a subset of its guidance where the target architecture has changed.
+
+- **Still in force from PRD1:**
+  - `lk-page` / `lk-page-wide` page container rules
+  - `.lk-page-header` / `.lk-page-title` visual hierarchy
+  - `.lk-card-content` as the standard internal card spacing wrapper
+  - nested `FluentCard` elimination
+  - premium background / motion polish already introduced in `app.css`
+- **Superseded by this PRD:**
+  - PRD1 section 3.2 assumption that the chat page preserves the existing two-column session rail architecture
+  - any checklist items that imply the session list remains a dedicated `chat-sessions-panel`
+- **Out of scope for this PRD:**
+  - chat search across sessions
+  - session folders, pinning, archiving, or reordering
+  - streaming markdown rendering changes
+  - syntax-highlighting theming beyond baseline readable code block styling
+  - redesigning the global FluentMainLayout shell itself
+
+### 1.2 Framework Version Lock (v4 Only)
+
+This PRD is locked to the current Fluent UI Blazor version used by the Gateway:
+
+- `Microsoft.FluentUI.AspNetCore.Components` **v4.14.2**
+- `Microsoft.FluentUI.AspNetCore.Components.Icons` **v4.14.2**
+
+All requirements in this document must be implemented with v4 component names and patterns.
+
+- Navigation workstream remains based on `FluentNavMenu`, `FluentNavGroup`, and `FluentNavLink`.
+- Existing page/form/input patterns remain v4 (`FluentMainLayout`, `FluentTextField`, `FluentSearch`, `FluentProgressRing`, wizard-step validation pattern already used by the repo).
+- Do **not** introduce v5-only component families (`FluentNav`/`FluentNavCategory`/`FluentNavItem`, `FluentTextInput`, `FluentSpinner`, `FluentLayout`/`FluentLayoutItem`) in this implementation plan.
+
+If/when the repository upgrades to v5, a dedicated migration PRD will redefine these requirements.
+
 ---
 
 ## 2. Core Principles
@@ -31,7 +66,7 @@ The `SessionList` component currently renders inside a `FluentCard` sidebar (`ch
 1. **NavMenu.razor** gains a `<FluentNavGroup Title="Sessions">` section after the "Chat" link.
    - The group is collapsible/expandable via `Expanded="false"`.
    - A "New session" action at the group header level (icon button or `FluentNavLink` with a `+` icon).
-   - Each session renders as a `FluentNavLink` with `Href="@($"/{session.SessionId}")"`, title text, and optional preview snippet.
+   - Each session renders as a `FluentNavLink` with `Href="@($"/chat/{session.SessionId}")"`, title text, and optional preview snippet.
 
 2. **`FluentNavGroup`** displays the active session with the `active` styling (matching the current `NavLinkMatch.All` behavior on `/`).
 
@@ -39,11 +74,26 @@ The `SessionList` component currently renders inside a `FluentCard` sidebar (`ch
    - **Preferred (A1): Direct injection.** `NavMenu.razor` injects `ChatService` (singular) to read `Sessions` and `CurrentSessionId`. The `ChatService` is already a singleton-style scoped service. This avoids passing session data through the layout hierarchy and keeps `MainLayout.razor` unchanged.
    - **Alternative (A2): Cascading parameter.** `Chat.razor` sets a `CascadingValue` of type `IReadOnlyList<ChatSessionSummary>`. `NavMenu` receives it via `[CascadingParameter]`. Cleaner DI but requires changes to the layout contract. *Revisit if A1 causes testability issues.*
 
-4. **Remove `chat-sessions-panel`** from `Chat.razor`. The `<FluentCard Class="chat-sessions-panel">` wrapper and its `<SessionList>` child are deleted.
+4. **Session route model**: the canonical session URL format is `/chat/{SessionId}`.
+   - Do **not** introduce root-level `/{SessionId}` routes because they would collide with existing top-level pages (`/admin`, `/knowledge`, `/onboarding`, etc.).
+   - The `Chat` top-level nav link continues to target `/` (or `/chat`) as the default conversation surface.
+   - Session nav items always target `/chat/{SessionId}`.
 
-5. **New session routing**: Clicking the "New session" nav action triggers `ChatService.StartNewSessionAsync()`. If NavMenu uses DI (A1), the button calls the service directly. If cascading (A2), it invokes a callback.
+5. **Nav visibility rule**: the sessions group is shown only on chat routes (`/` and `/chat*`).
+   - On non-chat pages, `NavMenu` shows the normal app navigation without the sessions group.
+   - This keeps the global nav focused and avoids exposing chat-specific state on unrelated screens.
 
-6. **Empty state**: When no sessions exist, `FluentNavGroup` shows a placeholder label ("No sessions yet") or collapses entirely with a subtle indicator.
+6. **State propagation**: `NavMenu` must rerender when sessions change.
+   - `ChatService` exposes a change notification event such as `SessionsChanged` or `StateChanged`.
+   - `NavMenu.razor` subscribes in `OnInitialized` and unsubscribes in `Dispose`.
+   - Session creation, selection, deletion, and cache hydration all raise the event.
+   - This is required whether the menu uses DI or cascading values.
+
+7. **Remove `chat-sessions-panel`** from `Chat.razor`. The `<FluentCard Class="chat-sessions-panel">` wrapper and its `<SessionList>` child are deleted.
+
+8. **New session routing**: Clicking the "New session" nav action triggers `ChatService.CreateNewSessionAsync()` and navigates to `/chat/{SessionId}` for the created session. If NavMenu uses DI (A1), the button calls the service directly. If cascading (A2), it invokes a callback.
+
+9. **Empty state**: When no sessions exist, `FluentNavGroup` shows a placeholder label ("No sessions yet") or collapses entirely with a subtle indicator.
 
 ### 3.3 Responsive Behavior
 
@@ -81,7 +131,7 @@ The `SessionList` component currently renders inside a `FluentCard` sidebar (`ch
    **Behavior:**
    - Processes `Content` through Markdig with a pipeline configured for the application's needs.
    - Renders as `@((MarkupString)html)` inside a `<div>` wrapper.
-   - **Html sanitization**: Markdig pipeline uses `DisableHtmlExtensions` to strip raw HTML tags from model output (LLMs can emit `<script>`, `<iframe>`, etc.).
+   - **Html sanitization**: Markdig pipeline uses `.DisableHtml()` to prevent raw HTML emitted by models from rendering into the page.
    - **Design tokens**: Rendered HTML uses FluentUI design tokens via CSS classes/scoped styles:
      - Code blocks: `background: var(--neutral-layer-3)`, rounded corners, monospace font.
      - Inline code: same as PRD1 (existing `code` styling in `app.css`).
@@ -91,19 +141,27 @@ The `SessionList` component currently renders inside a `FluentCard` sidebar (`ch
      - Lists: standard padding with `--lk-space-xxs` gaps.
    - **Copy button** (optional): a `FluentButton` with copy icon appears on hover over code blocks.
 
-3. **Replace the inline render in `ChatMessage.razor`.**
+3. **Render both user and assistant messages through `MarkdownSection`.**
+   - User messages and assistant responses should use the same rendering component so the chat transcript has one consistent content pipeline.
+   - User messages may use a lighter visual treatment via a CSS modifier class, but not a different rendering engine.
+
+4. **Replace the inline render in `ChatMessage.razor`.**
    - The existing:
      ```razor
      <div style="line-height: 1.6; word-break: break-word;">@((MarkupString)RenderMarkdown(Message.Content))</div>
      ```
-   - Becomes:
+   - And the current user path:
+     ```razor
+     <FluentLabel Typo="Typography.Body">@Message.Content</FluentLabel>
+     ```
+   - Become:
      ```razor
      <MarkdownSection Content="@Message.Content" />
      ```
    - The `RenderMarkdown()` static method and its three regex patterns are deleted.
    - The `@using System.Text.Encodings.Web` and `@using System.Text.RegularExpressions` imports can be removed from `ChatMessage.razor`.
 
-4. **Optional: Extend to other pages.** If Diagnostics or Admin display markdown-like content in the future, `MarkdownSection` can be reused directly without additional work.
+5. **Optional: Extend to other pages.** If Diagnostics or Admin display markdown-like content in the future, `MarkdownSection` can be reused directly without additional work.
 
 ### 4.3 Pipeline Configuration
 
@@ -152,7 +210,7 @@ The composer (`chat-composer-shell`) is in the normal document flow. As the mess
 
 5. **Empty state interaction**: When the message list is empty (no messages), the branded empty state card renders **inside** the `chat-message-list`. The composer still sits below it.
 
-6. **"New session" button**: Moves from the header row into the NavMenu (per Workstream A). The `lk-page-header` in the chat page omits the action button (or keeps a minimal "New" button in the header for discoverability; decide during implementation).
+6. **"New session" button**: Moves from the header row into the NavMenu (per Workstream A), but a secondary visible header button is retained for discoverability.
 
 7. **Edge case — loading state**: When `ChatService.IsLoading` is true, the `FluentProgressRing` + label is inside `chat-message-list` (as it already is). The composer is disabled but stays visible and pinned.
 
@@ -273,7 +331,7 @@ PRD1 established the convention: `FluentCard > FluentStack.Class("lk-card-conten
 - **Diagnostics**: Already checked in PRD1. Verify.
 - **Knowledge**: Uses `lk-card-content` in most places. The right-side details pane uses `lk-card-content` correctly after PRD1.
 - **Onboarding**: The wizard steps use a different structure (non-card). OK — this is intentional.
-- **Chat**: The message bubbles use `FluentCard` directly without `lk-card-content`. The composition is: `FluentCard > FluentStack (header row) + content`. This can optionally add `lk-card-content` for consistency, but it's not visually broken.
+- **Chat**: The message bubbles are an explicit exception only if the current internal spacing remains visually identical after the `MarkdownSection` migration. Otherwise, they should also adopt `lk-card-content` to preserve the global rule.
 
 #### 6.2.4 Responsive Audit
 
@@ -288,7 +346,7 @@ PRD1 established the convention: `FluentCard > FluentStack.Class("lk-card-conten
 
 - After Workstream A, the "New session" button lives in the NavMenu as a nav action.
 - Optionally, keep a secondary "New session" button in the Chat page header for discoverability (especially for new users who may not look in the collapsed nav).
-- **Decision**: Keep a secondary `FluentButton Appearance="Appearance.Outline"` in the Chat page header labeled "New session". This is removed after user onboarding or can remain as a persistent visible action.
+- **Decision**: Keep a secondary `FluentButton Appearance="Appearance.Outline"` in the Chat page header labeled "New session" as a persistent visible action.
 
 ### 6.3 Files Affected
 
@@ -330,13 +388,16 @@ Phase 3 — Cross-page polish (low risk)
 ### 8.1 NavMenu Session Integration
 
 - [ ] `NavMenu.razor` injects `ChatService` (or receives cascading parameter) and reads `Sessions` and `CurrentSessionId`
+- [ ] `ChatService` exposes a state-change event, and `NavMenu` subscribes / unsubscribes correctly
 - [ ] Sessions appear as `FluentNavLink` items under a `FluentNavGroup` titled "Sessions"
 - [ ] The active session shows the `active` CSS class / highlighted state
-- [ ] Clicking a session link navigates to `/{sessionId}` and loads that session in Chat.razor
-- [ ] The "New session" action in the NavMenu group triggers `ChatService.StartNewSessionAsync()` and navigates to the new session
+- [ ] Clicking a session link navigates to `/chat/{sessionId}` and loads that session in Chat.razor
+- [ ] The "New session" action in the NavMenu group triggers `ChatService.CreateNewSessionAsync()` and navigates to `/chat/{sessionId}` for the created session
 - [ ] When no sessions exist, the NavMenu group shows a placeholder (e.g. "No sessions yet") or collapses gracefully
 - [ ] The NavMenu group is collapsible/expandable via its built-in toggle
 - [ ] After session creation from any page, the NavMenu reflects the change on next render
+- [ ] The sessions group appears only on `/` and `/chat*` routes
+- [ ] The sessions group does not appear on `Admin`, `Diagnostics`, `Knowledge`, or `Onboarding`
 - [ ] `chat-sessions-panel` FluentCard is removed from Chat.razor — no sidebar visible
 - [ ] `SessionList.razor` is deleted (or kept if referenced elsewhere; verify no remaining references)
 - [ ] `.chat-sessions-panel`, `.lk-session-list`, `.lk-session-item` CSS rules are removed from `app.css` (or confirmed unused)
@@ -351,7 +412,7 @@ Phase 3 — Cross-page polish (low risk)
 - [ ] `MarkdownSection.razor` exists in `Components/Shared/` with the documented parameters
 - [ ] Markdig pipeline uses `UseAdvancedExtensions()` and `DisableHtml()` (tables, lists, code blocks, blockquotes all supported)
 - [ ] Raw HTML in LLM output (e.g. `<script>`) is stripped/escaped — **not** rendered as HTML
-- [ ] `ChatMessage.razor` replaces `RenderMarkdown()` call with `<MarkdownSection Content="@Message.Content" />`
+- [ ] `ChatMessage.razor` renders **both** user and assistant messages with `<MarkdownSection Content="@Message.Content" />`
 - [ ] `RenderMarkdown()` method and its 3 regex patterns are deleted from `ChatMessage.razor`
 - [ ] `@using System.Text.Encodings.Web` and `@using System.Text.RegularExpressions` removed from `ChatMessage.razor` (if no longer needed)
 - [ ] Rendered Markdown uses FluentUI design tokens:
@@ -400,7 +461,7 @@ Phase 3 — Cross-page polish (low risk)
 #### Card Nesting
 - [ ] All `FluentCard` components in Admin, Diagnostics, Knowledge wrap content in `<FluentStack Class="lk-card-content">`
 - [ ] No nested `FluentCard` elements remain (per PRD1 requirement; re-verify)
-- [ ] Chat message bubbles optionally use `lk-card-content` for internal padding consistency
+- [ ] Chat message bubbles either adopt `lk-card-content` or are explicitly documented as the sole exception to the card-content rule
 
 #### Responsive
 - [ ] Chat at ≤900px: no `.chat-sessions-panel` responsive rule (component removed); `.chat-page` switches to `flex-direction: column; height: auto;`
@@ -425,7 +486,8 @@ Phase 3 — Cross-page polish (low risk)
 ### 8.6 Final Integration Test
 
 - [ ] `dotnet build` succeeds with no warnings related to the changes
-- [ ] `npm run test` (or equivalent test command) passes in the leankernel repo
+- [ ] `dotnet test` succeeds for the repo test suite
+- [ ] `dotnet test test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj` succeeds for browser coverage (or document why it is skipped)
 - [ ] Deploy to swarm via `deploy/leankernel/scripts/deploy.sh --build`
 - [ ] All 5 leankernel services converge to 1/1
 - [ ] Manual walkthrough:

@@ -12,6 +12,8 @@ public sealed class ChatService(
     ILogger<ChatService> logger,
     IDbContextFactory<LeanKernelDbContext>? dbContextFactory = null)
 {
+    public event Action? SessionsChanged;
+
     public const string ChannelPrefix = "blazor";
     private const int MaxHistoryTurns = 100;
 
@@ -498,6 +500,7 @@ public sealed class ChatService(
             .GroupBy(session => session.SessionId, StringComparer.Ordinal)
             .Select(group => group.OrderByDescending(item => item.UpdatedAt).First())
             .OrderByDescending(session => session.UpdatedAt));
+        NotifySessionsChanged();
     }
 
     private void UpsertSession(ChatSessionSummary summary)
@@ -510,7 +513,10 @@ public sealed class ChatService(
 
         Sessions.Add(summary);
         Sessions.Sort((left, right) => right.UpdatedAt.CompareTo(left.UpdatedAt));
+        NotifySessionsChanged();
     }
+
+    private void NotifySessionsChanged() => SessionsChanged?.Invoke();
 
     private static ChatMessageViewModel CreatePendingUserMessage(string content)
         => new()

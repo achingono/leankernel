@@ -33,7 +33,7 @@ public class StaticAgentStrategyTests
         var response = await strategy.InvokeAsync(context);
 
         response.Should().Be("hello from model");
-        context.ModelUsed.Should().Be("gpt-4o-mini");
+        context.ModelUsed.Should().Be(new LeanKernel.Abstractions.Configuration.LiteLlmConfig().DefaultModel);
         chatClient.ReceivedMessages.Should().HaveCount(4);
         chatClient.ReceivedMessages[0].Role.Should().Be(ChatRole.System);
         chatClient.ReceivedMessages[0].Text.Should().Be("System policy");

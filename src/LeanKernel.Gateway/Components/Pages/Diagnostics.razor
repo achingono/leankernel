@@ -8,12 +8,8 @@
 <PageTitle>LeanKernel Diagnostics</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" Class="lk-page">
-    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-page-header">
-        <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-            <h1 class="lk-page-title">Diagnostics explorer</h1>
-            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Inspect the latest persisted context audit, budget usage, history shaping, and routing decisions for any session.</FluentLabel>
-        </FluentStack>
-    </FluentStack>
+    <PageHeader Title="Diagnostics explorer"
+                Subtitle="Inspect the latest persisted context audit, budget usage, history shaping, and routing decisions for any session." />
 
     <FluentCard>
         <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
@@ -24,6 +20,7 @@
                                  Disabled="@_isLoading"
                                  Style="flex: 1;" />
                 <FluentButton Appearance="Appearance.Accent"
+                              Id="diagnostics-load-button"
                               OnClick="LoadDiagnosticsAsync"
                               Disabled="@IsLoadDisabled"
                               Title="Search session"

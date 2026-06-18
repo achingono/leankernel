@@ -122,4 +122,38 @@ public class NavigationTests
         }
         finally { await page.CloseAsync(); }
     }
+
+    [Theory]
+    [InlineData("/chat", "Chat")]
+    [InlineData("/diagnostics", "Diagnostics explorer")]
+    [InlineData("/knowledge", "Knowledge")]
+    [InlineData("/admin", "Admin Console")]
+    [InlineData("/onboarding", "Guided setup")]
+    public async Task MainPages_RenderStandardPageHeader(string path, string expectedTitle)
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}{path}", new() { WaitUntil = WaitUntilState.NetworkIdle });
+            var heading = page.Locator(".lk-page-header .lk-page-title");
+            await Assertions.Expect(heading).ToBeVisibleAsync();
+            await Assertions.Expect(heading).ToHaveTextAsync(expectedTitle);
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
+    public async Task SessionsGroup_VisibleOnlyOnChatRoutes()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
+            await Assertions.Expect(page.Locator("#nav-new-session-button")).ToBeVisibleAsync();
+
+            await page.GotoAsync($"{_fixture.BaseUrl}/diagnostics", new() { WaitUntil = WaitUntilState.NetworkIdle });
+            await Assertions.Expect(page.Locator("#nav-new-session-button")).ToHaveCountAsync(0);
+        }
+        finally { await page.CloseAsync(); }
+    }
 }

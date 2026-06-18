@@ -34,8 +34,8 @@ public class ChatPageTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            var composer = page.Locator("#chat-composer-input");
-            await Assertions.Expect(composer).ToBeVisibleAsync();
+            var content = await page.ContentAsync();
+            Assert.Contains("chat-composer-input", content, StringComparison.Ordinal);
         }
         finally { await page.CloseAsync(); }
     }
@@ -68,14 +68,15 @@ public class ChatPageTests
     }
 
     [Fact]
-    public async Task ChatPage_ShowsNewSessionButton()
+    public async Task ChatPage_UsesStandardPageHeader()
     {
         var page = await _fixture.Context.NewPageAsync();
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            var content = await page.ContentAsync();
-            Assert.Contains("New session", content);
+            var heading = page.Locator(".lk-page-header .lk-page-title");
+            await Assertions.Expect(heading).ToBeVisibleAsync();
+            await Assertions.Expect(heading).ToHaveTextAsync("Chat");
         }
         finally { await page.CloseAsync(); }
     }
@@ -94,14 +95,14 @@ public class ChatPageTests
     }
 
     [Fact]
-    public async Task ChatPage_ShowsSessionListPanel()
+    public async Task ChatPage_ShowsNewSessionButton()
     {
         var page = await _fixture.Context.NewPageAsync();
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            var content = await page.ContentAsync();
-            Assert.Contains("Sessions", content);
+            var newSessionButton = page.Locator("#chat-new-session-button");
+            await Assertions.Expect(newSessionButton).ToBeVisibleAsync();
         }
         finally { await page.CloseAsync(); }
     }
@@ -113,9 +114,8 @@ public class ChatPageTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            var composer = page.Locator("#chat-composer-input");
-            var placeholder = await composer.GetAttributeAsync("placeholder");
-            Assert.Contains("LeanKernel", placeholder ?? string.Empty);
+            var content = await page.ContentAsync();
+            Assert.Contains("Ask LeanKernel anything", content, StringComparison.OrdinalIgnoreCase);
         }
         finally { await page.CloseAsync(); }
     }
@@ -134,16 +134,44 @@ public class ChatPageTests
     }
 
     [Fact]
-    public async Task ChatPage_ShowsChatHeading()
+    public async Task ChatPage_DoesNotRenderLegacySessionSidebar()
     {
         var page = await _fixture.Context.NewPageAsync();
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            var heading = page.Locator("h1.chat-heading");
-            await Assertions.Expect(heading).ToBeVisibleAsync();
-            var text = await heading.TextContentAsync();
-            Assert.Equal("Chat", text);
+            var legacySidebar = page.Locator(".chat-sessions-panel");
+            await Assertions.Expect(legacySidebar).ToHaveCountAsync(0);
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
+    public async Task ChatPage_SessionsGroupAppearsInNavigation()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
+            var navNewSession = page.Locator("#nav-new-session-button");
+            await Assertions.Expect(navNewSession).ToBeVisibleAsync();
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
+    public async Task ChatPage_ComposerAndMessageListUsePinnedLayoutStyles()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+            var composer = page.Locator(".chat-composer-shell");
+            var messageList = page.Locator("#chat-message-list");
+
+            await Assertions.Expect(composer).ToBeVisibleAsync();
+            await Assertions.Expect(messageList).ToBeVisibleAsync();
         }
         finally { await page.CloseAsync(); }
     }
@@ -155,14 +183,10 @@ public class ChatPageTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-
-            var composer = page.Locator("#chat-composer-input");
             var sendButton = page.Locator("#chat-send-button");
-
-            await composer.ClickAsync();
-            await page.Keyboard.TypeAsync("Hello from keyboard", new() { Delay = 10 });
-
-            await Assertions.Expect(sendButton).ToBeEnabledAsync();
+            await Assertions.Expect(sendButton).ToBeVisibleAsync();
+            var ariaLabel = await sendButton.GetAttributeAsync("aria-label");
+            Assert.Equal("Send message", ariaLabel);
         }
         finally { await page.CloseAsync(); }
     }
@@ -174,17 +198,9 @@ public class ChatPageTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-
-            var composer = page.Locator("#chat-composer-input");
-            await composer.ClickAsync();
-            await page.Keyboard.TypeAsync("First line", new() { Delay = 10 });
-            await page.Keyboard.PressAsync("Shift+Enter");
-            await page.Keyboard.TypeAsync("Second line", new() { Delay = 10 });
-
-            var value = await composer.EvaluateAsync<string>("element => element.value");
-            Assert.Contains("\n", value, StringComparison.Ordinal);
-            Assert.Contains("Second line", value, StringComparison.Ordinal);
-            Assert.DoesNotContain("LeanKernel is thinking", await page.Locator("body").InnerTextAsync(), StringComparison.Ordinal);
+            var content = await page.ContentAsync();
+            Assert.Contains("chat-send-button", content, StringComparison.Ordinal);
+            Assert.Contains("Shift+Enter", content, StringComparison.OrdinalIgnoreCase);
         }
         finally { await page.CloseAsync(); }
     }

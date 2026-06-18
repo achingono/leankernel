@@ -1,50 +1,39 @@
-@using System.Text.Encodings.Web
-@using System.Text.RegularExpressions
 @inject IJSRuntime JS
 
-<FluentCard Class="@($"{(IsUser ? "lk-chat-bubble-user" : "lk-chat-bubble-assistant")}")" Style="margin-bottom: 0.75rem;">
-    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.5rem;">
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
-            <FluentBadge Appearance="Appearance.Accent">@(IsUser ? "You" : "LeanKernel")</FluentBadge>
-            @if (!string.IsNullOrWhiteSpace(Message.CompactionLabel))
-            {
-                <FluentBadge Appearance="Appearance.Neutral">@Message.CompactionLabel</FluentBadge>
-            }
-            @if (Message.Status == ChatMessageStatus.Pending)
-            {
-                <FluentBadge Appearance="Appearance.Lightweight">Sending</FluentBadge>
-            }
-        </FluentStack>
-        
-        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.75rem;">
-            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetTimestampLabel()</FluentLabel>
-            @if (!IsUser)
-            {
-                <FluentButton Appearance="Appearance.Lightweight"
-                              IconEnd="@(new Icons.Regular.Size16.Copy())"
-                              OnClick="CopyMessageToClipboardAsync"
-                              AriaLabel="Copy assistant response"
-                              Title="Copy to clipboard"
-                              Style="height: 24px; padding: 0 var(--lk-space-xxs);" />
-            }
-        </FluentStack>
-    </FluentStack>
+<FluentCard Class="@($"{(IsUser ? "lk-chat-bubble-user" : "lk-chat-bubble-assistant")}")">
+    <FluentStack Orientation="Orientation.Vertical" Class="lk-card-content">
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; margin-bottom: 0.5rem;">
+            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.5rem;">
+                <FluentBadge Appearance="Appearance.Accent">@(IsUser ? "You" : "LeanKernel")</FluentBadge>
+                @if (!string.IsNullOrWhiteSpace(Message.CompactionLabel))
+                {
+                    <FluentBadge Appearance="Appearance.Neutral">@Message.CompactionLabel</FluentBadge>
+                }
+                @if (Message.Status == ChatMessageStatus.Pending)
+                {
+                    <FluentBadge Appearance="Appearance.Lightweight">Sending</FluentBadge>
+                }
+            </FluentStack>
 
-    @if (IsUser)
-    {
-        <FluentLabel Typo="Typography.Body">@Message.Content</FluentLabel>
-    }
-    else
-    {
-        <div style="line-height: 1.6; word-break: break-word;">@((MarkupString)RenderMarkdown(Message.Content))</div>
-    }
+            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 0.75rem;">
+                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">@GetTimestampLabel()</FluentLabel>
+                @if (!IsUser)
+                {
+                    <FluentButton Appearance="Appearance.Lightweight"
+                                  IconEnd="@(new Icons.Regular.Size16.Copy())"
+                                  OnClick="CopyMessageToClipboardAsync"
+                                  AriaLabel="Copy assistant response"
+                                  Title="Copy to clipboard"
+                                  Style="height: 24px; padding: 0 var(--lk-space-xxs);" />
+                }
+            </FluentStack>
+        </FluentStack>
+
+        <MarkdownSection Content="@Message.Content" Class="@(IsUser ? "lk-markdown-user" : "lk-markdown-assistant")" />
+    </FluentStack>
 </FluentCard>
 
 @code {
-    private static readonly Regex BoldPattern = new(@"\*\*(.+?)\*\*", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex InlineCodePattern = new(@"`([^`]+)`", RegexOptions.Compiled);
-    private static readonly Regex LinkPattern = new(@"\[(.+?)\]\((https?://[^\s)]+)\)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
     [Parameter]
     public required ChatMessageViewModel Message { get; set; }
 
@@ -55,14 +44,5 @@
     private async Task CopyMessageToClipboardAsync()
     {
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", Message.Content);
-    }
-
-    private static string RenderMarkdown(string content)
-    {
-        var encoded = HtmlEncoder.Default.Encode(content ?? string.Empty);
-        encoded = LinkPattern.Replace(encoded, "<a href=\"$2\" target=\"_blank\" rel=\"noreferrer\" style=\"color: var(--accent-fill-rest); text-decoration: underline;\">$1</a>");
-        encoded = BoldPattern.Replace(encoded, "<strong>$1</strong>");
-        encoded = InlineCodePattern.Replace(encoded, "<code>$1</code>");
-        return encoded.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", "<br />", StringComparison.Ordinal);
     }
 }

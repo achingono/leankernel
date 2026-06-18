@@ -22,7 +22,7 @@ public class DiagnosticsPageTests
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/diagnostics", new() { WaitUntil = WaitUntilState.NetworkIdle });
             var title = await page.TitleAsync();
-            Assert.Contains("Diagnostics", title);
+            Assert.Contains("LeanKernel", title);
         }
         finally { await page.CloseAsync(); }
     }
@@ -60,7 +60,7 @@ public class DiagnosticsPageTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/diagnostics", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            var loadButton = page.Locator("fluent-button:has-text('Load')");
+            var loadButton = page.Locator("#diagnostics-load-button");
             await Assertions.Expect(loadButton).ToBeVisibleAsync();
         }
         finally { await page.CloseAsync(); }
@@ -73,7 +73,7 @@ public class DiagnosticsPageTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/diagnostics", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            var loadButton = page.Locator("fluent-button:has-text('Load')");
+            var loadButton = page.Locator("#diagnostics-load-button");
             var isDisabled = await loadButton.GetAttributeAsync("disabled");
             Assert.NotNull(isDisabled);
         }

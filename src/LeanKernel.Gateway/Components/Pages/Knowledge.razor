@@ -13,30 +13,28 @@
 <PageTitle>LeanKernel Knowledge</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" Class="lk-page">
-    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Wrap="true" Class="lk-page-header">
-        <FluentStack Orientation="Orientation.Vertical" Class="lk-page-header-copy">
-            <h1 class="lk-page-title">Knowledge</h1>
-            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Browse GBrain wiki pages, inspect linked knowledge, and curate durable context.</FluentLabel>
-        </FluentStack>
-        @if (_currentTab == TabMode.Wiki)
-        {
-            <FluentButton Appearance="Appearance.Accent" @onclick="OpenCreateModal" AriaLabel="Create new page" id="knowledge-create-button">
-                <FluentIcon Value="@(new Icons.Regular.Size16.DocumentAdd())" />
-            </FluentButton>
-            <FluentTooltip Anchor="knowledge-create-button" Position="TooltipPosition.Top" Delay="150">
-                Create new page
-            </FluentTooltip>
-        }
-        else
-        {
-            <FluentButton Appearance="Appearance.Accent" @onclick="OpenUploadModal" AriaLabel="Upload document" id="knowledge-upload-button">
-                <FluentIcon Value="@(new Icons.Regular.Size16.ArrowUpload())" />
-            </FluentButton>
-            <FluentTooltip Anchor="knowledge-upload-button" Position="TooltipPosition.Top" Delay="150">
-                Upload document
-            </FluentTooltip>
-        }
-    </FluentStack>
+    <PageHeader Title="Knowledge" Subtitle="Browse GBrain wiki pages, inspect linked knowledge, and curate durable context.">
+        <Actions>
+            @if (_currentTab == TabMode.Wiki)
+            {
+                <FluentButton Appearance="Appearance.Accent" @onclick="OpenCreateModal" AriaLabel="Create new page" id="knowledge-create-button">
+                    <FluentIcon Value="@(new Icons.Regular.Size16.DocumentAdd())" />
+                </FluentButton>
+                <FluentTooltip Anchor="knowledge-create-button" Position="TooltipPosition.Top" Delay="150">
+                    Create new page
+                </FluentTooltip>
+            }
+            else
+            {
+                <FluentButton Appearance="Appearance.Accent" @onclick="OpenUploadModal" AriaLabel="Upload document" id="knowledge-upload-button">
+                    <FluentIcon Value="@(new Icons.Regular.Size16.ArrowUpload())" />
+                </FluentButton>
+                <FluentTooltip Anchor="knowledge-upload-button" Position="TooltipPosition.Top" Delay="150">
+                    Upload document
+                </FluentTooltip>
+            }
+        </Actions>
+    </PageHeader>
 
     <FluentStack Orientation="Orientation.Horizontal" Class="lk-tab-toggle-group">
         <FluentButton Appearance="@(_currentTab == TabMode.Wiki ? Appearance.Accent : Appearance.Neutral)" 
