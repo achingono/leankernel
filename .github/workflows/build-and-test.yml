@@ -8,6 +8,8 @@ on:
     paths:
       - 'src/**'
       - 'test/**'
+      - 'docs/**'
+      - 'README.md'
       - 'docker-compose*.yml'
       - 'scripts/**'
       - '.github/workflows/build-and-test.yml'
@@ -20,6 +22,8 @@ on:
     paths:
       - 'src/**'
       - 'test/**'
+      - 'docs/**'
+      - 'README.md'
       - 'docker-compose*.yml'
       - 'scripts/**'
       - '.github/workflows/build-and-test.yml'
@@ -73,6 +77,9 @@ jobs:
 
       - name: Restore
         run: dotnet restore src/LeanKernel.sln
+
+      - name: Documentation link check
+        run: python3 scripts/quality/check-doc-links.py
 
       - name: Build
         run: dotnet build src/LeanKernel.sln --no-restore -v minimal

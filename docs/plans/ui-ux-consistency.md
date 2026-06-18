@@ -93,7 +93,7 @@ We will replace/enhance custom HTML structures with built-in FluentUI Blazor com
 
 ### B. Shared & Interactive Components
 
-#### [MODIFY] [SessionList.razor](../../src/LeanKernel.Gateway/Components/Shared/SessionList.razor)
+#### [MODIFY] [NavMenu.razor](../../src/LeanKernel.Gateway/Components/Layout/NavMenu.razor)
 - Apply the upgraded styling tokens to make selected sessions look exceptionally premium with active status glows.
 
 #### [MODIFY] [ChatMessage.razor](../../src/LeanKernel.Gateway/Components/Shared/ChatMessage.razor)

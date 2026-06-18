@@ -1,6 +1,12 @@
 # Configuration Reference
 
-Configuration documentation organized by phase.
+Configuration documentation for runtime settings, appsettings, and environment overrides.
+
+## Canonical References
+
+- [Configuration reference](configuration-reference.md)
+- [Environment variables](environment-variables.md)
+- [Appsettings reference](appsettings-reference.md)
 
 ## Phase 1
 - [Phase 1 Configuration](phase-1-config.md)

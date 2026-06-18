@@ -1,5 +1,7 @@
 # Gateway API
 
+> Canonical API reference now lives at [`../api/gateway-api.md`](../api/gateway-api.md). This page is retained for compatibility links during docs migration.
+
 `LeanKernel.Gateway` is the ASP.NET Core entry point for the rearchitecture. It composes persistence, knowledge, context, tools, agents, diagnostics, and channel registrations, then exposes both the existing Minimal API surface over `IAgentRuntime` and the foundational Phase 4 Blazor Server chat UI.
 
 ## Implemented endpoints

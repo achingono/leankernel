@@ -1,30 +1,35 @@
 # LeanKernel Documentation
 
-LeanKernel is a .NET 10 personal agent platform with a modular monolith architecture and sidecar services for model proxying, vector storage, parsing, and indexing.
+This documentation set is organized for quick onboarding and implementation-accurate reference.
 
-## Documentation Sections
+## Start Paths
 
-| Section | Description |
-| --- | --- |
-| [CONTRIBUTING-DOCS.md](CONTRIBUTING-DOCS.md) | Documentation contribution guide and per-phase documentation requirements for the rearchitecture. |
-| [architecture/](architecture/index.md) | Current architecture, ownership boundaries, runtime topology, and key request flows. |
-| [features/](features/index.md) | Feature documentation organized by implementation phase. |
-| [configuration/](configuration/index.md) | Phase-by-phase configuration reference for new settings and defaults. |
-| [skills/](skills/index.md) | Runtime skill loading model, `SKILL.md` contract, and security/runtime behavior. |
-| [development/](development/index.md) | Build/test quality gates and LiteLLM spec compiler details. |
-| [plans/](plans/index.md) | Forward-looking roadmap PRDs and planning artifacts. |
+- New to the repo: [`getting-started/index.md`](getting-started/index.md)
+- System design and ownership: [`architecture/index.md`](architecture/index.md)
+- Product/runtime capability docs: [`features/index.md`](features/index.md)
+- HTTP surface and contracts: [`api/index.md`](api/index.md)
+- Runtime configuration: [`configuration/index.md`](configuration/index.md)
+- Build/test/quality workflows: [`development/index.md`](development/index.md)
+- Runtime operations and health: [`operations/index.md`](operations/index.md)
+- Skills and skill format: [`skills/index.md`](skills/index.md)
+- Planning artifacts: [`plans/index.md`](plans/index.md)
 
 ## Runtime Summary
 
 ```mermaid
 flowchart LR
-    User[User/API/Channel] --> Engine[LeanKernel-engine]
-    Engine --> LiteLLM[LiteLLM]
-    Engine --> Qdrant[(Qdrant)]
-    Engine --> Signal[Signal sidecar]
-    Indexer[Indexer sidecar] --> LiteLLM
-    Indexer --> Qdrant
-    Indexer --> Unstructured[Unstructured]
+    User[User / API / UI] --> Gateway[LeanKernel.Gateway]
+    Gateway --> Runtime[IAgentRuntime]
+    Runtime --> LiteLLM[LiteLLM]
+    Runtime --> Knowledge[GBrain / Knowledge services]
+    Runtime --> Persistence[(PostgreSQL)]
 ```
 
-> For a detailed view of LeanKernel’s internal modules (Commander, Thinker, Archivist, etc.), see the [architecture overview](architecture/index.md).
+## Documentation Conventions
+
+- Kebab-case file names.
+- Hierarchical folder structure.
+- `index.md` in each folder.
+- Canonical page per topic; related pages cross-link instead of duplicating content.
+
+See also: [`CONTRIBUTING-DOCS.md`](CONTRIBUTING-DOCS.md).

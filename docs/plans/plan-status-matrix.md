@@ -1,0 +1,106 @@
+# Plan Status Matrix
+
+This matrix provides file-by-file classification for all top-level plan documents in `docs/plans/`.
+
+Status values:
+
+- `active`: currently prioritized, in-flight, or queued for near-term implementation
+- `archive`: historical, completed, superseded, or not currently prioritized
+
+| Plan | Status |
+| --- | --- |
+| [accuracy-improvements.md](accuracy-improvements.md) | archive |
+| [admin-console-customization-prd.md](admin-console-customization-prd.md) | archive |
+| [admin-razor-fluentui-markup-prd.md](admin-razor-fluentui-markup-prd.md) | archive |
+| [ambiguity-reference-resolution-prd.md](ambiguity-reference-resolution-prd.md) | archive |
+| [architecture-decisions.md](architecture-decisions.md) | archive |
+| [autonomy-policy-engine-prd.md](autonomy-policy-engine-prd.md) | archive |
+| [benchmark-scenarios-prd.md](benchmark-scenarios-prd.md) | archive |
+| [blazor-framework-asset-404-prd.md](blazor-framework-asset-404-prd.md) | archive |
+| [browser-built-in-tool-playwright-service-prd.md](browser-built-in-tool-playwright-service-prd.md) | archive |
+| [browser-built-in-tool-playwright-service-reviewed-implementation-prd.md](browser-built-in-tool-playwright-service-reviewed-implementation-prd.md) | archive |
+| [budget-guardrails-fallback-prd.md](budget-guardrails-fallback-prd.md) | archive |
+| [chat-session-legacy-function-call-compatibility-prd.md](chat-session-legacy-function-call-compatibility-prd.md) | archive |
+| [complimentary-document-library-hardening-prd.md](complimentary-document-library-hardening-prd.md) | archive |
+| [complimentary-document-library-implementation.md](complimentary-document-library-implementation.md) | archive |
+| [complimentary-document-library-review.md](complimentary-document-library-review.md) | archive |
+| [complimentary-document-library-system-prd.md](complimentary-document-library-system-prd.md) | archive |
+| [document-folder-ingestion-monitor-prd.md](document-folder-ingestion-monitor-prd.md) | active |
+| [documentation-system-refresh-prd.md](documentation-system-refresh-prd.md) | active |
+| [engine-health-recovery-prd.md](engine-health-recovery-prd.md) | active |
+| [entity-discovery-useful-by-default-prd.md](entity-discovery-useful-by-default-prd.md) | active |
+| [fluentui-migration-playwright-tests.md](fluentui-migration-playwright-tests.md) | archive |
+| [gbrain-embedding-dimension-prd.md](gbrain-embedding-dimension-prd.md) | archive |
+| [gbrain-garrytan-integration-prd.md](gbrain-garrytan-integration-prd.md) | archive |
+| [gbrain-postgres-litellm-embeddings-prd.md](gbrain-postgres-litellm-embeddings-prd.md) | archive |
+| [knowledge-browser-ui-prd.md](knowledge-browser-ui-prd.md) | active |
+| [knowledge-fluentui-markup-prd.md](knowledge-fluentui-markup-prd.md) | archive |
+| [knowledge-ui-wiki-capture-prd.md](knowledge-ui-wiki-capture-prd.md) | archive |
+| [litellm-gbrain-proxy-prd.md](litellm-gbrain-proxy-prd.md) | archive |
+| [litellm-postgres-connection-prd.md](litellm-postgres-connection-prd.md) | archive |
+| [memory-hygiene-quality-prd.md](memory-hygiene-quality-prd.md) | archive |
+| [onboarding-fluentui-v4-prd.md](onboarding-fluentui-v4-prd.md) | active |
+| [onboarding-fluentwizard-prd.md](onboarding-fluentwizard-prd.md) | archive |
+| [onboarding-wizard-ui-prd.md](onboarding-wizard-ui-prd.md) | archive |
+| [p1-abstractions-prd.md](p1-abstractions-prd.md) | archive |
+| [p1-agents-prd.md](p1-agents-prd.md) | archive |
+| [p1-context-prd.md](p1-context-prd.md) | archive |
+| [p1-diagnostics-prd.md](p1-diagnostics-prd.md) | archive |
+| [p1-gateway-prd.md](p1-gateway-prd.md) | archive |
+| [p1-infrastructure-prd.md](p1-infrastructure-prd.md) | archive |
+| [p1-knowledge-prd.md](p1-knowledge-prd.md) | archive |
+| [p1-persistence-prd.md](p1-persistence-prd.md) | archive |
+| [p1-solution-scaffold-prd.md](p1-solution-scaffold-prd.md) | archive |
+| [p1-test-coverage-prd.md](p1-test-coverage-prd.md) | archive |
+| [p1-tools-prd.md](p1-tools-prd.md) | archive |
+| [phase-0-documentation-convention.md](phase-0-documentation-convention.md) | archive |
+| [phase-1-core-runtime.md](phase-1-core-runtime.md) | archive |
+| [phase-1-feature-documentation-prd.md](phase-1-feature-documentation-prd.md) | archive |
+| [phase-2-channel-expansion-prd.md](phase-2-channel-expansion-prd.md) | archive |
+| [phase-2-context-diagnostics-api-prd.md](phase-2-context-diagnostics-api-prd.md) | archive |
+| [phase-2-context-personalization.md](phase-2-context-personalization.md) | archive |
+| [phase-2-deterministic-history-shaping-prd.md](phase-2-deterministic-history-shaping-prd.md) | archive |
+| [phase-2-feature-documentation-prd.md](phase-2-feature-documentation-prd.md) | archive |
+| [phase-2-identity-onboarding-prd.md](phase-2-identity-onboarding-prd.md) | archive |
+| [phase-2-scoped-knowledge-retrieval-prd.md](phase-2-scoped-knowledge-retrieval-prd.md) | archive |
+| [phase-3-feature-documentation-prd.md](phase-3-feature-documentation-prd.md) | archive |
+| [phase-3-model-routing-escalation-prd.md](phase-3-model-routing-escalation-prd.md) | active |
+| [phase-3-multi-agent-orchestration-prd.md](phase-3-multi-agent-orchestration-prd.md) | active |
+| [phase-3-post-turn-learning-prd.md](phase-3-post-turn-learning-prd.md) | archive |
+| [phase-3-production-hardening-prd.md](phase-3-production-hardening-prd.md) | active |
+| [phase-3-quality-gates-prd.md](phase-3-quality-gates-prd.md) | active |
+| [phase-3-reliability-optimization.md](phase-3-reliability-optimization.md) | archive |
+| [phase-3-response-enhancement-prd.md](phase-3-response-enhancement-prd.md) | active |
+| [phase-3-scheduled-jobs-proactive-tasks-prd.md](phase-3-scheduled-jobs-proactive-tasks-prd.md) | active |
+| [phase-3-shadow-routing-prd.md](phase-3-shadow-routing-prd.md) | active |
+| [phase-4-admin-governance-console-prd.md](phase-4-admin-governance-console-prd.md) | archive |
+| [phase-4-blazor-chat-interface-prd.md](phase-4-blazor-chat-interface-prd.md) | archive |
+| [phase-4-diagnostics-explorer-prd.md](phase-4-diagnostics-explorer-prd.md) | archive |
+| [phase-4-ui-feature-documentation-prd.md](phase-4-ui-feature-documentation-prd.md) | archive |
+| [phase-4-user-interface.md](phase-4-user-interface.md) | archive |
+| [publish-release-after-image-build-prd.md](publish-release-after-image-build-prd.md) | archive |
+| [rearchitecture.md](rearchitecture.md) | archive |
+| [run-replay-provenance-prd.md](run-replay-provenance-prd.md) | archive |
+| [scheduled-jobs-management-prd.md](scheduled-jobs-management-prd.md) | active |
+| [test-project-relocation-and-coverage-prd.md](test-project-relocation-and-coverage-prd.md) | archive |
+| [tool-overflow-fix-plan.md](tool-overflow-fix-plan.md) | archive |
+| [tools-1to4-max-usefulness-prd.md](tools-1to4-max-usefulness-prd.md) | active |
+| [tools-subnamespace-reorganization-prd.md](tools-subnamespace-reorganization-prd.md) | archive |
+| [track-b-json-transform-implementation-prd.md](track-b-json-transform-implementation-prd.md) | archive |
+| [track-c-csv-xlsx-read-write-implementation-prd.md](track-c-csv-xlsx-read-write-implementation-prd.md) | archive |
+| [track-d-database-query-implementation-prd.md](track-d-database-query-implementation-prd.md) | archive |
+| [ui-audit-fluentui-datagrid-admin-live-prd.md](ui-audit-fluentui-datagrid-admin-live-prd.md) | archive |
+| [ui-layout-screenshot-audit-prd.md](ui-layout-screenshot-audit-prd.md) | archive |
+| [ui-rendering-improvement-2-prd.md](ui-rendering-improvement-2-prd.md) | active |
+| [ui-rendering-improvement-prd.md](ui-rendering-improvement-prd.md) | active |
+| [ui-ux-consistency.md](ui-ux-consistency.md) | archive |
+| [ui-ux-design-system-prd.md](ui-ux-design-system-prd.md) | active |
+| [ui-ux-polish-playwright-remediation-prd.md](ui-ux-polish-playwright-remediation-prd.md) | active |
+| [unified-chat-history-plan.md](unified-chat-history-plan.md) | archive |
+| [unified-chat-history-prd.md](unified-chat-history-prd.md) | archive |
+| [useful-by-default-file-tools-prd.md](useful-by-default-file-tools-prd.md) | active |
+| [web-fetch-tool-prd.md](web-fetch-tool-prd.md) | active |
+| [web-search-provider-fallback-prd.md](web-search-provider-fallback-prd.md) | archive |
+| [wiki-bind-mount-shared-token-prd.md](wiki-bind-mount-shared-token-prd.md) | archive |
+| [wiki-extraction-store-prd.md](wiki-extraction-store-prd.md) | archive |
+| [wiki-knowledge-tool-unification.md](wiki-knowledge-tool-unification.md) | archive |

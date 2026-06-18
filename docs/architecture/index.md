@@ -1,19 +1,27 @@
 # Architecture
 
-This section covers the structural design of LeanKernel, including both the current system and the **Phase 0 rearchitecture documentation set**.
+System design and ownership boundaries for the current runtime.
 
-## Contents
+## Canonical Pages
 
 | Document | Description |
 |----------|-------------|
-| [overview.md](overview.md) | High-level explanation of the target MAF-native architecture, its core principles, and the platform technology stack. |
-| [solution-structure.md](solution-structure.md) | Reference for target project responsibilities and dependency rules. |
-| [infrastructure.md](infrastructure.md) | Reference for Docker Compose services, deployment topology, health checks, and configuration precedence. |
-| [data-model.md](data-model.md) | Reference for the target Postgres schema and GBrain page conventions. |
-| [architecture.md](architecture.md) | Contributor-oriented explanation of the current architecture, agent loop, and self-improvement pipeline. |
-| [key-flows.md](key-flows.md) | Sequence diagrams and step-by-step descriptions of the inbound chat, knowledge indexing, and outbound message flows. |
-| [gaps-and-roadmap.md](gaps-and-roadmap.md) | Current architectural gaps, target topology, and incremental implementation phases. |
-| [diagrams/index.html](diagrams/index.html) | Multi-level architecture image set (system context, component flow, request/response sequence). |
+| [system-overview.md](system-overview.md) | Runtime topology and major execution boundaries. |
+| [solution-structure.md](solution-structure.md) | Project ownership and dependency rules. |
+| [runtime-flows.md](runtime-flows.md) | Inbound request and turn-processing flow summary. |
+| [data-and-persistence.md](data-and-persistence.md) | Session, diagnostics, and persistence model overview. |
+| [infrastructure-and-deploy.md](infrastructure-and-deploy.md) | Local infrastructure and deployment surfaces. |
+
+## Legacy Pages
+
+Legacy pages are still available while consolidation continues:
+
+- [overview.md](overview.md)
+- [architecture.md](architecture.md)
+- [key-flows.md](key-flows.md)
+- [infrastructure.md](infrastructure.md)
+- [data-model.md](data-model.md)
+- [gaps-and-roadmap.md](gaps-and-roadmap.md)
 
 ## Quick Reference
 

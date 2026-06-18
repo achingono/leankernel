@@ -1,5 +1,7 @@
 # Context Diagnostics API
 
+> Canonical API reference now lives at [`../api/diagnostics-api.md`](../api/diagnostics-api.md). This page is retained for compatibility links during docs migration.
+
 Phase 2 adds a dedicated context-diagnostics surface so operators can inspect the exact turn-time context decisions LeanKernel persisted during prompt assembly. The API does not recompute those decisions from mutable state; it reads stored per-turn snapshots captured by `TurnPipeline`.
 
 ## Why this feature matters

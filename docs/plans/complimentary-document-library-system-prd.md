@@ -39,7 +39,7 @@ This document outlines the architecture, design, and step-by-step plan for build
 
 ### Backend Ingestion Service
 
-#### [NEW] [DocumentLibraryService.cs](file:///Users/achingono/source/repos/worktrees/leankernel-rearchitecture/src/LeanKernel.Knowledge/DocumentLibraryService.cs)
+#### [NEW] [DocumentLibraryService.cs](../../src/LeanKernel.Tools/DocumentLibraryService.cs)
 Create a service that handles the orchestrating pipeline of:
 1. Writing the uploaded file stream to a temporary storage path under `/app/data/.scratch`.
 2. Invoking the existing `TextExtractionHelper.ExtractAsync` (which automatically checks if a file is text-like or calls the Python-based OCR script for PDFs/images).
@@ -49,7 +49,7 @@ Create a service that handles the orchestrating pipeline of:
 6. Invoking the GBrain MCP `file_upload` tool using `GBrainMcpClient.CallToolAsync` to store the raw binary file in the ledger and link it directly to the page slug.
 7. Returning details of the created document page.
 
-#### [MODIFY] [KnowledgeServiceCollectionExtensions.cs](file:///Users/achingono/source/repos/worktrees/leankernel-rearchitecture/src/LeanKernel.Knowledge/KnowledgeServiceCollectionExtensions.cs)
+#### [MODIFY] [KnowledgeServiceCollectionExtensions.cs](../../src/LeanKernel.Knowledge/KnowledgeServiceCollectionExtensions.cs)
 Register the new `DocumentLibraryService` in the dependency injection container as a singleton:
 ```csharp
 services.AddSingleton<DocumentLibraryService>();
@@ -59,13 +59,13 @@ services.AddSingleton<DocumentLibraryService>();
 
 ### Gateway and Frontend UI
 
-#### [NEW] [DocumentUiService.cs](file:///Users/achingono/source/repos/worktrees/leankernel-rearchitecture/src/LeanKernel.Gateway/Services/DocumentUiService.cs)
+#### [NEW] [DocumentUiService.cs](../../src/LeanKernel.Gateway/Services/DocumentUiService.cs)
 Create a UI bridge service that provides front-end helper methods:
 - `BrowseDocumentsAsync(int pageNumber, int pageSize)`: Invokes the GBrain `list_pages` tool with `type = "document"` to return only indexed documents.
 - `IngestFileAsync(string filename, Stream fileStream, string title, List<string> tags)`: Saves the stream to a temporary location and calls `DocumentLibraryService.IngestDocumentAsync`.
 - `GetDownloadUrlAsync(string storagePath)`: Invokes GBrain's `file_url` tool to generate a signed download link.
 
-#### [MODIFY] [Knowledge.razor](file:///Users/achingono/source/repos/worktrees/leankernel-rearchitecture/src/LeanKernel.Gateway/Components/Pages/Knowledge.razor)
+#### [MODIFY] [Knowledge.razor](../../src/LeanKernel.Gateway/Components/Pages/Knowledge.razor)
 We will expand the user interface in `Knowledge.razor` to introduce a premium tabbed layout (Wiki Pages vs. Document Library):
 - **Wiki Pages (Tab 1)**: The standard wiki browser/search (unchanged flow, styled with a modern glassmorphism aesthetic).
 - **Document Library (Tab 2)**:

@@ -1,37 +1,19 @@
-# Feature Documentation
+# Features
 
-Documentation for implemented features. Each file documents one major capability.
+Feature documentation is organized by capability area.
 
-## Phase 1 — Core Runtime
-- [Context Gating](context-gating.md)
-- [Turn Pipeline](turn-pipeline.md)
-- [Knowledge Retrieval](knowledge-retrieval.md)
-- [Tool Governance](tool-governance.md)
-- [Diagnostics](diagnostics.md)
-- [Gateway API](gateway-api.md)
-- [Authentication and Authorization](authentication.md)
+## Capability Areas
 
-## Phase 2 — Context & Personalization
-- [Identity and Onboarding](identity-onboarding.md)
-- [Scoped Retrieval](scoped-retrieval.md)
-- [History Shaping](history-shaping.md)
-- [Channels](channels.md)
-- [Context Diagnostics API](context-diagnostics-api.md)
+- Agent runtime: [`agent-runtime/index.md`](agent-runtime/index.md)
+- Channels: [`channels/index.md`](channels/index.md)
+- UI: [`ui/index.md`](ui/index.md)
+- Tools: [`tools/index.md`](tools/index.md)
 
-## Phase 3 — Reliability & Optimization
-- [Model Routing](model-routing.md)
-- [Quality Gates](quality-gates.md)
-- [Shadow Routing](shadow-routing.md)
-- [Multi-Agent Orchestration](multi-agent.md)
-- [Response Enhancement](response-enhancement.md)
-- [Learning Pipeline](learning-pipeline.md)
-- [Scheduler](scheduler.md)
-- [Production Operations](production-ops.md)
-- [Browser Automation Tool](browser-tool.md)
+## Legacy Topic Pages
 
-## Phase 4 — User Interface
-- [Chat UI](ui-chat.md)
-- [Diagnostics UI](ui-diagnostics.md)
-- [Admin UI](ui-admin.md)
-- [Knowledge UI](ui-knowledge.md)
-- [Onboarding UI](ui-onboarding.md)
+The following pages remain available and are linked from the capability indexes while consolidation is in progress.
+
+- Runtime and context: `context-gating.md`, `turn-pipeline.md`, `history-shaping.md`, `scoped-retrieval.md`, `knowledge-retrieval.md`, `model-routing.md`, `quality-gates.md`, `shadow-routing.md`, `response-enhancement.md`, `learning-pipeline.md`, `scheduler.md`, `multi-agent.md`
+- Channel and auth: `channels.md`, `channel-routing.md`, `authentication.md`
+- UI: `ui-chat.md`, `ui-diagnostics.md`, `ui-admin.md`, `ui-knowledge.md`, `ui-onboarding.md`, `blazor-chat-ui.md`
+- Tooling and ops: `tool-governance.md`, `browser-tool.md`, `production-ops.md`

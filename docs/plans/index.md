@@ -1,8 +1,16 @@
 # Roadmap PRDs
 
-This section contains execution-ready product requirements documents (PRDs) for roadmap work, plus a small number of companion planning artifacts such as architecture decision records.
+This section contains execution-ready product requirements documents (PRDs) and planning artifacts.
 
-## Contents
+## Plan Navigation
+
+- [Active plans](active/index.md)
+- [Archived plans](archive/index.md)
+- [Plan status matrix (file-by-file)](plan-status-matrix.md)
+
+## Legacy Flat Index
+
+This legacy table remains for backward compatibility while plan files are progressively reorganized.
 
 | Document | Roadmap Item | Outcome |
 | -------- | ------------ | ------- |

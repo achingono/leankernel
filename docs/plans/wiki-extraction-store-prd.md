@@ -473,7 +473,7 @@ Alfero Chingono prefers concise, direct assistance and has technical context tha
 
 ## Related
 
-- [what: Communication preferences](../what/communication-preferences.md)
+- what: communication-preferences
 ```
 
 The fenced `lk-facts` block is the canonical structured store. `## Facts` is a human-prose mirror regenerated from it on every write.

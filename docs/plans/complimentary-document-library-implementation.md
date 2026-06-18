@@ -17,23 +17,23 @@ I have successfully designed, implemented, registered, and validated a complete 
 
 ### Backend Ingest Pipeline
 
-#### [NEW] [DocumentLibraryService.cs](file:///Users/achingono/source/repos/worktrees/leankernel-rearchitecture/src/LeanKernel.Tools/DocumentLibraryService.cs)
+#### [NEW] [DocumentLibraryService.cs](../../src/LeanKernel.Tools/DocumentLibraryService.cs)
 - Orchestrates document stream writes, triggers text extraction, compiles frontmatter metadata, creates the standard `doc/` slug wiki markdown page, and links/uploads the source file using the `file_upload` MCP tool.
 
-#### [MODIFY] [ToolsServiceCollectionExtensions.cs](file:///Users/achingono/source/repos/worktrees/leankernel-rearchitecture/src/LeanKernel.Tools/ToolsServiceCollectionExtensions.cs)
+#### [MODIFY] [ToolsServiceCollectionExtensions.cs](../../src/LeanKernel.Tools/ToolsServiceCollectionExtensions.cs)
 - Registered the singleton dependency injection for `DocumentLibraryService`.
 
 ---
 
 ### UI Integration and Dashboard
 
-#### [NEW] [DocumentUiService.cs](file:///Users/achingono/source/repos/worktrees/leankernel-rearchitecture/src/LeanKernel.Gateway/Services/DocumentUiService.cs)
+#### [NEW] [DocumentUiService.cs](../../src/LeanKernel.Gateway/Services/DocumentUiService.cs)
 - Created the front-end bridge to list document-specific pages (`type = document` via the `list_pages` MCP tool), handle stream uploads, and fetch signed download links via GBrain's `file_url` tool.
 
-#### [MODIFY] [Program.cs](file:///Users/achingono/source/repos/worktrees/leankernel-rearchitecture/src/LeanKernel.Gateway/Program.cs)
+#### [MODIFY] [Program.cs](../../src/LeanKernel.Gateway/Program.cs)
 - Registered the scoped dependency injection for `DocumentUiService`.
 
-#### [MODIFY] [Knowledge.razor](file:///Users/achingono/source/repos/worktrees/leankernel-rearchitecture/src/LeanKernel.Gateway/Components/Pages/Knowledge.razor)
+#### [MODIFY] [Knowledge.razor](../../src/LeanKernel.Gateway/Components/Pages/Knowledge.razor)
 - Upgraded the page with a premium dual-tab view toggle (Wiki Pages & Document Library).
 - Added a **Document Library** explorer pane displaying slug indicators, last updated timestamps, and meta tags.
 - Added a **Document Details Viewer** with full extracted text scroll-inspector, source path telemetry, and a secure **Download original** download trigger using signed file URLs.

@@ -1,4 +1,7 @@
 # Production Operations
+
+> Canonical operations reference now lives at [`../operations/production-ops.md`](../operations/production-ops.md). This page is retained for compatibility links during docs migration.
+
 Production operations is LeanKernel's Phase 3 hardening layer for running the runtime safely under real load.
 It combines provider health tracking, spend controls, rate limiting, graceful degradation, request correlation, tracing, and container health checks into one operational story.
 
