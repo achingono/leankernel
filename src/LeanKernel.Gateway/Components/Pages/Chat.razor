@@ -6,80 +6,124 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
+@implements IDisposable
 @rendermode InteractiveServer
 
 <PageTitle>LeanKernel Chat</PageTitle>
 
-<FluentStack Orientation="Orientation.Vertical" Class="lk-page lk-page-wide chat-page">
-    <FluentStack Orientation="Orientation.Vertical" Class="chat-main">
-        <PageHeader Title="Chat" Subtitle="@GetHeaderSubtitle()">
-            <Actions>
-                <FluentButton Id="chat-new-session-button" Appearance="Appearance.Outline" OnClick="StartNewSessionAsync">New session</FluentButton>
-            </Actions>
-        </PageHeader>
+<div class="chat-page">
+    @if (!string.IsNullOrWhiteSpace(ChatService.ErrorMessage))
+    {
+        <FluentMessageBar Title="Error" Intent="@MessageIntent.Error">
+            @ChatService.ErrorMessage
+        </FluentMessageBar>
+    }
 
-        @if (!string.IsNullOrWhiteSpace(ChatService.ErrorMessage))
-        {
-            <FluentMessageBar Title="Error" Intent="@MessageIntent.Error">
-                @ChatService.ErrorMessage
-            </FluentMessageBar>
-        }
-
-        <div id="chat-message-list" class="chat-message-list">
-            @if (ChatService.Messages.Count == 0 && !ChatService.IsLoading)
-            {
-                <FluentCard Class="lk-empty-state">
-                    <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="gap: var(--lk-space-xs);">
-                        <div style="background: linear-gradient(135deg, var(--accent-fill-rest) 0%, #a855f7 100%); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--lk-space-xs) auto; box-shadow: 0 8px 16px var(--lk-glow-indigo);">
-                            <fluent-icon name="chat" value="@(new Icons.Regular.Size32.Chat())" color="white" />
-                        </div>
-                        <FluentLabel Typo="Typography.H3" Weight="FontWeight.Bold" Style="background: linear-gradient(90deg, var(--accent-fill-rest) 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: var(--lk-space-xxs);">Start a LeanKernel conversation</FluentLabel>
-                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="max-width: 440px; margin: 0 auto; line-height: 1.6;">
-                            Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.
-                        </FluentLabel>
-                    </FluentStack>
-                </FluentCard>
-            }
-            else
-            {
-                @foreach (var message in ChatService.Messages)
-                {
-                    <ChatMessage Message="message" />
-                }
-            }
-
-            @if (ChatService.IsLoading)
-            {
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
-                    <FluentProgressRing />
-                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">LeanKernel is thinking…</FluentLabel>
+    <FluentMultiSplitter Orientation="Orientation.Horizontal" Class="chat-horizontal-splitter">
+        <FluentMultiSplitterPane Size="260px" Min="180px" Max="400px" Class="chat-session-pane">
+            <FluentStack Orientation="Orientation.Vertical" Class="chat-session-list">
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center"
+                             Style="justify-content: space-between; width: 100%; padding: var(--lk-space-s); padding-bottom: 0;">
+                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Sessions</FluentLabel>
+                    <FluentButton Appearance="Appearance.Lightweight"
+                                  Id="chat-new-session-button"
+                                  OnClick="StartNewSessionAsync"
+                                  AriaLabel="New session"
+                                  Title="New session"
+                                  Style="height: 24px; min-width: 24px; padding: 0;">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Add())" />
+                    </FluentButton>
                 </FluentStack>
-            }
-        </div>
 
-        <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell" Style="flex-shrink: 0;">
-            <FluentTextArea Id="chat-composer-input"
-                           @bind-Value="ChatService.ComposerText"
-                           Immediate="true"
-                           Rows="4"
-                           Maxlength="12000"
-                           Placeholder="Ask LeanKernel anything…"
-                           Disabled="@ChatService.IsLoading"
-                           Class="chat-composer-input" />
-            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-composer-footer">
-                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Enter to send · Shift+Enter for newline</FluentLabel>
-                <FluentButton Id="chat-send-button"
-                              Appearance="Appearance.Accent"
-                              OnClick="SendAsync"
-                              Disabled="@IsSendDisabled"
-                              Title="Send message"
-                              AriaLabel="Send message">
-                    <FluentIcon Value="@(new Icons.Regular.Size16.Send())" />
-                </FluentButton>
+                @if (ChatService.Sessions.Count == 0)
+                {
+                    <div style="padding: var(--lk-space-s);">
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No sessions yet</FluentLabel>
+                    </div>
+                }
+                else
+                {
+                    <div class="chat-session-items">
+                        @foreach (var session in ChatService.Sessions)
+                        {
+                            <button type="button"
+                                    class="chat-session-item @(string.Equals(session.SessionId, ChatService.CurrentSessionId, StringComparison.Ordinal) ? "active" : "")"
+                                    @onclick="() => NavigateToSession(session.SessionId)"
+                                    title="@session.Preview">
+                                <span class="chat-session-item-title">@session.Title</span>
+                            </button>
+                        }
+                    </div>
+                }
             </FluentStack>
-        </FluentStack>
-    </FluentStack>
-</FluentStack>
+        </FluentMultiSplitterPane>
+
+        <FluentMultiSplitterPane Size="1fr" Class="chat-content-pane">
+            <FluentMultiSplitter Orientation="Orientation.Vertical" Class="chat-vertical-splitter">
+                <FluentMultiSplitterPane Size="1fr" Class="chat-messages-pane">
+                    <FluentStack Orientation="Orientation.Vertical" Class="chat-main">
+                        <PageHeader Title="Chat" Subtitle="@GetHeaderSubtitle()" />
+
+                        <div id="chat-message-list" class="chat-message-list">
+                            @if (ChatService.Messages.Count == 0 && !ChatService.IsLoading)
+                            {
+                                <FluentCard Class="lk-empty-state">
+                                    <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="gap: var(--lk-space-xs);">
+                                        <div style="background: linear-gradient(135deg, var(--accent-fill-rest) 0%, #a855f7 100%); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--lk-space-xs) auto; box-shadow: 0 8px 16px var(--lk-glow-indigo);">
+                                            <fluent-icon name="chat" value="@(new Icons.Regular.Size32.Chat())" color="white" />
+                                        </div>
+                                        <FluentLabel Typo="Typography.H3" Weight="FontWeight.Bold" Style="background: linear-gradient(90deg, var(--accent-fill-rest) 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: var(--lk-space-xxs);">Start a LeanKernel conversation</FluentLabel>
+                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="max-width: 440px; margin: 0 auto; line-height: 1.6;">
+                                            Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.
+                                        </FluentLabel>
+                                    </FluentStack>
+                                </FluentCard>
+                            }
+                            else
+                            {
+                                @foreach (var message in ChatService.Messages)
+                                {
+                                    <ChatMessage Message="message" />
+                                }
+                            }
+
+                            @if (ChatService.IsLoading)
+                            {
+                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
+                                    <FluentProgressRing />
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">LeanKernel is thinking…</FluentLabel>
+                                </FluentStack>
+                            }
+                        </div>
+                    </FluentStack>
+                </FluentMultiSplitterPane>
+
+                <FluentMultiSplitterPane Size="auto" Min="100px" Max="400px" Class="chat-composer-pane">
+                    <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell">
+                        <FluentTextArea Id="chat-composer-input"
+                                       @bind-Value="ChatService.ComposerText"
+                                       Rows="4"
+                                       Maxlength="12000"
+                                       Placeholder="Ask LeanKernel anything…"
+                                       Disabled="@ChatService.IsLoading"
+                                       Class="chat-composer-input" />
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-composer-footer">
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Enter to send · Shift+Enter for newline</FluentLabel>
+                            <FluentButton Id="chat-send-button"
+                                          Appearance="Appearance.Accent"
+                                          OnClick="SendAsync"
+                                          Disabled="@IsSendDisabled"
+                                          Title="Send message"
+                                          AriaLabel="Send message">
+                                <FluentIcon Value="@(new Icons.Regular.Size16.Send())" />
+                            </FluentButton>
+                        </FluentStack>
+                    </FluentStack>
+                </FluentMultiSplitterPane>
+            </FluentMultiSplitter>
+        </FluentMultiSplitterPane>
+    </FluentMultiSplitter>
+</div>
 
 @code {
     private const string OwnerStorageKey = "leankernel.chat.owner-id";
@@ -87,11 +131,18 @@
     private readonly CancellationTokenSource _disposeCts = new();
     private bool _initialized;
     private bool _shouldScroll;
+    private bool _disposed;
 
     [Parameter]
     public string? SessionId { get; set; }
 
     private bool IsSendDisabled => ChatService.IsLoading || string.IsNullOrWhiteSpace(ChatService.ComposerText);
+
+    protected override void OnInitialized()
+    {
+        ChatService.SessionsChanged += HandleSessionsChanged;
+        Navigation.LocationChanged += HandleLocationChanged;
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -141,8 +192,6 @@
             var cacheKey = authFlag ? $"{SessionCacheStorageKey}.{GetCacheKeySuffix(ownerId)}" : SessionCacheStorageKey;
             var cachedSessions = await LoadCachedSessionsAsync(cacheKey);
 
-            Console.WriteLine($"[Chat.OnAfterRenderAsync] ownerId={ownerId}, isAuthenticated={authFlag}, cachedSessions={cachedSessions.Count}, legacyOwnerId={legacyForMigration}, SessionId={SessionId}");
-
             await ChatService.InitializeAsync(ownerId, cachedSessions, SessionId, legacyForMigration, authFlag, _disposeCts.Token);
 
             if (legacyForMigration is not null && authFlag)
@@ -151,6 +200,7 @@
             }
 
             await PersistSessionCacheAsync(cacheKey);
+
             await JS.InvokeVoidAsync("leanKernelChat.registerComposer", "chat-composer-input", "chat-send-button");
 
             _initialized = true;
@@ -195,8 +245,21 @@
         return await JS.InvokeAsync<string?>("leanKernelChat.storage.get", OwnerStorageKey);
     }
 
+    private void HandleSessionsChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
     private async Task SendAsync()
     {
+        var text = await JS.InvokeAsync<string?>("leanKernelChat.getTextareaValue", "chat-composer-input");
+        ChatService.ComposerText = text ?? string.Empty;
+
         var sent = await ChatService.SendAsync(_disposeCts.Token);
         var cacheKey = GetCurrentCacheKey();
         await PersistSessionCacheAsync(cacheKey);
@@ -220,6 +283,11 @@
         var cacheKey = GetCurrentCacheKey();
         await PersistSessionCacheAsync(cacheKey);
         _shouldScroll = true;
+        Navigation.NavigateTo($"/chat/{sessionId}");
+    }
+
+    private void NavigateToSession(string sessionId)
+    {
         Navigation.NavigateTo($"/chat/{sessionId}");
     }
 
@@ -263,7 +331,7 @@
     {
         if (string.IsNullOrWhiteSpace(ChatService.CurrentSessionId))
         {
-            return "Create a session or pick a recent conversation from navigation.";
+            return "Create a session or pick a recent conversation.";
         }
 
         var session = ChatService.Sessions.FirstOrDefault(item => string.Equals(item.SessionId, ChatService.CurrentSessionId, StringComparison.Ordinal));
@@ -272,8 +340,45 @@
             : $"{session.Title} · Updated {session.UpdatedAt.LocalDateTime:g}";
     }
 
+    private void Cleanup()
+    {
+        ChatService.SessionsChanged -= HandleSessionsChanged;
+        Navigation.LocationChanged -= HandleLocationChanged;
+    }
+
+    private void CleanupAndDisposeCts()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        Cleanup();
+
+        if (!_disposeCts.IsCancellationRequested)
+        {
+            _disposeCts.Cancel();
+        }
+
+        _disposeCts.Dispose();
+    }
+
+    public void Dispose()
+    {
+        CleanupAndDisposeCts();
+    }
+
     public async ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        Cleanup();
+
         if (!_disposeCts.IsCancellationRequested)
         {
             await _disposeCts.CancelAsync();

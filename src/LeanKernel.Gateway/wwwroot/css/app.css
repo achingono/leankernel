@@ -464,60 +464,6 @@ fluent-progress,
     font-weight: 700;
 }
 
-/* ── High-Fidelity Chat Specifics ─────────────────────────────── */
-.chat-page {
-    height: 100%;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--lk-space-m);
-}
-
-.chat-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    gap: var(--lk-space-m);
-}
-
-.chat-message-list {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: var(--lk-space-xs);
-    display: flex;
-    flex-direction: column;
-    gap: var(--lk-space-s);
-    background: var(--neutral-layer-2);
-    border-radius: var(--lk-radius-m);
-    border: 1px solid var(--lk-glass-border);
-}
-
-.chat-composer-shell {
-    flex-shrink: 0;
-    gap: var(--lk-space-xs);
-    display: flex;
-    flex-direction: column;
-    padding: var(--lk-space-xs);
-    background: var(--lk-glass-bg);
-    border-radius: var(--lk-radius-m);
-    border: 1px solid var(--lk-glass-border);
-}
-
-.chat-composer-input {
-    width: 100%;
-    min-height: 7rem;
-}
-
-.chat-composer-footer {
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--lk-space-xs);
-    flex-wrap: wrap;
-}
-
 /* User & Assistant Bubble Styles */
 .lk-chat-bubble-user {
     background: var(--lk-user-bubble-bg) !important;
@@ -767,31 +713,6 @@ fluent-progress,
 
     .lk-onboarding-wizard-card {
         max-height: none;
-    }
-
-    .chat-page {
-        height: auto;
-        min-height: 100%;
-    }
-
-    .chat-main {
-        min-height: auto;
-        overflow: visible;
-    }
-
-    .chat-message-list {
-        flex: 0 1 auto;
-        min-height: 280px;
-        max-height: none;
-    }
-
-    .chat-composer-shell {
-        position: static;
-        z-index: 10;
-    }
-
-    .chat-composer-footer fluent-button {
-        width: 100%;
     }
 
     .lk-chat-bubble-user,

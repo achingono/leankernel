@@ -192,6 +192,46 @@ public class ChatPageTests
     }
 
     [Fact]
+    public async Task ChatPage_TypedTextEnablesSendButton()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+            var composer = page.Locator("#chat-composer-input");
+            await composer.FillAsync("Hello from Playwright");
+
+            var sendButton = page.Locator("#chat-send-button");
+            await Assertions.Expect(sendButton).ToBeVisibleAsync();
+
+            var isDisabled = await sendButton.GetAttributeAsync("disabled");
+            Assert.Null(isDisabled);
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
+    public async Task ChatPage_WhitespaceDoesNotSend()
+    {
+        var page = await _fixture.Context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+            var composer = page.Locator("#chat-composer-input");
+            await composer.FillAsync("   ");
+
+            var sendButton = page.Locator("#chat-send-button");
+            await Assertions.Expect(sendButton).ToBeVisibleAsync();
+
+            var isDisabled = await sendButton.GetAttributeAsync("disabled");
+            Assert.NotNull(isDisabled);
+        }
+        finally { await page.CloseAsync(); }
+    }
+
+    [Fact]
     public async Task ChatPage_ShiftEnterAddsNewlineWithoutSending()
     {
         var page = await _fixture.Context.NewPageAsync();
