@@ -40,6 +40,21 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<ILearningStep, FactExtractionStep>();
         }
 
+        if (config.IntentExtractionEnabled)
+        {
+            services.AddHttpClient(IdentityIntentExtractionStep.HttpClientName, (provider, client) =>
+            {
+                var resolvedConfig = provider.GetRequiredService<IOptions<LeanKernelConfig>>().Value;
+                client.BaseAddress = new Uri(EnsureTrailingSlash(resolvedConfig.LiteLlm.BaseUrl));
+
+                if (!string.IsNullOrWhiteSpace(resolvedConfig.LiteLlm.ApiKey))
+                {
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", resolvedConfig.LiteLlm.ApiKey);
+                }
+            });
+            services.AddSingleton<ILearningStep, IdentityIntentExtractionStep>();
+        }
+
         if (config.CapabilityGapDetectionEnabled)
         {
             services.AddSingleton<ILearningStep, CapabilityGapDetectionStep>();

@@ -16,6 +16,7 @@ public sealed class FactExtractionStep(
     ILogger<FactExtractionStep> logger) : ILearningStep
 {
     internal const string HttpClientName = "learning-litellm";
+    private const int MaxTranscriptChars = 12000;
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -71,7 +72,24 @@ public sealed class FactExtractionStep(
 
         var client = _httpClientFactory.CreateClient(HttpClientName);
         using var response = await client.PostAsJsonAsync("chat/completions", request, SerializerOptions, ct).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            _logger.LogWarning(
+                "Fact extraction request failed with status {StatusCode} for session {SessionId} turn {TurnId}. Body: {Body}",
+                (int)response.StatusCode,
+                turnEvent.SessionId,
+                turnEvent.TurnId,
+                Truncate(errorBody, 1200));
+
+            return new LearningStepResult
+            {
+                StepName = Name,
+                Success = false,
+                ItemsLearned = 0,
+                Error = $"litellm_status_{(int)response.StatusCode}",
+            };
+        }
 
         var completion = await response.Content.ReadFromJsonAsync<LiteLlmChatCompletionResponse>(SerializerOptions, ct).ConfigureAwait(false);
         var content = completion?.Choices?
@@ -119,7 +137,10 @@ public sealed class FactExtractionStep(
         }
 
         parts.Add($"Assistant response:\n{turnEvent.AssistantResponse ?? turnEvent.Content}");
-        return string.Join("\n\n", parts);
+        var transcript = string.Join("\n\n", parts);
+        return transcript.Length <= MaxTranscriptChars
+            ? transcript
+            : transcript[..MaxTranscriptChars];
     }
 
     private static string CreateFactPageContent(string fact, TurnEvent turnEvent)
@@ -163,6 +184,16 @@ public sealed class FactExtractionStep(
             .Where(line => !string.IsNullOrWhiteSpace(line) && !string.Equals(line, "none", StringComparison.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static string Truncate(string value, int maxChars)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= maxChars)
+        {
+            return value;
+        }
+
+        return value[..maxChars];
     }
 }
 

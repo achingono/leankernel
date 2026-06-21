@@ -49,4 +49,29 @@ public sealed class LearningConfig
     /// Gets or sets the minimum combined turn length required before fact extraction runs.
     /// </summary>
     public int MinTurnLengthForExtraction { get; set; } = 50;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether user-intent extraction for identity updates is enabled.
+    /// </summary>
+    public bool IntentExtractionEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the model used for user-intent extraction.
+    /// </summary>
+    public string IntentExtractionModel { get; set; } = "small";
+
+    /// <summary>
+    /// Gets or sets the temperature used for user-intent extraction.
+    /// </summary>
+    public double IntentExtractionTemperature { get; set; } = 0.0;
+
+    /// <summary>
+    /// Gets or sets the minimum confidence required to apply an extracted update.
+    /// </summary>
+    public double IntentExtractionMinConfidence { get; set; } = 0.72;
+
+    /// <summary>
+    /// Gets or sets the maximum number of extracted updates to apply per turn.
+    /// </summary>
+    public int IntentExtractionMaxUpdatesPerTurn { get; set; } = 3;
 }
