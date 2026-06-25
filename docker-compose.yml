@@ -55,7 +55,7 @@ services:
       - TZ=${TZ:-America/Toronto}
     volumes:
       - ./config/litellm:/app/config:ro
-      - ./config/litellm/leankernel_litellm_callbacks.py:/app/leankernel_litellm_callbacks.py:ro
+      - ./config/litellm/leankernel_litellm_callbacks.py:/app/litellm_callbacks.py:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     entrypoint: ["sh", "-c"]
@@ -199,10 +199,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Dockerfile stages are: source, watch, build, final.
+      # Default to `final` so `docker compose up` works without extra env vars.
+      target: ${LEANKERNEL_ENGINE_TARGET:-final}
     container_name: leankernel-engine
     environment:
-      - DOTNET_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:5080
+      - DOTNET_ENVIRONMENT=${LEANKERNEL_DOTNET_ENVIRONMENT:-Production}
+      - ASPNETCORE_URLS=http://+:${LEANKERNEL_ENGINE_PORT:-5080}
       - LEANKERNEL__LITELLM__BASEURL=http://litellm:4000
       - LEANKERNEL__LITELLM__APIKEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
       - LEANKERNEL__LITELLM__DEFAULTMODEL=${DEFAULT_MODEL:-tool}
@@ -229,14 +232,19 @@ services:
       - LEANKERNEL__DOCUMENTINGESTION__MANAGEDSTORAGEPATH=/app/data/managed-documents
       - LEANKERNEL__GATEWAY__APIKEY=${GATEWAY_API_KEY:-}
       - TZ=${TZ:-America/Toronto}
+      - DOTNET_USE_POLLING_FILE_WATCHER=1
     volumes:
       - ./data/skills:/app/data/skills:ro
       - ./data/wiki:/app/data/wiki:ro
       - ./data/documents:/app/data/documents
       - document-managed-data:/app/data/managed-documents
       - gbrain-data:/app/data/gbrain:ro
+      # In development, mount the repo so dotnet watch can hot reload.
+      - ./:/src
+      - /src/obj/                 # Anonymous volume to prevent overriding container build artifacts
+      - /src/bin/                 # Anonymous volume to prevent overriding container build artifacts
     ports:
-      - "${ENGINE_PORT:-5080}:5080"
+      - "${LEANKERNEL_ENGINE_PORT:-5080}:${LEANKERNEL_ENGINE_PORT:-5080}"
     depends_on:
       database:
         condition: service_healthy
@@ -248,7 +256,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5080/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${LEANKERNEL_ENGINE_PORT:-5080}/api/health"]
       interval: 15s
       timeout: 5s
       retries: 5

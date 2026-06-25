@@ -1,8 +1,9 @@
 # Dockerfile — LeanKernel Engine
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+
+# ── source: copy solution + csproj for restore caching ─────────
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS source
 WORKDIR /src
 
-# Copy solution and project files for restore
 COPY src/LeanKernel.sln .
 COPY src/Directory.Build.props .
 COPY src/LeanKernel.Abstractions/LeanKernel.Abstractions.csproj LeanKernel.Abstractions/
@@ -21,18 +22,48 @@ COPY test/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj ../test/LeanKernel.
 COPY test/LeanKernel.Tests.Integration/LeanKernel.Tests.Integration.csproj ../test/LeanKernel.Tests.Integration/
 COPY test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj ../test/LeanKernel.Tests.Playwright/
 
-RUN dotnet restore LeanKernel.sln
+# ── watch: install deps and run dotnet watch ────────────────
+FROM source AS watch
+WORKDIR /src
 
-# Copy source and build
-COPY src/ .
+# Install OS deps needed by the runtime image (OCR-backed extraction)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv poppler-utils \
+    && python3 -m venv /opt/ocr-venv \
+    && /opt/ocr-venv/bin/pip install --no-cache-dir paddlepaddle paddleocr pdf2image \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV LeanKernel__FileSystem__PythonExecutable=/opt/ocr-venv/bin/python
+
+ENV DOTNET_USE_POLLING_FILE_WATCHER=1
+ENV DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
+
+RUN useradd -m -s /bin/bash leankernel \
+    && mkdir -p /home/leankernel/.local/share/signal-cli \
+    && chown -R leankernel:leankernel /home/leankernel
+
+USER leankernel
+
+ENV LEANKERNEL_ENGINE_PORT=5080
+ENV ASPNETCORE_URLS=http://+:${LEANKERNEL_ENGINE_PORT}
+EXPOSE ${LEANKERNEL_ENGINE_PORT}
+
+ENTRYPOINT ["dotnet", "watch", "--project", "LeanKernel.Gateway/LeanKernel.Gateway.csproj", "run", "--configuration", "Debug", "--urls", "http://+:${LEANKERNEL_ENGINE_PORT}"]
+
+# ── build: restore and publish ───────────────────────────────
+FROM source AS build
+WORKDIR /src
+
+COPY src/ ./
+COPY test/ ../test/
+
 RUN dotnet restore LeanKernel.sln
 RUN dotnet publish LeanKernel.Gateway/LeanKernel.Gateway.csproj -c Release -o /app/publish --no-restore
 
-# Runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+# ── final: runtime image ─────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Install curl for health checks and Python tooling for OCR-backed text extraction
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl python3 python3-pip python3-venv poppler-utils \
     && python3 -m venv /opt/ocr-venv \
@@ -54,9 +85,10 @@ RUN useradd -m -s /bin/bash leankernel \
     && chown -R leankernel:leankernel /home/leankernel/.local
 USER leankernel
 
-ENV ASPNETCORE_URLS=http://+:5080
-EXPOSE 5080
+ENV LEANKERNEL_ENGINE_PORT=5080
+ENV ASPNETCORE_URLS=http://+:${LEANKERNEL_ENGINE_PORT}
+EXPOSE ${LEANKERNEL_ENGINE_PORT}
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD curl -f http://localhost:5080/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD curl -f http://localhost:${LEANKERNEL_ENGINE_PORT}/api/health || exit 1
 
 ENTRYPOINT ["dotnet", "LeanKernel.Gateway.dll"]
