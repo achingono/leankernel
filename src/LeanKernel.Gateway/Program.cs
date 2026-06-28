@@ -36,6 +36,7 @@ try
     builder.Services.AddHttpClient();
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
+    builder.WebHost.UseStaticWebAssets();
     builder.Services.AddFluentUIComponents();
     builder.Services.AddScoped<ChatService>();
     builder.Services.AddScoped<OnboardingService>();

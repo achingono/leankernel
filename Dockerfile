@@ -35,7 +35,9 @@ RUN apt-get update \
 
 ENV LeanKernel__FileSystem__PythonExecutable=/opt/ocr-venv/bin/python
 
-ENV DOTNET_USE_POLLING_FILE_WATCHER=1
+# DOTNET_USE_POLLING_FILE_WATCHER is intentionally NOT set.
+# Native file system events work reliably with modern Docker for Mac
+# and avoid false-positive restarts caused by polling on volume mounts.
 ENV DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
 
 RUN useradd -m -s /bin/bash leankernel \
@@ -48,7 +50,7 @@ ENV LEANKERNEL_ENGINE_PORT=5080
 ENV ASPNETCORE_URLS=http://+:${LEANKERNEL_ENGINE_PORT}
 EXPOSE ${LEANKERNEL_ENGINE_PORT}
 
-ENTRYPOINT ["dotnet", "watch", "--project", "LeanKernel.Gateway/LeanKernel.Gateway.csproj", "run", "--configuration", "Debug", "--urls", "http://+:${LEANKERNEL_ENGINE_PORT}"]
+ENTRYPOINT dotnet watch --project LeanKernel.Gateway/LeanKernel.Gateway.csproj run --configuration Debug
 
 # ── build: restore and publish ───────────────────────────────
 FROM source AS build

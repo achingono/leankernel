@@ -232,7 +232,6 @@ services:
       - LEANKERNEL__DOCUMENTINGESTION__MANAGEDSTORAGEPATH=/app/data/managed-documents
       - LEANKERNEL__GATEWAY__APIKEY=${GATEWAY_API_KEY:-}
       - TZ=${TZ:-America/Toronto}
-      - DOTNET_USE_POLLING_FILE_WATCHER=1
     volumes:
       - ./data/skills:/app/data/skills:ro
       - ./data/wiki:/app/data/wiki:ro
@@ -240,7 +239,7 @@ services:
       - document-managed-data:/app/data/managed-documents
       - gbrain-data:/app/data/gbrain:ro
       # In development, mount the repo so dotnet watch can hot reload.
-      - ./:/src
+      - ./src:/src
       - /src/obj/                 # Anonymous volume to prevent overriding container build artifacts
       - /src/bin/                 # Anonymous volume to prevent overriding container build artifacts
     ports:
