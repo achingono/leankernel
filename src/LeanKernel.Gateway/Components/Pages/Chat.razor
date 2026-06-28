@@ -121,41 +121,43 @@
 
                 <div class="chat-composer-pane" style="display: flex; flex-direction: column; width: 100%; min-height: 0; overflow: hidden;">
                     <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell teams-composer-shell">
-                        <FluentTextArea Id="chat-composer-input"
-                                        @bind-Value="ChatService.ComposerText"
-                                        Rows="3"
-                                        Maxlength="12000"
-                                        Placeholder="Type a message"
-                                        Disabled="@ChatService.IsLoading"
-                                        Class="chat-composer-input teams-composer-input" />
-                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-composer-footer teams-composer-footer">
-                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="teams-composer-tools" Style="width: auto;">
-                                <FluentButton Appearance="Appearance.Lightweight"
-                                              AriaLabel="Formatting"
-                                              Title="Formatting"
-                                              IconEnd="@(new Icons.Regular.Size16.Search())"
-                                              Class="teams-composer-tool-button" />
-                                <FluentButton Appearance="Appearance.Lightweight"
-                                              AriaLabel="Attach file"
-                                              Title="Attach file"
-                                              IconEnd="@(new Icons.Regular.Size16.Add())"
-                                              Class="teams-composer-tool-button" />
-                                <FluentButton Appearance="Appearance.Lightweight"
-                                              AriaLabel="Emoji"
-                                              Title="Emoji"
-                                              IconEnd="@(new Icons.Regular.Size16.Chat())"
-                                              Class="teams-composer-tool-button" />
-                            </FluentStack>
+                        <div class="teams-composer-surface">
+                            <FluentTextArea Id="chat-composer-input"
+                                            @bind-Value="ChatService.ComposerText"
+                                            Rows="4"
+                                            Maxlength="12000"
+                                            Placeholder="Type a message"
+                                            Disabled="@ChatService.IsLoading"
+                                            Class="chat-composer-input teams-composer-input" />
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-composer-footer teams-composer-footer">
+                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="teams-composer-tools" Style="width: auto;">
+                                    <FluentButton Appearance="Appearance.Lightweight"
+                                                  AriaLabel="Formatting"
+                                                  Title="Formatting"
+                                                  IconEnd="@(new Icons.Regular.Size16.Search())"
+                                                  Class="teams-composer-tool-button" />
+                                    <FluentButton Appearance="Appearance.Lightweight"
+                                                  AriaLabel="Attach file"
+                                                  Title="Attach file"
+                                                  IconEnd="@(new Icons.Regular.Size16.Add())"
+                                                  Class="teams-composer-tool-button" />
+                                    <FluentButton Appearance="Appearance.Lightweight"
+                                                  AriaLabel="Emoji"
+                                                  Title="Emoji"
+                                                  IconEnd="@(new Icons.Regular.Size16.Chat())"
+                                                  Class="teams-composer-tool-button" />
+                                </FluentStack>
 
-                            <FluentButton Id="chat-send-button"
-                                          Appearance="Appearance.Accent"
-                                          OnClick="SendAsync"
-                                          Disabled="@IsSendDisabled"
-                                          Title="Send message"
-                                          AriaLabel="Send message"
-                                          IconEnd="@(new Icons.Regular.Size16.Send())"
-                                          Class="teams-send-button" />
-                        </FluentStack>
+                                <FluentButton Id="chat-send-button"
+                                              Appearance="Appearance.Accent"
+                                              OnClick="SendAsync"
+                                              Disabled="@IsSendDisabled"
+                                              Title="Send message"
+                                              AriaLabel="Send message"
+                                              IconEnd="@(new Icons.Regular.Size16.Send())"
+                                              Class="teams-send-button" />
+                            </FluentStack>
+                        </div>
                     </FluentStack>
                 </div>
             </FluentStack>

@@ -428,22 +428,38 @@ fluent-switch {
 
 .teams-composer-shell {
     margin: var(--lk-space-xs);
-    padding: var(--lk-space-s);
+    padding: var(--lk-space-xs);
     border: 1px solid var(--lk-glass-border);
     border-radius: var(--lk-radius-m);
     background: color-mix(in srgb, var(--neutral-layer-1) 92%, white 8%);
     box-shadow: 0 6px 20px -10px rgba(15, 23, 42, 0.45);
 }
 
+.teams-composer-surface {
+    position: relative;
+    width: 100%;
+    min-height: 0;
+}
+
 .teams-composer-input {
-    min-height: 5.5rem;
+    min-height: 8rem;
+    width: 100%;
 }
 
 .teams-composer-footer {
-    margin-top: var(--lk-space-xxs);
+    position: absolute;
+    left: var(--lk-space-xs);
+    right: var(--lk-space-xs);
+    bottom: var(--lk-space-xs);
+    margin: 0;
     flex-wrap: nowrap;
     justify-content: space-between;
     align-items: center;
+    padding: 4px 6px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--lk-glass-border) 75%, transparent 25%);
+    background: color-mix(in srgb, var(--neutral-layer-1) 88%, white 12%);
+    box-shadow: 0 8px 18px -14px rgba(15, 23, 42, 0.55);
 }
 
 .teams-composer-tools {
@@ -466,6 +482,7 @@ fluent-switch {
     height: 34px;
     border-radius: 50%;
     padding: 0;
+    margin-left: auto;
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-fill-rest) 40%, black 60%);
 }
 
