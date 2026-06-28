@@ -127,7 +127,7 @@ public class ChatPageTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            await Assertions.Expect(page.Locator(".teams-composer-tool-button")).ToHaveCountAsync(3);
+            await Assertions.Expect(page.Locator(".teams-composer-tool-button")).ToHaveCountAsync(5);
         }
         finally { await page.CloseAsync(); }
     }

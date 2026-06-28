@@ -149,10 +149,10 @@ public class NavigationTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/chat", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            await Assertions.Expect(page.Locator("#nav-new-session-button")).ToBeVisibleAsync();
+            await Assertions.Expect(page.Locator("#chat-new-session-button")).ToBeVisibleAsync();
 
             await page.GotoAsync($"{_fixture.BaseUrl}/diagnostics", new() { WaitUntil = WaitUntilState.NetworkIdle });
-            await Assertions.Expect(page.Locator("#nav-new-session-button")).ToHaveCountAsync(0);
+            await Assertions.Expect(page.Locator("#chat-new-session-button")).ToHaveCountAsync(0);
         }
         finally { await page.CloseAsync(); }
     }

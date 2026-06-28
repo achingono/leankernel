@@ -85,8 +85,23 @@ window.leanKernelChat = window.leanKernelChat || {
                 }
             };
 
-            innerTextarea.addEventListener("input", updateSendDisabled);
+            const autoGrow = function () {
+                innerTextarea.style.height = "auto";
+                const newHeight = Math.min(innerTextarea.scrollHeight, 240);
+                innerTextarea.style.height = newHeight + "px";
+                if (innerTextarea.scrollHeight > 240) {
+                    innerTextarea.style.overflowY = "auto";
+                } else {
+                    innerTextarea.style.overflowY = "hidden";
+                }
+            };
+
+            innerTextarea.addEventListener("input", function () {
+                updateSendDisabled();
+                autoGrow();
+            });
             updateSendDisabled();
+            autoGrow();
 
             innerTextarea.dataset.lkComposerBound = "true";
             return true;

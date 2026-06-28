@@ -2,7 +2,7 @@ using LeanKernel.Abstractions.Models;
 
 namespace LeanKernel.Agents.ToolSelection;
 
-internal sealed class NullToolSelector : IToolSelector
+public sealed class NullToolSelector : IToolSelector
 {
     public static readonly NullToolSelector Instance = new();
 

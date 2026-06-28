@@ -2,7 +2,7 @@ using Microsoft.Extensions.AI;
 
 namespace LeanKernel.Agents;
 
-internal static class ChatResponseMetadataReader
+public static class ChatResponseMetadataReader
 {
     public static int GetTokensUsed(ChatResponse response)
     {

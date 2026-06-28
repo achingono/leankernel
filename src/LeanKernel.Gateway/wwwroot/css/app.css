@@ -428,38 +428,69 @@ fluent-switch {
 
 .teams-composer-shell {
     margin: var(--lk-space-xs);
-    padding: var(--lk-space-xs);
-    border: 1px solid var(--lk-glass-border);
-    border-radius: var(--lk-radius-m);
-    background: color-mix(in srgb, var(--neutral-layer-1) 92%, white 8%);
-    box-shadow: 0 6px 20px -10px rgba(15, 23, 42, 0.45);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .teams-composer-surface {
     position: relative;
+    display: flex;
+    flex-direction: column;
     width: 100%;
     min-height: 0;
+    border: 1px solid var(--neutral-stroke-divider-rest, #e0e0e0);
+    border-radius: var(--lk-radius-m);
+    background: var(--neutral-layer-1, #ffffff);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    box-sizing: border-box;
+    padding: 0;
 }
 
 .teams-composer-input {
-    min-height: 8rem;
     width: 100%;
+    height: auto !important;
+    min-height: unset !important;
+    resize: none;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    --stroke-width: 0 !important;
+    --neutral-stroke-rest: transparent !important;
+    --neutral-stroke-hover: transparent !important;
+    --neutral-stroke-active: transparent !important;
+    --neutral-stroke-focus: transparent !important;
+    --fill-color: transparent !important;
+    --neutral-fill-input-rest: transparent !important;
+}
+
+.teams-composer-input::part(control) {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 10px 14px 44px 14px !important;
+    box-sizing: border-box !important;
+    resize: none !important;
+    overflow-y: hidden;
 }
 
 .teams-composer-footer {
     position: absolute;
-    left: var(--lk-space-xs);
-    right: var(--lk-space-xs);
-    bottom: var(--lk-space-xs);
+    right: 8px;
+    bottom: 8px;
+    display: flex;
     margin: 0;
     flex-wrap: nowrap;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
-    padding: 4px 6px;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--lk-glass-border) 75%, transparent 25%);
-    background: color-mix(in srgb, var(--neutral-layer-1) 88%, white 12%);
-    box-shadow: 0 8px 18px -14px rgba(15, 23, 42, 0.55);
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    gap: var(--lk-space-xs);
+    z-index: 10;
 }
 
 .teams-composer-tools {
@@ -469,21 +500,45 @@ fluent-switch {
 }
 
 .teams-composer-tool-button {
-    width: 30px;
-    min-width: 30px;
-    height: 30px;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
     padding: 0;
     border-radius: 50%;
 }
 
+.teams-composer-separator {
+    width: 1px;
+    height: 20px;
+    background-color: var(--neutral-stroke-divider-rest, #e0e0e0);
+    margin: 0 var(--lk-space-xxs);
+    align-self: center;
+}
+
 .teams-send-button {
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
-    border-radius: 50%;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
     padding: 0;
-    margin-left: auto;
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-fill-rest) 40%, black 60%);
+    border-radius: 50%;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.teams-send-button:not([disabled]) {
+    color: var(--accent-fill-rest) !important;
+}
+
+.teams-composer-hint {
+    align-self: flex-end;
+    font-size: 11px;
+    color: var(--neutral-foreground-hint, #616161);
+    margin-top: 4px;
+    margin-right: 4px;
 }
 
 /* ── Standard Page Spacing ─────────────────────────────────────── */
