@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Json;
+using System.Net.WebSockets;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -16,6 +19,7 @@ public sealed class SignalChannel : IChannel
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly SignalChannelConfig _config;
     private readonly ILogger<SignalChannel> _logger;
+    private readonly ConcurrentDictionary<string, string> _senderNumber = new(StringComparer.Ordinal);
     private readonly object _syncRoot = new();
 
     private CancellationTokenSource? _pollingCts;
@@ -66,7 +70,7 @@ public sealed class SignalChannel : IChannel
             {
                 var captured = number;
                 _pollingTasks.Add(
-                    Task.Run(() => PollLoopAsync(captured, _pollingCts.Token), CancellationToken.None));
+                    Task.Run(() => WebSocketLoopAsync(captured, _pollingCts.Token), CancellationToken.None));
             }
         }
 
@@ -117,12 +121,18 @@ public sealed class SignalChannel : IChannel
             throw new InvalidOperationException("No phone numbers configured for Signal channel");
         }
 
+        var sourceNumber = numbers[0];
+        if (_senderNumber.TryGetValue(recipientId, out var mapped))
+        {
+            sourceNumber = mapped;
+        }
+
         var client = _httpClientFactory.CreateClient("signal-daemon");
         using var response = await client.PostAsJsonAsync(
             "/v2/send",
             new SignalSendRequest
             {
-                Number = numbers[0],
+                Number = sourceNumber,
                 Recipients = [recipientId],
                 Message = message
             },
@@ -132,9 +142,13 @@ public sealed class SignalChannel : IChannel
         response.EnsureSuccessStatusCode();
     }
 
-    private async Task PollLoopAsync(string phoneNumber, CancellationToken ct)
+    private async Task WebSocketLoopAsync(string phoneNumber, CancellationToken ct)
     {
-        var client = _httpClientFactory.CreateClient("signal-daemon");
+        var wsBase = _config.DaemonUrl
+            .Replace("http://", "ws://")
+            .Replace("https://", "wss://");
+        var wsUri = new Uri($"{wsBase}/v1/receive/{Uri.EscapeDataString(phoneNumber)}");
+
         var reconnectAttempts = 0;
         var wasEverConnected = false;
 
@@ -142,28 +156,42 @@ public sealed class SignalChannel : IChannel
         {
             try
             {
-                var requestUri = $"/v1/receive/{Uri.EscapeDataString(phoneNumber)}?timeout={Math.Max(0, _config.PollIntervalSeconds)}";
-                using var response = await client.GetAsync(requestUri, ct).ConfigureAwait(false);
-                response.EnsureSuccessStatusCode();
+                using var ws = new ClientWebSocket();
+                await ws.ConnectAsync(wsUri, ct).ConfigureAwait(false);
 
-                var payload = await response.Content.ReadFromJsonAsync<List<SignalReceiveEnvelope>>(SerializerOptions, ct).ConfigureAwait(false)
-                    ?? [];
-
-                if (!wasEverConnected)
-                {
-                    Interlocked.Increment(ref _connectedCount);
-                    wasEverConnected = true;
-                    _logger.LogInformation("Connected to Signal daemon for {PhoneNumber}", phoneNumber);
-                }
-
+                Interlocked.Increment(ref _connectedCount);
+                wasEverConnected = true;
                 reconnectAttempts = 0;
+                _logger.LogInformation("Connected to Signal daemon for {PhoneNumber}", phoneNumber);
 
-                foreach (var item in payload)
+                var buffer = new byte[8192];
+                var messageBuffer = new StringBuilder();
+
+                while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
                 {
-                    var channelMessage = CreateChannelMessage(item);
-                    if (channelMessage is not null)
+                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct).ConfigureAwait(false);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        await DispatchMessageAsync(channelMessage, ct).ConfigureAwait(false);
+                        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None)
+                            .ConfigureAwait(false);
+                        break;
+                    }
+
+                    messageBuffer.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+
+                    if (result.EndOfMessage)
+                    {
+                        var json = messageBuffer.ToString();
+                        messageBuffer.Clear();
+
+                        var envelope = JsonSerializer.Deserialize<SignalReceiveEnvelope>(json, SerializerOptions);
+                        var channelMessage = CreateChannelMessage(envelope, phoneNumber);
+                        if (channelMessage is not null)
+                        {
+                            _senderNumber[channelMessage.SenderId] = phoneNumber;
+                            await DispatchMessageAsync(channelMessage, ct).ConfigureAwait(false);
+                        }
                     }
                 }
             }
@@ -183,7 +211,7 @@ public sealed class SignalChannel : IChannel
 
                 _logger.LogWarning(
                     ex,
-                    "Signal polling failed for {PhoneNumber} (attempt {Attempt}/{MaxAttempts})",
+                    "Signal WebSocket disconnected for {PhoneNumber} (attempt {Attempt}/{MaxAttempts})",
                     phoneNumber,
                     reconnectAttempts,
                     _config.MaxReconnectAttempts);
@@ -191,7 +219,7 @@ public sealed class SignalChannel : IChannel
                 if (_config.MaxReconnectAttempts > 0 && reconnectAttempts >= _config.MaxReconnectAttempts)
                 {
                     _logger.LogError(
-                        "Signal channel reached the maximum reconnect attempts for {PhoneNumber} and will stop polling",
+                        "Signal channel reached the maximum reconnect attempts for {PhoneNumber} and will stop",
                         phoneNumber);
                     break;
                 }
@@ -236,9 +264,9 @@ public sealed class SignalChannel : IChannel
         }
     }
 
-    private ChannelMessage? CreateChannelMessage(SignalReceiveEnvelope item)
+    private static ChannelMessage? CreateChannelMessage(SignalReceiveEnvelope? item, string recipientId)
     {
-        ArgumentNullException.ThrowIfNull(item);
+        if (item is null) return null;
 
         var envelope = item.Envelope;
         var senderId = envelope?.SourceNumber ?? envelope?.Source;
@@ -251,8 +279,9 @@ public sealed class SignalChannel : IChannel
 
         return new ChannelMessage
         {
-            ChannelId = ChannelId,
+            ChannelId = "signal",
             SenderId = senderId,
+            RecipientId = recipientId,
             Content = content,
             Timestamp = envelope?.Timestamp is > 0
                 ? DateTimeOffset.FromUnixTimeMilliseconds(envelope.Timestamp.Value)
