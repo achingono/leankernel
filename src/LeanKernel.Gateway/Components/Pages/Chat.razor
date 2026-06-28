@@ -11,7 +11,7 @@
 
 <PageTitle>LeanKernel Chat</PageTitle>
 
-<div class="chat-page">
+<div class="chat-page" style="height: 100%; min-height: 0; overflow: hidden;">
     @if (!string.IsNullOrWhiteSpace(ChatService.ErrorMessage))
     {
         <FluentMessageBar Title="Error" Intent="@MessageIntent.Error">
@@ -19,21 +19,38 @@
         </FluentMessageBar>
     }
 
-    <FluentMultiSplitter Orientation="Orientation.Horizontal" Class="chat-horizontal-splitter">
-        <FluentMultiSplitterPane Size="260px" Min="180px" Max="400px" Class="chat-session-pane">
+    <FluentMultiSplitter Orientation="Orientation.Horizontal" Height="100%" Width="100%" Class="chat-horizontal-splitter" Style="flex: 1; min-height: 0; overflow: hidden;">
+        <FluentMultiSplitterPane Size="260px" Min="180px" Max="420px" Class="chat-session-pane" Style="display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
             <FluentStack Orientation="Orientation.Vertical" Class="chat-session-list">
-                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center"
-                             Style="justify-content: space-between; width: 100%; padding: var(--lk-space-s); padding-bottom: 0;">
-                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Sessions</FluentLabel>
-                    <FluentButton Appearance="Appearance.Lightweight"
-                                  Id="chat-new-session-button"
-                                  OnClick="StartNewSessionAsync"
-                                  AriaLabel="New session"
-                                  Title="New session"
-                                  Style="height: 24px; min-width: 24px; padding: 0;">
-                        <FluentIcon Value="@(new Icons.Regular.Size16.Add())" />
-                    </FluentButton>
+                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-session-header">
+                    <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Chats</FluentLabel>
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-session-header-actions">
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      Id="chat-toggle-search-button"
+                                      OnClick="ToggleSessionSearch"
+                                      AriaLabel="Toggle session search"
+                                      Title="Search"
+                                      IconEnd="@(new Icons.Regular.Size16.Search())"
+                                      Class="chat-session-header-icon-button" />
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      Id="chat-new-session-button"
+                                      OnClick="StartNewSessionAsync"
+                                      AriaLabel="New session"
+                                      Title="New session"
+                                      IconEnd="@(new Icons.Regular.Size16.Add())"
+                                      Class="chat-session-header-icon-button" />
+                    </FluentStack>
                 </FluentStack>
+
+                @if (_showSessionSearch)
+                {
+                    <div style="padding: var(--lk-space-s); padding-bottom: 0;">
+                        <FluentTextField Placeholder="Search sessions"
+                                         @bind-Value="_sessionSearch"
+                                         AriaLabel="Search sessions"
+                                         Class="chat-session-search" />
+                    </div>
+                }
 
                 @if (ChatService.Sessions.Count == 0)
                 {
@@ -41,10 +58,16 @@
                         <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No sessions yet</FluentLabel>
                     </div>
                 }
+                else if (FilteredSessions.Count == 0)
+                {
+                    <div style="padding: var(--lk-space-s);">
+                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral">No sessions match your search</FluentLabel>
+                    </div>
+                }
                 else
                 {
                     <div class="chat-session-items">
-                        @foreach (var session in ChatService.Sessions)
+                        @foreach (var session in FilteredSessions)
                         {
                             <button type="button"
                                     class="chat-session-item @(string.Equals(session.SessionId, ChatService.CurrentSessionId, StringComparison.Ordinal) ? "active" : "")"
@@ -58,69 +81,84 @@
             </FluentStack>
         </FluentMultiSplitterPane>
 
-        <FluentMultiSplitterPane Size="1fr" Class="chat-content-pane">
-            <FluentMultiSplitter Orientation="Orientation.Vertical" Class="chat-vertical-splitter">
-                <FluentMultiSplitterPane Size="1fr" Class="chat-messages-pane">
-                    <FluentStack Orientation="Orientation.Vertical" Class="chat-main">
-                        <PageHeader Title="Chat" Subtitle="@GetHeaderSubtitle()" />
+        <FluentMultiSplitterPane Size="1fr" Min="420px" Class="chat-content-pane" Style="display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+            <FluentStack Orientation="Orientation.Vertical" Class="chat-content-layout" Style="flex: 1; min-height: 0; overflow: hidden;">
+                <FluentStack Orientation="Orientation.Vertical" Class="chat-main" Style="flex: 1; min-height: 0; overflow: hidden;">
+                    <PageHeader Title="Chat" Subtitle="@GetHeaderSubtitle()" />
 
-                        <div id="chat-message-list" class="chat-message-list">
-                            @if (ChatService.Messages.Count == 0 && !ChatService.IsLoading)
-                            {
-                                <FluentCard Class="lk-empty-state">
-                                    <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="gap: var(--lk-space-xs);">
-                                        <div style="background: linear-gradient(135deg, var(--accent-fill-rest) 0%, #a855f7 100%); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--lk-space-xs) auto; box-shadow: 0 8px 16px var(--lk-glow-indigo);">
-                                            <fluent-icon name="chat" value="@(new Icons.Regular.Size32.Chat())" color="white" />
-                                        </div>
-                                        <FluentLabel Typo="Typography.H3" Weight="FontWeight.Bold" Style="background: linear-gradient(90deg, var(--accent-fill-rest) 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: var(--lk-space-xxs);">Start a LeanKernel conversation</FluentLabel>
-                                        <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="max-width: 440px; margin: 0 auto; line-height: 1.6;">
-                                            Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.
-                                        </FluentLabel>
-                                    </FluentStack>
-                                </FluentCard>
-                            }
-                            else
-                            {
-                                @foreach (var message in ChatService.Messages)
-                                {
-                                    <ChatMessage Message="message" />
-                                }
-                            }
-
-                            @if (ChatService.IsLoading)
-                            {
-                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
-                                    <FluentProgressRing />
-                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral">LeanKernel is thinking…</FluentLabel>
+                    <div id="chat-message-list" class="chat-message-list" style="flex: 1; min-height: 0; overflow-y: auto;">
+                        @if (ChatService.Messages.Count == 0 && !ChatService.IsLoading)
+                        {
+                            <FluentCard Class="lk-empty-state">
+                                <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="gap: var(--lk-space-xs);">
+                                    <div style="background: linear-gradient(135deg, var(--accent-fill-rest) 0%, #a855f7 100%); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--lk-space-xs) auto; box-shadow: 0 8px 16px var(--lk-glow-indigo);">
+                                        <fluent-icon name="chat" value="@(new Icons.Regular.Size32.Chat())" color="white" />
+                                    </div>
+                                    <FluentLabel Typo="Typography.H3" Weight="FontWeight.Bold" Style="background: linear-gradient(90deg, var(--accent-fill-rest) 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: var(--lk-space-xxs);">Start a LeanKernel conversation</FluentLabel>
+                                    <FluentLabel Typo="Typography.Body" Color="Color.Neutral" Style="max-width: 440px; margin: 0 auto; line-height: 1.6;">
+                                        Ask a question, inspect previous sessions, and keep the existing Gateway APIs available for automation.
+                                    </FluentLabel>
                                 </FluentStack>
+                            </FluentCard>
+                        }
+                        else
+                        {
+                            @foreach (var message in ChatService.Messages)
+                            {
+                                <ChatMessage Message="message" />
                             }
-                        </div>
-                    </FluentStack>
-                </FluentMultiSplitterPane>
+                        }
 
-                <FluentMultiSplitterPane Size="auto" Min="100px" Max="400px" Class="chat-composer-pane">
-                    <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell">
+                        @if (ChatService.IsLoading)
+                        {
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading">
+                                <FluentProgressRing />
+                                <FluentLabel Typo="Typography.Body" Color="Color.Neutral">LeanKernel is thinking…</FluentLabel>
+                            </FluentStack>
+                        }
+                    </div>
+                </FluentStack>
+
+                <div class="chat-composer-pane" style="display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+                    <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell teams-composer-shell">
                         <FluentTextArea Id="chat-composer-input"
-                                       @bind-Value="ChatService.ComposerText"
-                                       Rows="4"
-                                       Maxlength="12000"
-                                       Placeholder="Ask LeanKernel anything…"
-                                       Disabled="@ChatService.IsLoading"
-                                       Class="chat-composer-input" />
-                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-composer-footer">
-                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Enter to send · Shift+Enter for newline</FluentLabel>
+                                        @bind-Value="ChatService.ComposerText"
+                                        Rows="3"
+                                        Maxlength="12000"
+                                        Placeholder="Type a message"
+                                        Disabled="@ChatService.IsLoading"
+                                        Class="chat-composer-input teams-composer-input" />
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-composer-footer teams-composer-footer">
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="teams-composer-tools">
+                                <FluentButton Appearance="Appearance.Lightweight"
+                                              AriaLabel="Formatting"
+                                              Title="Formatting"
+                                              IconEnd="@(new Icons.Regular.Size16.Search())"
+                                              Class="teams-composer-tool-button" />
+                                <FluentButton Appearance="Appearance.Lightweight"
+                                              AriaLabel="Attach file"
+                                              Title="Attach file"
+                                              IconEnd="@(new Icons.Regular.Size16.Add())"
+                                              Class="teams-composer-tool-button" />
+                                <FluentButton Appearance="Appearance.Lightweight"
+                                              AriaLabel="Emoji"
+                                              Title="Emoji"
+                                              IconEnd="@(new Icons.Regular.Size16.Chat())"
+                                              Class="teams-composer-tool-button" />
+                            </FluentStack>
+
                             <FluentButton Id="chat-send-button"
                                           Appearance="Appearance.Accent"
                                           OnClick="SendAsync"
                                           Disabled="@IsSendDisabled"
                                           Title="Send message"
-                                          AriaLabel="Send message">
-                                <FluentIcon Value="@(new Icons.Regular.Size16.Send())" />
-                            </FluentButton>
+                                          AriaLabel="Send message"
+                                          IconEnd="@(new Icons.Regular.Size16.Send())"
+                                          Class="teams-send-button" />
                         </FluentStack>
                     </FluentStack>
-                </FluentMultiSplitterPane>
-            </FluentMultiSplitter>
+                </div>
+            </FluentStack>
         </FluentMultiSplitterPane>
     </FluentMultiSplitter>
 </div>
@@ -132,11 +170,30 @@
     private bool _initialized;
     private bool _shouldScroll;
     private bool _disposed;
+    private bool _showSessionSearch;
+    private string _sessionSearch = string.Empty;
 
     [Parameter]
     public string? SessionId { get; set; }
 
     private bool IsSendDisabled => ChatService.IsLoading || string.IsNullOrWhiteSpace(ChatService.ComposerText);
+
+    private IReadOnlyList<ChatSessionSummary> FilteredSessions
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_sessionSearch))
+            {
+                return ChatService.Sessions;
+            }
+
+            return ChatService.Sessions
+                .Where(session =>
+                    (session.Title?.Contains(_sessionSearch, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (session.Preview?.Contains(_sessionSearch, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToArray();
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -214,6 +271,7 @@
             _shouldScroll = false;
             await JS.InvokeVoidAsync("leanKernelChat.scrollToBottom", "chat-message-list");
         }
+
     }
 
     private static string GetUserKey(ClaimsPrincipal user)
@@ -253,6 +311,15 @@
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleSessionSearch()
+    {
+        _showSessionSearch = !_showSessionSearch;
+        if (!_showSessionSearch)
+        {
+            _sessionSearch = string.Empty;
+        }
     }
 
     private async Task SendAsync()

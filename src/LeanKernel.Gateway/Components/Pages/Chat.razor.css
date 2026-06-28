@@ -3,16 +3,19 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .chat-page ::deep .chat-horizontal-splitter {
     flex: 1;
     min-height: 0;
+    overflow: hidden;
 }
 
 .chat-page ::deep .chat-vertical-splitter {
     flex: 1;
     min-height: 0;
+    overflow: hidden;
 }
 
 .chat-page ::deep .chat-session-pane {
@@ -38,6 +41,10 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+}
+
+.chat-session-search {
+    width: 100%;
 }
 
 .chat-session-item {
@@ -82,12 +89,14 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
 }
 
 .chat-page ::deep .chat-messages-pane {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 .chat-main {
@@ -121,14 +130,17 @@
     background: var(--neutral-layer-1);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .chat-composer-shell {
-    flex-shrink: 0;
+    flex: 1;
+    min-height: 0;
     gap: var(--lk-space-xs);
     display: flex;
     flex-direction: column;
     padding: var(--lk-space-xs);
+    overflow: hidden;
 }
 
 .chat-composer-input {
@@ -146,6 +158,10 @@
 @media (max-width: 900px) {
     .chat-page ::deep .chat-session-pane {
         display: none;
+    }
+
+    .chat-page ::deep .chat-content-pane {
+        min-width: 0;
     }
 
     .chat-main {
