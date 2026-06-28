@@ -36,7 +36,7 @@ public static class BrowserToolDefinitions
         return new ToolDefinition
         {
             Name = "browser_run_task",
-            Description = "Submit an asynchronous browser automation task. Returns a runId; poll browser_get_run until the run reaches a terminal status.",
+            Description = "Submit an asynchronous browser automation task. Returns run_id (and runId alias); poll browser_get_run until the run reaches a terminal status.",
             Category = "browser",
             Parameters =
             [
@@ -76,9 +76,29 @@ public static class BrowserToolDefinitions
                     NormalizeOptional(ToolArgumentReader.GetString(args, "request_key")),
                     NormalizeOptional(ToolArgumentReader.GetString(args, "request_id")));
 
-                return await ExecuteAsync(
-                    "browser_run_task",
-                    () => client.SubmitRunAsync(request, ct)).ConfigureAwait(false);
+                try
+                {
+                    var response = await client.SubmitRunAsync(request, ct).ConfigureAwait(false);
+                    var output = new
+                    {
+                        run_id = response.RunId,
+                        response.RunId,
+                        response.Status,
+                        response.SubmittedAt,
+                        response.QueuePosition
+                    };
+
+                    return new ToolResult
+                    {
+                        ToolName = "browser_run_task",
+                        Success = true,
+                        Output = Truncate(JsonSerializer.Serialize(output, JsonOptions))
+                    };
+                }
+                catch (WebwrightException ex)
+                {
+                    return Failed("browser_run_task", FormatError(ex));
+                }
             }
         };
     }

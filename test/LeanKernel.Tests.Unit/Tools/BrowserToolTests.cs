@@ -90,6 +90,7 @@ public class BrowserToolTests
         fakeClient.LastRunRequest.RequestId.Should().Be("idem-1");
 
         using var output = JsonDocument.Parse(result.Output!);
+        output.RootElement.GetProperty("run_id").GetString().Should().Be("run-123");
         output.RootElement.GetProperty("runId").GetString().Should().Be("run-123");
         output.RootElement.GetProperty("status").GetString().Should().Be("queued");
     }
