@@ -419,8 +419,7 @@ def hash_payload(payload: dict[str, Any]) -> str:
 def build_webwright_command(state: RunState) -> list[str]:
     command = [
         "python",
-        "-m",
-        "webwright.run.cli",
+        "/app/app/run_cli.py",
         "-c",
         str(CONFIG_ROOT / "leankernel.runtime.yaml"),
         "-t",
