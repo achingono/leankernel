@@ -119,7 +119,7 @@
                     </div>
                 </FluentStack>
 
-                <div class="chat-composer-pane" style="display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+                <div class="chat-composer-pane" style="display: flex; flex-direction: column; width: 100%; min-height: 0; overflow: hidden;">
                     <FluentStack Orientation="Orientation.Vertical" Class="chat-composer-shell teams-composer-shell">
                         <FluentTextArea Id="chat-composer-input"
                                         @bind-Value="ChatService.ComposerText"
@@ -129,7 +129,7 @@
                                         Disabled="@ChatService.IsLoading"
                                         Class="chat-composer-input teams-composer-input" />
                         <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="chat-composer-footer teams-composer-footer">
-                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="teams-composer-tools">
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="teams-composer-tools" Style="width: auto;">
                                 <FluentButton Appearance="Appearance.Lightweight"
                                               AriaLabel="Formatting"
                                               Title="Formatting"

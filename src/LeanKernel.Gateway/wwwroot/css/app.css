@@ -409,6 +409,7 @@ fluent-switch {
     gap: var(--lk-space-xs);
     display: flex;
     flex-direction: column;
+    width: 100%;
     padding: var(--lk-space-xs);
     overflow: hidden;
 }
@@ -440,10 +441,15 @@ fluent-switch {
 
 .teams-composer-footer {
     margin-top: var(--lk-space-xxs);
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .teams-composer-tools {
     gap: var(--lk-space-xxs);
+    width: auto !important;
+    flex: 0 0 auto;
 }
 
 .teams-composer-tool-button {
