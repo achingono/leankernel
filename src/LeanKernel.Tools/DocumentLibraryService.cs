@@ -211,19 +211,30 @@ public sealed class DocumentLibraryService
             wikiPageWritten = true;
 
             _logger.LogInformation("Uploading binary asset to GBrain files store and linking to {Slug}", pageSlug);
-            var uploadResult = await _gBrainClient.CallToolAsync(
-                "file_upload",
-                new
+            string? fileStoragePath = null;
+            try
+            {
+                var uploadResult = await _gBrainClient.CallToolAsync(
+                    "file_upload",
+                    new
+                    {
+                        path = fullPath,
+                        page_slug = pageSlug
+                    },
+                    ct).ConfigureAwait(false);
+
+                fileStoragePath = ExtractStoragePath(uploadResult);
+                if (fileStoragePath == null)
                 {
-                    path = fullPath,
-                    page_slug = pageSlug
-                },
-                ct).ConfigureAwait(false);
+                    _logger.LogWarning("GBrain file_upload response did not include a storage path; continuing without binary attachment for {Slug}", pageSlug);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "GBrain file_upload failed for {Slug}; continuing with extracted text only", pageSlug);
+            }
 
-            var fileStoragePath = ExtractStoragePath(uploadResult)
-                ?? throw new InvalidOperationException("GBrain file_upload response did not include a storage path.");
-
-            if (!string.Equals(fileStoragePath, relativePath, StringComparison.Ordinal))
+            if (fileStoragePath != null && !string.Equals(fileStoragePath, relativePath, StringComparison.Ordinal))
             {
                 var finalizedContent = BuildMarkdownContent(
                     finalTitle,
@@ -259,7 +270,7 @@ public sealed class DocumentLibraryService
                 Title = finalTitle,
                 ExtractedLength = extractedText.Length,
                 RelativeFilePath = relativePath,
-                FileStoragePath = fileStoragePath
+                FileStoragePath = fileStoragePath ?? relativePath
             };
         }
         catch

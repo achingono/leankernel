@@ -129,5 +129,5 @@ public sealed class DocumentIngestionResult
     /// <summary>
     /// Gets the internal storage path inside GBrain storage.
     /// </summary>
-    public required string FileStoragePath { get; init; }
+    public string? FileStoragePath { get; init; }
 }
