@@ -4,11 +4,11 @@ Blazor UI capability docs for current Gateway pages.
 
 ## Pages
 
-- [Chat UI](../ui-chat.md)
-- [Diagnostics UI](../ui-diagnostics.md)
-- [Admin UI](../ui-admin.md)
-- [Knowledge UI](../ui-knowledge.md)
-- [Onboarding UI](../ui-onboarding.md)
+- [Chat UI](../ui-chat.md) - sessions list, composer, and turn history
+- [Diagnostics UI](../ui-diagnostics.md) - context/budget/history diagnostics explorer
+- [Admin UI](../ui-admin.md) - provider health, routing view, tool governance toggles, spend, scheduler
+- [Knowledge UI](../ui-knowledge.md) - wiki search/browse/edit plus document library and ingestion
+- [Onboarding UI](../ui-onboarding.md) - guided setup wizard (nav label: Setup)
 
 ## Route Reference
 
@@ -16,7 +16,7 @@ Blazor UI capability docs for current Gateway pages.
 - `/diagnostics`
 - `/admin`
 - `/knowledge`
-- `/onboarding`
+- `/onboarding` (shown as "Setup" in nav)
 
 ## Related Pages
 

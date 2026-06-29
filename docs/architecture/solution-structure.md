@@ -1,73 +1,33 @@
 # Solution Structure
 
-This reference describes the **target solution structure** for the LeanKernel rearchitecture project. It defines project boundaries so contributors can place new work in the correct project and avoid accidental coupling.
+This reference documents the current implemented project boundaries in `src/LeanKernel.sln`.
 
 ## Project responsibilities
 
-| Project | Owns | Does Not Own |
-|---------|------|--------------|
-| `LeanKernel.Abstractions` | Shared configuration, contracts, DTOs, enums | Feature implementations |
-| `LeanKernel.Agents` | MAF agent runtime, turn pipeline, strategies, middleware | Knowledge storage, channel delivery |
-| `LeanKernel.Channels` | Channel adapters, channel auth, channel routing, hosted channel lifecycle | Agent reasoning, persistence rules |
-| `LeanKernel.Context` | Context gating, budget enforcement, prompt assembly, token estimation | Model invocation, persistence |
-| `LeanKernel.Knowledge` | GBrain MCP client, knowledge retrieval, wiki operations | Context admission decisions |
-| `LeanKernel.Gateway` | API endpoints, auth, and runtime composition | Domain logic, agent reasoning |
-| `LeanKernel.Tools` | Tool registry, governance policy, built-in tools, skill loading | Turn orchestration |
-| `LeanKernel.Persistence` | EF Core DbContext, session store, migrations, Postgres access | Business rules, API endpoints |
-| `LeanKernel.Diagnostics` | OpenTelemetry, audit logging, diagnostic sinks | Feature logic |
+| Project | Owns | Pairings |
+|---------|------|----------|
+| `LeanKernel.Abstractions` | Shared config models, interfaces, enums, DTOs | Referenced by all runtime projects |
+| `LeanKernel.Agents` | Turn pipeline execution, runtime strategy selection, routing/orchestration, response quality/enhancement | Uses `Context`, `Tools`, diagnostics sinks |
+| `LeanKernel.Context` | Context budget/token logic, retrieval scoping, history shaping, identity-aware context assembly | Uses `Knowledge` and persistence-backed session/history data |
+| `LeanKernel.Knowledge` | GBrain MCP client and `IKnowledgeService` implementation | Used by `Context`, tools, and Gateway UI services |
+| `LeanKernel.Tools` | Built-in tools, governance policy, tool registry/executor, document ingestion services | Extended at runtime by `LeanKernel.Plugins` skills |
+| `LeanKernel.Plugins` | Runtime skill loading (`SKILL.md` parsing/validation) and dynamic tool registration | Complements `Tools` during Gateway startup |
+| `LeanKernel.Persistence` | EF Core DbContext, Postgres session store, diagnostics/doc-ingestion persistence | Used by runtime and Gateway composition bootstrap |
+| `LeanKernel.Diagnostics` | Metrics counters and diagnostics services/models plumbing | Consumed by runtime, middleware, and APIs |
+| `LeanKernel.Channels` | Channel routing/auth and hosted channel lifecycle (including optional Signal adapter) | Sends inbound messages into runtime |
+| `LeanKernel.Learning` | Background learning queue/worker and extraction steps | Runs alongside runtime using turn events |
+| `LeanKernel.Scheduler` | Cron schedule evaluation and background job execution host | Runs periodic jobs through runtime services |
+| `LeanKernel.Gateway` | ASP.NET Core composition root, minimal APIs, Blazor UI, auth, middleware, health endpoints | Hosts and wires all runtime projects |
 
-## Dependency rules
+## Gateway vs Host
 
-- All projects may depend on `LeanKernel.Abstractions`.
-- `LeanKernel.Agents` depends on `LeanKernel.Context` and `LeanKernel.Tools`.
-- `LeanKernel.Channels` depends only on `LeanKernel.Abstractions` plus hosting/http infrastructure packages.
-- `LeanKernel.Context` depends on `LeanKernel.Knowledge` and `LeanKernel.Persistence`.
-- `LeanKernel.Gateway` acts as the composition boundary for the full runtime pipeline and may directly reference the runtime registration projects it wires (`Agents`, `Channels`, `Context`, `Knowledge`, `Tools`, `Persistence`, and `Diagnostics`).
-- `LeanKernel.Diagnostics` is a supporting library and should stay free of feature-specific domain behavior.
-- No circular dependencies are allowed.
+- `LeanKernel.Gateway` is the active web host in the solution and contains the current HTTP API and UI runtime.
+- `LeanKernel.Host` directory exists under `src/` as scaffold/legacy source layout, but it is not included as a project in `src/LeanKernel.sln` and currently does not provide active controllers/endpoints.
 
-## Dependency map
+## Dependency guidance
 
-```mermaid
-flowchart LR
-    A[LeanKernel.Abstractions]
-    G[LeanKernel.Gateway]
-    CH[LeanKernel.Channels]
-    AG[LeanKernel.Agents]
-    C[LeanKernel.Context]
-    K[LeanKernel.Knowledge]
-    T[LeanKernel.Tools]
-    P[LeanKernel.Persistence]
-    D[LeanKernel.Diagnostics]
-
-    G --> AG
-    G --> CH
-    G --> C
-    G --> K
-    G --> T
-    G --> P
-    G --> D
-    AG --> C
-    AG --> T
-    C --> K
-    C --> P
-
-    G --> A
-    CH --> A
-    AG --> A
-    C --> A
-    K --> A
-    T --> A
-    P --> A
-    D --> A
-```
-
-## Placement guidance
-
-- Put reusable contracts, options objects, and DTOs in `LeanKernel.Abstractions`.
-- Put MAF turn execution, middleware, and agent strategies in `LeanKernel.Agents`.
-- Put channel adapters, inbound channel auth, and hosted channel lifecycle in `LeanKernel.Channels`.
-- Put deny-by-default context admission and prompt-budget logic in `LeanKernel.Context`.
-- Put knowledge retrieval and GBrain-facing operations in `LeanKernel.Knowledge`.
-- Keep `LeanKernel.Gateway` thin: HTTP transport, authentication, and composition only.
-- Keep database access in `LeanKernel.Persistence`, even when a feature also needs domain logic elsewhere.
+- Keep reusable contracts in `LeanKernel.Abstractions`.
+- Keep transport/composition concerns in `LeanKernel.Gateway`; keep domain behavior in runtime projects.
+- Keep persistence access in `LeanKernel.Persistence` rather than API/UI projects.
+- Keep tool execution in `LeanKernel.Tools`; dynamic skill discovery belongs in `LeanKernel.Plugins`.
+- Avoid adding new feature logic to scaffold-only folders that are not active solution projects.

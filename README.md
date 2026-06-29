@@ -1,6 +1,6 @@
 # LeanKernel
 
-LeanKernel is a `.NET 10` modular-monolith agent platform with a Blazor + API gateway, durable persistence, and configurable model/runtime orchestration.
+LeanKernel is a `.NET 10` modular-monolith agent platform built on [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) with a Blazor + API gateway, durable persistence, and configurable model/runtime orchestration.
 
 ## Why Try LeanKernel
 
@@ -41,17 +41,29 @@ LeanKernel is built for teams that want to ship practical AI agents without stit
 
 Primary solution: `src/LeanKernel.sln`
 
-- `src/LeanKernel.Abstractions`: contracts and shared models/config
-- `src/LeanKernel.Core`: core primitives
-- `src/LeanKernel.Agents`: runtime orchestration and strategy execution
-- `src/LeanKernel.Context`: prompt/context assembly and gating
-- `src/LeanKernel.Knowledge`: knowledge and retrieval integrations
-- `src/LeanKernel.Persistence`: persistence and session storage
-- `src/LeanKernel.Tools`: built-in tool surface
-- `src/LeanKernel.Channels`: channel routing and adapters
-- `src/LeanKernel.Diagnostics`: telemetry and diagnostics primitives
-- `src/LeanKernel.Scheduler`: scheduled/background jobs
-- `src/LeanKernel.Gateway`: ASP.NET Core host + Blazor UI + API endpoints
+Current solution projects and responsibilities:
+
+- `src/LeanKernel.Abstractions`: shared configuration contracts, interfaces, and cross-project models
+- `src/LeanKernel.Agents`: turn pipeline, runtime execution, routing/orchestration strategy, response quality/enhancement
+- `src/LeanKernel.Context`: context gating, retrieval scoping, history shaping, and identity grounding helpers
+- `src/LeanKernel.Knowledge`: GBrain-backed knowledge client/service integration
+- `src/LeanKernel.Tools`: built-in tool registry/execution (file, web, browser, wiki, data) and document ingestion plumbing
+- `src/LeanKernel.Plugins`: dynamic runtime skills loading (`SKILL.md` parsing/registration)
+- `src/LeanKernel.Persistence`: EF Core/Postgres persistence, session store, diagnostics/doc-ingestion repositories
+- `src/LeanKernel.Diagnostics`: diagnostics services and runtime metrics primitives
+- `src/LeanKernel.Channels`: channel router/auth and optional Signal channel host integration
+- `src/LeanKernel.Learning`: background learning pipeline (fact/intent extraction, capability and engagement signals)
+- `src/LeanKernel.Scheduler`: cron-based background job scheduling/execution
+- `src/LeanKernel.Gateway`: composition root, minimal APIs, middleware, auth, health endpoints, and Blazor UI
+
+Key pairings in runtime composition:
+
+- `LeanKernel.Gateway` composes all runtime modules and hosts HTTP + UI surfaces
+- `LeanKernel.Tools` + `LeanKernel.Plugins` provide built-in tools and dynamic skill tools
+- `LeanKernel.Context` + `LeanKernel.Knowledge` + `LeanKernel.Persistence` provide context assembly and durable memory inputs
+- `LeanKernel.Agents` + `LeanKernel.Learning` provide turn execution plus background learning updates
+
+Scaffold/legacy source folders currently present under `src/` but not active projects in `src/LeanKernel.sln`: `LeanKernel.Archivist`, `LeanKernel.Commander`, `LeanKernel.Core`, `LeanKernel.Generators`, `LeanKernel.Host`, `LeanKernel.Thinker`.
 
 ## CI-Aligned Local Commands
 
@@ -96,3 +108,19 @@ LEANKERNEL_BASE_URL="http://127.0.0.1:5080" dotnet test test/LeanKernel.Tests.Pl
 - Gateway default URL in local docs/tests: `http://127.0.0.1:5080`
 - Running outside Docker is supported for UI/test flows, but service probes to external dependencies may log warnings if backing services are unavailable.
 - For roadmap and implementation planning artifacts, see [`docs/plans/index.md`](docs/plans/index.md).
+
+## Dependency Credits
+
+LeanKernel builds on several great open-source projects:
+
+- Microsoft Agent Framework (MAF): <https://github.com/microsoft/agent-framework>
+- .NET (SDK/Runtime images): <https://github.com/dotnet/dotnet-docker>
+- PostgreSQL: <https://github.com/postgres/postgres>
+- pgvector: <https://github.com/pgvector/pgvector>
+- GBrain: <https://github.com/garrytan/gbrain>
+- LiteLLM: <https://github.com/BerriAI/litellm>
+- Playwright: <https://github.com/microsoft/playwright>
+- PaddleOCR: <https://github.com/PaddlePaddle/PaddleOCR>
+- PaddlePaddle: <https://github.com/PaddlePaddle/Paddle>
+- pdf2image: <https://github.com/Belval/pdf2image>
+- signal-cli REST API: <https://github.com/bbernhard/signal-cli-rest-api>

@@ -6,6 +6,7 @@ Tooling and governance docs for built-in tools and execution controls.
 
 - [Tool governance](../tool-governance.md)
 - [Browser tool](../browser-tool.md)
+- [Runtime skills](../skills.md)
 
 ## Related Pages
 

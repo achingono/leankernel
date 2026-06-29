@@ -8,10 +8,16 @@
 | --- | --- | --- | --- |
 | `/api/chat` | `POST` | `X-Api-Key` only when configured | Runs a chat turn through `IAgentRuntime`. |
 | `/api/health` | `GET` | Anonymous | Returns service + provider health summary. |
+| `/healthz` | `GET` | Anonymous | ASP.NET Core health-check endpoint (`MapHealthChecks`). |
 | `/api/diagnostics/{sessionId}` | `GET` | `X-Api-Key` only when configured | Returns persisted diagnostics entries. |
 | `/api/diagnostics/{sessionId}/context` | `GET` | `X-Api-Key` only when configured | Returns persisted context diagnostics view. |
 | `/api/diagnostics/{sessionId}/budget` | `GET` | `X-Api-Key` only when configured | Returns persisted budget diagnostics view. |
 | `/api/diagnostics/{sessionId}/history` | `GET` | `X-Api-Key` only when configured | Returns persisted history diagnostics view. |
+
+## Health Endpoints
+
+- `GET /api/health` returns LeanKernel runtime wiring/provider snapshot payload from `Endpoints.cs`.
+- `GET /healthz` is the platform health-check route mapped in `Program.cs`.
 
 ## `POST /api/chat`
 

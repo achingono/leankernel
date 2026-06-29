@@ -8,6 +8,8 @@ Feature documentation is organized by capability area.
 - Channels: [`channels/index.md`](channels/index.md)
 - UI: [`ui/index.md`](ui/index.md)
 - Tools: [`tools/index.md`](tools/index.md)
+- Skills: [`skills.md`](skills.md)
+- Middleware and request hardening: [`middleware.md`](middleware.md)
 
 ## Legacy Topic Pages
 

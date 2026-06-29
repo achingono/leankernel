@@ -24,12 +24,13 @@ Status values:
 | `docs/api/index.md` | integrators | accurate | self |
 | `docs/api/gateway-api.md` | integrators | accurate | self |
 | `docs/api/diagnostics-api.md` | integrators/operators | accurate | self |
+| `docs/api/host-api.md` | integrators/developers | accurate | self |
 | `docs/architecture/index.md` | developers | accurate | self |
 | `docs/architecture/system-overview.md` | developers | accurate | self |
 | `docs/architecture/runtime-flows.md` | developers | accurate | self |
 | `docs/architecture/data-and-persistence.md` | developers | accurate | self |
 | `docs/architecture/infrastructure-and-deploy.md` | developers/operators | accurate | self |
-| `docs/architecture/solution-structure.md` | developers | partial | self |
+| `docs/architecture/solution-structure.md` | developers | accurate | self |
 | `docs/architecture/overview.md` | developers | duplicate | `docs/architecture/system-overview.md` |
 | `docs/architecture/architecture.md` | developers | duplicate | `docs/architecture/system-overview.md` |
 | `docs/architecture/key-flows.md` | developers | duplicate | `docs/architecture/runtime-flows.md` |
@@ -41,6 +42,8 @@ Status values:
 | `docs/features/channels/index.md` | developers | accurate | self |
 | `docs/features/ui/index.md` | developers | accurate | self |
 | `docs/features/tools/index.md` | developers | accurate | self |
+| `docs/features/skills.md` | developers | accurate | self |
+| `docs/features/middleware.md` | developers | accurate | self |
 | `docs/features/gateway-api.md` | developers | duplicate | `docs/api/gateway-api.md` |
 | `docs/features/context-diagnostics-api.md` | developers | duplicate | `docs/api/diagnostics-api.md` |
 | `docs/features/production-ops.md` | operators | duplicate | `docs/operations/production-ops.md` |
