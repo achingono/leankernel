@@ -129,7 +129,7 @@ public class AdminServiceTests
         cleanup.Status.Should().Be(AdminJobStatus.Idle);
 
         var digest = snapshot.ScheduledJobs.First(j => j.Name == "digest");
-        digest.Status.Should().Be(AdminJobStatus.Failed);
+        digest.Status.Should().Be(AdminJobStatus.Disabled);
     }
 
     [Fact]

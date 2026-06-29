@@ -326,7 +326,7 @@
                                 <time datetime="@FormatTimestampAttribute(context.NextRunAt)">@FormatDateTime(context.NextRunAt)</time>
                             </TemplateColumn>
                             <TemplateColumn Title="Status">
-                                <FluentBadge Appearance="@(context.Status == AdminJobStatus.Running ? Appearance.Accent : context.Status == AdminJobStatus.Idle ? Appearance.Neutral : Appearance.Lightweight)">
+                                <FluentBadge Appearance="@(context.Status == AdminJobStatus.Running ? Appearance.Accent : context.Status == AdminJobStatus.Idle || context.Status == AdminJobStatus.Disabled ? Appearance.Neutral : Appearance.Lightweight)">
                                     @GetJobStatusLabel(context.Status)
                                 </FluentBadge>
                             </TemplateColumn>
@@ -460,6 +460,7 @@
         {
             AdminJobStatus.Running => "Running",
             AdminJobStatus.Idle => "Idle",
+            AdminJobStatus.Disabled => "Disabled",
             _ => "Failed",
         };
 

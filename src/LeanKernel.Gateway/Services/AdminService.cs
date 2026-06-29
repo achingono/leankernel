@@ -163,7 +163,7 @@ public sealed class AdminService
                 job.CronExpression,
                 now.AddMinutes(-Random.Shared.Next(5, 120)),
                 now.AddMinutes(Random.Shared.Next(5, 120)),
-                job.Enabled ? AdminJobStatus.Idle : AdminJobStatus.Failed))
+                job.Enabled ? AdminJobStatus.Idle : AdminJobStatus.Disabled))
             .ToList();
     }
 
@@ -244,5 +244,6 @@ public enum AdminJobStatus
 {
     Running,
     Idle,
+    Disabled,
     Failed,
 }
