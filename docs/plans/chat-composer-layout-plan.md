@@ -8,7 +8,7 @@ This plan outlines the changes required to align the chat composer and tool butt
 
 Modify the chat composer layout to merge the input field and actions toolbar into a single card container with a shared border. Update the action buttons to use the correct icons (formatting, emoji, attachment, loop component, add) and position the send button on the right side of the toolbar with a vertical divider. Add the "Shift+Enter starts a new line" hint text at the bottom right.
 
-#### [MODIFY] [Chat.razor](file:///Users/achingono/source/repos/leankernel/src/LeanKernel.Gateway/Components/Pages/Chat.razor)
+#### [MODIFY] [Chat.razor](../../src/LeanKernel.Gateway/Components/Pages/Chat.razor)
 
 - Simplify `FluentTextArea` settings by reducing `Rows` to `1` so it starts compact.
 - Group formatting, emoji, file attachment, loop component, and plus action buttons inside `.teams-composer-tools` with the updated regular size 16 icons:
@@ -22,7 +22,7 @@ Modify the chat composer layout to merge the input field and actions toolbar int
 - Rearrange elements so that the toolbar is aligned to the right inside the composer surface.
 - Add a hint container below the composer surface for "Shift+Enter starts a new line."
 
-#### [MODIFY] [app.css](file:///Users/achingono/source/repos/leankernel/src/LeanKernel.Gateway/wwwroot/css/app.css)
+#### [MODIFY] [app.css](../../src/LeanKernel.Gateway/wwwroot/css/app.css)
 
 - Update `.teams-composer-surface` to use flexbox (flex column layout) instead of relative positioning, which avoids overlapping issues between textarea and footer.
 - Disable borders, background color, and box shadow on the internal `<fluent-text-area>` and its parts to make only the outer card's border visible.
