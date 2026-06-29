@@ -13,6 +13,9 @@ namespace LeanKernel.Persistence.Migrations
 {
     [DbContext(typeof(LeanKernelDbContext))]
     [Migration("20250527191827_AddDocumentIngestionJobs")]
+    /// <summary>
+    /// Migration metadata snapshot for document ingestion jobs schema changes.
+    /// </summary>
     partial class AddDocumentIngestionJobs
     {
         /// <inheritdoc />

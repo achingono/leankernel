@@ -6,8 +6,16 @@ using Microsoft.Extensions.AI;
 
 namespace LeanKernel.Agents.Orchestration;
 
+/// <summary>
+/// Provides functionality for tool definition aitool adapter.
+/// </summary>
 internal static class ToolDefinitionAIToolAdapter
 {
+    /// <summary>
+    /// Executes create.
+    /// </summary>
+    /// <param name="tool">The tool.</param>
+    /// <returns>The operation result.</returns>
     public static AITool Create(ToolDefinition tool)
     {
         ArgumentNullException.ThrowIfNull(tool);
@@ -19,10 +27,16 @@ internal static class ToolDefinitionAIToolAdapter
         private readonly ToolDefinition _tool = tool ?? throw new ArgumentNullException(nameof(tool));
         private readonly JsonElement _jsonSchema = BuildJsonSchema(tool.Parameters);
 
+        /// <summary>
+        /// Gets name.
+        /// </summary>
         public override string Name => _tool.Name;
 
         public override string Description => BuildDescription(_tool);
 
+        /// <summary>
+        /// Gets json schema.
+        /// </summary>
         public override JsonElement JsonSchema => _jsonSchema;
 
         protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)

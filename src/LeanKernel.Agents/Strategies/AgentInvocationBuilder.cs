@@ -2,8 +2,16 @@ using Microsoft.Extensions.AI;
 
 namespace LeanKernel.Agents.Strategies;
 
+/// <summary>
+/// Provides functionality for agent invocation builder.
+/// </summary>
 internal static class AgentInvocationBuilder
 {
+    /// <summary>
+    /// Builds messages.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns>The operation result.</returns>
     public static IReadOnlyList<ChatMessage> BuildMessages(AgentStrategyContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -29,6 +37,11 @@ internal static class AgentInvocationBuilder
         return messages;
     }
 
+    /// <summary>
+    /// Builds options.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns>The operation result.</returns>
     public static ChatOptions? BuildOptions(AgentStrategyContext context)
     {
         ArgumentNullException.ThrowIfNull(context);

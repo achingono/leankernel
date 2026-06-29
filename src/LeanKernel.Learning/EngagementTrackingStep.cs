@@ -5,6 +5,11 @@ using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Learning;
 
+/// <summary>
+/// Learning step that tracks user engagement metrics including topic frequency,
+/// positive signals, and negative signals from conversation turns.
+/// Metrics are persisted as a JSON aggregate in the knowledge store.
+/// </summary>
 public sealed class EngagementTrackingStep(
     IKnowledgeService knowledgeService,
     KnowledgePageUpdateCoordinator updateCoordinator,
@@ -26,10 +31,18 @@ public sealed class EngagementTrackingStep(
     private readonly KnowledgePageUpdateCoordinator _updateCoordinator = updateCoordinator ?? throw new ArgumentNullException(nameof(updateCoordinator));
     private readonly ILogger<EngagementTrackingStep> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+    /// <inheritdoc/>
     public string Name => "engagement-tracking";
 
+    /// <inheritdoc/>
     public int Order => 30;
 
+    /// <summary>
+    /// Processes a turn event to extract topics, detect engagement signals, and update aggregate metrics.
+    /// </summary>
+    /// <param name="turnEvent">The turn event to track engagement for.</param>
+    /// <param name="ct">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A <see cref="LearningStepResult"/> indicating success and the topics tracked.</returns>
     public Task<LearningStepResult> ProcessAsync(TurnEvent turnEvent, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(turnEvent);
@@ -82,6 +95,9 @@ public sealed class EngagementTrackingStep(
             ct);
     }
 
+    /// <summary>
+    /// Loads the existing engagement metrics from the knowledge store.
+    /// </summary>
     private async Task<EngagementMetrics> LoadMetricsAsync(CancellationToken ct)
     {
         var page = await _knowledgeService.GetPageAsync(LearningKeys.EngagementMetricsPageKey, ct).ConfigureAwait(false);
@@ -101,6 +117,9 @@ public sealed class EngagementTrackingStep(
         }
     }
 
+    /// <summary>
+    /// Extracts topic keywords from the turn event using retrieved knowledge keys or user message tokens.
+    /// </summary>
     private static IReadOnlyList<string> ExtractTopics(TurnEvent turnEvent)
     {
         var topics = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -141,15 +160,33 @@ public sealed class EngagementTrackingStep(
     }
 }
 
+/// <summary>
+/// Aggregate metrics for user engagement tracking across conversation turns.
+/// </summary>
 public sealed class EngagementMetrics
 {
+    /// <summary>
+    /// Gets or sets the total number of turns processed.
+    /// </summary>
     public int TotalTurnsProcessed { get; set; }
 
+    /// <summary>
+    /// Gets or sets the count of positive engagement signals detected.
+    /// </summary>
     public int PositiveSignals { get; set; }
 
+    /// <summary>
+    /// Gets or sets the count of negative engagement signals detected.
+    /// </summary>
     public int NegativeSignals { get; set; }
 
+    /// <summary>
+    /// Gets or sets the frequency map of topics encountered across turns.
+    /// </summary>
     public Dictionary<string, int> TopicFrequency { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Gets or sets the timestamp of the last processed turn.
+    /// </summary>
     public DateTimeOffset LastUpdated { get; set; } = DateTimeOffset.UtcNow;
 }

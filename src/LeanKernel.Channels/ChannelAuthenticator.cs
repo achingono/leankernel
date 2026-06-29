@@ -5,6 +5,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels;
 
+/// <summary>
+/// Handles authentication for incoming channel messages.
+/// </summary>
 public sealed class ChannelAuthenticator(
     ILogger<ChannelAuthenticator> logger,
     IOptions<ChannelsConfig> config)
@@ -12,6 +15,11 @@ public sealed class ChannelAuthenticator(
     private readonly ILogger<ChannelAuthenticator> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ChannelsConfig _config = (config ?? throw new ArgumentNullException(nameof(config))).Value;
 
+    /// <summary>
+    /// Authorizes a channel message based on the configured channel authentication rules.
+    /// </summary>
+    /// <param name="message">The message to authorize.</param>
+    /// <returns>A result indicating whether the message is authorized and why.</returns>
     public ChannelAuthorizationResult Authorize(ChannelMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -53,4 +61,10 @@ public sealed class ChannelAuthenticator(
     }
 }
 
+/// <summary>
+/// Represents the result of a channel authorization check.
+/// </summary>
+/// <param name="IsAuthorized">True if the sender is authorized, otherwise false.</param>
+/// <param name="Reason">A description of the authorization result.</param>
 public sealed record ChannelAuthorizationResult(bool IsAuthorized, string Reason);
+

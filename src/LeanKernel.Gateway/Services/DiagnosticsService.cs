@@ -8,6 +8,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Gateway.Services;
 
+/// <summary>
+/// Provides functionality for diagnostics service.
+/// </summary>
 public sealed class DiagnosticsService : IDisposable
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
@@ -36,6 +39,12 @@ public sealed class DiagnosticsService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Executes load async.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public async Task<DiagnosticsLoadResult> LoadAsync(string sessionId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
@@ -251,55 +260,148 @@ public sealed class DiagnosticsService : IDisposable
             : singleKey;
     }
 
+    /// <summary>
+    /// Executes dispose.
+    /// </summary>
     public void Dispose() => _httpClient.Dispose();
 
+    /// <summary>
+    /// Provides functionality for diagnostics load result.
+    /// </summary>
     public sealed record DiagnosticsLoadResult
     {
+        /// <summary>
+        /// Gets or sets data.
+        /// </summary>
         public DiagnosticsExplorerData? Data { get; init; }
+        /// <summary>
+        /// Gets or sets error message.
+        /// </summary>
         public string? ErrorMessage { get; init; }
     }
 
+    /// <summary>
+    /// Provides functionality for diagnostics explorer data.
+    /// </summary>
     public sealed record DiagnosticsExplorerData
     {
+        /// <summary>
+        /// Gets or sets session id.
+        /// </summary>
         public required string SessionId { get; init; }
+        /// <summary>
+        /// Gets or sets turn id.
+        /// </summary>
         public string? TurnId { get; init; }
+        /// <summary>
+        /// Gets or sets timestamp.
+        /// </summary>
         public DateTimeOffset? Timestamp { get; init; }
+        /// <summary>
+        /// Gets or sets context.
+        /// </summary>
         public ContextDiagnosticsResponse? Context { get; init; }
+        /// <summary>
+        /// Gets or sets budget.
+        /// </summary>
         public BudgetDiagnosticsResponse? Budget { get; init; }
+        /// <summary>
+        /// Gets or sets history.
+        /// </summary>
         public HistoryDiagnosticsResponse? History { get; init; }
+        /// <summary>
+        /// Gets or sets routing decision.
+        /// </summary>
         public RoutingDecision? RoutingDecision { get; init; }
+        /// <summary>
+        /// Gets or sets quality gate.
+        /// </summary>
         public QualityGateResult? QualityGate { get; init; }
+        /// <summary>
+        /// Gets or sets shadow routing.
+        /// </summary>
         public ShadowRoutingResult? ShadowRouting { get; init; }
+        /// <summary>
+        /// Gets or sets raw entry count.
+        /// </summary>
         public int RawEntryCount { get; init; }
+        /// <summary>
+        /// Gets or sets warnings.
+        /// </summary>
         public IReadOnlyList<string> Warnings { get; init; } = [];
     }
 
     private sealed record ApiCallResult<T>(T? Value, bool IsSuccess, bool IsNotFound, bool IsUnauthorized, string? ErrorMessage)
         where T : class
     {
+        /// <summary>
+        /// Executes success.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns>The operation result.</returns>
         public static ApiCallResult<T> Success(T value) => new(value, true, false, false, null);
 
+        /// <summary>
+        /// Executes not found.
+        /// </summary>
+        /// <returns>The operation result.</returns>
         public static ApiCallResult<T> NotFound() => new(null, false, true, false, null);
 
+        /// <summary>
+        /// Executes unauthorized.
+        /// </summary>
+        /// <returns>The operation result.</returns>
         public static ApiCallResult<T> Unauthorized() => new(null, false, false, true, null);
 
+        /// <summary>
+        /// Executes failure.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        /// <returns>The operation result.</returns>
         public static ApiCallResult<T> Failure(string message) => new(null, false, false, false, message);
     }
 
     private sealed record RawDiagnosticsResponse
     {
+        /// <summary>
+        /// Gets or sets entries.
+        /// </summary>
         public IReadOnlyList<RawDiagnosticEntry> Entries { get; init; } = [];
+        /// <summary>
+        /// Gets or sets count.
+        /// </summary>
         public int Count { get; init; }
+        /// <summary>
+        /// Gets or sets message.
+        /// </summary>
         public string? Message { get; init; }
     }
 
     private sealed record RawDiagnosticEntry
     {
+        /// <summary>
+        /// Gets or sets id.
+        /// </summary>
         public string Id { get; init; } = string.Empty;
+        /// <summary>
+        /// Gets or sets session id.
+        /// </summary>
         public string SessionId { get; init; } = string.Empty;
+        /// <summary>
+        /// Gets or sets turn id.
+        /// </summary>
         public string? TurnId { get; init; }
+        /// <summary>
+        /// Gets or sets category.
+        /// </summary>
         public string Category { get; init; } = string.Empty;
+        /// <summary>
+        /// Gets or sets payload.
+        /// </summary>
         public JsonElement Payload { get; init; }
+        /// <summary>
+        /// Gets or sets timestamp.
+        /// </summary>
         public DateTimeOffset Timestamp { get; init; }
     }
 }

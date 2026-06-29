@@ -6,6 +6,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Gateway.Services;
 
+/// <summary>
+/// Provides functionality for chat service.
+/// </summary>
 public sealed class ChatService(
     IAgentRuntime agentRuntime,
     ISessionStore sessionStore,
@@ -22,15 +25,45 @@ public sealed class ChatService(
     private readonly ILogger<ChatService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IDbContextFactory<LeanKernelDbContext>? _dbContextFactory = dbContextFactory;
 
+    /// <summary>
+    /// Gets or sets owner id.
+    /// </summary>
     public string? OwnerId { get; private set; }
+    /// <summary>
+    /// Gets or sets current session id.
+    /// </summary>
     public string? CurrentSessionId { get; private set; }
+    /// <summary>
+    /// Gets or sets current channel id.
+    /// </summary>
     public string? CurrentChannelId { get; private set; }
+    /// <summary>
+    /// Gets or sets is initialized.
+    /// </summary>
     public bool IsInitialized { get; private set; }
+    /// <summary>
+    /// Gets or sets is loading.
+    /// </summary>
     public bool IsLoading { get; private set; }
+    /// <summary>
+    /// Gets or sets composer text.
+    /// </summary>
     public string ComposerText { get; set; } = string.Empty;
+    /// <summary>
+    /// Gets or sets error message.
+    /// </summary>
     public string? ErrorMessage { get; private set; }
+    /// <summary>
+    /// Gets sessions.
+    /// </summary>
     public List<ChatSessionSummary> Sessions { get; } = [];
+    /// <summary>
+    /// Gets messages.
+    /// </summary>
     public List<ChatMessageViewModel> Messages { get; } = [];
+    /// <summary>
+    /// Gets or sets is authenticated.
+    /// </summary>
     public bool IsAuthenticated { get; private set; }
 
     public async Task InitializeAsync(
@@ -155,6 +188,11 @@ public sealed class ChatService(
         }
     }
 
+    /// <summary>
+    /// Creates new session async.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public async Task<string> CreateNewSessionAsync(CancellationToken ct = default)
     {
         EnsureReady();
@@ -183,6 +221,12 @@ public sealed class ChatService(
         return sessionId;
     }
 
+    /// <summary>
+    /// Executes open session async.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public async Task OpenSessionAsync(string sessionId, CancellationToken ct = default)
     {
         EnsureReady();
@@ -230,6 +274,11 @@ public sealed class ChatService(
         }
     }
 
+    /// <summary>
+    /// Sends async.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public async Task<bool> SendAsync(CancellationToken ct = default)
     {
         EnsureReady();
@@ -635,29 +684,83 @@ public sealed class ChatService(
         string TurnId);
 }
 
+/// <summary>
+/// Provides functionality for chat session summary.
+/// </summary>
 public sealed record ChatSessionSummary
 {
+    /// <summary>
+    /// Gets or sets session id.
+    /// </summary>
     public required string SessionId { get; init; }
+    /// <summary>
+    /// Gets or sets channel id.
+    /// </summary>
     public string? ChannelId { get; init; }
+    /// <summary>
+    /// Gets or sets title.
+    /// </summary>
     public required string Title { get; init; }
+    /// <summary>
+    /// Gets or sets preview.
+    /// </summary>
     public required string Preview { get; init; }
+    /// <summary>
+    /// Gets or sets created at.
+    /// </summary>
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    /// <summary>
+    /// Gets or sets updated at.
+    /// </summary>
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
+    /// <summary>
+    /// Gets or sets has messages.
+    /// </summary>
     public bool HasMessages { get; init; }
 }
 
+/// <summary>
+/// Provides functionality for chat message view model.
+/// </summary>
 public sealed record ChatMessageViewModel
 {
+    /// <summary>
+    /// Gets or sets id.
+    /// </summary>
     public required string Id { get; init; }
+    /// <summary>
+    /// Gets or sets role.
+    /// </summary>
     public required string Role { get; init; }
+    /// <summary>
+    /// Gets or sets content.
+    /// </summary>
     public required string Content { get; init; }
+    /// <summary>
+    /// Gets or sets timestamp.
+    /// </summary>
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    /// <summary>
+    /// Gets or sets is compacted.
+    /// </summary>
     public bool IsCompacted { get; init; }
+    /// <summary>
+    /// Gets or sets compaction kind.
+    /// </summary>
     public ChatCompactionKind CompactionKind { get; init; }
+    /// <summary>
+    /// Gets or sets compaction label.
+    /// </summary>
     public string? CompactionLabel { get; init; }
+    /// <summary>
+    /// Gets or sets status.
+    /// </summary>
     public ChatMessageStatus Status { get; init; }
 }
 
+/// <summary>
+/// Represents chat compaction kind values.
+/// </summary>
 public enum ChatCompactionKind
 {
     None = 0,
@@ -665,6 +768,9 @@ public enum ChatCompactionKind
     Summarized = 2,
 }
 
+/// <summary>
+/// Represents chat message status values.
+/// </summary>
 public enum ChatMessageStatus
 {
     Persisted = 0,

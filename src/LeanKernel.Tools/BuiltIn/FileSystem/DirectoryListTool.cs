@@ -7,8 +7,16 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools.BuiltIn.FileSystem;
 
+/// <summary>
+/// Provides functionality for directory list tool.
+/// </summary>
 public static class DirectoryListTool
 {
+    /// <summary>
+    /// Executes create.
+    /// </summary>
+    /// <param name="scopeFactory">The scope factory.</param>
+    /// <returns>The operation result.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

@@ -14,6 +14,9 @@ using Npgsql;
 
 namespace LeanKernel.Tools.BuiltIn.Data;
 
+/// <summary>
+/// Provides functionality for database query tool.
+/// </summary>
 public static partial class DatabaseQueryTool
 {
     private const string ToolName = "database_query";
@@ -33,6 +36,11 @@ public static partial class DatabaseQueryTool
         "EXECUTE"
     ];
 
+    /// <summary>
+    /// Executes create.
+    /// </summary>
+    /// <param name="scopeFactory">The scope factory.</param>
+    /// <returns>The operation result.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

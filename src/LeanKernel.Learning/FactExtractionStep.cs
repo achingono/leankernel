@@ -9,6 +9,10 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Learning;
 
+/// <summary>
+/// Learning step that extracts factual information from conversation turns using an LLM.
+/// Extracted facts are persisted to the knowledge store for future retrieval and context assembly.
+/// </summary>
 public sealed class FactExtractionStep(
     IHttpClientFactory httpClientFactory,
     IKnowledgeService knowledgeService,
@@ -28,10 +32,19 @@ public sealed class FactExtractionStep(
     private readonly LeanKernelConfig _config = (config ?? throw new ArgumentNullException(nameof(config))).Value;
     private readonly ILogger<FactExtractionStep> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+    /// <inheritdoc/>
     public string Name => "fact-extraction";
 
+    /// <inheritdoc/>
     public int Order => 10;
 
+    /// <summary>
+    /// Extracts factual information from a turn event by sending the conversation transcript to an LLM.
+    /// Each extracted fact is stored as a knowledge page keyed by session, turn, and index.
+    /// </summary>
+    /// <param name="turnEvent">The turn event containing the conversation to extract facts from.</param>
+    /// <param name="ct">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A <see cref="LearningStepResult"/> indicating success and the number of facts extracted.</returns>
     public async Task<LearningStepResult> ProcessAsync(TurnEvent turnEvent, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(turnEvent);
@@ -120,6 +133,9 @@ public sealed class FactExtractionStep(
         };
     }
 
+    /// <summary>
+    /// Builds a conversation transcript from the turn event, including user message, recent history, and assistant response.
+    /// </summary>
     private static string BuildConversationTranscript(TurnEvent turnEvent)
     {
         var parts = new List<string>();
@@ -143,9 +159,16 @@ public sealed class FactExtractionStep(
             : transcript[..MaxTranscriptChars];
     }
 
+    /// <summary>
+    /// Creates markdown content for a fact page including the fact text and metadata.
+    /// </summary>
     private static string CreateFactPageContent(string fact, TurnEvent turnEvent)
         => $"# Learned Fact\n\n{fact}\n\n- Session: {turnEvent.SessionId}\n- Turn: {turnEvent.TurnId}\n- RecordedAt: {turnEvent.Timestamp:O}";
 
+    /// <summary>
+    /// Parses the LLM response content into a list of distinct fact strings.
+    /// Handles JSON array responses, plain text, and bullet-pointed lists.
+    /// </summary>
     private static IReadOnlyList<string> ParseFacts(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -186,6 +209,9 @@ public sealed class FactExtractionStep(
             .ToArray();
     }
 
+    /// <summary>
+    /// Truncates a string to the specified maximum character length.
+    /// </summary>
     private static string Truncate(string value, int maxChars)
     {
         if (string.IsNullOrEmpty(value) || value.Length <= maxChars)
@@ -197,6 +223,9 @@ public sealed class FactExtractionStep(
     }
 }
 
+/// <summary>
+/// Request model for the LiteLLM chat completion API used for fact extraction.
+/// </summary>
 internal sealed class LiteLlmChatCompletionRequest
 {
     [JsonPropertyName("model")]
@@ -209,6 +238,9 @@ internal sealed class LiteLlmChatCompletionRequest
     public List<LiteLlmChatMessage> Messages { get; set; } = [];
 }
 
+/// <summary>
+/// Message model for LiteLLM chat completion requests and responses.
+/// </summary>
 internal sealed class LiteLlmChatMessage
 {
     [JsonPropertyName("role")]
@@ -218,12 +250,18 @@ internal sealed class LiteLlmChatMessage
     public string Content { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Response model for the LiteLLM chat completion API.
+/// </summary>
 internal sealed class LiteLlmChatCompletionResponse
 {
     [JsonPropertyName("choices")]
     public List<LiteLlmChatChoice>? Choices { get; set; }
 }
 
+/// <summary>
+/// Represents a single choice from the LiteLLM chat completion response.
+/// </summary>
 internal sealed class LiteLlmChatChoice
 {
     [JsonPropertyName("message")]

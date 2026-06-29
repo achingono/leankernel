@@ -1,5 +1,8 @@
 namespace LeanKernel.Abstractions.Enums;
 
+/// <summary>
+/// Represents diagnostic category values.
+/// </summary>
 public enum DiagnosticCategory
 {
     ContextAdmission,

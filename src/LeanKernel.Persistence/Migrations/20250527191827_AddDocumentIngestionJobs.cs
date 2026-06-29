@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace LeanKernel.Persistence.Migrations
 {
+    /// <summary>
+    /// Adds the document ingestion jobs table and supporting indexes.
+    /// </summary>
     /// <inheritdoc />
     public partial class AddDocumentIngestionJobs : Migration
     {

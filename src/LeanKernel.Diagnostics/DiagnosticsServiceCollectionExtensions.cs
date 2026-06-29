@@ -5,8 +5,17 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Diagnostics;
 
+/// <summary>
+/// Extension methods for configuring diagnostics in the dependency injection container.
+/// </summary>
 public static class DiagnosticsServiceCollectionExtensions
 {
+    /// <summary>
+    /// Adds LeanKernel diagnostics services to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="config">The diagnostics configuration.</param>
+    /// <returns>The service collection after adding diagnostics services.</returns>
     public static IServiceCollection AddLeanKernelDiagnostics(
         this IServiceCollection services,
         DiagnosticsConfig config)

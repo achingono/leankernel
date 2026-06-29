@@ -9,6 +9,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Context.History;
 
+/// <summary>
+/// Provides functionality for history shaper.
+/// </summary>
 public sealed class HistoryShaper
 {
     private readonly HistoryCompactionStrategy _strategy;
@@ -232,9 +235,18 @@ public sealed class HistoryShaper
     private sealed record CompactionMarkerPersistenceRecord(CompactionMarker Marker, string Content);
 }
 
+/// <summary>
+/// Provides functionality for history shaping result.
+/// </summary>
 public sealed record HistoryShapingResult
 {
+    /// <summary>
+    /// Gets or sets history.
+    /// </summary>
     public IReadOnlyList<ConversationTurn> History { get; init; } = [];
+    /// <summary>
+    /// Gets or sets entries.
+    /// </summary>
     public IReadOnlyList<ShapedHistoryEntry> Entries { get; init; } = [];
     public HistoryShapingDiagnostics Diagnostics { get; init; } = new();
 }

@@ -11,6 +11,11 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Learning;
 
+/// <summary>
+/// Learning step that extracts user intent about assistant behavior preferences from conversation turns.
+/// Uses an LLM to identify preferences for autonomy level, communication style, work style,
+/// and tool preferences, then updates the identity preference page with confidence-scored fields.
+/// </summary>
 public sealed class IdentityIntentExtractionStep(
     IHttpClientFactory httpClientFactory,
     IKnowledgeService knowledgeService,
@@ -47,10 +52,20 @@ public sealed class IdentityIntentExtractionStep(
     private readonly LeanKernelConfig _config = (config ?? throw new ArgumentNullException(nameof(config))).Value;
     private readonly ILogger<IdentityIntentExtractionStep> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+    /// <inheritdoc/>
     public string Name => "identity-intent-extraction";
 
+    /// <inheritdoc/>
     public int Order => 15;
 
+    /// <summary>
+    /// Processes a turn event to extract behavior intent from the user's message.
+    /// Respects configuration gates for intent extraction enabled state, minimum confidence thresholds,
+    /// and maximum updates per turn.
+    /// </summary>
+    /// <param name="turnEvent">The turn event to extract behavior intent from.</param>
+    /// <param name="ct">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A <see cref="LearningStepResult"/> indicating success and the fields updated.</returns>
     public Task<LearningStepResult> ProcessAsync(TurnEvent turnEvent, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(turnEvent);
@@ -78,6 +93,9 @@ public sealed class IdentityIntentExtractionStep(
         return ProcessInternalAsync(turnEvent, ct);
     }
 
+    /// <summary>
+    /// Internal implementation that calls the LLM for intent extraction and applies validated updates.
+    /// </summary>
     private async Task<LearningStepResult> ProcessInternalAsync(TurnEvent turnEvent, CancellationToken ct)
     {
         var extractionResult = await ExtractIntentAsync(turnEvent, ct).ConfigureAwait(false);
@@ -133,6 +151,10 @@ public sealed class IdentityIntentExtractionStep(
         };
     }
 
+    /// <summary>
+    /// Applies validated identity intent updates to the user preference page,
+    /// merging with existing fields using confidence-based conflict resolution.
+    /// </summary>
     private async Task<IReadOnlyList<string>> ApplyUpdatesAsync(
         string pageKey,
         TurnEvent turnEvent,
@@ -199,6 +221,9 @@ public sealed class IdentityIntentExtractionStep(
         return applied;
     }
 
+    /// <summary>
+    /// Calls the LLM to extract behavior intent from the conversation transcript.
+    /// </summary>
     private async Task<IdentityIntentExtractionResult> ExtractIntentAsync(TurnEvent turnEvent, CancellationToken ct)
     {
         var request = new LiteLlmChatCompletionRequest
@@ -245,6 +270,9 @@ public sealed class IdentityIntentExtractionStep(
         return ParseExtraction(content);
     }
 
+    /// <summary>
+    /// Builds a conversation transcript for intent extraction, including user message, assistant response, and recent history.
+    /// </summary>
     private static string BuildIntentTranscript(TurnEvent turnEvent)
     {
         var builder = new StringBuilder();
@@ -270,6 +298,9 @@ public sealed class IdentityIntentExtractionStep(
             : transcript[..MaxIntentTranscriptChars];
     }
 
+    /// <summary>
+    /// Parses the LLM response into an identity intent extraction result.
+    /// </summary>
     private static IdentityIntentExtractionResult ParseExtraction(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -289,6 +320,9 @@ public sealed class IdentityIntentExtractionStep(
         }
     }
 
+    /// <summary>
+    /// Normalizes the extracted value based on the field type (e.g., autonomy level mappings).
+    /// </summary>
     private static string NormalizeValue(string field, string rawValue)
     {
         var value = rawValue.Trim();
@@ -319,6 +353,9 @@ public sealed class IdentityIntentExtractionStep(
         return value.Length > 400 ? value[..400].Trim() : value;
     }
 
+    /// <summary>
+    /// Truncates a string to the specified maximum character length.
+    /// </summary>
     private static string Truncate(string value, int maxChars)
     {
         if (string.IsNullOrEmpty(value) || value.Length <= maxChars)
@@ -329,6 +366,9 @@ public sealed class IdentityIntentExtractionStep(
         return value[..maxChars];
     }
 
+    /// <summary>
+    /// Result model for the identity intent extraction LLM call.
+    /// </summary>
     private sealed record IdentityIntentExtractionResult
     {
         [JsonPropertyName("hasBehaviorIntent")]
@@ -340,6 +380,9 @@ public sealed class IdentityIntentExtractionStep(
         public static IdentityIntentExtractionResult Empty { get; } = new();
     }
 
+    /// <summary>
+    /// Represents a single identity field update extracted from the conversation.
+    /// </summary>
     private sealed record IdentityIntentUpdate
     {
         [JsonPropertyName("field")]
@@ -355,6 +398,9 @@ public sealed class IdentityIntentExtractionStep(
         public string? Reason { get; init; }
     }
 
+    /// <summary>
+    /// Parses and serializes identity documents with YAML frontmatter metadata and structured fields.
+    /// </summary>
     private sealed class ParsedIdentityDocument
     {
         private static readonly HashSet<string> ReservedMetadataKeys = new(StringComparer.OrdinalIgnoreCase)
@@ -573,6 +619,9 @@ public sealed class IdentityIntentExtractionStep(
         }
     }
 
+    /// <summary>
+    /// Represents a single identity field with its value, confidence, and metadata.
+    /// </summary>
     private sealed class ParsedIdentityField
     {
         public required string Name { get; init; }

@@ -6,8 +6,17 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Learning;
 
+/// <summary>
+/// Registers learning services, steps, and HTTP clients in the dependency injection container.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Adds the LeanKernel learning subsystem and enabled learning steps.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="config">The learning configuration used to conditionally register components.</param>
+    /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddLeanKernelLearning(this IServiceCollection services, LearningConfig config)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -68,6 +77,9 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Ensures the provided base URL ends with a trailing slash.
+    /// </summary>
     private static string EnsureTrailingSlash(string value)
         => string.IsNullOrWhiteSpace(value)
             ? "http://litellm:4000/"

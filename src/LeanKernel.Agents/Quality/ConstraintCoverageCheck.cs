@@ -4,6 +4,9 @@ using LeanKernel.Abstractions.Models;
 
 namespace LeanKernel.Agents.Quality;
 
+/// <summary>
+/// Provides functionality for constraint coverage check.
+/// </summary>
 public sealed class ConstraintCoverageCheck : IQualityCheck
 {
     private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
@@ -13,12 +16,26 @@ public sealed class ConstraintCoverageCheck : IQualityCheck
 
     private static readonly Regex ConstraintWordPattern = new(@"\b[a-zA-Z][a-zA-Z0-9_-]{2,}\b", RegexOptions.Compiled);
 
+    /// <summary>
+    /// Gets name.
+    /// </summary>
     public string Name => "constraint-coverage";
 
+    /// <summary>
+    /// Gets order.
+    /// </summary>
     public int Order => 3;
 
+    /// <summary>
+    /// Gets failure outcome.
+    /// </summary>
     public QualityOutcome FailureOutcome => QualityOutcome.FailedLowCoverage;
 
+    /// <summary>
+    /// Executes evaluate.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns>The operation result.</returns>
     public QualityCheckResult Evaluate(QualityEvaluationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);

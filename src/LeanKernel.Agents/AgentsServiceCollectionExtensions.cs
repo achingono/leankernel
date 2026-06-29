@@ -8,16 +8,31 @@ using LeanKernel.Agents.Strategies;
 using LeanKernel.Agents.ToolSelection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Agents;
 
+/// <summary>
+/// Extension methods for registering agent services in the dependency injection container.
+/// </summary>
 public static class AgentsServiceCollectionExtensions
 {
+    /// <summary>
+    /// Registers the document library, ingestion services, and all built-in tools into the service collection.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection after adding the agents.</returns>
     public static IServiceCollection AddLeanKernelAgents(this IServiceCollection services)
         => services.AddLeanKernelAgents(new LeanKernelConfig());
 
+    /// <summary>
+    /// Registers the document library, ingestion services, and all built-in tools into the service collection with specified configuration.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="config">The agent configuration.</param>
+    /// <returns>The service collection after adding the agents.</returns>
     public static IServiceCollection AddLeanKernelAgents(this IServiceCollection services, LeanKernelConfig config)
     {
         ArgumentNullException.ThrowIfNull(services);

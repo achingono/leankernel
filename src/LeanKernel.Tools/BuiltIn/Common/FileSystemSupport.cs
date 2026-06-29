@@ -6,10 +6,18 @@ using LeanKernel.Abstractions.Configuration;
 
 namespace LeanKernel.Tools.BuiltIn.Common;
 
+/// <summary>
+/// Provides functionality for file system support.
+/// </summary>
 internal static class FileSystemSupport
 {
     private static readonly char[] PathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
 
+    /// <summary>
+    /// Executes normalize relative path.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <returns>The operation result.</returns>
     public static string NormalizeRelativePath(string path)
     {
         return string.IsNullOrWhiteSpace(path)
@@ -17,6 +25,12 @@ internal static class FileSystemSupport
             : path.Replace('\\', '/').TrimStart('/');
     }
 
+    /// <summary>
+    /// Executes resolve within root.
+    /// </summary>
+    /// <param name="root">The root.</param>
+    /// <param name="relativePath">The relative path.</param>
+    /// <returns>The operation result.</returns>
     public static string? ResolveWithinRoot(string root, string relativePath)
     {
         var normalizedRoot = Path.GetFullPath(root);
@@ -30,6 +44,12 @@ internal static class FileSystemSupport
         return HasSymlinkSegment(normalizedRoot, candidate) ? null : candidate;
     }
 
+    /// <summary>
+    /// Executes is within root.
+    /// </summary>
+    /// <param name="root">The root.</param>
+    /// <param name="candidate">The candidate.</param>
+    /// <returns>The operation result.</returns>
     public static bool IsWithinRoot(string root, string candidate)
     {
         var normalizedRoot = EnsureTrailingSeparator(Path.GetFullPath(root));
@@ -38,6 +58,11 @@ internal static class FileSystemSupport
             || normalizedCandidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Executes is text like extension.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <returns>The operation result.</returns>
     public static bool IsTextLikeExtension(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -48,6 +73,11 @@ internal static class FileSystemSupport
         return Path.GetExtension(path).ToLowerInvariant() is ".txt" or ".md" or ".json" or ".xml" or ".csv" or ".html" or ".htm" or ".yaml" or ".yml" or ".log" or ".ini" or ".cfg" or ".cs" or ".jsonl";
     }
 
+    /// <summary>
+    /// Executes is ocr candidate.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <returns>The operation result.</returns>
     public static bool IsOcrCandidate(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -58,24 +88,45 @@ internal static class FileSystemSupport
         return Path.GetExtension(path).ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".tiff" or ".tif" or ".pdf";
     }
 
+    /// <summary>
+    /// Executes is epub candidate.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <returns>The operation result.</returns>
     public static bool IsEpubCandidate(string? path)
     {
         return !string.IsNullOrWhiteSpace(path)
             && string.Equals(Path.GetExtension(path), ".epub", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Executes is docx candidate.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <returns>The operation result.</returns>
     public static bool IsDocxCandidate(string? path)
     {
         return !string.IsNullOrWhiteSpace(path)
             && string.Equals(Path.GetExtension(path), ".docx", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Executes is pptx candidate.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <returns>The operation result.</returns>
     public static bool IsPptxCandidate(string? path)
     {
         return !string.IsNullOrWhiteSpace(path)
             && string.Equals(Path.GetExtension(path), ".pptx", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Executes ensure scratch path.
+    /// </summary>
+    /// <param name="config">The config.</param>
+    /// <param name="extension">The extension.</param>
+    /// <returns>The operation result.</returns>
     public static string EnsureScratchPath(FileSystemConfig config, string extension)
     {
         var scratchRoot = Path.GetFullPath(config.ScratchRoot);
@@ -180,8 +231,18 @@ internal static class FileSystemSupport
     }
 }
 
+/// <summary>
+/// Provides functionality for text extraction helper.
+/// </summary>
 internal static class TextExtractionHelper
 {
+    /// <summary>
+    /// Executes extract async.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <param name="config">The config.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public static async Task<string> ExtractAsync(string path, FileSystemConfig config, CancellationToken ct)
     {
         if (FileSystemSupport.IsTextLikeExtension(path))

@@ -9,6 +9,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Context;
 
+/// <summary>
+/// Provides extension methods for context service collection.
+/// </summary>
 public static class ContextServiceCollectionExtensions
 {
     public static IServiceCollection AddLeanKernelContext(

@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Knowledge;
 
+/// <summary>
+/// Provides functionality for gbrain mcp client.
+/// </summary>
 public sealed class GBrainMcpClient
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
@@ -19,6 +22,13 @@ public sealed class GBrainMcpClient
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes call tool async.
+    /// </summary>
+    /// <param name="toolName">The tool name.</param>
+    /// <param name="args">The args.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public async Task<JsonElement?> CallToolAsync(string toolName, object? args = null, CancellationToken ct = default)
     {
         var requestId = Interlocked.Increment(ref _requestId);
@@ -52,6 +62,11 @@ public sealed class GBrainMcpClient
         return UnwrapToolResult(result.Result.Value);
     }
 
+    /// <summary>
+    /// Lists tools async.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public async Task<IReadOnlyList<McpToolInfo>> ListToolsAsync(CancellationToken ct = default)
     {
         var requestId = Interlocked.Increment(ref _requestId);
@@ -176,71 +191,141 @@ public sealed class GBrainMcpClient
     }
 }
 
+/// <summary>
+/// Provides functionality for mcp request.
+/// </summary>
 internal sealed class McpRequest
 {
     [JsonPropertyName("jsonrpc")]
+    /// <summary>
+    /// Gets or sets json rpc.
+    /// </summary>
     public string JsonRpc { get; set; } = "2.0";
 
     [JsonPropertyName("id")]
+    /// <summary>
+    /// Gets or sets id.
+    /// </summary>
     public int Id { get; set; }
 
     [JsonPropertyName("method")]
+    /// <summary>
+    /// Gets or sets method.
+    /// </summary>
     public required string Method { get; set; }
 
     [JsonPropertyName("params")]
+    /// <summary>
+    /// Gets or sets params.
+    /// </summary>
     public object? Params { get; set; }
 }
 
+/// <summary>
+/// Provides functionality for mcp tool call params.
+/// </summary>
 internal sealed class McpToolCallParams
 {
     [JsonPropertyName("name")]
+    /// <summary>
+    /// Gets or sets name.
+    /// </summary>
     public required string Name { get; set; }
 
     [JsonPropertyName("arguments")]
+    /// <summary>
+    /// Gets or sets arguments.
+    /// </summary>
     public object? Arguments { get; set; }
 }
 
+/// <summary>
+/// Provides functionality for mcp response.
+/// </summary>
 internal sealed class McpResponse
 {
     [JsonPropertyName("jsonrpc")]
+    /// <summary>
+    /// Gets or sets json rpc.
+    /// </summary>
     public string? JsonRpc { get; set; }
 
     [JsonPropertyName("id")]
+    /// <summary>
+    /// Gets or sets id.
+    /// </summary>
     public int Id { get; set; }
 
     [JsonPropertyName("result")]
+    /// <summary>
+    /// Gets or sets result.
+    /// </summary>
     public JsonElement? Result { get; set; }
 
     [JsonPropertyName("error")]
+    /// <summary>
+    /// Gets or sets error.
+    /// </summary>
     public McpError? Error { get; set; }
 }
 
+/// <summary>
+/// Provides functionality for mcp error.
+/// </summary>
 internal sealed class McpError
 {
     [JsonPropertyName("code")]
+    /// <summary>
+    /// Gets or sets code.
+    /// </summary>
     public int Code { get; set; }
 
     [JsonPropertyName("message")]
+    /// <summary>
+    /// Gets or sets message.
+    /// </summary>
     public string Message { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Provides functionality for mcp tool list result.
+/// </summary>
 internal sealed class McpToolListResult
 {
     [JsonPropertyName("tools")]
+    /// <summary>
+    /// Gets or sets tools.
+    /// </summary>
     public List<McpToolInfo> Tools { get; set; } = [];
 }
 
+/// <summary>
+/// Provides functionality for mcp tool result.
+/// </summary>
 internal sealed class McpToolResult
 {
     [JsonPropertyName("content")]
+    /// <summary>
+    /// Gets or sets content.
+    /// </summary>
     public List<McpContentItem> Content { get; set; } = [];
 
     [JsonPropertyName("structuredContent")]
+    /// <summary>
+    /// Gets or sets structured content.
+    /// </summary>
     public JsonElement? StructuredContent { get; set; }
 
     [JsonPropertyName("isError")]
+    /// <summary>
+    /// Gets or sets is error.
+    /// </summary>
     public bool IsError { get; set; }
 
+    /// <summary>
+    /// Gets message.
+    /// </summary>
+    /// <returns>The operation result.</returns>
     public string GetMessage()
     {
         var text = Content.FirstOrDefault(item => item.Type.Equals("text", StringComparison.OrdinalIgnoreCase))?.Text;
@@ -248,20 +333,38 @@ internal sealed class McpToolResult
     }
 }
 
+/// <summary>
+/// Provides functionality for mcp content item.
+/// </summary>
 internal sealed class McpContentItem
 {
     [JsonPropertyName("type")]
+    /// <summary>
+    /// Gets or sets type.
+    /// </summary>
     public string Type { get; set; } = string.Empty;
 
     [JsonPropertyName("text")]
+    /// <summary>
+    /// Gets or sets text.
+    /// </summary>
     public string? Text { get; set; }
 }
 
+/// <summary>
+/// Provides functionality for mcp tool info.
+/// </summary>
 public sealed class McpToolInfo
 {
     [JsonPropertyName("name")]
+    /// <summary>
+    /// Gets or sets name.
+    /// </summary>
     public string Name { get; set; } = string.Empty;
 
     [JsonPropertyName("description")]
+    /// <summary>
+    /// Gets or sets description.
+    /// </summary>
     public string? Description { get; set; }
 }

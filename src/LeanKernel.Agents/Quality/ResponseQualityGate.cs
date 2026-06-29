@@ -4,6 +4,9 @@ using LeanKernel.Abstractions.Models;
 
 namespace LeanKernel.Agents.Quality;
 
+/// <summary>
+/// Provides functionality for response quality gate.
+/// </summary>
 public sealed class ResponseQualityGate : IResponseQualityGate
 {
     private readonly IReadOnlyList<IQualityCheck> _checks;
@@ -23,6 +26,11 @@ public sealed class ResponseQualityGate : IResponseQualityGate
         _checks = checks.OrderBy(check => check.Order).ToArray();
     }
 
+    /// <summary>
+    /// Executes evaluate.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns>The operation result.</returns>
     public QualityGateResult Evaluate(QualityEvaluationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);

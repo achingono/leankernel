@@ -2,6 +2,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Plugins.BuiltIn.Skills;
 
+/// <summary>
+/// Manages the lifecycle and lookup of loaded skills.
+/// </summary>
 public sealed class RuntimeSkillRegistry
 {
     private readonly List<string> _basePaths;
@@ -10,9 +13,22 @@ public sealed class RuntimeSkillRegistry
     private readonly Dictionary<string, SkillDefinition> _skills = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _quarantined = new();
 
+    /// <summary>
+    /// Gets the dictionary of loaded skills.
+    /// </summary>
     public IReadOnlyDictionary<string, SkillDefinition> Skills => _skills;
+
+    /// <summary>
+    /// Gets the list of skill files that failed to load correctly.
+    /// </summary>
     public IReadOnlyList<string> Quarantined => _quarantined;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref:RuntimeSkillRegistry/> class.
+    /// </summary>
+    /// <param name="basePaths">The base paths to scan for skills.</param>
+    /// <param name="parser">The parser used to parse skill files.</param>
+    /// <param name="logger">The logger.</param>
     public RuntimeSkillRegistry(
         IEnumerable<string> basePaths,
         SkillParser parser,
@@ -23,6 +39,9 @@ public sealed class RuntimeSkillRegistry
         _logger = logger;
     }
 
+    /// <summary>
+    /// Scans the base paths for skill files and loads them into the registry.
+    /// </summary>
     public void LoadAll()
     {
         _skills.Clear();
@@ -70,12 +89,23 @@ public sealed class RuntimeSkillRegistry
         _logger.LogInformation("Skill registry loaded {Count} skills, {Quarantined} quarantined", _skills.Count, _quarantined.Count);
     }
 
+    /// <summary>
+    /// Retrieves a skill by its name.
+    /// </summary>
+    /// <param name="name">The name of the skill.</param>
+    /// <returns>The skill definition, or null if not found.</returns>
     public SkillDefinition? GetSkill(string name)
     {
         _skills.TryGetValue(name, out var skill);
         return skill;
     }
 
+    /// <summary>
+    /// Validates the properties of a skill definition.
+    /// </summary>
+    /// <param name="skill">The skill to validate.</param>
+    /// <param name="reason">The reason for validation failure, if any.</param>
+    /// <returns>True if the skill is valid, otherwise false.</returns>
     private static bool Validate(SkillDefinition skill, out string reason)
     {
         if (string.IsNullOrWhiteSpace(skill.Name))

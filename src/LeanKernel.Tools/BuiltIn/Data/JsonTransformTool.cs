@@ -7,12 +7,20 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace LeanKernel.Tools.BuiltIn.Data;
 
+/// <summary>
+/// Provides functionality for json transform tool.
+/// </summary>
 public static class JsonTransformTool
 {
     private const string ToolName = "json_transform";
     private const int MaxOperations = 50;
     private const int MaxOutputCharacters = 200_000;
 
+    /// <summary>
+    /// Executes create.
+    /// </summary>
+    /// <param name="scopeFactory">The scope factory.</param>
+    /// <returns>The operation result.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);
@@ -790,7 +798,17 @@ public static class JsonTransformTool
 
     private readonly record struct PathSegment(PathSegmentKind Kind, string? PropertyName, int Index)
     {
+        /// <summary>
+        /// Executes property.
+        /// </summary>
+        /// <param name="name">The name.</param>
+        /// <returns>The operation result.</returns>
         public static PathSegment Property(string name) => new(PathSegmentKind.Property, name, -1);
+        /// <summary>
+        /// Executes array index.
+        /// </summary>
+        /// <param name="index">The index.</param>
+        /// <returns>The operation result.</returns>
         public static PathSegment ArrayIndex(int index) => new(PathSegmentKind.Index, null, index);
     }
 }

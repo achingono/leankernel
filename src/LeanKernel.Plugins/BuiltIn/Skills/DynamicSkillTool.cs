@@ -10,11 +10,19 @@ public static class DynamicSkillTool
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+/// <summary>
+    /// Creates a <see cref="ToolDefinition"/> for a given skill operation.
+    /// </summary>
+    /// <param name="skill">The skill specification.</param>
+    /// <param name="operation">The specific operation within the skill.</param>
+    /// <param name="httpClientFactory">The factory to create an HTTP client.</param>
+    /// <returns>A new <see cref="ToolDefinition"/>.</returns>
     public static ToolDefinition CreateTool(
         SkillDefinition skill,
         SkillOperation operation,
         IHttpClientFactory httpClientFactory)
-    {
+{
+
         ArgumentNullException.ThrowIfNull(skill);
         ArgumentNullException.ThrowIfNull(operation);
         ArgumentNullException.ThrowIfNull(httpClientFactory);

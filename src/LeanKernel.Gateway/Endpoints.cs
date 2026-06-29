@@ -6,8 +6,15 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LeanKernel.Gateway;
 
+/// <summary>
+/// Provides functionality for endpoints.
+/// </summary>
 public static class Endpoints
 {
+    /// <summary>
+    /// Executes map endpoints.
+    /// </summary>
+    /// <param name="app">The app.</param>
     public static void MapEndpoints(this WebApplication app)
     {
         app.MapPost("/api/chat", HandleChatAsync)

@@ -8,11 +8,19 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools.BuiltIn.FileSystem;
 
+/// <summary>
+/// Provides functionality for file edit tool.
+/// </summary>
 public static class FileEditTool
 {
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
 
     [SuppressMessage("Major Code Smell", "S3776", Justification = "Replacement logic is intentionally explicit and bounded.")]
+    /// <summary>
+    /// Executes create.
+    /// </summary>
+    /// <param name="scopeFactory">The scope factory.</param>
+    /// <returns>The operation result.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

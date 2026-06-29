@@ -6,6 +6,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels;
 
+/// <summary>
+/// A hosted service that manages the lifecycle and message routing for all configured channels.
+/// </summary>
 public sealed class ChannelHostedService(
     IEnumerable<IChannel> channels,
     IChannelRouter router,
@@ -19,6 +22,11 @@ public sealed class ChannelHostedService(
     private readonly Dictionary<IChannel, Func<ChannelMessage, Task>> _subscriptions = [];
     private bool _started;
 
+    /// <summary>
+    /// Starts the hosted service, initializing and starting all configured channels.
+    /// </summary>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task StartAsync(CancellationToken ct)
     {
         if (!_config.Enabled)
@@ -47,6 +55,7 @@ public sealed class ChannelHostedService(
         _started = true;
     }
 
+    /// <inheritdoc/>
     public async Task StopAsync(CancellationToken ct)
     {
         foreach (var subscription in _subscriptions)
@@ -64,6 +73,12 @@ public sealed class ChannelHostedService(
         _started = false;
     }
 
+    /// <summary>
+    /// Handles inbound messages from a channel and routes them through the router.
+    /// </summary>
+    /// <param name="channel">The source channel.</param>
+    /// <param name="message">The message to route.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     private async Task HandleMessageAsync(IChannel channel, ChannelMessage message)
     {
         try

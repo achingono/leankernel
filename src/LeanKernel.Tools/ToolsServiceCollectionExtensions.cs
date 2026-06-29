@@ -14,8 +14,16 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools;
 
+/// <summary>
+/// Extension methods for registering tools and related services in the dependency injection container.
+/// </summary>
 public static class ToolsServiceCollectionExtensions
 {
+    /// <summary>
+    /// Registers the document library, ingestion services, and all built-in tools into the service collection.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection after adding the tools.</returns>
     public static IServiceCollection AddLeanKernelTools(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);

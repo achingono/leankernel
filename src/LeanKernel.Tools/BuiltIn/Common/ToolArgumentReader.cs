@@ -4,8 +4,17 @@ using System.Text.Json.Nodes;
 
 namespace LeanKernel.Tools.BuiltIn.Common;
 
+/// <summary>
+/// Provides functionality for tool argument reader.
+/// </summary>
 internal static class ToolArgumentReader
 {
+    /// <summary>
+    /// Gets string.
+    /// </summary>
+    /// <param name="arguments">The arguments.</param>
+    /// <param name="name">The name.</param>
+    /// <returns>The operation result.</returns>
     public static string GetString(IDictionary<string, object?> arguments, string name)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -24,6 +33,13 @@ internal static class ToolArgumentReader
         };
     }
 
+    /// <summary>
+    /// Gets int32 or default.
+    /// </summary>
+    /// <param name="arguments">The arguments.</param>
+    /// <param name="name">The name.</param>
+    /// <param name="defaultValue">The default value.</param>
+    /// <returns>The operation result.</returns>
     public static int GetInt32OrDefault(IDictionary<string, object?> arguments, string name, int defaultValue)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -47,6 +63,13 @@ internal static class ToolArgumentReader
         return parsed;
     }
 
+    /// <summary>
+    /// Gets bool or default.
+    /// </summary>
+    /// <param name="arguments">The arguments.</param>
+    /// <param name="name">The name.</param>
+    /// <param name="defaultValue">The default value.</param>
+    /// <returns>The operation result.</returns>
     public static bool GetBoolOrDefault(IDictionary<string, object?> arguments, string name, bool defaultValue)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -66,6 +89,12 @@ internal static class ToolArgumentReader
         };
     }
 
+    /// <summary>
+    /// Gets json object or null.
+    /// </summary>
+    /// <param name="arguments">The arguments.</param>
+    /// <param name="name">The name.</param>
+    /// <returns>The operation result.</returns>
     public static JsonObject? GetJsonObjectOrNull(IDictionary<string, object?> arguments, string name)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -88,6 +117,12 @@ internal static class ToolArgumentReader
         };
     }
 
+    /// <summary>
+    /// Gets json array or null.
+    /// </summary>
+    /// <param name="arguments">The arguments.</param>
+    /// <param name="name">The name.</param>
+    /// <returns>The operation result.</returns>
     public static JsonArray? GetJsonArrayOrNull(IDictionary<string, object?> arguments, string name)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -109,6 +144,12 @@ internal static class ToolArgumentReader
         };
     }
 
+    /// <summary>
+    /// Gets string dictionary.
+    /// </summary>
+    /// <param name="arguments">The arguments.</param>
+    /// <param name="name">The name.</param>
+    /// <returns>The operation result.</returns>
     public static Dictionary<string, string> GetStringDictionary(IDictionary<string, object?> arguments, string name)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -151,6 +192,12 @@ internal static class ToolArgumentReader
         return result;
     }
 
+    /// <summary>
+    /// Gets object dictionary.
+    /// </summary>
+    /// <param name="arguments">The arguments.</param>
+    /// <param name="name">The name.</param>
+    /// <returns>The operation result.</returns>
     public static Dictionary<string, object?> GetObjectDictionary(IDictionary<string, object?> arguments, string name)
     {
         ArgumentNullException.ThrowIfNull(arguments);

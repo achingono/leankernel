@@ -7,6 +7,11 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Learning;
 
+/// <summary>
+/// Learning step that detects when the assistant indicates a knowledge or capability gap
+/// (e.g., "I don't know", "I can't help with that") and records these gaps for future improvement.
+/// Gaps are persisted as a JSON aggregate in the knowledge store.
+/// </summary>
 public sealed class CapabilityGapDetectionStep(
     IKnowledgeService knowledgeService,
     KnowledgePageUpdateCoordinator updateCoordinator,
@@ -35,10 +40,19 @@ public sealed class CapabilityGapDetectionStep(
     private readonly LeanKernelConfig _config = (config ?? throw new ArgumentNullException(nameof(config))).Value;
     private readonly ILogger<CapabilityGapDetectionStep> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+    /// <inheritdoc/>
     public string Name => "capability-gap-detection";
 
+    /// <inheritdoc/>
     public int Order => 20;
 
+    /// <summary>
+    /// Analyzes the assistant's response for known gap patterns and records any detected gaps.
+    /// Existing gaps are updated with occurrence counts; new gaps are appended.
+    /// </summary>
+    /// <param name="turnEvent">The turn event to analyze for capability gaps.</param>
+    /// <param name="ct">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A <see cref="LearningStepResult"/> indicating whether a gap was detected.</returns>
     public Task<LearningStepResult> ProcessAsync(TurnEvent turnEvent, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(turnEvent);
@@ -104,6 +118,9 @@ public sealed class CapabilityGapDetectionStep(
             ct);
     }
 
+    /// <summary>
+    /// Loads the existing capability gaps from the knowledge store.
+    /// </summary>
     private async Task<List<CapabilityGap>> LoadGapsAsync(CancellationToken ct)
     {
         var page = await _knowledgeService.GetPageAsync(LearningKeys.CapabilityGapsPageKey, ct).ConfigureAwait(false);
@@ -123,6 +140,9 @@ public sealed class CapabilityGapDetectionStep(
         }
     }
 
+    /// <summary>
+    /// Attempts to detect a capability gap by matching the assistant's response against known patterns.
+    /// </summary>
     private bool TryDetectGap(TurnEvent turnEvent, out CapabilityGap gap)
     {
         var response = turnEvent.AssistantResponse ?? turnEvent.Content;
@@ -151,6 +171,9 @@ public sealed class CapabilityGapDetectionStep(
         return false;
     }
 
+    /// <summary>
+    /// Enumerates all gap detection patterns from configuration and built-in defaults.
+    /// </summary>
     private IEnumerable<string> EnumeratePatterns()
         => _config.Routing.RefusalPatterns
             .Concat(DefaultPatterns)

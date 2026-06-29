@@ -6,6 +6,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Context.History;
 
+/// <summary>
+/// Provides functionality for history compaction strategy.
+/// </summary>
 public sealed class HistoryCompactionStrategy
 {
     private readonly ITokenEstimator _tokenEstimator;
@@ -22,6 +25,12 @@ public sealed class HistoryCompactionStrategy
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// Creates plan.
+    /// </summary>
+    /// <param name="turns">The turns.</param>
+    /// <param name="budgetTokens">The budget tokens.</param>
+    /// <returns>The operation result.</returns>
     public HistoryCompactionPlan CreatePlan(IReadOnlyList<ConversationTurn> turns, int budgetTokens)
     {
         ArgumentNullException.ThrowIfNull(turns);
@@ -126,12 +135,30 @@ public sealed class HistoryCompactionStrategy
     }
 }
 
+/// <summary>
+/// Provides functionality for history compaction plan.
+/// </summary>
 public sealed record HistoryCompactionPlan
 {
+    /// <summary>
+    /// Gets or sets assigned entries.
+    /// </summary>
     public IReadOnlyList<ShapedHistoryEntry> AssignedEntries { get; init; } = [];
+    /// <summary>
+    /// Gets or sets verbatim turns.
+    /// </summary>
     public IReadOnlyList<ConversationTurn> VerbatimTurns { get; init; } = [];
+    /// <summary>
+    /// Gets or sets compacted turns.
+    /// </summary>
     public IReadOnlyList<ConversationTurn> CompactedTurns { get; init; } = [];
+    /// <summary>
+    /// Gets or sets summarized turns.
+    /// </summary>
     public IReadOnlyList<ConversationTurn> SummarizedTurns { get; init; } = [];
+    /// <summary>
+    /// Gets or sets dropped turns.
+    /// </summary>
     public IReadOnlyList<ConversationTurn> DroppedTurns { get; init; } = [];
     public HistoryShapingDiagnostics Diagnostics { get; init; } = new();
 }

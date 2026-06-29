@@ -8,6 +8,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Diagnostics;
 
+/// <summary>
+/// Provides functionality for context diagnostics service.
+/// </summary>
 public sealed class ContextDiagnosticsService(
     ILogger<ContextDiagnosticsService> logger,
     IOptions<DiagnosticsConfig> diagnosticsConfig,

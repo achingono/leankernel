@@ -5,8 +5,17 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels;
 
+/// <summary>
+/// Extension methods for configuring channels in the dependency injection container.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Adds the LeanKernel channels to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="config">The channels configuration.</param>
+    /// <returns>The service collection after adding channels.</returns>
     public static IServiceCollection AddLeanKernelChannels(this IServiceCollection services, ChannelsConfig config)
     {
         ArgumentNullException.ThrowIfNull(services);

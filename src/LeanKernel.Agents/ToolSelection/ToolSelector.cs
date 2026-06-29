@@ -8,6 +8,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Agents.ToolSelection;
 
+/// <summary>
+/// Provides functionality for tool selector.
+/// </summary>
 public sealed class ToolSelector : IToolSelector
 {
     private readonly AgentFactory _agentFactory;

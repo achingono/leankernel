@@ -10,6 +10,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Context.History;
 
+/// <summary>
+/// Provides functionality for conversation compactor.
+/// </summary>
 public sealed class ConversationCompactor : IConversationCompactor
 {
     private const string CompactPrompt = "Extract the key facts, decisions, and context from these conversation turns. Be concise.";
@@ -47,9 +50,21 @@ public sealed class ConversationCompactor : IConversationCompactor
         }
     }
 
+    /// <summary>
+    /// Compacts async.
+    /// </summary>
+    /// <param name="turns">The turns.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public Task<string> CompactAsync(IReadOnlyList<ConversationTurn> turns, CancellationToken ct = default)
         => SendCompletionAsync(CompactPrompt, turns, ct);
 
+    /// <summary>
+    /// Summarizes async.
+    /// </summary>
+    /// <param name="turns">The turns.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public Task<string> SummarizeAsync(IReadOnlyList<ConversationTurn> turns, CancellationToken ct = default)
         => SendCompletionAsync(SummarizePrompt, turns, ct);
 
@@ -109,8 +124,14 @@ public sealed class ConversationCompactor : IConversationCompactor
 
     private sealed record ChatCompletionResponse([property: JsonPropertyName("choices")] IReadOnlyList<ChatCompletionResponse.Choice> Choices)
     {
+        /// <summary>
+        /// Provides functionality for choice.
+        /// </summary>
         public sealed record Choice([property: JsonPropertyName("message")] Message Message);
 
+        /// <summary>
+        /// Provides functionality for message.
+        /// </summary>
         public sealed record Message([property: JsonPropertyName("content")] string Content);
     }
 }

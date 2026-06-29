@@ -12,6 +12,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools.BuiltIn.Data;
 
+/// <summary>
+/// Provides functionality for csv xlsx read write tool.
+/// </summary>
 public static class CsvXlsxReadWriteTool
 {
     private const string ToolName = "csv_xlsx_read_write";
@@ -19,6 +22,11 @@ public static class CsvXlsxReadWriteTool
     private const int MaxRowsLimit = 5000;
     private const string DefaultSheetName = "Sheet1";
 
+    /// <summary>
+    /// Executes create.
+    /// </summary>
+    /// <param name="scopeFactory">The scope factory.</param>
+    /// <returns>The operation result.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

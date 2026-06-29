@@ -8,6 +8,11 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Learning;
 
+/// <summary>
+/// Background hosted service that drains turn events from the <see cref="TurnEventQueue"/>
+/// and processes them through the <see cref="ISelfImprovementPipeline"/>.
+/// Supports configurable concurrency and graceful shutdown with a drain timeout.
+/// </summary>
 public sealed class LearningBackgroundWorker(
     TurnEventQueue queue,
     ISelfImprovementPipeline pipeline,
@@ -26,6 +31,11 @@ public sealed class LearningBackgroundWorker(
     private Task? _runTask;
     private long _workItemId;
 
+    /// <summary>
+    /// Starts the background worker loop if learning is enabled via configuration.
+    /// </summary>
+    /// <param name="ct">A cancellation token that can be used to cancel the start operation.</param>
+    /// <returns>A task that completes when the worker has started.</returns>
     public Task StartAsync(CancellationToken ct)
     {
         if (!_config.Enabled)
@@ -38,6 +48,12 @@ public sealed class LearningBackgroundWorker(
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Signals the queue to complete and waits for in-flight work items to finish,
+    /// with a configurable drain timeout. Abandons remaining work if the timeout expires.
+    /// </summary>
+    /// <param name="ct">A cancellation token that can be used to cancel the stop operation.</param>
+    /// <returns>A task that completes when the worker has stopped or the drain timeout expired.</returns>
     public async Task StopAsync(CancellationToken ct)
     {
         if (_runTask is null)
@@ -67,12 +83,16 @@ public sealed class LearningBackgroundWorker(
         }
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         _shutdownCts.Dispose();
         _concurrencyGate.Dispose();
     }
 
+    /// <summary>
+    /// Main loop that reads turn events from the queue and dispatches them for processing.
+    /// </summary>
     private async Task RunAsync(CancellationToken ct)
     {
         try
@@ -102,6 +122,9 @@ public sealed class LearningBackgroundWorker(
         }
     }
 
+    /// <summary>
+    /// Processes a single turn event through the self-improvement pipeline.
+    /// </summary>
     private async Task ProcessTurnEventAsync(long workItemId, TurnEvent turnEvent, CancellationToken ct)
     {
         try
@@ -127,6 +150,9 @@ public sealed class LearningBackgroundWorker(
         }
     }
 
+    /// <summary>
+    /// Observes a work item task to completion and cleans up tracking state.
+    /// </summary>
     private async Task ObserveCompletionAsync(long workItemId, Task task)
     {
         try
@@ -143,6 +169,9 @@ public sealed class LearningBackgroundWorker(
         }
     }
 
+    /// <summary>
+    /// Waits for all in-flight work items to complete during shutdown.
+    /// </summary>
     private async Task AwaitInFlightAsync(CancellationToken ct)
     {
         var tasks = _inFlight.Values.ToArray();

@@ -3,6 +3,9 @@ using LeanKernel.Abstractions.Models;
 
 namespace LeanKernel.Agents.Quality;
 
+/// <summary>
+/// Defines the contract for iquality check.
+/// </summary>
 internal interface IQualityCheck
 {
     string Name { get; }

@@ -12,6 +12,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels;
 
+/// <summary>
+/// Provides functionality for signal channel.
+/// </summary>
 public sealed class SignalChannel : IChannel
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
@@ -39,12 +42,20 @@ public sealed class SignalChannel : IChannel
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// Gets channel id.
+    /// </summary>
     public string ChannelId => "signal";
 
     public bool IsConnected => Volatile.Read(ref _connectedCount) > 0;
 
     public event Func<ChannelMessage, Task>? MessageReceived;
 
+    /// <summary>
+    /// Starts async.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public Task StartAsync(CancellationToken ct = default)
     {
         if (!_config.Enabled)
@@ -80,6 +91,11 @@ public sealed class SignalChannel : IChannel
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Stops async.
+    /// </summary>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public async Task StopAsync(CancellationToken ct = default)
     {
         List<Task> tasks;
@@ -113,6 +129,7 @@ public sealed class SignalChannel : IChannel
         }
     }
 
+    /// <inheritdoc/>
     public async Task SendAsync(string recipientId, string message, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(recipientId);
@@ -171,9 +188,21 @@ public sealed class SignalChannel : IChannel
         }
     }
 
+    /// <summary>
+    /// Starts typing async.
+    /// </summary>
+    /// <param name="recipientId">The recipient id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public Task StartTypingAsync(string recipientId, CancellationToken ct = default)
         => SendTypingIndicatorAsync(recipientId, stop: false, ct);
 
+    /// <summary>
+    /// Stops typing async.
+    /// </summary>
+    /// <param name="recipientId">The recipient id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public Task StopTypingAsync(string recipientId, CancellationToken ct = default)
         => SendTypingIndicatorAsync(recipientId, stop: true, ct);
 
@@ -436,44 +465,86 @@ public sealed class SignalChannel : IChannel
     }
 }
 
+/// <summary>
+/// Provides functionality for signal receive envelope.
+/// </summary>
 internal sealed class SignalReceiveEnvelope
 {
     [JsonPropertyName("envelope")]
+    /// <summary>
+    /// Gets or sets envelope.
+    /// </summary>
     public SignalEnvelope? Envelope { get; set; }
 
     [JsonPropertyName("account")]
+    /// <summary>
+    /// Gets or sets account.
+    /// </summary>
     public string? Account { get; set; }
 }
 
+/// <summary>
+/// Provides functionality for signal envelope.
+/// </summary>
 internal sealed class SignalEnvelope
 {
     [JsonPropertyName("sourceNumber")]
+    /// <summary>
+    /// Gets or sets source number.
+    /// </summary>
     public string? SourceNumber { get; set; }
 
     [JsonPropertyName("source")]
+    /// <summary>
+    /// Gets or sets source.
+    /// </summary>
     public string? Source { get; set; }
 
     [JsonPropertyName("timestamp")]
+    /// <summary>
+    /// Gets or sets timestamp.
+    /// </summary>
     public long? Timestamp { get; set; }
 
     [JsonPropertyName("dataMessage")]
+    /// <summary>
+    /// Gets or sets data message.
+    /// </summary>
     public SignalDataMessage? DataMessage { get; set; }
 }
 
+/// <summary>
+/// Provides functionality for signal data message.
+/// </summary>
 internal sealed class SignalDataMessage
 {
     [JsonPropertyName("message")]
+    /// <summary>
+    /// Gets or sets message.
+    /// </summary>
     public string? Message { get; set; }
 }
 
+/// <summary>
+/// Provides functionality for signal send request.
+/// </summary>
 internal sealed class SignalSendRequest
 {
     [JsonPropertyName("number")]
+    /// <summary>
+    /// Gets or sets number.
+    /// </summary>
     public string Number { get; set; } = string.Empty;
 
     [JsonPropertyName("recipients")]
+    /// <summary>
+    /// Gets or sets recipients.
+    /// </summary>
     public List<string> Recipients { get; set; } = [];
 
     [JsonPropertyName("message")]
+    /// <summary>
+    /// Gets or sets message.
+    /// </summary>
     public string Message { get; set; } = string.Empty;
 }

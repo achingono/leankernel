@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Agents;
 
+/// <summary>
+/// A chat client that supports replaying legacy function-call payloads.
+/// </summary>
 internal sealed class LegacyFunctionCallChatClient : IChatClient
 {
     private const int MaxReplayAttempts = 1;
@@ -14,6 +17,13 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
     private readonly IToolExecutor _toolExecutor;
     private readonly ILogger<LegacyFunctionCallChatClient> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LegacyFunctionCallChatClient"/> class.
+    /// </summary>
+    /// <param name="functionInvokingClient">The client for invoking functions.</param>
+    /// <param name="rawClient">The raw chat client for direct messaging.</param>
+    /// <param name="toolExecutor">The tool executor.</param>
+    /// <param name="logger">The logger.</param>
     public LegacyFunctionCallChatClient(
         IChatClient functionInvokingClient,
         IChatClient rawClient,
@@ -26,6 +36,7 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <inheritdoc/>
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
@@ -35,6 +46,7 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
         return GetResponseCoreAsync(messages, options, cancellationToken);
     }
 
+    /// <inheritdoc/>
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
@@ -46,9 +58,11 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
         }
     }
 
+    /// <inheritdoc/>
     public object? GetService(Type serviceType, object? serviceKey = null)
         => _functionInvokingClient.GetService(serviceType, serviceKey);
 
+    /// <inheritdoc/>
     public void Dispose()
         => _functionInvokingClient.Dispose();
 
@@ -90,13 +104,13 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
         replayMessages.AddRange(originalMessages);
         replayMessages.Add(new ChatMessage(ChatRole.Assistant, [new FunctionCallContent(callId, legacyCall.Name, legacyCall.Parameters)]));
         replayMessages.Add(new ChatMessage(ChatRole.Tool, [new FunctionResultContent(callId, execution.Output ?? string.Empty)]));
-
-        for (var attempt = 0; attempt <= MaxReplayAttempts; attempt++)
+        
+        for (var attempt = 0; attempt < MaxReplayAttempts; attempt++)
         {
-            var replayResponse = await _rawClient.GetResponseAsync(replayMessages, options, cancellationToken).ConfigureAwait(false);
-            if (!TryParseLegacyFunctionCall(replayResponse.Text, out _))
+            var response = await _rawClient.GetResponseAsync(replayMessages, options, cancellationToken).ConfigureAwait(false);
+            if (!TryParseLegacyFunctionCall(response.Text, out _))
             {
-                return replayResponse;
+                return response;
             }
         }
 
@@ -110,14 +124,13 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
     private static bool TryParseLegacyFunctionCall(string? responseText, out LegacyFunctionCall legacyCall)
     {
         legacyCall = default!;
-
         if (string.IsNullOrWhiteSpace(responseText))
         {
             return false;
         }
 
         var trimmed = responseText.Trim();
-        if (IsFencedJson(trimmed))
+        if (isFencedJson(trimmed))
         {
             var firstNewLine = trimmed.IndexOf('\n');
             var lastFence = trimmed.LastIndexOf("```", StringComparison.Ordinal);
@@ -160,8 +173,7 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
                 return false;
             }
 
-            if (typeElement.ValueKind != JsonValueKind.String
-                || !string.Equals(typeElement.GetString(), "function", StringComparison.OrdinalIgnoreCase))
+            if (typeElement.ValueKind != JsonValueKind.String || !string.Equals(typeElement.GetString(), "function", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -187,24 +199,16 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
         }
     }
 
-    private static bool IsFencedJson(string value)
+    private static bool isFencedJson(string value)
         => value.StartsWith("```", StringComparison.Ordinal)
             && value.EndsWith("```", StringComparison.Ordinal)
             && value.Contains('\n');
 
     private static bool TryGetProperty(JsonElement root, string propertyName, out JsonElement value)
     {
-        foreach (var property in root.EnumerateObject())
-        {
-            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
-            {
-                value = property.Value;
-                return true;
-            }
-        }
-
-        value = default;
-        return false;
+        var property = root.EnumerateObject().FirstOrDefault(p => string.Equals(p.Name, propertyName, StringComparison.OrdinalIgnoreCase));
+        value = property.Value;
+        return true;
     }
 
     private static IDictionary<string, object?> ConvertObject(JsonElement element)
@@ -214,7 +218,6 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
         {
             values[property.Name] = ConvertValue(property.Value);
         }
-
         return values;
     }
 
@@ -229,8 +232,15 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
             JsonValueKind.Number => element.GetDouble(),
             JsonValueKind.True => true,
             JsonValueKind.False => false,
-            JsonValueKind.Null or JsonValueKind.Undefined => null,
             _ => element.GetRawText(),
+        };
+
+    private static int ToInt32(long value)
+        => value switch
+        {
+            > int.MaxValue => int.MaxValue,
+            < int.MinValue => int.MinValue,
+            _ => (int)value
         };
 
     private sealed record LegacyFunctionCall(string Name, IDictionary<string, object?> Parameters);

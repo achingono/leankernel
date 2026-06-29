@@ -9,8 +9,16 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Plugins;
 
+/// <summary>
+/// Extension methods for configuring skills in the dependency injection container.
+/// </summary>
 public static class SkillExtensions
 {
+    /// <summary>
+    /// Adds the LeanKernel skills and their associated hosted services to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection to add skills to.</param>
+    /// <returns>The service collection after adding the skills.</returns>
     public static IServiceCollection AddLeanKernelSkills(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -30,6 +38,9 @@ public static class SkillExtensions
     }
 }
 
+/// <summary>
+/// A hosted service that initializes and manages the runtime skill registry.
+/// </summary>
 public sealed class SkillHostedService : IHostedService
 {
     private readonly RuntimeSkillRegistry _registry;
@@ -37,6 +48,13 @@ public sealed class SkillHostedService : IHostedService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<SkillHostedService> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref:SkillHostedService/> class.
+    /// </summary>
+    /// <param name="registry">The runtime skill registry.</param>
+    /// <param name="toolRegistry">The tool registry.</param>
+    /// <param name="httpClientFactory">The HTTP client factory.</param>
+    /// <param name="logger">The logger.</param>
     public SkillHostedService(
         RuntimeSkillRegistry registry,
         IToolRegistry toolRegistry,
@@ -49,6 +67,11 @@ public sealed class SkillHostedService : IHostedService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Starts the hosted service, loading all skills and registering their tools.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token to monitor for cancellation requests.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _registry.LoadAll();
@@ -70,5 +93,10 @@ public sealed class SkillHostedService : IHostedService
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Stops the hosted service.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token to monitor for cancellation requests.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

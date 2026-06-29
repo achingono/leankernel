@@ -7,9 +7,17 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools.BuiltIn.FileSystem;
 
+/// <summary>
+/// Provides functionality for file copy tool.
+/// </summary>
 public static class FileCopyTool
 {
     [SuppressMessage("Major Code Smell", "S3776", Justification = "Tool handler stays explicit for path safety checks.")]
+    /// <summary>
+    /// Executes create.
+    /// </summary>
+    /// <param name="scopeFactory">The scope factory.</param>
+    /// <returns>The operation result.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

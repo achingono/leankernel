@@ -9,6 +9,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools.BuiltIn.FileSystem;
 
+/// <summary>
+/// Provides functionality for file search tool.
+/// </summary>
 public static class FileSearchTool
 {
     private const int DefaultLimit = 20;
@@ -18,6 +21,11 @@ public static class FileSearchTool
     private const long DefaultMaxFileBytes = 1_000_000;
 
     [SuppressMessage("Major Code Smell", "S3776", Justification = "Search loop is intentionally explicit to keep safety and truncation rules readable.")]
+    /// <summary>
+    /// Executes create.
+    /// </summary>
+    /// <param name="scopeFactory">The scope factory.</param>
+    /// <returns>The operation result.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);
@@ -274,9 +282,21 @@ public static class FileSearchTool
 
     private sealed record Stats
     {
+        /// <summary>
+        /// Gets or sets scanned files.
+        /// </summary>
         public int ScannedFiles { get; set; }
+        /// <summary>
+        /// Gets or sets scanned directories.
+        /// </summary>
         public int ScannedDirectories { get; set; }
+        /// <summary>
+        /// Gets or sets skipped entries.
+        /// </summary>
         public int SkippedEntries { get; set; }
+        /// <summary>
+        /// Gets or sets truncated.
+        /// </summary>
         public bool Truncated { get; set; }
     }
 }

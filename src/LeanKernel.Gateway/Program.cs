@@ -211,6 +211,9 @@ static void ConfigureOpenTelemetry(WebApplicationBuilder builder, LeanKernelConf
     });
 }
 
+/// <summary>
+/// Provides functionality for program.
+/// </summary>
 public partial class Program
 {
 }

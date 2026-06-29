@@ -3,24 +3,45 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace LeanKernel.Gateway.Auth;
 
+/// <summary>
+/// Provides functionality for forwarded auth options.
+/// </summary>
 public sealed class ForwardedAuthOptions : AuthenticationSchemeOptions
 {
+    /// <summary>
+    /// Gets or sets enabled.
+    /// </summary>
     public bool Enabled { get; set; }
+    /// <summary>
+    /// Gets or sets require authenticated user.
+    /// </summary>
     public bool RequireAuthenticatedUser { get; set; } = true;
 
     // When true, the handler will only accept X-Auth-Request-User / X-Forwarded-User.
     // This avoids ambiguity when multiple forwarded identity headers are present.
+    /// <summary>
+    /// Gets or sets require user header.
+    /// </summary>
     public bool RequireUserHeader { get; set; } = true;
 
     // Name of the request header carrying the authenticated user identity.
     // Default checks both oauth2-proxy reverse-proxy (X-Forwarded-User)
     // and forward-auth (X-Auth-Request-User) modes.
+    /// <summary>
+    /// Gets or sets user header.
+    /// </summary>
     public string UserHeader { get; set; } = "X-Forwarded-User";
 
     // Fallback header checked when UserHeader yields no value.
+    /// <summary>
+    /// Gets or sets fallback user header.
+    /// </summary>
     public string? FallbackUserHeader { get; set; } = "X-Auth-Request-User";
 }
 
+/// <summary>
+/// Provides functionality for forwarded auth handler.
+/// </summary>
 public sealed class ForwardedAuthHandler : AuthenticationHandler<ForwardedAuthOptions>
 {
     public const string SchemeName = "ForwardedAuth";

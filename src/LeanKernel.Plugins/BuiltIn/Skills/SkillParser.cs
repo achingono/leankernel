@@ -4,6 +4,9 @@ using YamlDotNet.Serialization;
 
 namespace LeanKernel.Plugins.BuiltIn.Skills;
 
+/// <summary>
+/// Parses skill definitions from YAML frontmatter in files.
+/// </summary>
 public sealed partial class SkillParser
 {
     private static readonly Regex FrontmatterRegex = FrontmatterPattern();
@@ -13,6 +16,11 @@ public sealed partial class SkillParser
         .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.CamelCaseNamingConvention.Instance)
         .Build();
 
+    /// <summary>
+    /// Parses a skill definition from a file.
+    /// </summary>
+    /// <param name="filePath">The path to the skill file.</param>
+    /// <returns>The parsed <see cref="SkillDefinition"/>, or null if parsing fails or the file does not exist.</returns>
     public SkillDefinition? Parse(string filePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
@@ -24,6 +32,12 @@ public sealed partial class SkillParser
         return ParseContent(content, filePath);
     }
 
+    /// <summary>
+    /// Parses a skill definition from string content.
+    /// </summary>
+    /// <param name="content">The content of the skill file.</param>
+    /// <param name="sourcePath">The source path for the content, if available.</param>
+    /// <returns>The parsed <see cref="SkillDefinition"/>, or null if parsing fails.</returns>
     public SkillDefinition? ParseContent(string content, string? sourcePath = null)
     {
         var match = FrontmatterRegex.Match(content);

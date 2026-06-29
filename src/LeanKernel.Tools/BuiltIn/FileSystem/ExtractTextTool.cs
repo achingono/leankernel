@@ -6,8 +6,16 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools.BuiltIn.FileSystem;
 
+/// <summary>
+/// Provides functionality for extract text tool.
+/// </summary>
 public static class ExtractTextTool
 {
+    /// <summary>
+    /// Executes create.
+    /// </summary>
+    /// <param name="scopeFactory">The scope factory.</param>
+    /// <returns>The operation result.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

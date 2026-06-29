@@ -1,9 +1,18 @@
 using Microsoft.Extensions.AI;
+using System.Reflection;
 
 namespace LeanKernel.Agents;
 
+/// <summary>
+/// Utility class for reading token usage from chat responses.
+/// </summary>
 public static class ChatResponseMetadataReader
 {
+    /// <summary>
+    /// Extracts the total number of tokens used from a chat response.
+    /// </summary>
+    /// <param name="response">The chat response to inspect.</param>
+    /// <returns>The total number of tokens used.</returns>
     public static int GetTokensUsed(ChatResponse response)
     {
         ArgumentNullException.ThrowIfNull(response);

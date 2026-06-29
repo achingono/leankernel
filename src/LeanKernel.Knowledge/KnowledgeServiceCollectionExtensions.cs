@@ -5,8 +5,17 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Knowledge;
 
+/// <summary>
+/// Provides extension methods for knowledge service collection.
+/// </summary>
 public static class KnowledgeServiceCollectionExtensions
 {
+    /// <summary>
+    /// Adds lean kernel knowledge.
+    /// </summary>
+    /// <param name="services">The services.</param>
+    /// <param name="config">The config.</param>
+    /// <returns>The operation result.</returns>
     public static IServiceCollection AddLeanKernelKnowledge(this IServiceCollection services, GBrainConfig config)
     {
         ArgumentNullException.ThrowIfNull(services);

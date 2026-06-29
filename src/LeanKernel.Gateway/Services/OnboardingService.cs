@@ -6,6 +6,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Gateway.Services;
 
+/// <summary>
+/// Provides functionality for onboarding service.
+/// </summary>
 public sealed class OnboardingService(
     IKnowledgeService knowledgeService,
     IOnboardingDetector onboardingDetector,
@@ -27,6 +30,12 @@ public sealed class OnboardingService(
     private readonly IOnboardingDetector _onboardingDetector = onboardingDetector ?? throw new ArgumentNullException(nameof(onboardingDetector));
     private readonly ILogger<OnboardingService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+    /// <summary>
+    /// Executes load async.
+    /// </summary>
+    /// <param name="userId">The user id.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public async Task<OnboardingLoadResult> LoadAsync(string userId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
@@ -81,6 +90,13 @@ public sealed class OnboardingService(
             .ToList();
     }
 
+    /// <summary>
+    /// Executes save async.
+    /// </summary>
+    /// <param name="userId">The user id.</param>
+    /// <param name="draft">The draft.</param>
+    /// <param name="ct">The ct.</param>
+    /// <returns>The operation result.</returns>
     public async Task<OnboardingSaveResult> SaveAsync(string userId, OnboardingDraft draft, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
@@ -492,49 +508,106 @@ public sealed class OnboardingService(
         string Body);
 }
 
+/// <summary>
+/// Provides functionality for onboarding draft.
+/// </summary>
 public sealed class OnboardingDraft
 {
     [Required(ErrorMessage = "Display name is required.")]
     [MaxLength(120, ErrorMessage = "Display name must be 120 characters or fewer.")]
+    /// <summary>
+    /// Gets or sets display name.
+    /// </summary>
     public string DisplayName { get; set; } = string.Empty;
 
     [MaxLength(120, ErrorMessage = "Role or title must be 120 characters or fewer.")]
+    /// <summary>
+    /// Gets or sets role title.
+    /// </summary>
     public string RoleTitle { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets communication style.
+    /// </summary>
     public string CommunicationStyle { get; set; } = "balanced";
 
     [MaxLength(120, ErrorMessage = "Timezone must be 120 characters or fewer.")]
+    /// <summary>
+    /// Gets or sets timezone.
+    /// </summary>
     public string Timezone { get; set; } = string.Empty;
 
     [MaxLength(120, ErrorMessage = "Preferred language must be 120 characters or fewer.")]
+    /// <summary>
+    /// Gets or sets preferred language.
+    /// </summary>
     public string PreferredLanguage { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets domains.
+    /// </summary>
     public List<string> Domains { get; set; } = [];
 
+    /// <summary>
+    /// Gets or sets goals.
+    /// </summary>
     public List<string> Goals { get; set; } = [];
 
     [MaxLength(1200, ErrorMessage = "Other goals must be 1200 characters or fewer.")]
+    /// <summary>
+    /// Gets or sets other goals.
+    /// </summary>
     public string OtherGoals { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Provides functionality for onboarding load result.
+/// </summary>
 public sealed record OnboardingLoadResult
 {
+    /// <summary>
+    /// Gets or sets draft.
+    /// </summary>
     public required OnboardingDraft Draft { get; init; }
 
+    /// <summary>
+    /// Gets or sets has existing profile.
+    /// </summary>
     public bool HasExistingProfile { get; init; }
 
+    /// <summary>
+    /// Gets or sets gaps.
+    /// </summary>
     public IReadOnlyList<OnboardingGapInsight> Gaps { get; init; } = [];
 }
 
+/// <summary>
+/// Provides functionality for onboarding save result.
+/// </summary>
 public sealed record OnboardingSaveResult
 {
+    /// <summary>
+    /// Gets or sets is success.
+    /// </summary>
     public bool IsSuccess { get; init; }
 
+    /// <summary>
+    /// Gets or sets message.
+    /// </summary>
     public string Message { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets errors.
+    /// </summary>
     public IReadOnlyList<string> Errors { get; init; } = [];
 
+    /// <summary>
+    /// Gets or sets gaps.
+    /// </summary>
     public IReadOnlyList<OnboardingGapInsight> Gaps { get; init; } = [];
 }
 
+/// <summary>
+/// Provides functionality for onboarding gap insight.
+/// </summary>
 public sealed record OnboardingGapInsight(string FieldName, string Title, string Detail);

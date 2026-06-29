@@ -7,6 +7,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Context;
 
+/// <summary>
+/// Provides functionality for conversation history assembler.
+/// </summary>
 public sealed class ConversationHistoryAssembler
 {
     private readonly ITokenEstimator _tokenEstimator;

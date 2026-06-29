@@ -3,6 +3,9 @@ using LeanKernel.Abstractions.Models;
 
 namespace LeanKernel.Agents.Enhancement;
 
+/// <summary>
+/// Provides functionality for enhancement text matcher.
+/// </summary>
 internal static partial class EnhancementTextMatcher
 {
     private static readonly HashSet<string> StopWords = new(StringComparer.Ordinal)
