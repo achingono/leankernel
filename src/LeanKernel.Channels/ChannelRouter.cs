@@ -87,12 +87,45 @@ public sealed class ChannelRouter : IChannelRouter
             message.ChannelId,
             message.SenderId);
 
-        var response = await _runtime.RunTurnAsync(runtimeMessage, ct).ConfigureAwait(false);
-        await channel.SendAsync(message.SenderId, response, ct).ConfigureAwait(false);
+        await TrySignalTypingAsync(channel, message.SenderId, stop: false, ct).ConfigureAwait(false);
+
+        try
+        {
+            var response = await _runtime.RunTurnAsync(runtimeMessage, ct).ConfigureAwait(false);
+            await channel.SendAsync(message.SenderId, response, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            await TrySignalTypingAsync(channel, message.SenderId, stop: true, ct).ConfigureAwait(false);
+        }
 
         _logger.LogInformation(
             "Delivered channel response for {ChannelId} to {SenderId}",
             message.ChannelId,
             message.SenderId);
+    }
+
+    private async Task TrySignalTypingAsync(IChannel channel, string recipientId, bool stop, CancellationToken ct)
+    {
+        try
+        {
+            if (stop)
+            {
+                await channel.StopTypingAsync(recipientId, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await channel.StartTypingAsync(recipientId, ct).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(
+                ex,
+                "Typing indicator update failed for {ChannelId} to {RecipientId} (stop={Stop})",
+                channel.ChannelId,
+                recipientId,
+                stop);
+        }
     }
 }

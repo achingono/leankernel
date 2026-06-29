@@ -51,6 +51,8 @@ public class ChannelRouterTests
         channel.SentMessages.Should().ContainSingle();
         channel.SentMessages[0].RecipientId.Should().Be("+15550001");
         channel.SentMessages[0].Message.Should().Be("hi back");
+        channel.TypingStarts.Should().Be(1);
+        channel.TypingStops.Should().Be(1);
     }
 
     [Fact]
@@ -80,6 +82,8 @@ public class ChannelRouterTests
 
         runtime.Verify(candidate => candidate.RunTurnAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<CancellationToken>()), Times.Never);
         channel.SentMessages.Should().BeEmpty();
+        channel.TypingStarts.Should().Be(0);
+        channel.TypingStops.Should().Be(0);
     }
 
     [Fact]
@@ -108,6 +112,8 @@ public class ChannelRouterTests
 
         runtime.Verify(candidate => candidate.RunTurnAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<CancellationToken>()), Times.Never);
         channel.SentMessages.Should().BeEmpty();
+        channel.TypingStarts.Should().Be(0);
+        channel.TypingStops.Should().Be(0);
     }
 
     private static ChannelRouter CreateRouter(IAgentRuntime runtime, IChannel channel, ChannelsConfig config)
@@ -126,6 +132,10 @@ public class ChannelRouterTests
 
         public List<(string RecipientId, string Message)> SentMessages { get; } = [];
 
+        public int TypingStarts { get; private set; }
+
+        public int TypingStops { get; private set; }
+
         public event Func<ChannelMessage, Task>? MessageReceived
         {
             add { }
@@ -141,6 +151,18 @@ public class ChannelRouterTests
         public Task StopAsync(CancellationToken ct = default)
         {
             IsConnected = false;
+            return Task.CompletedTask;
+        }
+
+        public Task StartTypingAsync(string recipientId, CancellationToken ct = default)
+        {
+            TypingStarts++;
+            return Task.CompletedTask;
+        }
+
+        public Task StopTypingAsync(string recipientId, CancellationToken ct = default)
+        {
+            TypingStops++;
             return Task.CompletedTask;
         }
 

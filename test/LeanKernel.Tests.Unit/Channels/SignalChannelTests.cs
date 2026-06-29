@@ -101,6 +101,63 @@ public class SignalChannelTests
     }
 
     [Fact]
+    public async Task StartTypingAsync_and_StopTypingAsync_use_the_signal_typing_indicator_endpoint()
+    {
+        var handler = new RecordingHttpMessageHandler((_, _) => CreateJsonResponse(new { timestamp = 123L }));
+        var channel = CreateChannel(handler, new ChannelsConfig
+        {
+            Signal = new SignalChannelConfig
+            {
+                Enabled = true,
+                PhoneNumber = "+15550001"
+            }
+        });
+
+        await channel.StartTypingAsync("+15550002");
+        await channel.StopTypingAsync("+15550002");
+
+        handler.RequestUris.Should().HaveCount(2);
+        handler.RequestMethods[0].Should().Be(HttpMethod.Put);
+        handler.RequestMethods[1].Should().Be(HttpMethod.Delete);
+        handler.RequestUris[0].AbsolutePath.Should().Be("/v1/typing-indicator/%2B15550001");
+        handler.RequestUris[1].AbsolutePath.Should().Be("/v1/typing-indicator/%2B15550001");
+
+        using var firstBody = JsonDocument.Parse(handler.RequestBodies[0]);
+        using var secondBody = JsonDocument.Parse(handler.RequestBodies[1]);
+        firstBody.RootElement.GetProperty("recipient").GetString().Should().Be("+15550002");
+        secondBody.RootElement.GetProperty("recipient").GetString().Should().Be("+15550002");
+    }
+
+    [Fact]
+    public async Task SendAsync_splits_oversized_messages_before_posting_to_signal()
+    {
+        var handler = new RecordingHttpMessageHandler((_, _) => CreateJsonResponse(new { timestamp = 123L }));
+        var channel = CreateChannel(handler, new ChannelsConfig
+        {
+            Signal = new SignalChannelConfig
+            {
+                Enabled = true,
+                PhoneNumber = "+15550001"
+            }
+        });
+
+        var oversizedMessage = new string('x', 5742);
+
+        await channel.SendAsync("+15550002", oversizedMessage);
+
+        handler.RequestUris.Should().HaveCount(2);
+        handler.RequestBodies.Should().HaveCount(2);
+
+        var firstChunk = JsonDocument.Parse(handler.RequestBodies[0]).RootElement.GetProperty("message").GetString();
+        var secondChunk = JsonDocument.Parse(handler.RequestBodies[1]).RootElement.GetProperty("message").GetString();
+
+        firstChunk.Should().HaveLength(3500);
+        secondChunk.Should().HaveLength(2242);
+        firstChunk.Should().Be(new string('x', 3500));
+        secondChunk.Should().Be(new string('x', 2242));
+    }
+
+    [Fact]
     public async Task StartAsync_recovers_after_a_transient_poll_failure()
     {
         var requestCount = 0;
@@ -179,9 +236,11 @@ public class SignalChannelTests
 
         public ConcurrentQueue<string> RecordedBodies { get; } = new();
         public ConcurrentQueue<Uri> RecordedUris { get; } = new();
+        public ConcurrentQueue<HttpMethod> RecordedMethods { get; } = new();
 
         public List<string> RequestBodies => RecordedBodies.ToList();
         public List<Uri> RequestUris => RecordedUris.ToList();
+        public List<HttpMethod> RequestMethods => RecordedMethods.ToList();
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -189,6 +248,8 @@ public class SignalChannelTests
             {
                 RecordedUris.Enqueue(request.RequestUri);
             }
+
+            RecordedMethods.Enqueue(request.Method);
 
             RecordedBodies.Enqueue(request.Content is null
                 ? string.Empty

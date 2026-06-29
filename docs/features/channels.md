@@ -54,11 +54,11 @@ Signal is disabled by default. The adapter is registered only when:
 
 Even then, `StartAsync` refuses to poll when `PhoneNumber` is empty. That prevents a half-configured daemon connection from starting silently.
 ### Receive path
-The adapter polls:
+The adapter connects via WebSocket:
 ```text
-GET /v1/receive/{phoneNumber}?timeout={PollIntervalSeconds}
+ws://signal:8080/v1/receive/{phoneNumber}
 ```
-It reads envelopes from the Signal daemon, ignores payloads that lack a sender or text message, and turns valid messages into `ChannelMessage` values.
+It reads SSE envelopes from the Signal daemon, ignores payloads that lack a sender or text message, and turns valid messages into `ChannelMessage` values.
 ### Send path
 Outbound replies are posted to:
 ```text
@@ -70,7 +70,10 @@ with a JSON body containing:
 - `recipients`
 - `message`
 ### Reconnect behavior
-Polling failures increment a reconnect counter and apply exponential backoff based on `ReconnectDelaySeconds`. The delay is capped at 300 seconds, and polling stops after `MaxReconnectAttempts` consecutive failures.
+WebSocket disconnects increment a reconnect counter and apply exponential backoff based on `ReconnectDelaySeconds`. The delay is capped at 300 seconds, and reconnection stops after `MaxReconnectAttempts` consecutive failures. Each disconnection is logged with the elapsed connection duration, and the reconnect attempt count is included in the log message.
+
+### Rate-limit handling
+When `POST /v2/send` returns a 429 response (rate-limited), the engine logs the challenge tokens from the response body with a clear error message including the recovery instructions. The rate limit must be resolved by submitting a captcha to the signal-cli daemon's `POST /v1/accounts/{number}/rate-limit-challenge` endpoint. See the [Swarm operational notes](https://github.com/anomalyco/swarm/blob/main/docs/deployment/stacks/leankernel/operational-notes.md#signal-rate-limit-recovery) for the full recovery procedure.
 ## Adding a new channel
 A new adapter fits the existing design when it:
 

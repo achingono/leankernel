@@ -15,6 +15,9 @@ namespace LeanKernel.Channels;
 public sealed class SignalChannel : IChannel
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
+    private const int MaxSignalMessageChars = 3500;
+    private static readonly TimeSpan SignalSendTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan SignalTypingTimeout = TimeSpan.FromSeconds(5);
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly SignalChannelConfig _config;
@@ -115,32 +118,64 @@ public sealed class SignalChannel : IChannel
         ArgumentException.ThrowIfNullOrWhiteSpace(recipientId);
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
-        var numbers = _config.GetPhoneNumbers();
-        if (numbers.Count == 0)
-        {
-            throw new InvalidOperationException("No phone numbers configured for Signal channel");
-        }
-
-        var sourceNumber = numbers[0];
-        if (_senderNumber.TryGetValue(recipientId, out var mapped))
-        {
-            sourceNumber = mapped;
-        }
+        var sourceNumber = GetSourceNumber(recipientId);
+        using var timeoutCts = new CancellationTokenSource(SignalSendTimeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
         var client = _httpClientFactory.CreateClient("signal-daemon");
-        using var response = await client.PostAsJsonAsync(
-            "/v2/send",
-            new SignalSendRequest
-            {
-                Number = sourceNumber,
-                Recipients = [recipientId],
-                Message = message
-            },
-            SerializerOptions,
-            ct).ConfigureAwait(false);
+        var chunks = SplitMessage(message);
+        if (chunks.Count > 1)
+        {
+            _logger.LogWarning(
+                "Signal reply to {RecipientId} exceeded {MaxChars} characters; splitting into {ChunkCount} messages",
+                recipientId,
+                MaxSignalMessageChars,
+                chunks.Count);
+        }
 
-        response.EnsureSuccessStatusCode();
+        foreach (var chunk in chunks)
+        {
+            using var response = await client.PostAsJsonAsync(
+                "/v2/send",
+                new SignalSendRequest
+                {
+                    Number = sourceNumber,
+                    Recipients = [recipientId],
+                    Message = chunk
+                },
+                SerializerOptions,
+                linkedCts.Token).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                var statusCode = (int)response.StatusCode;
+
+                if (statusCode == 429)
+                {
+                    _logger.LogError(
+                        "Signal send rate-limited (429) for {RecipientId} from {SourceNumber}: {Body}",
+                        recipientId, sourceNumber, body);
+                    _logger.LogError(
+                        "Resolve via POST /v1/accounts/{{number}}/rate-limit-challenge with a captcha");
+                }
+                else
+                {
+                    _logger.LogError(
+                        "Signal send failed ({StatusCode}) for {RecipientId} from {SourceNumber}: {Body}",
+                        statusCode, recipientId, sourceNumber, body);
+                }
+
+                response.EnsureSuccessStatusCode();
+            }
+        }
     }
+
+    public Task StartTypingAsync(string recipientId, CancellationToken ct = default)
+        => SendTypingIndicatorAsync(recipientId, stop: false, ct);
+
+    public Task StopTypingAsync(string recipientId, CancellationToken ct = default)
+        => SendTypingIndicatorAsync(recipientId, stop: true, ct);
 
     private async Task WebSocketLoopAsync(string phoneNumber, CancellationToken ct)
     {
@@ -154,6 +189,8 @@ public sealed class SignalChannel : IChannel
 
         while (!ct.IsCancellationRequested)
         {
+            var connectTime = DateTimeOffset.UtcNow;
+
             try
             {
                 using var ws = new ClientWebSocket();
@@ -162,7 +199,8 @@ public sealed class SignalChannel : IChannel
                 Interlocked.Increment(ref _connectedCount);
                 wasEverConnected = true;
                 reconnectAttempts = 0;
-                _logger.LogInformation("Connected to Signal daemon for {PhoneNumber}", phoneNumber);
+                _logger.LogInformation(
+                    "Signal WebSocket connected for {PhoneNumber}", phoneNumber);
 
                 var buffer = new byte[8192];
                 var messageBuffer = new StringBuilder();
@@ -173,6 +211,11 @@ public sealed class SignalChannel : IChannel
 
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
+                        var elapsed = DateTimeOffset.UtcNow - connectTime;
+                        _logger.LogInformation(
+                            "Signal WebSocket closed normally for {PhoneNumber} after {Elapsed}",
+                            phoneNumber,
+                            elapsed);
                         await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None)
                             .ConfigureAwait(false);
                         break;
@@ -197,6 +240,14 @@ public sealed class SignalChannel : IChannel
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
+                if (wasEverConnected)
+                {
+                    var elapsed = DateTimeOffset.UtcNow - connectTime;
+                    _logger.LogInformation(
+                        "Signal WebSocket cancelled for {PhoneNumber} after {Elapsed}",
+                        phoneNumber,
+                        elapsed);
+                }
                 break;
             }
             catch (Exception ex)
@@ -205,16 +256,26 @@ public sealed class SignalChannel : IChannel
 
                 if (wasEverConnected)
                 {
+                    var elapsed = DateTimeOffset.UtcNow - connectTime;
+                    _logger.LogWarning(
+                        ex,
+                        "Signal WebSocket disconnected for {PhoneNumber} after {Elapsed} (attempt {Attempt}/{MaxAttempts})",
+                        phoneNumber,
+                        elapsed,
+                        reconnectAttempts,
+                        _config.MaxReconnectAttempts);
                     Interlocked.Decrement(ref _connectedCount);
                     wasEverConnected = false;
                 }
-
-                _logger.LogWarning(
-                    ex,
-                    "Signal WebSocket disconnected for {PhoneNumber} (attempt {Attempt}/{MaxAttempts})",
-                    phoneNumber,
-                    reconnectAttempts,
-                    _config.MaxReconnectAttempts);
+                else
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Signal WebSocket connection failed for {PhoneNumber} (attempt {Attempt}/{MaxAttempts})",
+                        phoneNumber,
+                        reconnectAttempts,
+                        _config.MaxReconnectAttempts);
+                }
 
                 if (_config.MaxReconnectAttempts > 0 && reconnectAttempts >= _config.MaxReconnectAttempts)
                 {
@@ -225,6 +286,12 @@ public sealed class SignalChannel : IChannel
                 }
 
                 var reconnectDelay = GetReconnectDelay(reconnectAttempts);
+                _logger.LogInformation(
+                    "Signal WebSocket reconnecting for {PhoneNumber} in {Delay} (attempt {Attempt}/{MaxAttempts})",
+                    phoneNumber,
+                    reconnectDelay,
+                    reconnectAttempts,
+                    _config.MaxReconnectAttempts);
                 if (reconnectDelay > TimeSpan.Zero)
                 {
                     await Task.Delay(reconnectDelay, ct).ConfigureAwait(false);
@@ -299,6 +366,73 @@ public sealed class SignalChannel : IChannel
         var multiplier = Math.Pow(2, Math.Max(0, reconnectAttempt - 1));
         var totalSeconds = _config.ReconnectDelaySeconds * multiplier;
         return TimeSpan.FromSeconds(Math.Min(totalSeconds, 300));
+    }
+
+    private string GetSourceNumber(string recipientId)
+    {
+        var numbers = _config.GetPhoneNumbers();
+        if (numbers.Count == 0)
+        {
+            throw new InvalidOperationException("No phone numbers configured for Signal channel");
+        }
+
+        return _senderNumber.TryGetValue(recipientId, out var mapped)
+            ? mapped
+            : numbers[0];
+    }
+
+    private async Task SendTypingIndicatorAsync(string recipientId, bool stop, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recipientId);
+
+        try
+        {
+            var sourceNumber = GetSourceNumber(recipientId);
+            using var timeoutCts = new CancellationTokenSource(SignalTypingTimeout);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+            var client = _httpClientFactory.CreateClient("signal-daemon");
+            using var request = new HttpRequestMessage(
+                stop ? HttpMethod.Delete : HttpMethod.Put,
+                $"/v1/typing-indicator/{Uri.EscapeDataString(sourceNumber)}")
+            {
+                Content = JsonContent.Create(new { recipient = recipientId }, options: SerializerOptions)
+            };
+
+            using var response = await client.SendAsync(request, linkedCts.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogDebug(
+                    "Signal typing indicator returned {StatusCode} for {RecipientId} (stop={Stop})",
+                    (int)response.StatusCode,
+                    recipientId,
+                    stop);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogDebug(
+                ex,
+                "Signal typing indicator request failed (ignored) for {RecipientId} (stop={Stop})",
+                recipientId,
+                stop);
+        }
+    }
+
+    private static List<string> SplitMessage(string message)
+    {
+        if (message.Length <= MaxSignalMessageChars)
+        {
+            return [message];
+        }
+
+        var chunks = new List<string>((message.Length + MaxSignalMessageChars - 1) / MaxSignalMessageChars);
+        for (var index = 0; index < message.Length; index += MaxSignalMessageChars)
+        {
+            var length = Math.Min(MaxSignalMessageChars, message.Length - index);
+            chunks.Add(message.Substring(index, length));
+        }
+
+        return chunks;
     }
 }
 

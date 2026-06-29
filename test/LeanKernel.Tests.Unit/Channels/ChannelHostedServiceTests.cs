@@ -101,6 +101,12 @@ public class ChannelHostedServiceTests
             return Task.CompletedTask;
         }
 
+        public Task StartTypingAsync(string recipientId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task StopTypingAsync(string recipientId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task SendAsync(string recipientId, string message, CancellationToken ct = default)
             => Task.CompletedTask;
 

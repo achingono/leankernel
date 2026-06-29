@@ -8,6 +8,8 @@ public interface IChannel
     bool IsConnected { get; }
     Task StartAsync(CancellationToken ct = default);
     Task StopAsync(CancellationToken ct = default);
+    Task StartTypingAsync(string recipientId, CancellationToken ct = default);
+    Task StopTypingAsync(string recipientId, CancellationToken ct = default);
     Task SendAsync(string recipientId, string message, CancellationToken ct = default);
     event Func<ChannelMessage, Task>? MessageReceived;
 }
