@@ -15,7 +15,7 @@ public static class FileWriteTool
         return new ToolDefinition
         {
             Name = "file_write",
-            Description = "Write a local file in the allowed data directory",
+            Description = "Write a local file under /app/data. For user-facing documents (notes, guides, group docs), use the documents/ subdirectory. Use managed-documents/ for UI-uploaded files.",
             Category = "filesystem",
             Parameters =
             [

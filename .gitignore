@@ -84,3 +84,6 @@ config/litellm/litellm_config.generated.yaml
 .playwright/
 playwright-report/
 .playwright-mcp/
+
+# OpenCode
+.opencode/
