@@ -154,60 +154,50 @@ static void ConfigureOpenTelemetry(WebApplicationBuilder builder, LeanKernelConf
         ? "leankernel"
         : leanKernelConfig.Diagnostics.ServiceName;
 
+    var otlpUri = string.IsNullOrWhiteSpace(otlpEndpoint) ? null : new Uri(otlpEndpoint, UriKind.Absolute);
+
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(resource => resource.AddService(serviceName))
-        .WithTracing(tracing =>
-        {
-            tracing
-                .AddSource("LeanKernel.Diagnostics")
-                .AddSource("LeanKernel.Persistence")
-                .AddSource("LeanKernel.Tools.Browser")
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation();
+        .WithTracing(tracing => ConfigureTracing(tracing, consoleExporterEnabled, otlpUri))
+        .WithMetrics(metrics => ConfigureMetrics(metrics, consoleExporterEnabled, otlpUri));
 
-            if (consoleExporterEnabled)
-            {
-                tracing.AddConsoleExporter();
-            }
+    ConfigureLogging(builder, consoleExporterEnabled, otlpUri);
+}
 
-            if (!string.IsNullOrWhiteSpace(otlpEndpoint))
-            {
-                tracing.AddOtlpExporter(options => options.Endpoint = new Uri(otlpEndpoint, UriKind.Absolute));
-            }
-        })
-        .WithMetrics(metrics =>
-        {
-            metrics
-                .AddMeter("LeanKernel")
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation();
+static void ConfigureTracing(TracerProviderBuilder tracing, bool consoleExporterEnabled, Uri? otlpUri)
+{
+    tracing
+        .AddSource("LeanKernel.Diagnostics")
+        .AddSource("LeanKernel.Persistence")
+        .AddSource("LeanKernel.Tools.Browser")
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation();
 
-            if (consoleExporterEnabled)
-            {
-                metrics.AddConsoleExporter();
-            }
+    if (consoleExporterEnabled) tracing.AddConsoleExporter();
+    if (otlpUri is not null) tracing.AddOtlpExporter(options => options.Endpoint = otlpUri);
+}
 
-            if (!string.IsNullOrWhiteSpace(otlpEndpoint))
-            {
-                metrics.AddOtlpExporter(options => options.Endpoint = new Uri(otlpEndpoint, UriKind.Absolute));
-            }
-        });
+static void ConfigureMetrics(MeterProviderBuilder metrics, bool consoleExporterEnabled, Uri? otlpUri)
+{
+    metrics
+        .AddMeter("LeanKernel")
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation();
 
+    if (consoleExporterEnabled) metrics.AddConsoleExporter();
+    if (otlpUri is not null) metrics.AddOtlpExporter(options => options.Endpoint = otlpUri);
+}
+
+static void ConfigureLogging(WebApplicationBuilder builder, bool consoleExporterEnabled, Uri? otlpUri)
+{
     builder.Logging.AddOpenTelemetry(options =>
     {
         options.IncludeFormattedMessage = true;
         options.IncludeScopes = true;
         options.ParseStateValues = true;
 
-        if (consoleExporterEnabled)
-        {
-            options.AddConsoleExporter();
-        }
-
-        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
-        {
-            options.AddOtlpExporter(exporterOptions => exporterOptions.Endpoint = new Uri(otlpEndpoint, UriKind.Absolute));
-        }
+        if (consoleExporterEnabled) options.AddConsoleExporter();
+        if (otlpUri is not null) options.AddOtlpExporter(exporterOptions => exporterOptions.Endpoint = otlpUri);
     });
 }
 

@@ -487,7 +487,7 @@ public static class JsonTransformTool
             return false;
         }
 
-        if (path.Any(char.IsWhiteSpace) || path.Contains('$') || path.Contains('*') || path.Contains("..", StringComparison.Ordinal))
+        if (HasUnsupportedPathSyntax(path))
         {
             error = "path contains unsupported syntax";
             return false;
@@ -497,39 +497,52 @@ public static class JsonTransformTool
         var index = 0;
         while (index < path.Length)
         {
-            if (!TryReadProperty(path, ref index, parsed, out error))
+            if (!TryReadNextSegment(path, ref index, parsed, out error))
             {
-                return false;
-            }
-
-            while (index < path.Length && path[index] == '[')
-            {
-                if (!TryReadIndex(path, ref index, parsed, out error))
-                {
-                    return false;
-                }
-            }
-
-            if (index == path.Length)
-            {
-                break;
-            }
-
-            if (path[index] != '.')
-            {
-                error = $"unexpected character '{path[index]}'";
-                return false;
-            }
-
-            index++;
-            if (index == path.Length)
-            {
-                error = "path cannot end with '.'";
                 return false;
             }
         }
 
         segments = [.. parsed];
+        return true;
+    }
+
+    private static bool HasUnsupportedPathSyntax(string path)
+        => path.Any(char.IsWhiteSpace) || path.Contains('$') || path.Contains('*') || path.Contains("..", StringComparison.Ordinal);
+
+    private static bool TryReadNextSegment(string path, ref int index, List<PathSegment> parsed, out string error)
+    {
+        if (!TryReadProperty(path, ref index, parsed, out error))
+        {
+            return false;
+        }
+
+        while (index < path.Length && path[index] == '[')
+        {
+            if (!TryReadIndex(path, ref index, parsed, out error))
+            {
+                return false;
+            }
+        }
+
+        if (index == path.Length)
+        {
+            return true;
+        }
+
+        if (path[index] != '.')
+        {
+            error = $"unexpected character '{path[index]}'";
+            return false;
+        }
+
+        index++;
+        if (index == path.Length)
+        {
+            error = "path cannot end with '.'";
+            return false;
+        }
+
         return true;
     }
 

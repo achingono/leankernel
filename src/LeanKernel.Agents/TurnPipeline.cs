@@ -118,15 +118,7 @@ public sealed class TurnPipeline : ITurnPipeline
         {
             _logger.LogInformation("Processing turn {TurnId} for session {SessionId}", turnId, sessionId);
 
-            await _sessions.AppendTurnAsync(
-                sessionId,
-                new ConversationTurn
-                {
-                    Role = "user",
-                    Content = turnScopedMessage.Content,
-                    Timestamp = turnScopedMessage.Timestamp
-                },
-                ct).ConfigureAwait(false);
+            await AppendUserTurnAsync(turnScopedMessage, sessionId, ct);
 
             var budget = ContextBudget.FromConfig(
                 _config.LiteLlm.ContextWindowTokens,
@@ -134,32 +126,7 @@ public sealed class TurnPipeline : ITurnPipeline
 
             var gatedContext = await _gatekeeper.GateContextAsync(turnScopedMessage, budget, sessionId, ct).ConfigureAwait(false);
 
-            var visibleTools = _toolRegistry.GetVisibleTools(new ToolVisibilityContext
-            {
-                UserId = turnScopedMessage.SenderId
-            });
-
-            var maxTools = _config.LiteLlm.MaxTools;
-            if (visibleTools.Count > maxTools)
-            {
-                _logger.LogWarning(
-                    "Tool count {Count} exceeds MaxTools ({MaxTools}). Selecting relevant subset.",
-                    visibleTools.Count,
-                    maxTools);
-                visibleTools = await _toolSelector.SelectToolsAsync(
-                    turnScopedMessage.Content,
-                    visibleTools,
-                    maxTools,
-                    ct).ConfigureAwait(false);
-            }
-            else if (visibleTools.Count >= maxTools * 0.9)
-            {
-                _logger.LogInformation(
-                    "Tool count {Count} approaching MaxTools ({MaxTools}) threshold.",
-                    visibleTools.Count,
-                    maxTools);
-            }
-
+            var visibleTools = await SelectVisibleToolsAsync(turnScopedMessage, ct);
             var visibleToolNames = MergeToolNames(gatedContext.ActiveToolNames, visibleTools.Select(tool => tool.Name));
 
             _logger.LogDebug(
@@ -169,25 +136,7 @@ public sealed class TurnPipeline : ITurnPipeline
 
             var context = CopyWithToolNames(gatedContext, visibleToolNames);
 
-            if (_contextDiagnosticsService is not null)
-            {
-                try
-                {
-                    await _contextDiagnosticsService.StoreContextDiagnosticsAsync(
-                        sessionId,
-                        turnId,
-                        CreateContextSnapshot(context, budget, sessionId, turnId),
-                        ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Context diagnostics persistence failed for session {SessionId} turn {TurnId}", sessionId, turnId);
-                }
-            }
+            await StoreContextDiagnosticsAsync(sessionId, turnId, context, budget, ct);
 
             var systemMessage = _promptAssembler.AssembleSystemMessage(context);
 
@@ -218,97 +167,10 @@ public sealed class TurnPipeline : ITurnPipeline
                 warnings.Add(spendDecision.Reason);
             }
 
-            string response;
-            var modelExecutedSuccessfully = false;
+            var (response, modelExecutedSuccessfully) = await ResolveModelResponseAsync(
+                degradationDecision, spendDecision, strategyContext, sessionId, turnId, ct);
 
-            if (!degradationDecision.AllowModelExecution)
-            {
-                response = degradationDecision.UserMessage
-                    ?? "LeanKernel cannot reach the configured model provider right now. Please try again shortly.";
-            }
-            else if (spendDecision?.Action == SpendGuardAction.Block)
-            {
-                response = spendDecision.Reason;
-            }
-            else
-            {
-                try
-                {
-                    response = await _strategy.InvokeAsync(strategyContext, ct).ConfigureAwait(false);
-                    modelExecutedSuccessfully = true;
-                    _providerHealthTracker?.RecordProbeResult(ProviderNames.LiteLlm, ProviderProbeResult.Healthy("Model invocation succeeded."));
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _providerHealthTracker?.RecordProbeResult(ProviderNames.LiteLlm, ProviderProbeResult.Unhealthy("Model invocation failed.", ex.Message));
-                    _logger.LogWarning(ex, "Model invocation failed for session {SessionId} turn {TurnId}; returning degraded response", sessionId, turnId);
-                    response = "LeanKernel cannot reach the configured model provider right now. Please try again shortly.";
-                }
-            }
-
-            if (_diagnosticsCollector is not null && strategyContext.OrchestrationResult is not null)
-            {
-                try
-                {
-                    await _diagnosticsCollector.RecordOrchestrationAsync(
-                        sessionId,
-                        turnId,
-                        strategyContext.OrchestrationResult,
-                        ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Orchestration diagnostics persistence failed for session {SessionId} turn {TurnId}", sessionId, turnId);
-                }
-            }
-
-            if (_diagnosticsCollector is not null && strategyContext.RoutingDecision is not null)
-            {
-                try
-                {
-                    await _diagnosticsCollector.RecordModelRoutingAsync(
-                        sessionId,
-                        turnId,
-                        strategyContext.RoutingDecision,
-                        ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Routing diagnostics persistence failed for session {SessionId} turn {TurnId}", sessionId, turnId);
-                }
-            }
-
-            if (_diagnosticsCollector is not null && strategyContext.QualityGateResult is not null)
-            {
-                try
-                {
-                    await _diagnosticsCollector.RecordQualityGateAsync(
-                        sessionId,
-                        turnId,
-                        strategyContext.QualityGateResult,
-                        ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Quality gate diagnostics persistence failed for session {SessionId} turn {TurnId}", sessionId, turnId);
-                }
-            }
+            await RecordDiagnosticsAsync(sessionId, turnId, strategyContext, ct);
 
             if (strategyContext.QualityGateResult is { Passed: false, FailureReason: { Length: > 0 } failureReason })
             {
@@ -351,25 +213,7 @@ public sealed class TurnPipeline : ITurnPipeline
                 }
             }
 
-            if (_diagnosticsCollector is not null && enhancementResult is not null)
-            {
-                try
-                {
-                    await _diagnosticsCollector.RecordResponseEnhancementAsync(
-                        sessionId,
-                        turnId,
-                        enhancementResult,
-                        ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Response enhancement diagnostics persistence failed for session {SessionId} turn {TurnId}", sessionId, turnId);
-                }
-            }
+            await RecordResponseEnhancementDiagnosticsAsync(sessionId, turnId, enhancementResult, ct);
 
             if (modelExecutedSuccessfully && _spendTracker is not null && _spendGuardService is not null)
             {
@@ -384,46 +228,9 @@ public sealed class TurnPipeline : ITurnPipeline
             response = AppendWarnings(response, warnings);
 
             var assistantTimestamp = DateTimeOffset.UtcNow;
-            await _sessions.AppendTurnAsync(
-                sessionId,
-                new ConversationTurn
-                {
-                    Role = "assistant",
-                    Content = response,
-                    Timestamp = assistantTimestamp
-                },
-                ct).ConfigureAwait(false);
+            await AppendAssistantTurnAsync(response, sessionId, assistantTimestamp, ct);
 
-            if (_turnEventSink is not null)
-            {
-                try
-                {
-                    await _turnEventSink.PublishAsync(
-                        new TurnEvent
-                        {
-                            SessionId = sessionId,
-                            TurnId = turnId,
-                            Role = "assistant",
-                            Content = response,
-                            UserMessage = turnScopedMessage.Content,
-                            AssistantResponse = response,
-                            Timestamp = assistantTimestamp,
-                            Context = context,
-                            ModelUsed = strategyContext.ModelUsed ?? _config.LiteLlm.DefaultModel,
-                            RoutingDecision = strategyContext.RoutingDecision,
-                            OrchestrationResult = strategyContext.OrchestrationResult,
-                        },
-                        ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Turn event publication failed for session {SessionId} turn {TurnId}", sessionId, turnId);
-                }
-            }
+            await PublishTurnEventAsync(turnScopedMessage, response, sessionId, turnId, context, strategyContext, assistantTimestamp, ct);
 
             _logger.LogInformation(
                 "Turn {TurnId} completed for session {SessionId}: {ResponseLength} chars",
@@ -436,6 +243,233 @@ public sealed class TurnPipeline : ITurnPipeline
         finally
         {
             _metrics?.RecordTurnLatency(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+        }
+    }
+
+    private async Task AppendUserTurnAsync(LeanKernelMessage turnScopedMessage, string sessionId, CancellationToken ct)
+    {
+        await _sessions.AppendTurnAsync(
+            sessionId,
+            new ConversationTurn
+            {
+                Role = "user",
+                Content = turnScopedMessage.Content,
+                Timestamp = turnScopedMessage.Timestamp
+            },
+            ct).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<ToolDefinition>> SelectVisibleToolsAsync(LeanKernelMessage turnScopedMessage, CancellationToken ct)
+    {
+        var visibleTools = _toolRegistry.GetVisibleTools(new ToolVisibilityContext
+        {
+            UserId = turnScopedMessage.SenderId
+        });
+
+        var maxTools = _config.LiteLlm.MaxTools;
+        if (visibleTools.Count > maxTools)
+        {
+            _logger.LogWarning(
+                "Tool count {Count} exceeds MaxTools ({MaxTools}). Selecting relevant subset.",
+                visibleTools.Count,
+                maxTools);
+            visibleTools = await _toolSelector.SelectToolsAsync(
+                turnScopedMessage.Content,
+                visibleTools,
+                maxTools,
+                ct).ConfigureAwait(false);
+        }
+        else if (visibleTools.Count >= maxTools * 0.9)
+        {
+            _logger.LogInformation(
+                "Tool count {Count} approaching MaxTools ({MaxTools}) threshold.",
+                visibleTools.Count,
+                maxTools);
+        }
+
+        return visibleTools;
+    }
+
+    private async Task StoreContextDiagnosticsAsync(string sessionId, string turnId, ConversationContext context, ContextBudget budget, CancellationToken ct)
+    {
+        if (_contextDiagnosticsService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _contextDiagnosticsService.StoreContextDiagnosticsAsync(
+                    sessionId,
+                    turnId,
+                    CreateContextSnapshot(context, budget, sessionId, turnId),
+                    ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Context diagnostics persistence failed for session {SessionId} turn {TurnId}", sessionId, turnId);
+        }
+    }
+
+    private async Task<(string Response, bool ModelExecutedSuccessfully)> ResolveModelResponseAsync(
+        GracefulDegradationDecision degradationDecision,
+        SpendGuardDecision? spendDecision,
+        AgentStrategyContext strategyContext,
+        string sessionId,
+        string turnId,
+        CancellationToken ct)
+    {
+        if (!degradationDecision.AllowModelExecution)
+        {
+            return (degradationDecision.UserMessage
+                ?? "LeanKernel cannot reach the configured model provider right now. Please try again shortly.", false);
+        }
+
+        if (spendDecision?.Action == SpendGuardAction.Block)
+        {
+            return (spendDecision.Reason, false);
+        }
+
+        try
+        {
+            var response = await _strategy.InvokeAsync(strategyContext, ct).ConfigureAwait(false);
+            _providerHealthTracker?.RecordProbeResult(ProviderNames.LiteLlm, ProviderProbeResult.Healthy("Model invocation succeeded."));
+            return (response, true);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _providerHealthTracker?.RecordProbeResult(ProviderNames.LiteLlm, ProviderProbeResult.Unhealthy("Model invocation failed.", ex.Message));
+            _logger.LogWarning(ex, "Model invocation failed for session {SessionId} turn {TurnId}; returning degraded response", sessionId, turnId);
+            return ("LeanKernel cannot reach the configured model provider right now. Please try again shortly.", false);
+        }
+    }
+
+    private async Task RecordDiagnosticsAsync(string sessionId, string turnId, AgentStrategyContext strategyContext, CancellationToken ct)
+    {
+        if (_diagnosticsCollector is null)
+        {
+            return;
+        }
+
+        if (strategyContext.OrchestrationResult is not null)
+        {
+            await TryRecordDiagnosticAsync(
+                () => _diagnosticsCollector.RecordOrchestrationAsync(sessionId, turnId, strategyContext.OrchestrationResult, ct),
+                "Orchestration", sessionId, turnId, ct);
+        }
+
+        if (strategyContext.RoutingDecision is not null)
+        {
+            await TryRecordDiagnosticAsync(
+                () => _diagnosticsCollector.RecordModelRoutingAsync(sessionId, turnId, strategyContext.RoutingDecision, ct),
+                "Routing", sessionId, turnId, ct);
+        }
+
+        if (strategyContext.QualityGateResult is not null)
+        {
+            await TryRecordDiagnosticAsync(
+                () => _diagnosticsCollector.RecordQualityGateAsync(sessionId, turnId, strategyContext.QualityGateResult, ct),
+                "Quality gate", sessionId, turnId, ct);
+        }
+    }
+
+    private async Task TryRecordDiagnosticAsync(Func<Task> recordAsync, string label, string sessionId, string turnId, CancellationToken ct)
+    {
+        try
+        {
+            await recordAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "{Label} diagnostics persistence failed for session {SessionId} turn {TurnId}", label, sessionId, turnId);
+        }
+    }
+
+    private async Task RecordResponseEnhancementDiagnosticsAsync(string sessionId, string turnId, EnhancementResult? enhancementResult, CancellationToken ct)
+    {
+        if (_diagnosticsCollector is null || enhancementResult is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _diagnosticsCollector.RecordResponseEnhancementAsync(
+                sessionId, turnId, enhancementResult, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Response enhancement diagnostics persistence failed for session {SessionId} turn {TurnId}", sessionId, turnId);
+        }
+    }
+
+    private async Task AppendAssistantTurnAsync(string response, string sessionId, DateTimeOffset assistantTimestamp, CancellationToken ct)
+    {
+        await _sessions.AppendTurnAsync(
+            sessionId,
+            new ConversationTurn
+            {
+                Role = "assistant",
+                Content = response,
+                Timestamp = assistantTimestamp
+            },
+            ct).ConfigureAwait(false);
+    }
+
+    private async Task PublishTurnEventAsync(
+        LeanKernelMessage turnScopedMessage,
+        string response,
+        string sessionId,
+        string turnId,
+        ConversationContext context,
+        AgentStrategyContext strategyContext,
+        DateTimeOffset assistantTimestamp,
+        CancellationToken ct)
+    {
+        if (_turnEventSink is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _turnEventSink.PublishAsync(
+                new TurnEvent
+                {
+                    SessionId = sessionId,
+                    TurnId = turnId,
+                    Role = "assistant",
+                    Content = response,
+                    UserMessage = turnScopedMessage.Content,
+                    AssistantResponse = response,
+                    Timestamp = assistantTimestamp,
+                    Context = context,
+                    ModelUsed = strategyContext.ModelUsed ?? _config.LiteLlm.DefaultModel,
+                    RoutingDecision = strategyContext.RoutingDecision,
+                    OrchestrationResult = strategyContext.OrchestrationResult,
+                },
+                ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Turn event publication failed for session {SessionId} turn {TurnId}", sessionId, turnId);
         }
     }
 

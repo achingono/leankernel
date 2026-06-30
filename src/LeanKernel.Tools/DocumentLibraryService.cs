@@ -191,77 +191,26 @@ public sealed class DocumentLibraryService
         var baseSlug = BuildBaseSlug(finalTitle);
         var pageSlug = await ResolveUniquePageSlugAsync(baseSlug, ct).ConfigureAwait(false);
         var wikiPageWritten = false;
-        var wikiPageAlreadyDeletedInCatch = false;
 
         try
         {
             _logger.LogInformation("Invoking text extraction pipeline for: {Path}", fullPath);
             var extractedText = await TextExtractionHelper.ExtractAsync(fullPath, _config.FileSystem, ct).ConfigureAwait(false);
 
-            var pendingContent = BuildMarkdownContent(
-                finalTitle,
-                relativePath,
-                null,
-                cleanTags,
-                importedAt,
-                extractedText);
+            var pendingContent = BuildMarkdownContent(finalTitle, relativePath, null, cleanTags, importedAt, extractedText);
 
             _logger.LogInformation("Writing compiled document page {Slug} to GBrain", pageSlug);
             await _knowledgeService.PutPageAsync(pageSlug, pendingContent, ct).ConfigureAwait(false);
             wikiPageWritten = true;
 
             _logger.LogInformation("Uploading binary asset to GBrain files store and linking to {Slug}", pageSlug);
-            string? fileStoragePath = null;
-            try
-            {
-                var uploadResult = await _gBrainClient.CallToolAsync(
-                    "file_upload",
-                    new
-                    {
-                        path = fullPath,
-                        page_slug = pageSlug
-                    },
-                    ct).ConfigureAwait(false);
-
-                fileStoragePath = ExtractStoragePath(uploadResult);
-                if (fileStoragePath == null)
-                {
-                    _logger.LogWarning("GBrain file_upload response did not include a storage path; continuing without binary attachment for {Slug}", pageSlug);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "GBrain file_upload failed for {Slug}; continuing with extracted text only", pageSlug);
-            }
+            var fileStoragePath = await UploadFileToGBrainAsync(fullPath, pageSlug, ct).ConfigureAwait(false);
 
             if (fileStoragePath != null && !string.Equals(fileStoragePath, relativePath, StringComparison.Ordinal))
             {
-                var finalizedContent = BuildMarkdownContent(
-                    finalTitle,
-                    relativePath,
-                    fileStoragePath,
-                    cleanTags,
-                    importedAt,
-                    extractedText);
-
-                try
-                {
-                    await _knowledgeService.PutPageAsync(pageSlug, finalizedContent, ct).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Second wiki write failed; cleaning up incomplete page {Slug}", pageSlug);
-                    try
-                    {
-                        await _knowledgeService.DeletePageAsync(pageSlug, ct).ConfigureAwait(false);
-                        wikiPageAlreadyDeletedInCatch = true;
-                    }
-                    catch (Exception deleteEx)
-                    {
-                        _logger.LogWarning(deleteEx, "Failed to clean up wiki page {Slug} after failed update", pageSlug);
-                    }
-                    throw;
-                }
+                await ReplaceWikiPageWithStoragePathAsync(
+                    pageSlug, finalTitle, relativePath, fileStoragePath,
+                    cleanTags, importedAt, extractedText, ct).ConfigureAwait(false);
             }
 
             return new DocumentIngestionResult
@@ -275,18 +224,61 @@ public sealed class DocumentLibraryService
         }
         catch
         {
-            if (wikiPageWritten && !wikiPageAlreadyDeletedInCatch)
+            if (wikiPageWritten)
             {
-                try
-                {
-                    await _knowledgeService.DeletePageAsync(pageSlug, ct).ConfigureAwait(false);
-                }
-                catch (Exception deleteEx)
-                {
-                    _logger.LogWarning(deleteEx, "Failed to clean up wiki page {Slug} after ingest failure", pageSlug);
-                }
+                await TryDeletePageAsync(pageSlug, ct).ConfigureAwait(false);
             }
             throw;
+        }
+    }
+
+    private async Task<string?> UploadFileToGBrainAsync(string fullPath, string pageSlug, CancellationToken ct)
+    {
+        try
+        {
+            var uploadResult = await _gBrainClient.CallToolAsync(
+                "file_upload",
+                new { path = fullPath, page_slug = pageSlug },
+                ct).ConfigureAwait(false);
+
+            var storagePath = ExtractStoragePath(uploadResult);
+            if (storagePath == null)
+            {
+                _logger.LogWarning("GBrain file_upload response did not include a storage path; continuing without binary attachment for {Slug}", pageSlug);
+            }
+
+            return storagePath;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GBrain file_upload failed for {Slug}; continuing with extracted text only", pageSlug);
+            return null;
+        }
+    }
+
+    private async Task ReplaceWikiPageWithStoragePathAsync(
+        string pageSlug,
+        string finalTitle,
+        string relativePath,
+        string fileStoragePath,
+        IReadOnlyList<string> cleanTags,
+        DateTimeOffset importedAt,
+        string extractedText,
+        CancellationToken ct)
+    {
+        var finalizedContent = BuildMarkdownContent(finalTitle, relativePath, fileStoragePath, cleanTags, importedAt, extractedText);
+        await _knowledgeService.PutPageAsync(pageSlug, finalizedContent, ct).ConfigureAwait(false);
+    }
+
+    private async Task TryDeletePageAsync(string pageSlug, CancellationToken ct)
+    {
+        try
+        {
+            await _knowledgeService.DeletePageAsync(pageSlug, ct).ConfigureAwait(false);
+        }
+        catch (Exception deleteEx)
+        {
+            _logger.LogWarning(deleteEx, "Failed to clean up wiki page {Slug}", pageSlug);
         }
     }
 

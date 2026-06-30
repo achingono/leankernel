@@ -220,29 +220,40 @@ internal static class ToolArgumentReader
 
         if (value is JsonElement element && element.ValueKind == JsonValueKind.Object)
         {
-            var result = new Dictionary<string, object?>(StringComparer.Ordinal);
-            foreach (var property in element.EnumerateObject())
-            {
-                result[property.Name] = property.Value.ValueKind switch
-                {
-                    JsonValueKind.String => property.Value.GetString(),
-                    JsonValueKind.Number => property.Value.TryGetInt64(out var int64Value)
-                        ? int64Value
-                        : property.Value.TryGetDouble(out var doubleValue)
-                            ? doubleValue
-                            : property.Value.GetRawText(),
-                    JsonValueKind.True => true,
-                    JsonValueKind.False => false,
-                    JsonValueKind.Null => null,
-                    _ => property.Value.GetRawText()
-                };
-            }
-
-            return result;
+            return ConvertJsonObjectToDictionary(element);
         }
 
         throw new ArgumentException($"Argument '{name}' must be an object map.");
     }
+
+    private static Dictionary<string, object?> ConvertJsonObjectToDictionary(JsonElement element)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var property in element.EnumerateObject())
+        {
+            result[property.Name] = ConvertJsonValue(property.Value);
+        }
+
+        return result;
+    }
+
+    private static object? ConvertJsonValue(JsonElement value)
+        => value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Number => ConvertJsonNumber(value),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            _ => value.GetRawText()
+        };
+
+    private static object ConvertJsonNumber(JsonElement value)
+        => value.TryGetInt64(out var int64Value)
+            ? int64Value
+            : value.TryGetDouble(out var doubleValue)
+                ? doubleValue
+                : value.GetRawText();
 
     private static bool TryGetJsonInt32(JsonElement element, out int value)
     {

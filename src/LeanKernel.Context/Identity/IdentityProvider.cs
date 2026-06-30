@@ -188,29 +188,11 @@ internal static class IdentityPageSerializer
 
             if (ReservedMetadataKeys.Contains(currentKey))
             {
-                if (currentMap is not null && currentMap.TryGetValue("value", out var metadataValue) && !string.IsNullOrWhiteSpace(metadataValue))
-                {
-                    metadata[currentKey] = metadataValue;
-                }
-                else if (currentList is not null && currentList.Count > 0)
-                {
-                    metadata[currentKey] = string.Join(", ", currentList);
-                }
+                StoreReservedMetadata(currentKey, currentMap, currentList, metadata);
             }
             else
             {
-                var value = ResolveFieldValue(currentMap, currentList);
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    fields[currentKey] = new IdentityField
-                    {
-                        Name = currentKey,
-                        Value = value,
-                        Confidence = ResolveConfidence(currentMap),
-                        LastUpdated = ResolveLastUpdated(currentMap),
-                        Source = ResolveSource(currentMap),
-                    };
-                }
+                StoreFieldIfNonEmpty(currentKey, currentMap, currentList, fields);
             }
 
             currentKey = null;
@@ -220,77 +202,23 @@ internal static class IdentityPageSerializer
 
         foreach (var rawLine in lines)
         {
-            if (string.IsNullOrWhiteSpace(rawLine))
+            if (TrySkipIgnoredLine(rawLine))
             {
                 continue;
             }
 
             var trimmedLine = rawLine.Trim();
-            if (trimmedLine.StartsWith("#", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
             var indent = rawLine.Length - rawLine.TrimStart().Length;
+
             if (indent == 0)
             {
                 FinalizeCurrent();
-
-                var separatorIndex = trimmedLine.IndexOf(':');
-                if (separatorIndex < 0)
-                {
-                    continue;
-                }
-
-                var key = trimmedLine[..separatorIndex].Trim();
-                var rawValue = trimmedLine[(separatorIndex + 1)..].Trim();
-                if (string.IsNullOrWhiteSpace(rawValue))
-                {
-                    currentKey = key;
-                    currentMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    currentList = [];
-                    continue;
-                }
-
-                var normalizedValue = NormalizeScalar(rawValue);
-                if (ReservedMetadataKeys.Contains(key))
-                {
-                    metadata[key] = normalizedValue;
-                }
-                else
-                {
-                    fields[key] = new IdentityField
-                    {
-                        Name = key,
-                        Value = normalizedValue,
-                    };
-                }
-
-                continue;
+                ProcessTopLevelField(trimmedLine, metadata, fields, ref currentKey, ref currentMap, ref currentList);
             }
-
-            if (string.IsNullOrWhiteSpace(currentKey))
+            else if (!string.IsNullOrWhiteSpace(currentKey))
             {
-                continue;
+                ProcessIndentedField(trimmedLine, ref currentMap, ref currentList);
             }
-
-            if (trimmedLine.StartsWith("- ", StringComparison.Ordinal))
-            {
-                currentList ??= [];
-                currentList.Add(NormalizeScalar(trimmedLine[2..]));
-                continue;
-            }
-
-            var nestedSeparatorIndex = trimmedLine.IndexOf(':');
-            if (nestedSeparatorIndex < 0)
-            {
-                continue;
-            }
-
-            var nestedKey = trimmedLine[..nestedSeparatorIndex].Trim();
-            var nestedValue = NormalizeScalar(trimmedLine[(nestedSeparatorIndex + 1)..].Trim());
-            currentMap ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            currentMap[nestedKey] = nestedValue;
         }
 
         FinalizeCurrent();
@@ -301,6 +229,119 @@ internal static class IdentityPageSerializer
             Fields = fields,
             Body = body,
         };
+    }
+
+    private static bool TrySkipIgnoredLine(string rawLine)
+    {
+        if (string.IsNullOrWhiteSpace(rawLine))
+        {
+            return true;
+        }
+
+        var trimmedLine = rawLine.Trim();
+        return trimmedLine.StartsWith("#", StringComparison.Ordinal);
+    }
+
+    private static void StoreReservedMetadata(
+        string currentKey,
+        Dictionary<string, string>? currentMap,
+        List<string>? currentList,
+        Dictionary<string, string> metadata)
+    {
+        if (currentMap is not null && currentMap.TryGetValue("value", out var metadataValue) && !string.IsNullOrWhiteSpace(metadataValue))
+        {
+            metadata[currentKey] = metadataValue;
+        }
+        else if (currentList is not null && currentList.Count > 0)
+        {
+            metadata[currentKey] = string.Join(", ", currentList);
+        }
+    }
+
+    private static void StoreFieldIfNonEmpty(
+        string currentKey,
+        Dictionary<string, string>? currentMap,
+        List<string>? currentList,
+        Dictionary<string, IdentityField> fields)
+    {
+        var value = ResolveFieldValue(currentMap, currentList);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        fields[currentKey] = new IdentityField
+        {
+            Name = currentKey,
+            Value = value,
+            Confidence = ResolveConfidence(currentMap),
+            LastUpdated = ResolveLastUpdated(currentMap),
+            Source = ResolveSource(currentMap),
+        };
+    }
+
+    private static void ProcessTopLevelField(
+        string trimmedLine,
+        Dictionary<string, string> metadata,
+        Dictionary<string, IdentityField> fields,
+        ref string? currentKey,
+        ref Dictionary<string, string>? currentMap,
+        ref List<string>? currentList)
+    {
+        var separatorIndex = trimmedLine.IndexOf(':');
+        if (separatorIndex < 0)
+        {
+            return;
+        }
+
+        var key = trimmedLine[..separatorIndex].Trim();
+        var rawValue = trimmedLine[(separatorIndex + 1)..].Trim();
+
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            currentKey = key;
+            currentMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            currentList = [];
+            return;
+        }
+
+        var normalizedValue = NormalizeScalar(rawValue);
+        if (ReservedMetadataKeys.Contains(key))
+        {
+            metadata[key] = normalizedValue;
+        }
+        else
+        {
+            fields[key] = new IdentityField
+            {
+                Name = key,
+                Value = normalizedValue,
+            };
+        }
+    }
+
+    private static void ProcessIndentedField(
+        string trimmedLine,
+        ref Dictionary<string, string>? currentMap,
+        ref List<string>? currentList)
+    {
+        if (trimmedLine.StartsWith("- ", StringComparison.Ordinal))
+        {
+            currentList ??= [];
+            currentList.Add(NormalizeScalar(trimmedLine[2..]));
+            return;
+        }
+
+        var nestedSeparatorIndex = trimmedLine.IndexOf(':');
+        if (nestedSeparatorIndex < 0)
+        {
+            return;
+        }
+
+        var nestedKey = trimmedLine[..nestedSeparatorIndex].Trim();
+        var nestedValue = NormalizeScalar(trimmedLine[(nestedSeparatorIndex + 1)..].Trim());
+        currentMap ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        currentMap[nestedKey] = nestedValue;
     }
 
     public static string SerializeDocument(

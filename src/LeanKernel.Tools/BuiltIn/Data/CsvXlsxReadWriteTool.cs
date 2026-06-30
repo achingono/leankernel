@@ -49,64 +49,30 @@ public static class CsvXlsxReadWriteTool
             ],
             Handler = async (args, ct) =>
             {
-                var operation = ToolArgumentReader.GetString(args, "operation").Trim().ToLowerInvariant();
-                var relativePath = ToolArgumentReader.GetString(args, "path");
-                var formatArg = ToolArgumentReader.GetString(args, "format");
-                var sheet = ToolArgumentReader.GetString(args, "sheet");
-                var hasHeader = ToolArgumentReader.GetBoolOrDefault(args, "has_header", true);
-                var maxRows = ClampMaxRows(ToolArgumentReader.GetInt32OrDefault(args, "max_rows", DefaultMaxRows));
-                var append = ToolArgumentReader.GetBoolOrDefault(args, "append", false);
-
-                if (string.IsNullOrWhiteSpace(operation))
-                {
-                    return Error("Operation is required");
-                }
-
-                if (operation is not "read" and not "write")
-                {
-                    return Error("Operation must be either 'read' or 'write'");
-                }
-
-                if (string.IsNullOrWhiteSpace(relativePath))
-                {
-                    return Error("Path is required");
-                }
-
                 using var scope = scopeFactory.CreateScope();
                 var config = scope.ServiceProvider.GetRequiredService<IOptions<LeanKernelConfig>>().Value.FileSystem;
-                var fullPath = FileSystemSupport.ResolveWithinRoot(config.AllowedRoot, relativePath);
-                if (fullPath is null)
+                var resolved = ParseCsvXlsxArgs(args, config);
+                if (resolved.ErrorMessage is not null)
                 {
-                    return Error("Access denied: path is outside the allowed directory");
-                }
-
-                var format = ResolveFormat(formatArg, relativePath);
-                if (format is null)
-                {
-                    return Error("Unable to infer format from path. Specify format as 'csv' or 'xlsx'");
-                }
-
-                if (format is not "csv" and not "xlsx")
-                {
-                    return Error("Unsupported format. Use 'csv' or 'xlsx'");
+                    return Error(resolved.ErrorMessage);
                 }
 
                 try
                 {
-                    return operation switch
+                    return resolved.Operation switch
                     {
-                        "read" => await HandleReadAsync(fullPath, relativePath, format, sheet, hasHeader, maxRows, ct),
-                        "write" => await HandleWriteAsync(args, fullPath, relativePath, format, sheet, hasHeader, append, ct),
+                        "read" => await HandleReadAsync(resolved.FullPath, resolved.RelativePath, resolved.Format, resolved.Sheet, resolved.HasHeader, resolved.MaxRows, ct),
+                        "write" => await HandleWriteAsync(args, resolved.FullPath, resolved.RelativePath, resolved.Format, resolved.Sheet, resolved.HasHeader, resolved.Append, ct),
                         _ => Error("Operation must be either 'read' or 'write'")
                     };
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    return Error($"Permission denied for path '{relativePath}': {ex.Message}");
+                    return Error($"Permission denied for path '{resolved.RelativePath}': {ex.Message}");
                 }
                 catch (IOException ex)
                 {
-                    return Error($"I/O error for path '{relativePath}': {ex.Message}");
+                    return Error($"I/O error for path '{resolved.RelativePath}': {ex.Message}");
                 }
                 catch (Exception ex)
                 {
@@ -114,6 +80,62 @@ public static class CsvXlsxReadWriteTool
                 }
             }
         };
+    }
+
+    private sealed record CsvXlsxArgs(
+        string Operation,
+        string FullPath,
+        string RelativePath,
+        string Format,
+        string? Sheet,
+        bool HasHeader,
+        int MaxRows,
+        bool Append,
+        string? ErrorMessage);
+
+    private static CsvXlsxArgs ParseCsvXlsxArgs(IDictionary<string, object?> args, LeanKernel.Abstractions.Configuration.FileSystemConfig config)
+    {
+        var operation = ToolArgumentReader.GetString(args, "operation").Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(operation))
+        {
+            return new CsvXlsxArgs(operation, null!, null!, null!, null, false, 0, false, "Operation is required");
+        }
+
+        if (operation is not "read" and not "write")
+        {
+            return new CsvXlsxArgs(operation, null!, null!, null!, null, false, 0, false, "Operation must be either 'read' or 'write'");
+        }
+
+        var relativePath = ToolArgumentReader.GetString(args, "path");
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return new CsvXlsxArgs(operation, null!, null!, null!, null, false, 0, false, "Path is required");
+        }
+
+        var fullPath = FileSystemSupport.ResolveWithinRoot(config.AllowedRoot, relativePath);
+        if (fullPath is null)
+        {
+            return new CsvXlsxArgs(operation, null!, null!, null!, null, false, 0, false, "Access denied: path is outside the allowed directory");
+        }
+
+        var formatArg = ToolArgumentReader.GetString(args, "format");
+        var format = ResolveFormat(formatArg, relativePath);
+        if (format is null)
+        {
+            return new CsvXlsxArgs(operation, null!, null!, null!, null, false, 0, false, "Unable to infer format from path. Specify format as 'csv' or 'xlsx'");
+        }
+
+        if (format is not "csv" and not "xlsx")
+        {
+            return new CsvXlsxArgs(operation, null!, null!, null!, null, false, 0, false, "Unsupported format. Use 'csv' or 'xlsx'");
+        }
+
+        var sheet = ToolArgumentReader.GetString(args, "sheet");
+        var hasHeader = ToolArgumentReader.GetBoolOrDefault(args, "has_header", true);
+        var maxRows = ClampMaxRows(ToolArgumentReader.GetInt32OrDefault(args, "max_rows", DefaultMaxRows));
+        var append = ToolArgumentReader.GetBoolOrDefault(args, "append", false);
+
+        return new CsvXlsxArgs(operation, fullPath, relativePath, format, sheet, hasHeader, maxRows, append, null);
     }
 
     private static async Task<ToolResult> HandleReadAsync(
@@ -149,54 +171,64 @@ public static class CsvXlsxReadWriteTool
         };
 
         using var csv = new CsvReader(reader, csvConfig);
+
+        return hasHeader
+            ? await ReadCsvWithHeaderAsync(csv, maxRows, ct)
+            : await ReadCsvWithoutHeaderAsync(csv, maxRows, ct);
+    }
+
+    private static async Task<ToolResult> ReadCsvWithHeaderAsync(CsvReader csv, int maxRows, CancellationToken ct)
+    {
         var rows = new List<IReadOnlyList<string>>();
-        List<string> columns;
         var truncated = false;
 
-        if (hasHeader)
+        if (!await csv.ReadAsync())
         {
-            if (!await csv.ReadAsync())
-            {
-                return SuccessPayload(Array.Empty<string>(), rows, 0, false);
-            }
-
-            csv.ReadHeader();
-            columns = csv.HeaderRecord?.ToList() ?? [];
-
-            while (await csv.ReadAsync())
-            {
-                if (rows.Count == maxRows)
-                {
-                    truncated = true;
-                    break;
-                }
-
-                ct.ThrowIfCancellationRequested();
-                rows.Add(ReadCsvRow(csv, columns.Count));
-            }
+            return SuccessPayload(Array.Empty<string>(), rows, 0, false);
         }
-        else
+
+        csv.ReadHeader();
+        var columns = csv.HeaderRecord?.ToList() ?? [];
+
+        while (await csv.ReadAsync())
         {
-            var maxColumns = 0;
-            while (await csv.ReadAsync())
+            if (rows.Count == maxRows)
             {
-                if (rows.Count == maxRows)
-                {
-                    truncated = true;
-                    break;
-                }
-
-                ct.ThrowIfCancellationRequested();
-                var record = csv.Parser.Record ?? [];
-                maxColumns = Math.Max(maxColumns, record.Length);
-                rows.Add(record.Select(value => value ?? string.Empty).ToArray());
+                truncated = true;
+                break;
             }
 
-            columns = Enumerable.Range(1, maxColumns).Select(index => $"c{index}").ToList();
-            for (var i = 0; i < rows.Count; i++)
+            ct.ThrowIfCancellationRequested();
+            rows.Add(ReadCsvRow(csv, columns.Count));
+        }
+
+        return SuccessPayload(columns, rows, rows.Count, truncated);
+    }
+
+    private static async Task<ToolResult> ReadCsvWithoutHeaderAsync(CsvReader csv, int maxRows, CancellationToken ct)
+    {
+        var rows = new List<IReadOnlyList<string>>();
+        var maxColumns = 0;
+        var truncated = false;
+
+        while (await csv.ReadAsync())
+        {
+            if (rows.Count == maxRows)
             {
-                rows[i] = PadRow(rows[i], maxColumns);
+                truncated = true;
+                break;
             }
+
+            ct.ThrowIfCancellationRequested();
+            var record = csv.Parser.Record ?? [];
+            maxColumns = Math.Max(maxColumns, record.Length);
+            rows.Add(record.Select(value => value ?? string.Empty).ToArray());
+        }
+
+        var columns = Enumerable.Range(1, maxColumns).Select(index => $"c{index}").ToList();
+        for (var i = 0; i < rows.Count; i++)
+        {
+            rows[i] = PadRow(rows[i], maxColumns);
         }
 
         return SuccessPayload(columns, rows, rows.Count, truncated);

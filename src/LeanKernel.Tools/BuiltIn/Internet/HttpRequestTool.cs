@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -49,94 +50,100 @@ public static class HttpRequestTool
             ],
             Handler = async (args, ct) =>
             {
-                var url = ToolArgumentReader.GetString(args, "url");
-                if (string.IsNullOrWhiteSpace(url))
-                {
-                    return new ToolResult { ToolName = ToolName, Success = false, Error = "URL is required" };
-                }
-
-                if (!TryValidateUrl(url, out var uri, out var validationError))
-                {
-                    return new ToolResult { ToolName = ToolName, Success = false, Error = validationError };
-                }
-
-                var method = ToolArgumentReader.GetString(args, "method");
-                if (string.IsNullOrWhiteSpace(method))
-                {
-                    method = "GET";
-                }
-
-                method = method.Trim().ToUpperInvariant();
-                if (!AllowedMethods.Contains(method))
-                {
-                    return new ToolResult
-                    {
-                        ToolName = ToolName,
-                        Success = false,
-                        Error = "Method must be one of: GET, POST, PUT, PATCH, DELETE, HEAD"
-                    };
-                }
-
-                if (!TryReadStringMap(args, "headers", out var headers, out var headersError))
-                {
-                    return new ToolResult { ToolName = ToolName, Success = false, Error = headersError };
-                }
-
-                if (!TryReadStringMap(args, "query", out var query, out var queryError))
-                {
-                    return new ToolResult { ToolName = ToolName, Success = false, Error = queryError };
-                }
-
-                var maxOutputChars = Math.Clamp(ToolArgumentReader.GetInt32OrDefault(args, "max_output_chars", DefaultMaxOutputChars), 1, MaxOutputCharsLimit);
-                var followRedirects = ToolArgumentReader.GetBoolOrDefault(args, "follow_redirects", true);
-                var contentType = ToolArgumentReader.GetString(args, "content_type");
-
-                if (!TryReadBody(args, out var bodyContent, out var isJsonBody, out var bodyError))
-                {
-                    return new ToolResult { ToolName = ToolName, Success = false, Error = bodyError };
-                }
-
-                if (isJsonBody && string.IsNullOrWhiteSpace(contentType))
-                {
-                    contentType = "application/json";
-                }
-
-                try
-                {
-                    using var scope = scopeFactory.CreateScope();
-                    using var client = CreateHttpClient(scope.ServiceProvider);
-                    var requestUri = AppendQuery(uri!, query);
-
-                    var responseResult = await SendWithRedirectsAsync(
-                        client,
-                        requestUri,
-                        method,
-                        headers,
-                        bodyContent,
-                        contentType,
-                        followRedirects,
-                        maxOutputChars,
-                        ct);
-
-                    return new ToolResult
-                    {
-                        ToolName = ToolName,
-                        Success = responseResult.Success,
-                        Output = responseResult.Output,
-                        Error = responseResult.Error
-                    };
-                }
-                catch (Exception ex)
-                {
-                    return new ToolResult
-                    {
-                        ToolName = ToolName,
-                        Success = false,
-                        Error = $"HTTP request failed: {ex.Message}"
-                    };
-                }
+                var parsed = await ParseAndExecuteRequestAsync(args, scopeFactory, ct);
+                return parsed;
             }
         };
+    }
+
+    private static async Task<ToolResult> ParseAndExecuteRequestAsync(
+        IDictionary<string, object?> args,
+        IServiceScopeFactory scopeFactory,
+        CancellationToken ct)
+    {
+        var url = ToolArgumentReader.GetString(args, "url");
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = "URL is required" };
+        }
+
+        if (!TryValidateUrl(url, out var uri, out var validationError))
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = validationError };
+        }
+
+        var method = ToolArgumentReader.GetString(args, "method");
+        if (string.IsNullOrWhiteSpace(method))
+        {
+            method = "GET";
+        }
+
+        method = method.Trim().ToUpperInvariant();
+        if (!AllowedMethods.Contains(method))
+        {
+            return new ToolResult
+            {
+                ToolName = ToolName,
+                Success = false,
+                Error = "Method must be one of: GET, POST, PUT, PATCH, DELETE, HEAD"
+            };
+        }
+
+        if (!TryReadStringMap(args, "headers", out var headers, out var headersError))
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = headersError };
+        }
+
+        if (!TryReadStringMap(args, "query", out var query, out var queryError))
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = queryError };
+        }
+
+        var maxOutputChars = Math.Clamp(ToolArgumentReader.GetInt32OrDefault(args, "max_output_chars", DefaultMaxOutputChars), 1, MaxOutputCharsLimit);
+        var followRedirects = ToolArgumentReader.GetBoolOrDefault(args, "follow_redirects", true);
+
+        if (!TryReadBody(args, out var bodyContent, out var isJsonBody, out var bodyError))
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = bodyError };
+        }
+
+        var rawContentType = ToolArgumentReader.GetString(args, "content_type");
+        var contentType = isJsonBody && string.IsNullOrWhiteSpace(rawContentType) ? "application/json" : rawContentType;
+
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            using var client = CreateHttpClient(scope.ServiceProvider);
+            var requestUri = AppendQuery(uri!, query);
+
+            var responseResult = await SendWithRedirectsAsync(
+                client,
+                requestUri,
+                method,
+                headers,
+                bodyContent,
+                contentType,
+                followRedirects,
+                maxOutputChars,
+                ct);
+
+            return new ToolResult
+            {
+                ToolName = ToolName,
+                Success = responseResult.Success,
+                Output = responseResult.Output,
+                Error = responseResult.Error
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ToolResult
+            {
+                ToolName = ToolName,
+                Success = false,
+                Error = $"HTTP request failed: {ex.Message}"
+            };
+        }
     }
 
     private static HttpClient CreateHttpClient(IServiceProvider serviceProvider)
@@ -249,28 +256,8 @@ public static class HttpRequestTool
         var boundedContent = truncated ? content[..maxOutputChars] : content;
 
         var responseHeaders = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        foreach (var header in response.Headers)
-        {
-            if (string.Equals(header.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            responseHeaders[header.Key] = string.Join(", ", header.Value);
-        }
-
-        if (response.Content is not null)
-        {
-            foreach (var header in response.Content.Headers)
-            {
-                if (string.Equals(header.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                responseHeaders[header.Key] = string.Join(", ", header.Value);
-            }
-        }
+        AddHeadersToDictionary(response.Headers, responseHeaders);
+        AddHeadersToDictionary(response.Content?.Headers, responseHeaders);
 
         var output = JsonSerializer.Serialize(new HttpRequestOutput(
             StatusCode: (int)response.StatusCode,
@@ -284,6 +271,24 @@ public static class HttpRequestTool
             });
 
         return (true, output, null);
+    }
+
+    private static void AddHeadersToDictionary(HttpHeaders? headers, SortedDictionary<string, string> dictionary)
+    {
+        if (headers is null)
+        {
+            return;
+        }
+
+        foreach (var header in headers)
+        {
+            if (string.Equals(header.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            dictionary[header.Key] = string.Join(", ", header.Value);
+        }
     }
 
     private static bool TryReadStringMap(
@@ -302,36 +307,7 @@ public static class HttpRequestTool
 
         if (value is JsonElement element)
         {
-            if (element.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
-            {
-                return true;
-            }
-
-            if (element.ValueKind != JsonValueKind.Object)
-            {
-                error = $"'{name}' must be an object of string key/value pairs.";
-                return false;
-            }
-
-            var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var property in element.EnumerateObject())
-            {
-                if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
-                {
-                    error = $"'{name}' values must be strings, numbers, booleans, or null.";
-                    return false;
-                }
-
-                result[property.Name] = property.Value.ValueKind switch
-                {
-                    JsonValueKind.Null => string.Empty,
-                    JsonValueKind.String => property.Value.GetString() ?? string.Empty,
-                    _ => property.Value.ToString()
-                };
-            }
-
-            map = result;
-            return true;
+            return TryReadJsonElementMap(element, name, out map, out error);
         }
 
         if (value is IDictionary<string, string> typedStringDictionary)
@@ -342,37 +318,81 @@ public static class HttpRequestTool
 
         if (value is IDictionary<string, object?> objectDictionary)
         {
-            var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var (key, item) in objectDictionary)
-            {
-                if (item is null)
-                {
-                    result[key] = string.Empty;
-                    continue;
-                }
-
-                if (item is string text)
-                {
-                    result[key] = text;
-                    continue;
-                }
-
-                if (item is bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal)
-                {
-                    result[key] = Convert.ToString(item, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
-                    continue;
-                }
-
-                error = $"'{name}' values must be strings, numbers, booleans, or null.";
-                return false;
-            }
-
-            map = result;
-            return true;
+            return TryReadObjectDictionary(objectDictionary, name, out map, out error);
         }
 
         error = $"'{name}' must be an object of string key/value pairs.";
         return false;
+    }
+
+    private static bool TryReadJsonElementMap(JsonElement element, string name, out IReadOnlyDictionary<string, string> map, out string? error)
+    {
+        map = new Dictionary<string, string>(StringComparer.Ordinal);
+        error = null;
+
+        if (element.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return true;
+        }
+
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            error = $"'{name}' must be an object of string key/value pairs.";
+            return false;
+        }
+
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+            {
+                error = $"'{name}' values must be strings, numbers, booleans, or null.";
+                return false;
+            }
+
+            result[property.Name] = property.Value.ValueKind switch
+            {
+                JsonValueKind.Null => string.Empty,
+                JsonValueKind.String => property.Value.GetString() ?? string.Empty,
+                _ => property.Value.ToString()
+            };
+        }
+
+        map = result;
+        return true;
+    }
+
+    private static bool TryReadObjectDictionary(IDictionary<string, object?> objectDictionary, string name, out IReadOnlyDictionary<string, string> map, out string? error)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, item) in objectDictionary)
+        {
+            if (item is null)
+            {
+                result[key] = string.Empty;
+                continue;
+            }
+
+            if (item is string text)
+            {
+                result[key] = text;
+                continue;
+            }
+
+            if (item is bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal)
+            {
+                result[key] = Convert.ToString(item, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                continue;
+            }
+
+            error = $"'{name}' values must be strings, numbers, booleans, or null.";
+            map = null!;
+            return false;
+        }
+
+        map = result;
+        error = null;
+        return true;
     }
 
     private static bool TryReadBody(

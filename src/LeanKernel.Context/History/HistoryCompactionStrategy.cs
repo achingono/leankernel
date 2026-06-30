@@ -56,19 +56,18 @@ public sealed class HistoryCompactionStrategy
         var compactedTurns = Math.Max(0, _config.CompactedTurnsMax);
         var summarizedTurns = Math.Max(0, _config.SummarizedTurnsMax);
 
-        if (_config.EnableCompaction && !_config.EnableSummarization)
-        {
-            compactedTurns += summarizedTurns;
-            summarizedTurns = 0;
-        }
-        else if (!_config.EnableCompaction && _config.EnableSummarization)
-        {
-            summarizedTurns += compactedTurns;
-            compactedTurns = 0;
-        }
-        else if (!_config.EnableCompaction && !_config.EnableSummarization)
+        if (!_config.EnableCompaction)
         {
             compactedTurns = 0;
+        }
+
+        if (!_config.EnableSummarization)
+        {
+            if (_config.EnableCompaction)
+            {
+                compactedTurns += summarizedTurns;
+            }
+
             summarizedTurns = 0;
         }
 

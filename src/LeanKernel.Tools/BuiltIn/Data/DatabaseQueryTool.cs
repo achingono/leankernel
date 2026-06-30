@@ -62,152 +62,145 @@ public static partial class DatabaseQueryTool
             {
                 try
                 {
-                    var connectionName = ToolArgumentReader.GetString(args, "connection");
-                    var query = ToolArgumentReader.GetString(args, "query");
-                    if (string.IsNullOrWhiteSpace(connectionName))
-                    {
-                        return new ToolResult { ToolName = ToolName, Success = false, Error = "Connection is required" };
-                    }
-
-                    if (string.IsNullOrWhiteSpace(query))
-                    {
-                        return new ToolResult { ToolName = ToolName, Success = false, Error = "Query is required" };
-                    }
-
-                    var parameters = ToolArgumentReader.GetObjectDictionary(args, "parameters");
-
-                    using var scope = scopeFactory.CreateScope();
-                    var databaseQueryConfig = scope.ServiceProvider.GetRequiredService<IOptions<LeanKernelConfig>>().Value.DatabaseQuery;
-                    var connectionConfig = databaseQueryConfig.Connections.FirstOrDefault(
-                        entry => string.Equals(entry.Name, connectionName, StringComparison.OrdinalIgnoreCase));
-
-                    if (connectionConfig is null)
-                    {
-                        return new ToolResult { ToolName = ToolName, Success = false, Error = $"Unknown database connection: {connectionName}" };
-                    }
-
-                    if (!connectionConfig.ReadOnly)
-                    {
-                        return new ToolResult
-                        {
-                            ToolName = ToolName,
-                            Success = false,
-                            Error = $"Database connection '{connectionConfig.Name}' must be configured with readOnly=true for {ToolName}"
-                        };
-                    }
-
-                    var provider = connectionConfig.Provider.Trim().ToLowerInvariant();
-                    if (provider is not ("postgres" or "sqlite"))
-                    {
-                        return new ToolResult
-                        {
-                            ToolName = ToolName,
-                            Success = false,
-                            Error = $"Unsupported database provider '{connectionConfig.Provider}'. Supported providers: postgres, sqlite"
-                        };
-                    }
-
-                    var configuredMaxRows = Math.Max(1, databaseQueryConfig.MaxRows);
-                    var requestedMaxRows = ToolArgumentReader.GetInt32OrDefault(args, "max_rows", configuredMaxRows);
-                    if (requestedMaxRows <= 0)
-                    {
-                        return new ToolResult { ToolName = ToolName, Success = false, Error = "max_rows must be greater than zero" };
-                    }
-
-                    var configuredTimeout = Math.Max(1, databaseQueryConfig.DefaultTimeoutSeconds);
-                    var requestedTimeout = ToolArgumentReader.GetInt32OrDefault(args, "timeout_seconds", configuredTimeout);
-                    if (requestedTimeout <= 0)
-                    {
-                        return new ToolResult { ToolName = ToolName, Success = false, Error = "timeout_seconds must be greater than zero" };
-                    }
-
-                    var maxRows = Math.Clamp(requestedMaxRows, 1, configuredMaxRows);
-                    var timeoutSeconds = Math.Clamp(requestedTimeout, 1, configuredTimeout);
-
-                    if (!TryValidateReadOnlyQuery(query, provider, connectionConfig.AllowedSchemas, out var validationError))
-                    {
-                        return new ToolResult { ToolName = ToolName, Success = false, Error = validationError };
-                    }
-
-                    await using var connection = CreateConnection(connectionConfig, provider);
-                    await connection.OpenAsync(ct);
-
-                    await using var command = connection.CreateCommand();
-                    command.CommandText = query;
-                    command.CommandTimeout = timeoutSeconds;
-                    AddParameters(command, parameters);
-
-                    var stopwatch = Stopwatch.StartNew();
-                    await using var reader = await command.ExecuteReaderAsync(ct);
-
-                    var columns = Enumerable.Range(0, reader.FieldCount)
-                        .Select(reader.GetName)
-                        .ToList();
-
-                    var rows = new List<List<object?>>();
-                    var truncated = false;
-                    while (await reader.ReadAsync(ct))
-                    {
-                        if (rows.Count >= maxRows)
-                        {
-                            truncated = true;
-                            break;
-                        }
-
-                        var row = new List<object?>(reader.FieldCount);
-                        for (var index = 0; index < reader.FieldCount; index++)
-                        {
-                            row.Add(NormalizeResultValue(reader.GetValue(index)));
-                        }
-
-                        rows.Add(row);
-                    }
-
-                    stopwatch.Stop();
-                    var output = JsonSerializer.Serialize(new
-                    {
-                        columns,
-                        rows,
-                        rowCount = rows.Count,
-                        truncated,
-                        executionMs = stopwatch.ElapsedMilliseconds
-                    });
-
-                    return new ToolResult
-                    {
-                        ToolName = ToolName,
-                        Success = true,
-                        Output = output
-                    };
+                    return await ExecuteQueryAsync(args, scopeFactory, ct);
                 }
                 catch (ArgumentException ex)
                 {
-                    return new ToolResult
-                    {
-                        ToolName = ToolName,
-                        Success = false,
-                        Error = ex.Message
-                    };
+                    return new ToolResult { ToolName = ToolName, Success = false, Error = ex.Message };
                 }
                 catch (DbException ex)
                 {
-                    return new ToolResult
-                    {
-                        ToolName = ToolName,
-                        Success = false,
-                        Error = $"Database query failed: {ex.Message}"
-                    };
+                    return new ToolResult { ToolName = ToolName, Success = false, Error = $"Database query failed: {ex.Message}" };
                 }
                 catch (Exception ex)
                 {
-                    return new ToolResult
-                    {
-                        ToolName = ToolName,
-                        Success = false,
-                        Error = $"Database query execution failed: {ex.Message}"
-                    };
+                    return new ToolResult { ToolName = ToolName, Success = false, Error = $"Database query execution failed: {ex.Message}" };
                 }
             }
+        };
+    }
+
+    private static async Task<ToolResult> ExecuteQueryAsync(
+        IDictionary<string, object?> args,
+        IServiceScopeFactory scopeFactory,
+        CancellationToken ct)
+    {
+        var connectionName = ToolArgumentReader.GetString(args, "connection");
+        var query = ToolArgumentReader.GetString(args, "query");
+        if (string.IsNullOrWhiteSpace(connectionName))
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = "Connection is required" };
+        }
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = "Query is required" };
+        }
+
+        var parameters = ToolArgumentReader.GetObjectDictionary(args, "parameters");
+
+        using var scope = scopeFactory.CreateScope();
+        var databaseQueryConfig = scope.ServiceProvider.GetRequiredService<IOptions<LeanKernelConfig>>().Value.DatabaseQuery;
+        var connectionConfig = databaseQueryConfig.Connections.FirstOrDefault(
+            entry => string.Equals(entry.Name, connectionName, StringComparison.OrdinalIgnoreCase));
+
+        if (connectionConfig is null)
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = $"Unknown database connection: {connectionName}" };
+        }
+
+        if (!connectionConfig.ReadOnly)
+        {
+            return new ToolResult
+            {
+                ToolName = ToolName,
+                Success = false,
+                Error = $"Database connection '{connectionConfig.Name}' must be configured with readOnly=true for {ToolName}"
+            };
+        }
+
+        var provider = connectionConfig.Provider.Trim().ToLowerInvariant();
+        if (provider is not ("postgres" or "sqlite"))
+        {
+            return new ToolResult
+            {
+                ToolName = ToolName,
+                Success = false,
+                Error = $"Unsupported database provider '{connectionConfig.Provider}'. Supported providers: postgres, sqlite"
+            };
+        }
+
+        var configuredMaxRows = Math.Max(1, databaseQueryConfig.MaxRows);
+        var requestedMaxRows = ToolArgumentReader.GetInt32OrDefault(args, "max_rows", configuredMaxRows);
+        if (requestedMaxRows <= 0)
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = "max_rows must be greater than zero" };
+        }
+
+        var configuredTimeout = Math.Max(1, databaseQueryConfig.DefaultTimeoutSeconds);
+        var requestedTimeout = ToolArgumentReader.GetInt32OrDefault(args, "timeout_seconds", configuredTimeout);
+        if (requestedTimeout <= 0)
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = "timeout_seconds must be greater than zero" };
+        }
+
+        var maxRows = Math.Clamp(requestedMaxRows, 1, configuredMaxRows);
+        var timeoutSeconds = Math.Clamp(requestedTimeout, 1, configuredTimeout);
+
+        if (!TryValidateReadOnlyQuery(query, provider, connectionConfig.AllowedSchemas, out var validationError))
+        {
+            return new ToolResult { ToolName = ToolName, Success = false, Error = validationError };
+        }
+
+        await using var connection = CreateConnection(connectionConfig, provider);
+        await connection.OpenAsync(ct);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = query;
+        command.CommandTimeout = timeoutSeconds;
+        AddParameters(command, parameters);
+
+        var stopwatch = Stopwatch.StartNew();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+
+        var columns = Enumerable.Range(0, reader.FieldCount)
+            .Select(reader.GetName)
+            .ToList();
+
+        var rows = new List<List<object?>>();
+        var truncated = false;
+        while (await reader.ReadAsync(ct))
+        {
+            if (rows.Count >= maxRows)
+            {
+                truncated = true;
+                break;
+            }
+
+            var row = new List<object?>(reader.FieldCount);
+            for (var index = 0; index < reader.FieldCount; index++)
+            {
+                row.Add(NormalizeResultValue(reader.GetValue(index)));
+            }
+
+            rows.Add(row);
+        }
+
+        stopwatch.Stop();
+        var output = JsonSerializer.Serialize(new
+        {
+            columns,
+            rows,
+            rowCount = rows.Count,
+            truncated,
+            executionMs = stopwatch.ElapsedMilliseconds
+        });
+
+        return new ToolResult
+        {
+            ToolName = ToolName,
+            Success = true,
+            Output = output
         };
     }
 
@@ -459,109 +452,106 @@ public static partial class DatabaseQueryTool
 
             if (inLineComment)
             {
-                if (current == '\n')
-                {
-                    inLineComment = false;
-                    builder.Append('\n');
-                }
-                else
-                {
-                    builder.Append(' ');
-                }
-
-                continue;
+                HandleLineCommentState(current, builder, ref inLineComment);
             }
-
-            if (inBlockComment)
+            else if (inBlockComment)
             {
-                if (current == '*' && next == '/')
-                {
-                    inBlockComment = false;
-                    builder.Append("  ");
-                    index++;
-                }
-                else
-                {
-                    builder.Append(char.IsWhiteSpace(current) ? current : ' ');
-                }
-
-                continue;
+                HandleBlockCommentState(current, next, builder, ref inBlockComment, ref index);
             }
-
-            if (inSingleQuote)
+            else if (inSingleQuote)
             {
-                if (current == '\'' && next == '\'')
-                {
-                    builder.Append("  ");
-                    index++;
-                    continue;
-                }
-
-                if (current == '\'')
-                {
-                    inSingleQuote = false;
-                    builder.Append(' ');
-                    continue;
-                }
-
-                builder.Append(char.IsWhiteSpace(current) ? current : ' ');
-                continue;
+                HandleQuoteState(current, next, builder, ref inSingleQuote, ref index, '\'');
             }
-
-            if (inDoubleQuote)
+            else if (inDoubleQuote)
             {
-                if (current == '"' && next == '"')
-                {
-                    builder.Append("\"\"");
-                    index++;
-                    continue;
-                }
-
-                if (current == '"')
-                {
-                    inDoubleQuote = false;
-                    builder.Append('"');
-                    continue;
-                }
-
-                builder.Append(current);
-                continue;
+                HandleQuoteState(current, next, builder, ref inDoubleQuote, ref index, '"');
             }
-
-            if (current == '-' && next == '-')
+            else
             {
-                inLineComment = true;
-                builder.Append("  ");
-                index++;
-                continue;
+                HandleNormalSqlChar(current, next, builder, ref inLineComment, ref inBlockComment, ref inSingleQuote, ref inDoubleQuote, ref index);
             }
-
-            if (current == '/' && next == '*')
-            {
-                inBlockComment = true;
-                builder.Append("  ");
-                index++;
-                continue;
-            }
-
-            if (current == '\'')
-            {
-                inSingleQuote = true;
-                builder.Append(' ');
-                continue;
-            }
-
-            if (current == '"')
-            {
-                inDoubleQuote = true;
-                builder.Append('"');
-                continue;
-            }
-
-            builder.Append(current);
         }
 
         return builder.ToString();
+    }
+
+    private static void HandleLineCommentState(char current, StringBuilder builder, ref bool inLineComment)
+    {
+        if (current == '\n')
+        {
+            inLineComment = false;
+            builder.Append('\n');
+        }
+        else
+        {
+            builder.Append(' ');
+        }
+    }
+
+    private static void HandleBlockCommentState(char current, char next, StringBuilder builder, ref bool inBlockComment, ref int index)
+    {
+        if (current == '*' && next == '/')
+        {
+            inBlockComment = false;
+            builder.Append("  ");
+            index++;
+        }
+        else
+        {
+            builder.Append(char.IsWhiteSpace(current) ? current : ' ');
+        }
+    }
+
+    private static void HandleQuoteState(char current, char next, StringBuilder builder, ref bool inQuote, ref int index, char quoteChar)
+    {
+        if (current == quoteChar && next == quoteChar)
+        {
+            builder.Append(quoteChar == '\'' ? "  " : "\"\"");
+            index++;
+        }
+        else if (current == quoteChar)
+        {
+            inQuote = false;
+            builder.Append(quoteChar == '\'' ? ' ' : '"');
+        }
+        else if (quoteChar == '\'')
+        {
+            builder.Append(char.IsWhiteSpace(current) ? current : ' ');
+        }
+        else
+        {
+            builder.Append(current);
+        }
+    }
+
+    private static void HandleNormalSqlChar(char current, char next, StringBuilder builder, ref bool inLineComment, ref bool inBlockComment, ref bool inSingleQuote, ref bool inDoubleQuote, ref int index)
+    {
+        if (current == '-' && next == '-')
+        {
+            inLineComment = true;
+            builder.Append("  ");
+            index++;
+        }
+        else if (current == '/' && next == '*')
+        {
+            inBlockComment = true;
+            builder.Append("  ");
+            index++;
+        }
+        else if (current == '\'')
+        {
+            inSingleQuote = true;
+            builder.Append(' ');
+        }
+        else if (current == '"')
+        {
+            inDoubleQuote = true;
+            builder.Append('"');
+        }
+        else
+        {
+            builder.Append(current);
+        }
     }
 
     [GeneratedRegex(@"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant)]

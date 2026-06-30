@@ -231,99 +231,18 @@ public sealed class SignalChannel : IChannel
                 _logger.LogInformation(
                     "Signal WebSocket connected for {PhoneNumber}", phoneNumber);
 
-                var buffer = new byte[8192];
-                var messageBuffer = new StringBuilder();
-
-                while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
-                {
-                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct).ConfigureAwait(false);
-
-                    if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        var elapsed = DateTimeOffset.UtcNow - connectTime;
-                        _logger.LogInformation(
-                            "Signal WebSocket closed normally for {PhoneNumber} after {Elapsed}",
-                            phoneNumber,
-                            elapsed);
-                        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None)
-                            .ConfigureAwait(false);
-                        break;
-                    }
-
-                    messageBuffer.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
-
-                    if (result.EndOfMessage)
-                    {
-                        var json = messageBuffer.ToString();
-                        messageBuffer.Clear();
-
-                        var envelope = JsonSerializer.Deserialize<SignalReceiveEnvelope>(json, SerializerOptions);
-                        var channelMessage = CreateChannelMessage(envelope, phoneNumber);
-                        if (channelMessage is not null)
-                        {
-                            _senderNumber[channelMessage.SenderId] = phoneNumber;
-                            await DispatchMessageAsync(channelMessage, ct).ConfigureAwait(false);
-                        }
-                    }
-                }
+                await ProcessWebSocketMessagesAsync(ws, phoneNumber, connectTime, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                if (wasEverConnected)
-                {
-                    var elapsed = DateTimeOffset.UtcNow - connectTime;
-                    _logger.LogInformation(
-                        "Signal WebSocket cancelled for {PhoneNumber} after {Elapsed}",
-                        phoneNumber,
-                        elapsed);
-                }
+                LogCancellation(phoneNumber, connectTime, wasEverConnected);
                 break;
             }
             catch (Exception ex)
             {
-                reconnectAttempts++;
-
-                if (wasEverConnected)
+                if (!TryHandleReconnect(ex, phoneNumber, connectTime, ref wasEverConnected, ref reconnectAttempts))
                 {
-                    var elapsed = DateTimeOffset.UtcNow - connectTime;
-                    _logger.LogWarning(
-                        ex,
-                        "Signal WebSocket disconnected for {PhoneNumber} after {Elapsed} (attempt {Attempt}/{MaxAttempts})",
-                        phoneNumber,
-                        elapsed,
-                        reconnectAttempts,
-                        _config.MaxReconnectAttempts);
-                    Interlocked.Decrement(ref _connectedCount);
-                    wasEverConnected = false;
-                }
-                else
-                {
-                    _logger.LogWarning(
-                        ex,
-                        "Signal WebSocket connection failed for {PhoneNumber} (attempt {Attempt}/{MaxAttempts})",
-                        phoneNumber,
-                        reconnectAttempts,
-                        _config.MaxReconnectAttempts);
-                }
-
-                if (_config.MaxReconnectAttempts > 0 && reconnectAttempts >= _config.MaxReconnectAttempts)
-                {
-                    _logger.LogError(
-                        "Signal channel reached the maximum reconnect attempts for {PhoneNumber} and will stop",
-                        phoneNumber);
                     break;
-                }
-
-                var reconnectDelay = GetReconnectDelay(reconnectAttempts);
-                _logger.LogInformation(
-                    "Signal WebSocket reconnecting for {PhoneNumber} in {Delay} (attempt {Attempt}/{MaxAttempts})",
-                    phoneNumber,
-                    reconnectDelay,
-                    reconnectAttempts,
-                    _config.MaxReconnectAttempts);
-                if (reconnectDelay > TimeSpan.Zero)
-                {
-                    await Task.Delay(reconnectDelay, ct).ConfigureAwait(false);
                 }
             }
         }
@@ -332,6 +251,115 @@ public sealed class SignalChannel : IChannel
         {
             Interlocked.Decrement(ref _connectedCount);
         }
+    }
+
+    private async Task ProcessWebSocketMessagesAsync(ClientWebSocket ws, string phoneNumber, DateTimeOffset connectTime, CancellationToken ct)
+    {
+        var buffer = new byte[8192];
+        var messageBuffer = new StringBuilder();
+
+        while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
+        {
+            var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct).ConfigureAwait(false);
+
+            if (result.MessageType == WebSocketMessageType.Close)
+            {
+                var elapsed = DateTimeOffset.UtcNow - connectTime;
+                _logger.LogInformation(
+                    "Signal WebSocket closed normally for {PhoneNumber} after {Elapsed}",
+                    phoneNumber,
+                    elapsed);
+                await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None)
+                    .ConfigureAwait(false);
+                break;
+            }
+
+            messageBuffer.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+
+            if (result.EndOfMessage)
+            {
+                await DispatchIncomingMessageAsync(messageBuffer, phoneNumber, ct);
+            }
+        }
+    }
+
+    private async Task DispatchIncomingMessageAsync(StringBuilder messageBuffer, string phoneNumber, CancellationToken ct)
+    {
+        var json = messageBuffer.ToString();
+        messageBuffer.Clear();
+
+        var envelope = JsonSerializer.Deserialize<SignalReceiveEnvelope>(json, SerializerOptions);
+        var channelMessage = CreateChannelMessage(envelope, phoneNumber);
+        if (channelMessage is not null)
+        {
+            _senderNumber[channelMessage.SenderId] = phoneNumber;
+            await DispatchMessageAsync(channelMessage, ct).ConfigureAwait(false);
+        }
+    }
+
+    private void LogCancellation(string phoneNumber, DateTimeOffset connectTime, bool wasEverConnected)
+    {
+        if (!wasEverConnected)
+        {
+            return;
+        }
+
+        var elapsed = DateTimeOffset.UtcNow - connectTime;
+        _logger.LogInformation(
+            "Signal WebSocket cancelled for {PhoneNumber} after {Elapsed}",
+            phoneNumber,
+            elapsed);
+    }
+
+    private bool TryHandleReconnect(Exception ex, string phoneNumber, DateTimeOffset connectTime, ref bool wasEverConnected, ref int reconnectAttempts)
+    {
+        reconnectAttempts++;
+
+        if (wasEverConnected)
+        {
+            var elapsed = DateTimeOffset.UtcNow - connectTime;
+            _logger.LogWarning(
+                ex,
+                "Signal WebSocket disconnected for {PhoneNumber} after {Elapsed} (attempt {Attempt}/{MaxAttempts})",
+                phoneNumber,
+                elapsed,
+                reconnectAttempts,
+                _config.MaxReconnectAttempts);
+            Interlocked.Decrement(ref _connectedCount);
+            wasEverConnected = false;
+        }
+        else
+        {
+            _logger.LogWarning(
+                ex,
+                "Signal WebSocket connection failed for {PhoneNumber} (attempt {Attempt}/{MaxAttempts})",
+                phoneNumber,
+                reconnectAttempts,
+                _config.MaxReconnectAttempts);
+        }
+
+        if (_config.MaxReconnectAttempts > 0 && reconnectAttempts >= _config.MaxReconnectAttempts)
+        {
+            _logger.LogError(
+                "Signal channel reached the maximum reconnect attempts for {PhoneNumber} and will stop",
+                phoneNumber);
+            return false;
+        }
+
+        var reconnectDelay = GetReconnectDelay(reconnectAttempts);
+        _logger.LogInformation(
+            "Signal WebSocket reconnecting for {PhoneNumber} in {Delay} (attempt {Attempt}/{MaxAttempts})",
+            phoneNumber,
+            reconnectDelay,
+            reconnectAttempts,
+            _config.MaxReconnectAttempts);
+
+        if (reconnectDelay > TimeSpan.Zero)
+        {
+            Task.Delay(reconnectDelay, CancellationToken.None).Wait();
+        }
+
+        return true;
     }
 
     private async Task DispatchMessageAsync(ChannelMessage message, CancellationToken ct)

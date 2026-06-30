@@ -442,7 +442,12 @@ public sealed class IdentityIntentExtractionStep(
 
             var frontmatter = normalized[4..closingIndex];
             document.Body = normalized[(closingIndex + 5)..].Trim();
-            var lines = frontmatter.Split('\n');
+            ParseFrontmatterLines(frontmatter.Split('\n'), document);
+            return document;
+        }
+
+        private static void ParseFrontmatterLines(string[] lines, ParsedIdentityDocument document)
+        {
             string? currentKey = null;
             var currentMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -461,36 +466,7 @@ public sealed class IdentityIntentExtractionStep(
                     FlushCurrentField(document, currentKey, currentMap);
                     currentMap.Clear();
                     currentKey = null;
-
-                    var separatorIndex = trimmed.IndexOf(':');
-                    if (separatorIndex < 0)
-                    {
-                        continue;
-                    }
-
-                    var key = trimmed[..separatorIndex].Trim();
-                    var value = trimmed[(separatorIndex + 1)..].Trim();
-
-                    if (string.IsNullOrWhiteSpace(value))
-                    {
-                        currentKey = key;
-                        continue;
-                    }
-
-                    var scalar = Unquote(value);
-                    if (ReservedMetadataKeys.Contains(key))
-                    {
-                        document.Metadata[key] = scalar;
-                    }
-                    else
-                    {
-                        document.Fields[key] = new ParsedIdentityField
-                        {
-                            Name = key,
-                            Value = scalar,
-                        };
-                    }
-
+                    ProcessTopLevelLine(trimmed, document, ref currentKey);
                     continue;
                 }
 
@@ -499,19 +475,55 @@ public sealed class IdentityIntentExtractionStep(
                     continue;
                 }
 
-                var nestedSeparator = trimmed.IndexOf(':');
-                if (nestedSeparator < 0)
-                {
-                    continue;
-                }
-
-                var nestedKey = trimmed[..nestedSeparator].Trim();
-                var nestedValue = Unquote(trimmed[(nestedSeparator + 1)..].Trim());
-                currentMap[nestedKey] = nestedValue;
+                ProcessNestedLine(trimmed, currentMap);
             }
 
             FlushCurrentField(document, currentKey, currentMap);
-            return document;
+        }
+
+        private static void ProcessTopLevelLine(string trimmed, ParsedIdentityDocument document, ref string? currentKey)
+        {
+            var separatorIndex = trimmed.IndexOf(':');
+            if (separatorIndex < 0)
+            {
+                return;
+            }
+
+            var key = trimmed[..separatorIndex].Trim();
+            var value = trimmed[(separatorIndex + 1)..].Trim();
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                currentKey = key;
+                return;
+            }
+
+            var scalar = Unquote(value);
+            if (ReservedMetadataKeys.Contains(key))
+            {
+                document.Metadata[key] = scalar;
+            }
+            else
+            {
+                document.Fields[key] = new ParsedIdentityField
+                {
+                    Name = key,
+                    Value = scalar,
+                };
+            }
+        }
+
+        private static void ProcessNestedLine(string trimmed, Dictionary<string, string> currentMap)
+        {
+            var nestedSeparator = trimmed.IndexOf(':');
+            if (nestedSeparator < 0)
+            {
+                return;
+            }
+
+            var nestedKey = trimmed[..nestedSeparator].Trim();
+            var nestedValue = Unquote(trimmed[(nestedSeparator + 1)..].Trim());
+            currentMap[nestedKey] = nestedValue;
         }
 
         public string Serialize()

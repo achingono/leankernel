@@ -82,63 +82,20 @@ public static class Endpoints
             return Results.BadRequest(new { error = "Message is required" });
         }
 
-        var authenticatedUserKey = GetAuthenticatedUserKey(httpContext);
-        var isAuthenticated = !string.IsNullOrWhiteSpace(authenticatedUserKey);
-
-        var forwardedAuthOptions = httpContext.RequestServices
-            .GetService<Microsoft.Extensions.Options.IOptionsMonitor<ForwardedAuthOptions>>()
-            ?.Get(ForwardedAuthHandler.SchemeName);
-
-        var forwardedAuthEnabled = forwardedAuthOptions?.Enabled == true;
-        var forwardedAuthRequiresAuth = forwardedAuthOptions?.RequireAuthenticatedUser == true;
-
-        string senderId;
-        if (isAuthenticated)
+        var (senderId, isAuthenticated) = ResolveSenderId(request, httpContext);
+        if (senderId is null)
         {
-            senderId = authenticatedUserKey!;
-            if (!string.IsNullOrWhiteSpace(request.UserId)
-                && !string.Equals(request.UserId, authenticatedUserKey, StringComparison.Ordinal))
-            {
-                var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogWarning(
-                    "API chat request supplied UserId '{RequestUserId}' but authenticated user is '{AuthUserId}'; using authenticated identity",
-                    request.UserId, authenticatedUserKey);
-            }
-        }
-        else
-        {
-            // If forwarded auth is enabled and requires an authenticated identity,
-            // do not accept caller-controlled request.UserId.
-            if (forwardedAuthEnabled && forwardedAuthRequiresAuth)
-            {
-                return Results.Unauthorized();
-            }
-
-            senderId = string.IsNullOrWhiteSpace(request.UserId)
-                ? "api-user"
-                : request.UserId;
+            return Results.Unauthorized();
         }
 
         var channelId = string.IsNullOrWhiteSpace(request.ChannelId)
             ? "api"
             : request.ChannelId;
 
-        string sessionId;
-        if (string.IsNullOrWhiteSpace(request.SessionId))
+        var sessionId = await ResolveSessionIdAsync(request, sessionStore, senderId, isAuthenticated, ct).ConfigureAwait(false);
+        if (sessionId is null)
         {
-            sessionId = await sessionStore.GetOrCreateSessionIdAsync(channelId, senderId, ct).ConfigureAwait(false);
-        }
-        else
-        {
-            if (isAuthenticated)
-            {
-                var belongs = await sessionStore.SessionBelongsToUserAsync(request.SessionId, senderId, ct).ConfigureAwait(false);
-                if (!belongs)
-                {
-                    return Results.NotFound(new { error = "Session not found" });
-                }
-            }
-            sessionId = request.SessionId;
+            return Results.NotFound(new { error = "Session not found" });
         }
 
         var message = new LeanKernelMessage
@@ -157,6 +114,70 @@ public static class Endpoints
             Response = response,
             SessionId = message.SessionId
         });
+    }
+
+    private static (string? SenderId, bool IsAuthenticated) ResolveSenderId(ChatRequest request, HttpContext httpContext)
+    {
+        var authenticatedUserKey = GetAuthenticatedUserKey(httpContext);
+        var isAuthenticated = !string.IsNullOrWhiteSpace(authenticatedUserKey);
+
+        if (isAuthenticated)
+        {
+            if (!string.IsNullOrWhiteSpace(request.UserId)
+                && !string.Equals(request.UserId, authenticatedUserKey, StringComparison.Ordinal))
+            {
+                var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogWarning(
+                    "API chat request supplied UserId '{RequestUserId}' but authenticated user is '{AuthUserId}'; using authenticated identity",
+                    request.UserId, authenticatedUserKey);
+            }
+
+            return (authenticatedUserKey!, true);
+        }
+
+        var forwardedAuthOptions = httpContext.RequestServices
+            .GetService<Microsoft.Extensions.Options.IOptionsMonitor<ForwardedAuthOptions>>()
+            ?.Get(ForwardedAuthHandler.SchemeName);
+
+        var forwardedAuthEnabled = forwardedAuthOptions?.Enabled == true;
+        var forwardedAuthRequiresAuth = forwardedAuthOptions?.RequireAuthenticatedUser == true;
+
+        if (forwardedAuthEnabled && forwardedAuthRequiresAuth)
+        {
+            return (null, false);
+        }
+
+        var senderId = string.IsNullOrWhiteSpace(request.UserId)
+            ? "api-user"
+            : request.UserId;
+
+        return (senderId, false);
+    }
+
+    private static async Task<string?> ResolveSessionIdAsync(
+        ChatRequest request,
+        ISessionStore sessionStore,
+        string senderId,
+        bool isAuthenticated,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.SessionId))
+        {
+            return await sessionStore.GetOrCreateSessionIdAsync(
+                string.IsNullOrWhiteSpace(request.ChannelId) ? "api" : request.ChannelId,
+                senderId, ct).ConfigureAwait(false);
+        }
+
+        if (isAuthenticated)
+        {
+            var belongs = await sessionStore.SessionBelongsToUserAsync(request.SessionId, senderId, ct).ConfigureAwait(false);
+            if (!belongs)
+            {
+                return null;
+            }
+        }
+
+        return request.SessionId;
     }
 
     private static string? GetAuthenticatedUserKey(HttpContext httpContext)

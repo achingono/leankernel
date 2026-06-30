@@ -24,7 +24,7 @@ public sealed class DocumentIngestionHostedService(
     private Task? _runTask;
 
     /// <inheritdoc />
-    public Task StartAsync(CancellationToken ct)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         if (!_enabled)
         {
@@ -39,7 +39,7 @@ public sealed class DocumentIngestionHostedService(
     }
 
     /// <inheritdoc />
-    public async Task StopAsync(CancellationToken ct)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         if (_runTask is null || _shutdownCts is null)
         {
@@ -60,9 +60,9 @@ public sealed class DocumentIngestionHostedService(
 
         try
         {
-            await _runTask.WaitAsync(ct).ConfigureAwait(false);
+            await _runTask.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("Document ingestion service shutdown timed out with {PendingCount} jobs remaining", _queue.PendingCount);
         }

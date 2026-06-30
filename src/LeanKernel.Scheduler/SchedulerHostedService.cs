@@ -41,7 +41,7 @@ public sealed class SchedulerHostedService(
     public int InFlightCount => _inFlight.Count;
 
     /// <inheritdoc />
-    public Task StartAsync(CancellationToken ct)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         if (!_config.Enabled)
         {
@@ -55,7 +55,7 @@ public sealed class SchedulerHostedService(
     }
 
     /// <inheritdoc />
-    public async Task StopAsync(CancellationToken ct)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         if (_runTask is null)
         {
@@ -67,9 +67,9 @@ public sealed class SchedulerHostedService(
 
         try
         {
-            await _runTask.WaitAsync(ct).ConfigureAwait(false);
+            await _runTask.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(
                 "Scheduler shutdown timed out with {InFlightCount} jobs still running",

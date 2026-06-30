@@ -129,17 +129,10 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
             return false;
         }
 
-        var trimmed = responseText.Trim();
-        if (isFencedJson(trimmed))
+        var trimmed = TryExtractFencedJsonBody(responseText.Trim());
+        if (trimmed is null)
         {
-            var firstNewLine = trimmed.IndexOf('\n');
-            var lastFence = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-            if (firstNewLine < 0 || lastFence <= firstNewLine)
-            {
-                return false;
-            }
-
-            trimmed = trimmed[(firstNewLine + 1)..lastFence].Trim();
+            return false;
         }
 
         if (trimmed.Length < 2 || trimmed[0] != '{' || trimmed[^1] != '}')
@@ -147,9 +140,32 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
             return false;
         }
 
+        return TryParseJsonFunctionCall(trimmed, out legacyCall);
+    }
+
+    private static string? TryExtractFencedJsonBody(string trimmed)
+    {
+        if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+        {
+            return trimmed;
+        }
+
+        var firstNewLine = trimmed.IndexOf('\n');
+        var lastFence = trimmed.LastIndexOf("```", StringComparison.Ordinal);
+        if (firstNewLine < 0 || lastFence <= firstNewLine)
+        {
+            return null;
+        }
+
+        return trimmed[(firstNewLine + 1)..lastFence].Trim();
+    }
+
+    private static bool TryParseJsonFunctionCall(string json, out LegacyFunctionCall legacyCall)
+    {
+        legacyCall = default!;
         try
         {
-            using var document = JsonDocument.Parse(trimmed, new JsonDocumentOptions
+            using var document = JsonDocument.Parse(json, new JsonDocumentOptions
             {
                 CommentHandling = JsonCommentHandling.Disallow,
                 AllowTrailingCommas = false,
@@ -198,11 +214,6 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
             return false;
         }
     }
-
-    private static bool isFencedJson(string value)
-        => value.StartsWith("```", StringComparison.Ordinal)
-            && value.EndsWith("```", StringComparison.Ordinal)
-            && value.Contains('\n');
 
     private static bool TryGetProperty(JsonElement root, string propertyName, out JsonElement value)
     {

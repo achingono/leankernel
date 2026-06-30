@@ -87,42 +87,9 @@ public static class DynamicSkillTool
         var method = httpMethod.ToUpperInvariant();
 
         var queryParams = new List<string>();
-        var flags = operation.Invoke.Flags;
-        object? body = null;
+        var body = BuildRequestBody(args, operation.Invoke.Flags, queryParams, method);
 
-        foreach (var kvp in args)
-        {
-            if (kvp.Value is null) continue;
-
-            if (flags.TryGetValue(kvp.Key, out var flagName))
-            {
-                if (method is "GET" or "DELETE")
-                {
-                    queryParams.Add($"{Uri.EscapeDataString(flagName)}={Uri.EscapeDataString(SerializeScalarValue(kvp.Value))}");
-                }
-                else
-                {
-                    if (body is null)
-                        body = new Dictionary<string, object?>();
-                    ((Dictionary<string, object?>)body)[flagName] = kvp.Value;
-                }
-            }
-        }
-
-        var url = baseUrl + httpPath;
-
-        if (url.Contains("{") && url.Contains("}"))
-        {
-            foreach (var kvp in args)
-            {
-                if (kvp.Value is null) continue;
-                var placeholder = "{" + kvp.Key + "}";
-                if (url.Contains(placeholder, StringComparison.OrdinalIgnoreCase))
-                {
-                    url = url.Replace(placeholder, Uri.EscapeDataString(SerializeScalarValue(kvp.Value)));
-                }
-            }
-        }
+        var url = ResolveUrl(baseUrl, httpPath, args);
 
         if (queryParams.Count > 0)
             url += "?" + string.Join("&", queryParams);
@@ -156,6 +123,59 @@ public static class DynamicSkillTool
         };
     }
 
+    private static object? BuildRequestBody(
+        IDictionary<string, object?> args,
+        IReadOnlyDictionary<string, string> flags,
+        List<string> queryParams,
+        string method)
+    {
+        Dictionary<string, object?>? body = null;
+
+        foreach (var kvp in args)
+        {
+            if (kvp.Value is null) continue;
+
+            if (!flags.TryGetValue(kvp.Key, out var flagName))
+            {
+                continue;
+            }
+
+            if (method is "GET" or "DELETE")
+            {
+                queryParams.Add($"{Uri.EscapeDataString(flagName)}={Uri.EscapeDataString(SerializeScalarValue(kvp.Value))}");
+            }
+            else
+            {
+                body ??= new Dictionary<string, object?>();
+                body[flagName] = kvp.Value;
+            }
+        }
+
+        return body;
+    }
+
+    private static string ResolveUrl(string baseUrl, string httpPath, IDictionary<string, object?> args)
+    {
+        var url = baseUrl + httpPath;
+
+        if (!url.Contains("{") || !url.Contains("}"))
+        {
+            return url;
+        }
+
+        foreach (var kvp in args)
+        {
+            if (kvp.Value is null) continue;
+            var placeholder = "{" + kvp.Key + "}";
+            if (url.Contains(placeholder, StringComparison.OrdinalIgnoreCase))
+            {
+                url = url.Replace(placeholder, Uri.EscapeDataString(SerializeScalarValue(kvp.Value)));
+            }
+        }
+
+        return url;
+    }
+
     private static Task<ToolResult> ExecuteCliAsync(
         SkillDefinition skill,
         SkillOperation operation,
@@ -181,26 +201,7 @@ public static class DynamicSkillTool
             psi.ArgumentList.Add(arg);
         }
 
-        var flags = operation.Invoke.Flags;
-        foreach (var kvp in args)
-        {
-            if (kvp.Value is null) continue;
-            if (flags.TryGetValue(kvp.Key, out var flagName))
-            {
-                if (TryGetBooleanLikeValue(kvp.Value, out var boolValue))
-                {
-                    if (boolValue)
-                    {
-                        psi.ArgumentList.Add(flagName);
-                    }
-
-                    continue;
-                }
-
-                psi.ArgumentList.Add(flagName);
-                psi.ArgumentList.Add(SerializeScalarValue(kvp.Value));
-            }
-        }
+        AddFlagArguments(psi, args, operation.Invoke.Flags);
 
         var process = new System.Diagnostics.Process { StartInfo = psi };
         process.Start();
@@ -255,6 +256,31 @@ public static class DynamicSkillTool
         }
     }
 
+    private static void AddFlagArguments(
+        System.Diagnostics.ProcessStartInfo psi,
+        IDictionary<string, object?> args,
+        IReadOnlyDictionary<string, string> flags)
+    {
+        foreach (var kvp in args)
+        {
+            if (kvp.Value is null) continue;
+            if (!flags.TryGetValue(kvp.Key, out var flagName)) continue;
+
+            if (TryGetBooleanLikeValue(kvp.Value, out var boolValue))
+            {
+                if (boolValue)
+                {
+                    psi.ArgumentList.Add(flagName);
+                }
+
+                continue;
+            }
+
+            psi.ArgumentList.Add(flagName);
+            psi.ArgumentList.Add(SerializeScalarValue(kvp.Value));
+        }
+    }
+
     private static List<ToolParameter>? BuildParameters(SkillOperation operation)
     {
         if (operation.ParametersRaw is null)
@@ -263,32 +289,14 @@ public static class DynamicSkillTool
         if (!operation.ParametersRaw.TryGetValue("properties", out var propsObj) || propsObj is not Dictionary<object, object?> props)
             return null;
 
-        var required = new HashSet<string>();
-        if (operation.ParametersRaw.TryGetValue("required", out var requiredObj) && requiredObj is List<object> requiredList)
-        {
-            foreach (var r in requiredList)
-            {
-                if (r is string s)
-                    required.Add(s);
-            }
-        }
+        var required = ParseRequiredFields(operation.ParametersRaw);
 
         var parameters = new List<ToolParameter>();
         foreach (var prop in props)
         {
             var name = prop.Key?.ToString() ?? string.Empty;
-            var propValue = prop.Value;
 
-            var type = "string";
-            var description = string.Empty;
-
-            if (propValue is Dictionary<object, object?> propDict)
-            {
-                if (propDict.TryGetValue("type", out var typeVal) && typeVal is string ts)
-                    type = ts;
-                if (propDict.TryGetValue("description", out var descVal) && descVal is string ds)
-                    description = ds;
-            }
+            var (type, description) = ParsePropertyMetadata(prop.Value);
 
             parameters.Add(new ToolParameter
             {
@@ -300,6 +308,35 @@ public static class DynamicSkillTool
         }
 
         return parameters;
+    }
+
+    private static HashSet<string> ParseRequiredFields(Dictionary<string, object?> parametersRaw)
+    {
+        var required = new HashSet<string>();
+        if (parametersRaw.TryGetValue("required", out var requiredObj) && requiredObj is List<object> requiredList)
+        {
+            foreach (var r in requiredList)
+            {
+                if (r is string s)
+                    required.Add(s);
+            }
+        }
+
+        return required;
+    }
+
+    private static (string Type, string Description) ParsePropertyMetadata(object? propValue)
+    {
+        string type = "string", description = string.Empty;
+        if (propValue is Dictionary<object, object?> propDict)
+        {
+            if (propDict.TryGetValue("type", out var typeVal) && typeVal is string ts)
+                type = ts;
+            if (propDict.TryGetValue("description", out var descVal) && descVal is string ds)
+                description = ds;
+        }
+
+        return (type, description);
     }
 
     private static string SerializeScalarValue(object? value)

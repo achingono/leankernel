@@ -84,29 +84,7 @@ public sealed class EntityExpander(
                 continue;
             }
 
-            foreach (var linkedKey in page.LinkedPages
-                .Where(link => !string.IsNullOrWhiteSpace(link))
-                .OrderBy(link => link, StringComparer.Ordinal))
-            {
-                boostedKeys.Add(linkedKey);
-
-                var entityName = ExtractKeyEntity(linkedKey);
-                if (!string.IsNullOrWhiteSpace(entityName))
-                {
-                    expandedEntities.Add(entityName);
-                    await CollectSearchResultsAsync(entityName, expandedCandidates, boostedKeys, expandedEntities, searchedTerms, ct).ConfigureAwait(false);
-                }
-
-                if (visitedKeys.Add(linkedKey))
-                {
-                    queue.Enqueue((linkedKey, depth + 1));
-                }
-
-                if (expandedCandidates.Count >= _retrievalConfig.MaxEntityExpansionResults)
-                {
-                    break;
-                }
-            }
+            await ProcessLinkedPagesAsync(page, depth, queue, expandedCandidates, boostedKeys, expandedEntities, visitedKeys, searchedTerms, ct);
         }
 
         _logger.LogDebug(
@@ -161,6 +139,48 @@ public sealed class EntityExpander(
             if (!string.IsNullOrWhiteSpace(keyEntity))
             {
                 expandedEntities.Add(keyEntity);
+            }
+        }
+    }
+
+    private async Task ProcessLinkedPagesAsync(
+        KnowledgePage page,
+        int depth,
+        Queue<(string Key, int Depth)> queue,
+        IDictionary<string, RetrievalCandidate> expandedCandidates,
+        ISet<string> boostedKeys,
+        ISet<string> expandedEntities,
+        HashSet<string> visitedKeys,
+        HashSet<string> searchedTerms,
+        CancellationToken ct)
+    {
+        var linkedPages = page.LinkedPages;
+        if (linkedPages is null || linkedPages.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var linkedKey in linkedPages
+            .Where(link => !string.IsNullOrWhiteSpace(link))
+            .OrderBy(link => link, StringComparer.Ordinal))
+        {
+            boostedKeys.Add(linkedKey);
+
+            var entityName = ExtractKeyEntity(linkedKey);
+            if (!string.IsNullOrWhiteSpace(entityName))
+            {
+                expandedEntities.Add(entityName);
+                await CollectSearchResultsAsync(entityName, expandedCandidates, boostedKeys, expandedEntities, searchedTerms, ct).ConfigureAwait(false);
+            }
+
+            if (visitedKeys.Add(linkedKey))
+            {
+                queue.Enqueue((linkedKey, depth + 1));
+            }
+
+            if (expandedCandidates.Count >= _retrievalConfig.MaxEntityExpansionResults)
+            {
+                break;
             }
         }
     }

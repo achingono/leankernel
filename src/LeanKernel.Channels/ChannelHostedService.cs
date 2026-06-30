@@ -25,9 +25,9 @@ public sealed class ChannelHostedService(
     /// <summary>
     /// Starts the hosted service, initializing and starting all configured channels.
     /// </summary>
-    /// <param name="ct">A cancellation token.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    public async Task StartAsync(CancellationToken ct)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         if (!_config.Enabled)
         {
@@ -49,14 +49,14 @@ public sealed class ChannelHostedService(
                 channel.MessageReceived += handler;
             }
 
-            await channel.StartAsync(ct).ConfigureAwait(false);
+            await channel.StartAsync(cancellationToken).ConfigureAwait(false);
         }
 
         _started = true;
     }
 
     /// <inheritdoc/>
-    public async Task StopAsync(CancellationToken ct)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         foreach (var subscription in _subscriptions)
         {
@@ -67,7 +67,7 @@ public sealed class ChannelHostedService(
 
         foreach (var channel in _channels)
         {
-            await channel.StopAsync(ct).ConfigureAwait(false);
+            await channel.StopAsync(cancellationToken).ConfigureAwait(false);
         }
 
         _started = false;

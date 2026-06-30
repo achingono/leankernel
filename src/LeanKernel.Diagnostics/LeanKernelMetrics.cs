@@ -19,8 +19,6 @@ public sealed class LeanKernelMetrics : IDisposable
     private readonly Histogram<double> _requestsDuration;
     private readonly Counter<long> _requestErrors;
     private readonly Counter<long> _rateLimitRejected;
-    private readonly ObservableGauge<double> _spendTotalUsd;
-    private readonly ObservableGauge<int> _providersHealth;
     private readonly object _sync = new();
     private decimal _dailySpendUsd;
     private decimal _monthlySpendUsd;
@@ -47,8 +45,8 @@ public sealed class LeanKernelMetrics : IDisposable
         _requestsDuration = _meter.CreateHistogram<double>("leankernel.requests.duration", "ms", "HTTP request duration");
         _requestErrors = _meter.CreateCounter<long>("leankernel.requests.errors", "errors", "HTTP request errors");
         _rateLimitRejected = _meter.CreateCounter<long>("leankernel.ratelimit.rejected", "requests", "Rate-limited requests");
-        _spendTotalUsd = _meter.CreateObservableGauge("leankernel.spend.total_usd", ObserveSpendTotalUsd, "usd", "Current tracked spend totals");
-        _providersHealth = _meter.CreateObservableGauge("leankernel.providers.health", ObserveProviderHealth, description: "Provider health (1=healthy, 0=unhealthy)");
+        _meter.CreateObservableGauge("leankernel.spend.total_usd", ObserveSpendTotalUsd, "usd", "Current tracked spend totals");
+        _meter.CreateObservableGauge("leankernel.providers.health", ObserveProviderHealth, description: "Provider health (1=healthy, 0=unhealthy)");
     }
 
     /// <summary>

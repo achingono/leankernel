@@ -34,9 +34,9 @@ public sealed class LearningBackgroundWorker(
     /// <summary>
     /// Starts the background worker loop if learning is enabled via configuration.
     /// </summary>
-    /// <param name="ct">A cancellation token that can be used to cancel the start operation.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the start operation.</param>
     /// <returns>A task that completes when the worker has started.</returns>
-    public Task StartAsync(CancellationToken ct)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         if (!_config.Enabled)
         {
@@ -52,9 +52,9 @@ public sealed class LearningBackgroundWorker(
     /// Signals the queue to complete and waits for in-flight work items to finish,
     /// with a configurable drain timeout. Abandons remaining work if the timeout expires.
     /// </summary>
-    /// <param name="ct">A cancellation token that can be used to cancel the stop operation.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the stop operation.</param>
     /// <returns>A task that completes when the worker has stopped or the drain timeout expired.</returns>
-    public async Task StopAsync(CancellationToken ct)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         if (_runTask is null)
         {
@@ -63,7 +63,7 @@ public sealed class LearningBackgroundWorker(
 
         _queue.Complete();
 
-        var completedTask = await Task.WhenAny(_runTask, Task.Delay(DrainTimeout, ct)).ConfigureAwait(false);
+        var completedTask = await Task.WhenAny(_runTask, Task.Delay(DrainTimeout, cancellationToken)).ConfigureAwait(false);
         if (completedTask != _runTask)
         {
             _logger.LogWarning(

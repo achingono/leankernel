@@ -85,34 +85,11 @@ public sealed class DocumentUiService
             {
                 foreach (var item in itemsElement.EnumerateArray())
                 {
-                    var slug = TryGetString(item, "slug", "path", "key");
-                    
-                    if (string.IsNullOrEmpty(slug))
+                    var summary = TryParsePageItem(item);
+                    if (summary is not null)
                     {
-                        continue;
+                        items.Add(summary);
                     }
-
-                    var lastModified = TryGetDateTime(item, "updated_at", "updatedAt", "last_modified", "lastModified");
-
-                    var tags = new List<string>();
-                    if (TryGetProperty(item, "tags", out var tProp) && tProp.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var tag in tProp.EnumerateArray())
-                        {
-                            if (tag.ValueKind == JsonValueKind.String)
-                            {
-                                tags.Add(tag.GetString()!);
-                            }
-                        }
-                    }
-
-                    items.Add(new KnowledgePageSummary
-                    {
-                        Slug = slug,
-                        LastModified = lastModified,
-                        TagCount = tags.Count,
-                        Tags = tags
-                    });
                 }
             }
 
@@ -123,6 +100,43 @@ public sealed class DocumentUiService
             _logger.LogWarning(ex, "Failed to browse documents from GBrain.");
             throw;
         }
+    }
+
+    private static KnowledgePageSummary? TryParsePageItem(JsonElement item)
+    {
+        var slug = TryGetString(item, "slug", "path", "key");
+        if (string.IsNullOrEmpty(slug))
+        {
+            return null;
+        }
+
+        var lastModified = TryGetDateTime(item, "updated_at", "updatedAt", "last_modified", "lastModified");
+        var tags = ExtractTagsFromItem(item);
+
+        return new KnowledgePageSummary
+        {
+            Slug = slug,
+            LastModified = lastModified,
+            TagCount = tags.Count,
+            Tags = tags
+        };
+    }
+
+    private static List<string> ExtractTagsFromItem(JsonElement item)
+    {
+        var tags = new List<string>();
+        if (TryGetProperty(item, "tags", out var tProp) && tProp.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var tag in tProp.EnumerateArray())
+            {
+                if (tag.ValueKind == JsonValueKind.String)
+                {
+                    tags.Add(tag.GetString()!);
+                }
+            }
+        }
+
+        return tags;
     }
 
     /// <summary>
