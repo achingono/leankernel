@@ -77,6 +77,81 @@ public class FileSystemToolsTests
         listResult.Output.Should().Contain("alpha.txt");
     }
 
+    [Fact]
+    public async Task FileDeleteTool_returns_error_when_path_is_missing()
+    {
+        var root = CreateTempRoot();
+        var delete = FileDeleteTool.Create(CreateScopeFactory(root));
+
+        var result = await delete.Handler!(new Dictionary<string, object?>(), CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Be("Path is required");
+    }
+
+    [Fact]
+    public async Task FileDeleteTool_returns_error_for_path_outside_allowed_root()
+    {
+        var root = CreateTempRoot();
+        var delete = FileDeleteTool.Create(CreateScopeFactory(root));
+
+        var result = await delete.Handler!(new Dictionary<string, object?> { ["path"] = "../outside.txt" }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Be("Access denied: path is outside the allowed directory");
+    }
+
+    [Fact]
+    public async Task FileDeleteTool_returns_error_when_deleting_directory_without_recursive()
+    {
+        var root = CreateTempRoot();
+        Directory.CreateDirectory(Path.Combine(root, "mydir"));
+        var delete = FileDeleteTool.Create(CreateScopeFactory(root));
+
+        var result = await delete.Handler!(new Dictionary<string, object?> { ["path"] = "mydir" }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Be("Directory delete requires recursive=true");
+    }
+
+    [Fact]
+    public async Task FileDeleteTool_deletes_directory_recursively()
+    {
+        var root = CreateTempRoot();
+        Directory.CreateDirectory(Path.Combine(root, "mydir"));
+        var delete = FileDeleteTool.Create(CreateScopeFactory(root));
+
+        var result = await delete.Handler!(new Dictionary<string, object?> { ["path"] = "mydir", ["recursive"] = true }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Output.Should().Be("Deleted directory mydir");
+        Directory.Exists(Path.Combine(root, "mydir")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task FileDeleteTool_returns_success_when_missing_ok_is_default()
+    {
+        var root = CreateTempRoot();
+        var delete = FileDeleteTool.Create(CreateScopeFactory(root));
+
+        var result = await delete.Handler!(new Dictionary<string, object?> { ["path"] = "nonexistent.txt" }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Output.Should().Be("Path not found; nothing deleted: nonexistent.txt");
+    }
+
+    [Fact]
+    public async Task FileDeleteTool_returns_error_when_missing_ok_is_false()
+    {
+        var root = CreateTempRoot();
+        var delete = FileDeleteTool.Create(CreateScopeFactory(root));
+
+        var result = await delete.Handler!(new Dictionary<string, object?> { ["path"] = "nonexistent.txt", ["missingOk"] = false }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Be("Path not found: nonexistent.txt");
+    }
+
     private static IServiceScopeFactory CreateScopeFactory(string root, string? pythonExecutable = null)
     {
         var services = new ServiceCollection();

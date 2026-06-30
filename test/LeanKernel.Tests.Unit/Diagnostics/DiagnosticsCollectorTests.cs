@@ -36,6 +36,29 @@ public class DiagnosticsCollectorTests
     }
 
     [Fact]
+    public async Task RecordContextAdmissionAsync_persists_entries_when_enabled_and_sink_is_available()
+    {
+        var sink = new RecordingDiagnosticsSink();
+        var collector = CreateCollector(new DiagnosticsConfig
+        {
+            Enabled = true,
+            PersistToDatabase = true
+        }, sink);
+
+        await collector.RecordContextAdmissionAsync(
+            "session-1",
+            "turn-1",
+            [new ContextAdmissionRecord { Key = "doc-1", Source = "gbrain", Admitted = true },
+             new ContextAdmissionRecord { Key = "doc-2", Source = "wiki", Admitted = false }]);
+
+        sink.Entries.Should().ContainSingle();
+        sink.Entries[0].Category.Should().Be(DiagnosticCategory.ContextAdmission.ToString());
+        var payload = sink.Entries[0].Payload.Should().BeAssignableTo<IReadOnlyList<ContextAdmissionRecord>>().Subject;
+        payload.Should().HaveCount(2);
+        payload[0].Admitted.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task RecordBudgetUsageAsync_persists_entries_when_enabled_and_a_sink_is_available()
     {
         var sink = new RecordingDiagnosticsSink();
@@ -58,6 +81,26 @@ public class DiagnosticsCollectorTests
         sink.Entries.Should().ContainSingle();
         sink.Entries[0].Category.Should().Be(DiagnosticCategory.BudgetAllocation.ToString());
         sink.Entries[0].Payload.Should().Be(usage);
+    }
+
+    [Fact]
+    public async Task RecordToolVisibilityAsync_persists_entries_when_enabled_and_sink_is_available()
+    {
+        var sink = new RecordingDiagnosticsSink();
+        var collector = CreateCollector(new DiagnosticsConfig
+        {
+            Enabled = true,
+            PersistToDatabase = true
+        }, sink);
+
+        await collector.RecordToolVisibilityAsync(
+            "session-1",
+            "turn-1",
+            ["wiki_search"],
+            ["admin_reset"]);
+
+        sink.Entries.Should().ContainSingle();
+        sink.Entries[0].Category.Should().Be(DiagnosticCategory.ToolVisibility.ToString());
     }
 
     [Fact]

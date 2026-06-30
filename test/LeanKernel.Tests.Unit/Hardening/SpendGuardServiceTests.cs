@@ -97,6 +97,98 @@ public class SpendGuardServiceTests
         decision.Reason.Should().Contain("session spend limit");
     }
 
+    [Fact]
+    public async Task Evaluate_returns_block_when_daily_limit_would_be_exceeded()
+    {
+        var timeProvider = new AdjustableTimeProvider(DateTimeOffset.Parse("2025-05-20T10:00:00Z"));
+        using var metrics = new LeanKernelMetrics();
+        var tracker = new SpendTracker(metrics, NullLogger<SpendTracker>.Instance, timeProvider);
+        await tracker.RecordSpendAsync("session-1", "turn-1", 9.40m);
+        var service = new SpendGuardService(
+            Options.Create(new HardeningConfig
+            {
+                SpendGuard = new SpendGuardConfig
+                {
+                    Enabled = true,
+                    MaxDailySpendUsd = 9.50m,
+                    MaxSessionSpendUsd = 100.00m,
+                    MaxMonthlySpendUsd = 100.00m,
+                    WarnAtPercent = "80"
+                }
+            }),
+            tracker,
+            NullLogger<SpendGuardService>.Instance);
+
+        var decision = service.Evaluate("session-2", ModelTier.Standard, 50_000, 0);
+
+        decision.Action.Should().Be(SpendGuardAction.Block);
+        decision.Reason.Should().Contain("daily spend limit");
+    }
+
+    [Fact]
+    public async Task Evaluate_returns_block_when_monthly_limit_would_be_exceeded()
+    {
+        var timeProvider = new AdjustableTimeProvider(DateTimeOffset.Parse("2025-05-20T10:00:00Z"));
+        using var metrics = new LeanKernelMetrics();
+        var tracker = new SpendTracker(metrics, NullLogger<SpendTracker>.Instance, timeProvider);
+        await tracker.RecordSpendAsync("session-1", "turn-1", 95.00m);
+        var service = new SpendGuardService(
+            Options.Create(new HardeningConfig
+            {
+                SpendGuard = new SpendGuardConfig
+                {
+                    Enabled = true,
+                    MaxDailySpendUsd = 100.00m,
+                    MaxSessionSpendUsd = 100.00m,
+                    MaxMonthlySpendUsd = 96.00m,
+                    WarnAtPercent = "80"
+                }
+            }),
+            tracker,
+            NullLogger<SpendGuardService>.Instance);
+
+        var decision = service.Evaluate("session-2", ModelTier.Standard, 500_000, 0);
+
+        decision.Action.Should().Be(SpendGuardAction.Block);
+        decision.Reason.Should().Contain("monthly spend limit");
+    }
+
+    [Fact]
+    public void EstimateCostUsd_returns_cost_for_standard_tier()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = new SpendTracker(metrics, NullLogger<SpendTracker>.Instance, TimeProvider.System);
+        var service = new SpendGuardService(
+            Options.Create(new HardeningConfig
+            {
+                SpendGuard = new SpendGuardConfig { Enabled = false }
+            }),
+            tracker,
+            NullLogger<SpendGuardService>.Instance);
+
+        var cost = service.EstimateCostUsd(ModelTier.Standard, 1000, 500);
+
+        cost.Should().Be(0.0075m);
+    }
+
+    [Fact]
+    public void EstimateCostUsd_falls_back_to_standard_for_unknown_tier()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = new SpendTracker(metrics, NullLogger<SpendTracker>.Instance, TimeProvider.System);
+        var service = new SpendGuardService(
+            Options.Create(new HardeningConfig
+            {
+                SpendGuard = new SpendGuardConfig { Enabled = false }
+            }),
+            tracker,
+            NullLogger<SpendGuardService>.Instance);
+
+        var cost = service.EstimateCostUsd((ModelTier)999, 1000, 500);
+
+        cost.Should().Be(0.0075m);
+    }
+
     private sealed class AdjustableTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         private DateTimeOffset _utcNow = utcNow;

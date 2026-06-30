@@ -1,5 +1,6 @@
 using FluentAssertions;
 using LeanKernel.Abstractions.Configuration;
+using LeanKernel.Abstractions.Enums;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Diagnostics;
@@ -50,6 +51,67 @@ public class ProviderHealthTrackerTests
         beforeRecovery.IsHealthy.Should().BeFalse();
         afterRecovery.IsHealthy.Should().BeTrue();
         afterRecovery.ConsecutiveSuccesses.Should().Be(2);
+    }
+
+    [Fact]
+    public void GetSnapshot_returns_current_provider_statuses()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = CreateTracker(metrics, unhealthyThreshold: 2, healthyThreshold: 2);
+        tracker.RecordProbeResult(ProviderNames.LiteLlm, ProviderProbeResult.Unhealthy("fail"));
+
+        var snapshot = tracker.GetSnapshot();
+
+        snapshot.Providers.Should().ContainKey(ProviderNames.LiteLlm);
+        snapshot.Providers[ProviderNames.LiteLlm].ConsecutiveFailures.Should().Be(1);
+    }
+
+    [Fact]
+    public void GetStatus_creates_initial_status_for_unknown_provider()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = CreateTracker(metrics, unhealthyThreshold: 3, healthyThreshold: 2);
+
+        var status = tracker.GetStatus("new-provider");
+
+        status.State.Should().Be(ProviderHealthState.Healthy);
+        status.Description.Should().Be("Provider has not yet been probed.");
+        status.ConsecutiveFailures.Should().Be(0);
+        status.ConsecutiveSuccesses.Should().Be(0);
+    }
+
+    [Fact]
+    public void GetStatus_returns_existing_status_for_registered_provider()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = CreateTracker(metrics, unhealthyThreshold: 3, healthyThreshold: 2);
+        tracker.RecordProbeResult(ProviderNames.LiteLlm, ProviderProbeResult.Unhealthy("db down"));
+
+        var status = tracker.GetStatus(ProviderNames.LiteLlm);
+
+        status.State.Should().Be(ProviderHealthState.Healthy);
+        status.Description.Should().Be("db down");
+        status.ConsecutiveFailures.Should().Be(1);
+        status.ConsecutiveSuccesses.Should().Be(0);
+    }
+
+    [Fact]
+    public void GetStatus_throws_on_null_or_whitespace_name()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = CreateTracker(metrics, unhealthyThreshold: 3, healthyThreshold: 2);
+
+        Assert.Throws<ArgumentNullException>(() => tracker.GetStatus(null!));
+        Assert.Throws<ArgumentException>(() => tracker.GetStatus(""));
+    }
+
+    [Fact]
+    public void RecordProbeResult_throws_on_null_result()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = CreateTracker(metrics, unhealthyThreshold: 3, healthyThreshold: 2);
+
+        Assert.Throws<ArgumentNullException>(() => tracker.RecordProbeResult(ProviderNames.LiteLlm, null!));
     }
 
     private static ProviderHealthTracker CreateTracker(LeanKernelMetrics metrics, int unhealthyThreshold, int healthyThreshold)
