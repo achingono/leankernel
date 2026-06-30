@@ -17,7 +17,19 @@ public static class ChatResponseMetadataReader
     {
         ArgumentNullException.ThrowIfNull(response);
 
-        var usage = response.GetType().GetProperty("Usage")?.GetValue(response);
+        // Some test doubles (and potentially some model response types) may hide ChatResponse.Usage using `new`.
+        // `GetProperty("Usage")` then becomes ambiguous; prefer the property declared on the most derived type.
+        object? usage = null;
+        var responseType = response.GetType();
+        var usageProp = responseType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(p => string.Equals(p.Name, "Usage", System.StringComparison.Ordinal)
+                && p.DeclaringType == responseType)
+            ?? responseType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(p => string.Equals(p.Name, "Usage", System.StringComparison.Ordinal));
+        if (usageProp is not null)
+        {
+            usage = usageProp.GetValue(response);
+        }
         if (usage is null)
         {
             return 0;

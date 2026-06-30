@@ -212,26 +212,22 @@ public sealed class DocumentLibraryService
 
             _logger.LogInformation("Uploading binary asset to GBrain files store and linking to {Slug}", pageSlug);
             string? fileStoragePath = null;
-            try
-            {
-                var uploadResult = await _gBrainClient.CallToolAsync(
-                    "file_upload",
-                    new
-                    {
-                        path = fullPath,
-                        page_slug = pageSlug
-                    },
-                    ct).ConfigureAwait(false);
 
-                fileStoragePath = ExtractStoragePath(uploadResult);
-                if (fileStoragePath == null)
+            // If file_upload fails, we should fail the ingestion (and clean up the wiki page) rather than silently
+            // continuing with extracted text only.
+            var uploadResult = await _gBrainClient.CallToolAsync(
+                "file_upload",
+                new
                 {
-                    _logger.LogWarning("GBrain file_upload response did not include a storage path; continuing without binary attachment for {Slug}", pageSlug);
-                }
-            }
-            catch (Exception ex)
+                    path = fullPath,
+                    page_slug = pageSlug
+                },
+                ct).ConfigureAwait(false);
+
+            fileStoragePath = ExtractStoragePath(uploadResult);
+            if (fileStoragePath == null)
             {
-                _logger.LogWarning(ex, "GBrain file_upload failed for {Slug}; continuing with extracted text only", pageSlug);
+                _logger.LogWarning("GBrain file_upload response did not include a storage path; continuing without binary attachment for {Slug}", pageSlug);
             }
 
             if (fileStoragePath != null && !string.Equals(fileStoragePath, relativePath, StringComparison.Ordinal))
