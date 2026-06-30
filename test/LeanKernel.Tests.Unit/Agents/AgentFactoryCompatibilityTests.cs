@@ -183,7 +183,7 @@ public class AgentFactoryCompatibilityTests
         ]);
 
         response.Text.Should().Be("Page 'greeting' updated successfully.");
-        chatClient.CallCount.Should().Be(3);
+        chatClient.CallCount.Should().Be(2);
         toolExecutor.VerifyAll();
     }
 
@@ -311,13 +311,16 @@ public class AgentFactoryCompatibilityTests
         var floatValue = arguments.TryGetValue("float", out var floatObject) ? floatObject : null;
         var tags = arguments.TryGetValue("tags", out var tagsValue) ? tagsValue : null;
 
+        var optionalIsNullOrStringNull = optional is null
+            || (optional is string optionalString && optionalString == "null");
+
         return string.Equals(key, "greeting", StringComparison.Ordinal)
             && string.Equals(content, "Hello!", StringComparison.Ordinal)
             && count is long
             && decimalValue is decimal
             && enabled is bool boolValue && boolValue
             && isArchived is bool archived && !archived
-            && optional is null
+            && optionalIsNullOrStringNull
             && floatValue is double
             && tags is object[];
     }

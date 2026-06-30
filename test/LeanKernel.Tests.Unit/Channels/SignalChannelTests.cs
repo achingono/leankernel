@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.WebSockets;
 using System.Text.Json;
 using FluentAssertions;
 using LeanKernel.Abstractions.Configuration;
@@ -16,33 +17,30 @@ public class SignalChannelTests
     [Fact]
     public async Task StartAsync_polls_the_daemon_and_raises_received_messages()
     {
+        await using var server = await TestWebSocketServer.CreateAsync(port => port);
+
         var receivedMessage = new TaskCompletionSource<ChannelMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var handler = new RecordingHttpMessageHandler((request, _) =>
+        server.OnConnectAsync = async (webSocket, _reqPath) =>
         {
-            if (request.Method == HttpMethod.Get)
+            var payload = new
             {
-                return CreateJsonResponse(new[]
+                envelope = new
                 {
-                    new
-                    {
-                        envelope = new
-                        {
-                            sourceNumber = "+15550002",
-                            timestamp = 1720000000000L,
-                            dataMessage = new
-                            {
-                                message = "hello from signal"
-                            }
-                        },
-                        account = "+15550001"
-                    }
-                });
-            }
+                    sourceNumber = "+15550002",
+                    timestamp = 1720000000000L,
+                    dataMessage = new { message = "hello from signal" }
+                },
+                account = "+15550001"
+            };
 
-            return CreateJsonResponse(new { timestamp = 0 });
-        });
+            var json = JsonSerializer.Serialize(payload);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            await webSocket.SendAsync(bytes, WebSocketMessageType.Text, endOfMessage: true, cancellationToken: CancellationToken.None);
+            await Task.Delay(50);
+            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+        };
 
-        var channel = CreateChannel(handler, new ChannelsConfig
+        var channel = CreateChannel(new RecordingHttpMessageHandler((_, _) => CreateJsonResponse(new { timestamp = 0L })), new ChannelsConfig
         {
             Signal = new SignalChannelConfig
             {
@@ -50,7 +48,8 @@ public class SignalChannelTests
                 PhoneNumber = "+15550001",
                 PollIntervalSeconds = 0,
                 ReconnectDelaySeconds = 0,
-                MaxReconnectAttempts = 3
+                MaxReconnectAttempts = 3,
+                DaemonUrl = server.DaemonUrl
             }
         });
 
@@ -161,20 +160,23 @@ public class SignalChannelTests
     public async Task StartAsync_recovers_after_a_transient_poll_failure()
     {
         var requestCount = 0;
-        var handler = new RecordingHttpMessageHandler((request, _) =>
+
+        await using var server = await TestWebSocketServer.CreateAsync(port => port);
+        server.OnConnectAsync = async (webSocket, _reqPath) =>
         {
-            if (request.Method != HttpMethod.Get)
+            var attempt = Interlocked.Increment(ref requestCount);
+            if (attempt == 1)
             {
-                return CreateJsonResponse(new { timestamp = 0L });
+                await webSocket.CloseAsync(WebSocketCloseStatus.InternalServerError, "transient", CancellationToken.None);
+                return;
             }
 
-            var attempt = Interlocked.Increment(ref requestCount);
-            return attempt == 1
-                ? throw new HttpRequestException("boom")
-                : CreateJsonResponse(Array.Empty<object>());
-        });
+            // Second connection: keep it alive briefly to allow the client loop to consider itself connected.
+            await Task.Delay(100);
+            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "ok", CancellationToken.None);
+        };
 
-        var channel = CreateChannel(handler, new ChannelsConfig
+        var channel = CreateChannel(new RecordingHttpMessageHandler((_, _) => CreateJsonResponse(new { timestamp = 0L })), new ChannelsConfig
         {
             Signal = new SignalChannelConfig
             {
@@ -182,7 +184,8 @@ public class SignalChannelTests
                 PhoneNumber = "+15550001",
                 PollIntervalSeconds = 0,
                 ReconnectDelaySeconds = 0,
-                MaxReconnectAttempts = 3
+                MaxReconnectAttempts = 3,
+                DaemonUrl = server.DaemonUrl
             }
         });
 
@@ -256,6 +259,99 @@ public class SignalChannelTests
                 : await request.Content.ReadAsStringAsync().ConfigureAwait(false));
 
             return _handler(request, cancellationToken);
+        }
+    }
+
+    private sealed class TestWebSocketServer : IAsyncDisposable
+    {
+        private readonly System.Net.HttpListener _listener;
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _acceptLoop;
+
+        public string DaemonUrl { get; }
+
+        public Func<WebSocket, string, Task> OnConnectAsync { get; set; } = (_, _) => Task.CompletedTask;
+
+        private TestWebSocketServer(System.Net.HttpListener listener, string daemonUrl)
+        {
+            _listener = listener;
+            DaemonUrl = daemonUrl;
+            _acceptLoop = Task.Run(AcceptLoopAsync);
+        }
+
+        public static Task<TestWebSocketServer> CreateAsync(Func<int, int> portSelector)
+        {
+            // Simple approach: pick an ephemeral port by binding to port 0.
+            var listener = new System.Net.HttpListener();
+            listener.Prefixes.Add("http://127.0.0.1:0/");
+            // HttpListener doesn't expose the chosen port until start; use TcpListener to allocate.
+            return Task.FromResult(new TestWebSocketServer(CreateBoundListener(out var daemonUrl), daemonUrl));
+        }
+
+        private static System.Net.HttpListener CreateBoundListener(out string daemonUrl)
+        {
+            var tcp = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            tcp.Start();
+            var port = ((IPEndPoint)tcp.LocalEndpoint).Port;
+            tcp.Stop();
+
+            daemonUrl = $"http://127.0.0.1:{port}";
+            var listener = new System.Net.HttpListener();
+            listener.Prefixes.Add($"{daemonUrl}/");
+            listener.Start();
+            return listener;
+        }
+
+        private async Task AcceptLoopAsync()
+        {
+            while (!_cts.IsCancellationRequested)
+            {
+                HttpListenerContext context;
+                try
+                {
+                    context = await _listener.GetContextAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    if (_cts.IsCancellationRequested) return;
+                    continue;
+                }
+
+                if (!context.Request.IsWebSocketRequest)
+                {
+                    context.Response.StatusCode = 400;
+                    context.Response.Close();
+                    continue;
+                }
+
+                _ = Task.Run(async () =>
+                {
+                    WebSocket? ws = null;
+                    try
+                    {
+                        var wsContext = await context.AcceptWebSocketAsync(subProtocol: null).ConfigureAwait(false);
+                        ws = wsContext.WebSocket;
+                        await OnConnectAsync(ws, context.Request.Url?.AbsolutePath ?? string.Empty).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Ignore; tests rely on client-side reconnect behavior.
+                    }
+                    finally
+                    {
+                        try { ws?.Dispose(); } catch { }
+                        try { context.Response.Close(); } catch { }
+                    }
+                });
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _cts.Cancel();
+            try { _listener.Stop(); } catch { }
+            try { await _acceptLoop.ConfigureAwait(false); } catch { }
+            _cts.Dispose();
         }
     }
 }

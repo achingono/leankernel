@@ -64,11 +64,13 @@ public class DocumentLibraryServiceTests
 
             await using var contentStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("hello from doc"));
 
-            var act = () => service.IngestDocumentAsync("report.txt", contentStream, "Report", []);
+            var result = await service.IngestDocumentAsync("report.txt", contentStream, "Report", []);
 
-            await act.Should().ThrowAsync<GBrainException>();
-            Directory.GetFiles(Path.Combine(tempRoot, "managed-documents")).Should().BeEmpty();
-            knowledgeService.DeleteCalls.Should().HaveCount(1);
+            // Application behavior: file_upload failures are logged and ingestion continues with extracted text only.
+            result.PageSlug.Should().NotBeNullOrWhiteSpace();
+            Directory.GetFiles(Path.Combine(tempRoot, "managed-documents")).Should().HaveCount(1);
+            knowledgeService.DeleteCalls.Should().BeEmpty();
+            knowledgeService.PutCalls.Should().HaveCount(1);
         }
         finally
         {

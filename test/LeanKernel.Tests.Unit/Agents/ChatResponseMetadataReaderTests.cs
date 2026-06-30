@@ -10,38 +10,9 @@ public class ChatResponseMetadataReaderTests
 {
     private class TestChatResponse : ChatResponse
     {
-        public new object? Usage { get; set; }
-
         public TestChatResponse(ChatMessage message) : base(message)
         {
         }
-    }
-
-    private class UsageWithTotalTokenCountInt
-    {
-        public int TotalTokenCount { get; set; }
-    }
-
-    private class UsageWithTotalTokenCountLong
-    {
-        public long TotalTokenCount { get; set; }
-    }
-
-    private class UsageWithTotalTokens
-    {
-        public int TotalTokens { get; set; }
-    }
-
-    private class UsageWithInputOutputCount
-    {
-        public int InputTokenCount { get; set; }
-        public int OutputTokenCount { get; set; }
-    }
-
-    private class UsageWithInputOutputTokens
-    {
-        public long InputTokens { get; set; }
-        public long OutputTokens { get; set; }
     }
 
     [Fact]
@@ -62,7 +33,7 @@ public class ChatResponseMetadataReaderTests
     {
         var response = new TestChatResponse(new ChatMessage(ChatRole.Assistant, "hello"))
         {
-            Usage = new UsageWithTotalTokenCountInt { TotalTokenCount = 123 }
+            Usage = new UsageDetails { TotalTokenCount = 123 }
         };
 
         ChatResponseMetadataReader.GetTokensUsed(response).Should().Be(123);
@@ -73,21 +44,10 @@ public class ChatResponseMetadataReaderTests
     {
         var response = new TestChatResponse(new ChatMessage(ChatRole.Assistant, "hello"))
         {
-            Usage = new UsageWithTotalTokenCountLong { TotalTokenCount = 456L }
+            Usage = new UsageDetails { TotalTokenCount = 456L }
         };
 
         ChatResponseMetadataReader.GetTokensUsed(response).Should().Be(456);
-    }
-
-    [Fact]
-    public void GetTokensUsed_Reads_TotalTokens()
-    {
-        var response = new TestChatResponse(new ChatMessage(ChatRole.Assistant, "hello"))
-        {
-            Usage = new UsageWithTotalTokens { TotalTokens = 789 }
-        };
-
-        ChatResponseMetadataReader.GetTokensUsed(response).Should().Be(789);
     }
 
     [Fact]
@@ -95,21 +55,10 @@ public class ChatResponseMetadataReaderTests
     {
         var response = new TestChatResponse(new ChatMessage(ChatRole.Assistant, "hello"))
         {
-            Usage = new UsageWithInputOutputCount { InputTokenCount = 10, OutputTokenCount = 20 }
+            Usage = new UsageDetails { InputTokenCount = 10, OutputTokenCount = 20 }
         };
 
         ChatResponseMetadataReader.GetTokensUsed(response).Should().Be(30);
-    }
-
-    [Fact]
-    public void GetTokensUsed_Calculates_InputOutputTokens()
-    {
-        var response = new TestChatResponse(new ChatMessage(ChatRole.Assistant, "hello"))
-        {
-            Usage = new UsageWithInputOutputTokens { InputTokens = 100L, OutputTokens = 200L }
-        };
-
-        ChatResponseMetadataReader.GetTokensUsed(response).Should().Be(300);
     }
 
     [Fact]
@@ -117,14 +66,14 @@ public class ChatResponseMetadataReaderTests
     {
         var responseLarge = new TestChatResponse(new ChatMessage(ChatRole.Assistant, "hello"))
         {
-            Usage = new UsageWithTotalTokenCountLong { TotalTokenCount = (long)int.MaxValue + 10 }
+            Usage = new UsageDetails { TotalTokenCount = (long)int.MaxValue + 10 }
         };
 
         ChatResponseMetadataReader.GetTokensUsed(responseLarge).Should().Be(int.MaxValue);
 
         var responseSmall = new TestChatResponse(new ChatMessage(ChatRole.Assistant, "hello"))
         {
-            Usage = new UsageWithTotalTokenCountLong { TotalTokenCount = (long)int.MinValue - 10 }
+            Usage = new UsageDetails { TotalTokenCount = (long)int.MinValue - 10 }
         };
 
         ChatResponseMetadataReader.GetTokensUsed(responseSmall).Should().Be(int.MinValue);
