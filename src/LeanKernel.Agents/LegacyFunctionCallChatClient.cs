@@ -10,8 +10,7 @@ namespace LeanKernel.Agents;
 /// </summary>
 internal sealed class LegacyFunctionCallChatClient : IChatClient
 {
-    // After executing the tool, we may need multiple replays until the model stops returning the legacy payload.
-    private const int MaxReplayAttempts = 2;
+    private const int MaxReplayAttempts = 1;
 
     private readonly IChatClient _functionInvokingClient;
     private readonly IChatClient _rawClient;
@@ -233,7 +232,6 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
             JsonValueKind.Number => element.GetDouble(),
             JsonValueKind.True => true,
             JsonValueKind.False => false,
-            JsonValueKind.Null => null,
             _ => element.GetRawText(),
         };
 
