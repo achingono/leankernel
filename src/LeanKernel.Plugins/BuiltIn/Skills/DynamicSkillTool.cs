@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using LeanKernel.Abstractions.Models;
@@ -96,6 +97,12 @@ public static class DynamicSkillTool
 
         var client = httpClientFactory.CreateClient("SkillHttp");
         using var request = new HttpRequestMessage(new HttpMethod(httpMethod), url);
+
+        var authError = ApplyHttpAuth(request, skill.Runtime.Auth);
+        if (!string.IsNullOrWhiteSpace(authError))
+        {
+            return Failed(operation.Id, authError);
+        }
 
         if (method is "POST" or "PUT" or "PATCH")
         {
@@ -409,6 +416,75 @@ public static class DynamicSkillTool
 
         result = default;
         return false;
+    }
+
+    private static string? ApplyHttpAuth(HttpRequestMessage request, SkillAuthConfig auth)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(auth);
+
+        if (string.IsNullOrWhiteSpace(auth.Type)
+            || auth.Type.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (!auth.Type.Equals("bearer", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Unsupported HTTP auth type '{auth.Type}'.";
+        }
+
+        if (string.IsNullOrWhiteSpace(auth.SecretRef))
+        {
+            return "HTTP skill bearer auth requires runtime.auth.secretRef.";
+        }
+
+        var token = ResolveSecret(auth.SecretRef);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return $"HTTP skill bearer auth secret '{auth.SecretRef}' is missing or empty.";
+        }
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return null;
+    }
+
+    private static string? ResolveSecret(string secretRef)
+    {
+        var secretPath = Path.Combine("/run/secrets", secretRef);
+        if (File.Exists(secretPath))
+        {
+            var value = File.ReadAllText(secretPath).Trim();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        var directValue = Environment.GetEnvironmentVariable(secretRef);
+        if (!string.IsNullOrWhiteSpace(directValue))
+        {
+            return directValue.Trim();
+        }
+
+        var normalizedKey = NormalizeSecretEnvKey(secretRef);
+        if (string.IsNullOrWhiteSpace(normalizedKey))
+        {
+            return null;
+        }
+
+        var normalizedValue = Environment.GetEnvironmentVariable(normalizedKey);
+        return string.IsNullOrWhiteSpace(normalizedValue) ? null : normalizedValue.Trim();
+    }
+
+    private static string NormalizeSecretEnvKey(string secretRef)
+    {
+        var chars = secretRef
+            .Trim()
+            .ToUpperInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : '_')
+            .ToArray();
+        return new string(chars);
     }
 
     private static bool TryParseBooleanString(string? text, out bool result)

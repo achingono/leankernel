@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Enums;
 using LeanKernel.Abstractions.Interfaces;
@@ -26,6 +27,31 @@ namespace LeanKernel.Agents;
 /// </summary>
 public sealed class TurnPipeline : ITurnPipeline
 {
+    private static readonly HashSet<string> CoreToolNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "web_search",
+        "web_fetch",
+        "http_request",
+        "wiki_search",
+        "wiki_read",
+        "file_read",
+        "file_search",
+        "file_write",
+        "file_edit",
+        "browser_run_task",
+        "browser_get_run",
+        "browser_get_artifact",
+        "browser_cancel_run"
+    };
+
+    private static readonly HashSet<string> BrowserBuiltInToolNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "browser_run_task",
+        "browser_get_run",
+        "browser_get_artifact",
+        "browser_cancel_run"
+    };
+
     private readonly IContextGatekeeper _gatekeeper;
     private readonly ISessionStore _sessions;
     private readonly IAgentStrategy _strategy;
@@ -112,6 +138,8 @@ public sealed class TurnPipeline : ITurnPipeline
             : await _sessions.GetOrCreateSessionIdAsync(message.ChannelId, message.SenderId, ct).ConfigureAwait(false);
         var turnId = ResolveTurnId(message.Metadata);
         var turnScopedMessage = CreateTurnScopedMessage(message, sessionId, turnId);
+        TurnToolInvocationTracker? toolInvocationTracker = null;
+        IReadOnlyList<ToolDefinition>? visibleToolsForLogging = null;
         using var turnActivity = _diagnosticsCollector?.StartTurnActivity(sessionId, turnId);
 
         try
@@ -127,6 +155,11 @@ public sealed class TurnPipeline : ITurnPipeline
             var gatedContext = await _gatekeeper.GateContextAsync(turnScopedMessage, budget, sessionId, ct).ConfigureAwait(false);
 
             var visibleTools = await SelectVisibleToolsAsync(turnScopedMessage, ct);
+            visibleToolsForLogging = visibleTools;
+            toolInvocationTracker = new TurnToolInvocationTracker();
+            visibleTools = WrapToolsForTurn(visibleTools, turnId, sessionId, toolInvocationTracker);
+
+            LogToolAvailability(turnId, sessionId, visibleTools);
             var visibleToolNames = MergeToolNames(gatedContext.ActiveToolNames, visibleTools.Select(tool => tool.Name));
 
             _logger.LogDebug(
@@ -238,7 +271,14 @@ public sealed class TurnPipeline : ITurnPipeline
                 sessionId,
                 response.Length);
 
+            LogToolExecutionSummary(turnId, sessionId, visibleToolsForLogging, toolInvocationTracker);
+
             return response;
+        }
+        catch
+        {
+            LogToolExecutionSummary(turnId, sessionId, visibleToolsForLogging, toolInvocationTracker);
+            throw;
         }
         finally
         {
@@ -266,6 +306,8 @@ public sealed class TurnPipeline : ITurnPipeline
             UserId = turnScopedMessage.SenderId
         });
 
+        visibleTools = RemoveRedundantTools(visibleTools);
+
         var maxTools = _config.LiteLlm.MaxTools;
         if (visibleTools.Count > maxTools)
         {
@@ -273,11 +315,14 @@ public sealed class TurnPipeline : ITurnPipeline
                 "Tool count {Count} exceeds MaxTools ({MaxTools}). Selecting relevant subset.",
                 visibleTools.Count,
                 maxTools);
+            var candidateTools = visibleTools;
             visibleTools = await _toolSelector.SelectToolsAsync(
                 turnScopedMessage.Content,
-                visibleTools,
+                candidateTools,
                 maxTools,
                 ct).ConfigureAwait(false);
+
+            visibleTools = EnsureCoreToolsAvailable(visibleTools, candidateTools, maxTools);
         }
         else if (visibleTools.Count >= maxTools * 0.9)
         {
@@ -288,6 +333,303 @@ public sealed class TurnPipeline : ITurnPipeline
         }
 
         return visibleTools;
+    }
+
+    private IReadOnlyList<ToolDefinition> RemoveRedundantTools(IReadOnlyList<ToolDefinition> tools)
+    {
+        if (tools.Count == 0)
+        {
+            return tools;
+        }
+
+        var hasBuiltInBrowserTools = BrowserBuiltInToolNames.All(requiredName =>
+            tools.Any(t => t.Name.Equals(requiredName, StringComparison.OrdinalIgnoreCase)));
+        if (!hasBuiltInBrowserTools)
+        {
+            return tools;
+        }
+
+        var filtered = tools
+            .Where(t => !t.Name.StartsWith("web_actions_", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (filtered.Count == tools.Count)
+        {
+            return tools;
+        }
+
+        _logger.LogInformation(
+            "Removed {RemovedCount} redundant web_actions tools because built-in browser tools are available.",
+            tools.Count - filtered.Count);
+
+        return filtered;
+    }
+
+    private IReadOnlyList<ToolDefinition> EnsureCoreToolsAvailable(
+        IReadOnlyList<ToolDefinition> selectedTools,
+        IReadOnlyList<ToolDefinition> visibleTools,
+        int maxTools)
+    {
+        var coreAvailable = visibleTools
+            .Where(tool => CoreToolNames.Contains(tool.Name))
+            .ToList();
+        if (coreAvailable.Count == 0)
+        {
+            return selectedTools;
+        }
+
+        var result = selectedTools.ToList();
+        foreach (var coreTool in coreAvailable)
+        {
+            if (!result.Any(tool => tool.Name.Equals(coreTool.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                result.Add(coreTool);
+            }
+        }
+
+        if (result.Count <= maxTools)
+        {
+            return result;
+        }
+
+        for (var i = result.Count - 1; i >= 0 && result.Count > maxTools; i--)
+        {
+            if (!CoreToolNames.Contains(result[i].Name))
+            {
+                result.RemoveAt(i);
+            }
+        }
+
+        return result.Count <= maxTools ? result : result.Take(maxTools).ToList();
+    }
+
+    private IReadOnlyList<ToolDefinition> WrapToolsForTurn(
+        IReadOnlyList<ToolDefinition> tools,
+        string turnId,
+        string sessionId,
+        TurnToolInvocationTracker tracker)
+    {
+        ArgumentNullException.ThrowIfNull(tracker);
+
+        if (tools.Count == 0)
+        {
+            return tools;
+        }
+
+        var wrapped = new List<ToolDefinition>(tools.Count);
+        foreach (var tool in tools)
+        {
+            if (tool.Handler is null)
+            {
+                wrapped.Add(tool);
+                continue;
+            }
+
+            var originalHandler = tool.Handler;
+            var toolName = tool.Name;
+            wrapped.Add(tool with
+            {
+                Handler = async (arguments, cancellationToken) =>
+                {
+                    var invocationId = tracker.NextInvocationId();
+                    var startedAt = Stopwatch.GetTimestamp();
+                    _logger.LogInformation(
+                        "Tool invocation started (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, args={Arguments})",
+                        turnId,
+                        sessionId,
+                        invocationId,
+                        toolName,
+                        SummarizeArguments(arguments));
+
+                    try
+                    {
+                        var result = await originalHandler(arguments, cancellationToken).ConfigureAwait(false);
+                        var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+                        tracker.Record(toolName, result.Success, durationMs);
+
+                        if (result.Success)
+                        {
+                            _logger.LogInformation(
+                                "Tool invocation succeeded (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1}, outputLength={OutputLength})",
+                                turnId,
+                                sessionId,
+                                invocationId,
+                                toolName,
+                                durationMs,
+                                result.Output?.Length ?? 0);
+                        }
+                        else
+                        {
+                            _logger.LogWarning(
+                                "Tool invocation failed (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1}, error={Error})",
+                                turnId,
+                                sessionId,
+                                invocationId,
+                                toolName,
+                                durationMs,
+                                Truncate(result.Error, 320));
+                        }
+
+                        return result;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+                        tracker.Record(toolName, success: false, durationMs);
+                        _logger.LogWarning(
+                            "Tool invocation cancelled (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1})",
+                            turnId,
+                            sessionId,
+                            invocationId,
+                            toolName,
+                            durationMs);
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+                        tracker.Record(toolName, success: false, durationMs);
+                        _logger.LogError(
+                            ex,
+                            "Tool invocation threw exception (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1})",
+                            turnId,
+                            sessionId,
+                            invocationId,
+                            toolName,
+                            durationMs);
+                        throw;
+                    }
+                }
+            });
+        }
+
+        return wrapped;
+    }
+
+    private void LogToolAvailability(string turnId, string sessionId, IReadOnlyList<ToolDefinition> tools)
+    {
+        var msTodoTools = tools
+            .Where(tool => tool.Name.StartsWith("ms-todo", StringComparison.OrdinalIgnoreCase))
+            .Select(tool => tool.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        _logger.LogInformation(
+            "Tool availability (turn={TurnId}, session={SessionId}, total={ToolCount}, msTodoCount={MsTodoCount}, sample={ToolSample})",
+            turnId,
+            sessionId,
+            tools.Count,
+            msTodoTools.Length,
+            SummarizeToolNames(tools));
+
+        if (msTodoTools.Length > 0)
+        {
+            _logger.LogInformation(
+                "MS To Do tools available for turn {TurnId}: {MsTodoTools}",
+                turnId,
+                string.Join(", ", msTodoTools));
+        }
+    }
+
+    private void LogToolExecutionSummary(
+        string turnId,
+        string sessionId,
+        IReadOnlyList<ToolDefinition>? visibleTools,
+        TurnToolInvocationTracker? tracker)
+    {
+        if (visibleTools is null)
+        {
+            return;
+        }
+
+        if (tracker is null)
+        {
+            _logger.LogInformation(
+                "Tool execution summary unavailable (turn={TurnId}, session={SessionId}, offered={OfferedCount})",
+                turnId,
+                sessionId,
+                visibleTools.Count);
+            return;
+        }
+
+        var totalInvocations = tracker.TotalInvocations;
+        var successfulInvocations = tracker.SuccessfulInvocations;
+        var failedInvocations = tracker.FailedInvocations;
+
+        _logger.LogInformation(
+            "Tool execution summary (turn={TurnId}, session={SessionId}, offered={OfferedCount}, invoked={InvokedCount}, succeeded={SucceededCount}, failed={FailedCount}, tools={ExecutedTools})",
+            turnId,
+            sessionId,
+            visibleTools.Count,
+            totalInvocations,
+            successfulInvocations,
+            failedInvocations,
+            tracker.GetSummary());
+
+        if (totalInvocations == 0)
+        {
+            _logger.LogInformation(
+                "No tool invocations were executed for turn {TurnId}; any tool-usage claims in assistant text were not backed by runtime calls.",
+                turnId);
+        }
+    }
+
+    private static string SummarizeToolNames(IReadOnlyList<ToolDefinition> tools, int maxNames = 20)
+    {
+        if (tools.Count == 0)
+        {
+            return "(none)";
+        }
+
+        var names = tools
+            .Select(tool => tool.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Take(maxNames)
+            .ToArray();
+
+        var suffix = tools.Count > maxNames ? $", +{tools.Count - maxNames} more" : string.Empty;
+        return string.Join(", ", names) + suffix;
+    }
+
+    private static string SummarizeArguments(IDictionary<string, object?> arguments)
+    {
+        if (arguments.Count == 0)
+        {
+            return "{}";
+        }
+
+        var ordered = arguments.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase);
+        var parts = new List<string>();
+        foreach (var (key, value) in ordered)
+        {
+            var renderedValue = IsSensitiveKey(key)
+                ? "[redacted]"
+                : Truncate(value?.ToString(), 160);
+            parts.Add($"{key}={renderedValue}");
+        }
+
+        return "{" + string.Join(", ", parts) + "}";
+    }
+
+    private static bool IsSensitiveKey(string key)
+        => key.Contains("token", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("secret", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("password", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("authorization", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("api_key", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("apikey", StringComparison.OrdinalIgnoreCase);
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Length <= maxLength
+            ? value
+            : value[..maxLength] + "...";
     }
 
     private async Task StoreContextDiagnosticsAsync(string sessionId, string turnId, ConversationContext context, ContextBudget budget, CancellationToken ct)
@@ -667,6 +1009,88 @@ public sealed class TurnPipeline : ITurnPipeline
             HistoryDiagnostics = context.HistoryDiagnostics,
             RetrievalDiagnostics = context.RetrievalDiagnostics,
         };
+
+    private sealed class TurnToolInvocationTracker
+    {
+        private readonly object _gate = new();
+        private readonly Dictionary<string, ToolInvocationStats> _stats = new(StringComparer.OrdinalIgnoreCase);
+        private int _nextInvocationId;
+
+        public int TotalInvocations { get; private set; }
+
+        public int SuccessfulInvocations { get; private set; }
+
+        public int FailedInvocations => TotalInvocations - SuccessfulInvocations;
+
+        public int NextInvocationId()
+            => Interlocked.Increment(ref _nextInvocationId);
+
+        public void Record(string toolName, bool success, double durationMs)
+        {
+            lock (_gate)
+            {
+                TotalInvocations++;
+                if (success)
+                {
+                    SuccessfulInvocations++;
+                }
+
+                if (!_stats.TryGetValue(toolName, out var stats))
+                {
+                    stats = new ToolInvocationStats();
+                    _stats[toolName] = stats;
+                }
+
+                stats.Count++;
+                stats.TotalDurationMs += durationMs;
+                if (success)
+                {
+                    stats.SuccessCount++;
+                }
+            }
+        }
+
+        public string GetSummary()
+        {
+            lock (_gate)
+            {
+                if (_stats.Count == 0)
+                {
+                    return "(none)";
+                }
+
+                var builder = new StringBuilder();
+                foreach (var (toolName, stats) in _stats.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    if (builder.Length > 0)
+                    {
+                        builder.Append("; ");
+                    }
+
+                    var averageDurationMs = stats.Count == 0 ? 0d : stats.TotalDurationMs / stats.Count;
+                    builder.Append(toolName)
+                        .Append(':')
+                        .Append(stats.SuccessCount)
+                        .Append('/')
+                        .Append(stats.Count)
+                        .Append(" ok, avg=")
+                        .Append(averageDurationMs.ToString("F1"))
+                        .Append("ms");
+                }
+
+                return builder.ToString();
+            }
+        }
+
+        private sealed class ToolInvocationStats
+        {
+            public int Count { get; set; }
+
+            public int SuccessCount { get; set; }
+
+            public double TotalDurationMs { get; set; }
+        }
+    }
 
     private readonly record struct ProjectedExecution(ModelTier Tier, int InputTokens);
 }

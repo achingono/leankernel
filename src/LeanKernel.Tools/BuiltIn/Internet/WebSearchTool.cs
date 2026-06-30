@@ -44,7 +44,7 @@ public static class WebSearchTool
                     var braveApiKey = Environment.GetEnvironmentVariable("BRAVE_API_KEY");
 
                     var output = !string.IsNullOrWhiteSpace(braveApiKey)
-                        ? await SearchWithBraveAsync(client, query, braveApiKey, ct)
+                        ? await SearchWithFallbackAsync(client, query, braveApiKey, ct)
                         : await SearchWithDuckDuckGoAsync(client, query, ct);
 
                     return new ToolResult
@@ -65,6 +65,18 @@ public static class WebSearchTool
                 }
             }
         };
+    }
+
+    private static async Task<string> SearchWithFallbackAsync(HttpClient client, string query, string apiKey, CancellationToken ct)
+    {
+        try
+        {
+            return await SearchWithBraveAsync(client, query, apiKey, ct);
+        }
+        catch
+        {
+            return await SearchWithDuckDuckGoAsync(client, query, ct);
+        }
     }
 
     private static async Task<string> SearchWithDuckDuckGoAsync(HttpClient client, string query, CancellationToken ct)
