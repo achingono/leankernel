@@ -33,7 +33,9 @@ The current scheduler supports three job types.
 | --- | --- |
 | `agent-prompt` | Builds a `LeanKernelMessage` and runs it through `IAgentRuntime.RunTurnAsync`, just like a user turn. |
 | `knowledge-refresh` | Rehydrates one page by key or searches and rewrites matching knowledge pages. |
-| `maintenance` | Deletes old diagnostics and/or compaction markers from persistence. |
+| `maintenance` | Runs housekeeping tasks including persistence cleanup and knowledge fact defragmentation/retirement with 5W1H normalization. |
+
+The `knowledge-fact-defrag` maintenance task defaults to `normalization_mode=hybrid`: deterministic normalization first, then bounded LLM-assisted repair for partial pages. Missing 5W1H fields are marked as partial (not silently defaulted).
 
 The important pattern is consistency: `agent-prompt` jobs do not bypass the main agent runtime.
 

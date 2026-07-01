@@ -161,6 +161,202 @@ public class JobExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_runs_knowledge_fact_defrag_and_retires_older_duplicate_facts()
+    {
+        var runtime = new Mock<IAgentRuntime>(MockBehavior.Strict);
+        var knowledge = new Mock<IKnowledgeService>(MockBehavior.Strict);
+        var factory = CreateFactory();
+        var timeProvider = new TestTimeProvider(DateTimeOffset.Parse("2025-05-20T08:00:00Z"));
+        const string oldKey = "learning/facts/session-a/turn-1/01";
+        const string newKey = "learning/facts/session-b/turn-2/01";
+
+        knowledge
+            .Setup(candidate => candidate.SearchAsync("learning/facts/", 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new RetrievalCandidate { Key = oldKey, Content = "I prefer morning meetings.", Source = "gbrain" },
+                new RetrievalCandidate { Key = newKey, Content = "I prefer morning meetings.", Source = "gbrain" },
+            ]);
+        knowledge
+            .Setup(candidate => candidate.GetPageAsync(oldKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new KnowledgePage
+            {
+                Key = oldKey,
+                Content = "# Learned Fact\n\nI prefer morning meetings.\n\n- Session: session-a\n- Turn: turn-1\n- RecordedAt: 2025-03-01T00:00:00Z",
+            });
+        knowledge
+            .Setup(candidate => candidate.GetPageAsync(newKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new KnowledgePage
+            {
+                Key = newKey,
+                Content = "# Learned Fact\n\nI prefer morning meetings.\n\n- Session: session-b\n- Turn: turn-2\n- RecordedAt: 2025-05-10T00:00:00Z",
+            });
+        knowledge
+            .Setup(candidate => candidate.PutPageAsync(
+                oldKey,
+                It.Is<string>(content =>
+                    content.Contains("# Retired Fact", StringComparison.Ordinal) &&
+                    content.Contains("## 5W1H", StringComparison.Ordinal) &&
+                    content.Contains("- RetirementReason: duplicate-fact", StringComparison.Ordinal) &&
+                    content.Contains($"- SupersededBy: {newKey}", StringComparison.Ordinal)),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        knowledge
+            .Setup(candidate => candidate.PutPageAsync(
+                newKey,
+                It.Is<string>(content =>
+                    content.Contains("# Learned Fact", StringComparison.Ordinal) &&
+                    content.Contains("## 5W1H", StringComparison.Ordinal) &&
+                    content.Contains("- What: I prefer morning meetings.", StringComparison.Ordinal)),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var executor = CreateExecutor(runtime.Object, knowledge.Object, factory, timeProvider);
+        var job = new ScheduledJobDefinition
+        {
+            Name = "knowledge-maintenance",
+            CronExpression = "0 2 * * 0",
+            JobType = "maintenance",
+            Parameters = new Dictionary<string, string>
+            {
+                ["task"] = "knowledge-fact-defrag",
+                ["scope_query"] = "learning/facts/",
+                ["max_candidates"] = "50",
+                ["min_age_days"] = "7",
+                ["normalization_mode"] = "deterministic",
+            },
+        };
+
+        var execution = await executor.ExecuteAsync(job, DateTimeOffset.Parse("2025-05-20T02:00:00Z"));
+
+        execution.Success.Should().BeTrue();
+        execution.Result.Should().Contain("retired 1 facts");
+        execution.Result.Should().Contain("normalized 1 pages partially");
+        knowledge.Verify(candidate => candidate.PutPageAsync(oldKey, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        knowledge.Verify(candidate => candidate.PutPageAsync(newKey, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        knowledge.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_normalizes_single_learned_fact_page_to_5w1h_without_retirement()
+    {
+        var runtime = new Mock<IAgentRuntime>(MockBehavior.Strict);
+        var knowledge = new Mock<IKnowledgeService>(MockBehavior.Strict);
+        var factory = CreateFactory();
+        var timeProvider = new TestTimeProvider(DateTimeOffset.Parse("2025-05-20T08:00:00Z"));
+        const string key = "learning/facts/session-c/turn-9/01";
+
+        knowledge
+            .Setup(candidate => candidate.SearchAsync("learning/facts/", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new RetrievalCandidate { Key = key, Content = "I work best in the mornings.", Source = "gbrain" },
+            ]);
+        knowledge
+            .Setup(candidate => candidate.GetPageAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new KnowledgePage
+            {
+                Key = key,
+                Content = "# Learned Fact\n\nI work best in the mornings.\n\n- Session: session-c\n- Turn: turn-9\n- RecordedAt: 2025-05-18T00:00:00Z",
+            });
+        knowledge
+            .Setup(candidate => candidate.PutPageAsync(
+                key,
+                It.Is<string>(content =>
+                    content.Contains("# Learned Fact", StringComparison.Ordinal) &&
+                    content.Contains("## 5W1H", StringComparison.Ordinal) &&
+                    content.Contains("- What: I work best in the mornings.", StringComparison.Ordinal) &&
+                    content.Contains("- Session: session-c", StringComparison.Ordinal)),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var executor = CreateExecutor(runtime.Object, knowledge.Object, factory, timeProvider);
+        var job = new ScheduledJobDefinition
+        {
+            Name = "knowledge-maintenance",
+            CronExpression = "0 2 * * 0",
+            JobType = "maintenance",
+            Parameters = new Dictionary<string, string>
+            {
+                ["task"] = "knowledge-fact-defrag",
+                ["scope_query"] = "learning/facts/",
+                ["max_candidates"] = "20",
+                ["min_age_days"] = "7",
+                ["normalization_mode"] = "deterministic",
+            },
+        };
+
+        var execution = await executor.ExecuteAsync(job, DateTimeOffset.Parse("2025-05-20T02:00:00Z"));
+
+        execution.Success.Should().BeTrue();
+        execution.Result.Should().Contain("retired 0 facts");
+        execution.Result.Should().Contain("normalized 1 pages partially");
+        knowledge.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_uses_hybrid_llm_repairs_for_missing_5w1h_fields()
+    {
+        var runtime = new Mock<IAgentRuntime>(MockBehavior.Strict);
+        var knowledge = new Mock<IKnowledgeService>(MockBehavior.Strict);
+        var factory = CreateFactory();
+        var timeProvider = new TestTimeProvider(DateTimeOffset.Parse("2025-05-20T08:00:00Z"));
+        const string key = "learning/facts/session-d/turn-4/01";
+        string? normalizedContent = null;
+
+        knowledge
+            .Setup(candidate => candidate.SearchAsync("learning/facts/", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new RetrievalCandidate { Key = key, Content = "I prefer async status updates.", Source = "gbrain" },
+            ]);
+        knowledge
+            .Setup(candidate => candidate.GetPageAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new KnowledgePage
+            {
+                Key = key,
+                Content = "# Learned Fact\n\nI prefer async status updates.\n\n- Session: session-d\n- Turn: turn-4\n- RecordedAt: 2025-05-18T00:00:00Z",
+            });
+        runtime
+            .Setup(candidate => candidate.RunTurnAsync(
+                It.IsAny<LeanKernelMessage>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("{\"Who\":\"Engineering team\",\"What\":null,\"When\":null,\"Where\":\"standup process\",\"Why\":\"Reduce interruptions\",\"How\":\"Asynchronous updates in shared channel\"}");
+        knowledge
+            .Setup(candidate => candidate.PutPageAsync(
+                key,
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, content, _) => normalizedContent = content)
+            .Returns(Task.CompletedTask);
+
+        var executor = CreateExecutor(runtime.Object, knowledge.Object, factory, timeProvider);
+        var job = new ScheduledJobDefinition
+        {
+            Name = "knowledge-maintenance",
+            CronExpression = "0 2 * * 0",
+            JobType = "maintenance",
+            Parameters = new Dictionary<string, string>
+            {
+                ["task"] = "knowledge-fact-defrag",
+                ["scope_query"] = "learning/facts/",
+                ["max_candidates"] = "20",
+                ["min_age_days"] = "7",
+                ["normalization_mode"] = "hybrid",
+                ["max_llm_repairs_per_run"] = "5",
+            },
+        };
+
+        var execution = await executor.ExecuteAsync(job, DateTimeOffset.Parse("2025-05-20T02:00:00Z"));
+
+        execution.Success.Should().BeTrue();
+        execution.Result.Should().Contain("attempted 1 LLM repairs (1 succeeded, 0 failed)");
+        normalizedContent.Should().NotBeNull();
+        normalizedContent.Should().Contain("- NormalizationMethod: hybrid-llm");
+        normalizedContent.Should().Contain("- Who: Engineering team");
+        normalizedContent.Should().Contain("- NormalizationStatus: complete");
+        knowledge.VerifyAll();
+        runtime.VerifyAll();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_records_failures_for_unsupported_job_types()
     {
         var runtime = new Mock<IAgentRuntime>(MockBehavior.Strict);

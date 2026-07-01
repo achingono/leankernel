@@ -131,8 +131,15 @@ The shipped appsettings examples define two disabled-by-default worker shapes:
 | `key` | `knowledge-refresh` | Refresh one knowledge page by exact key. |
 | `query` | `knowledge-refresh` | Search query used when no exact key is supplied. |
 | `max_results` | `knowledge-refresh` | Maximum search matches to refresh. |
-| `task` | `maintenance` | `cleanup-old-diagnostics`, `cleanup-compaction-markers`, or `cleanup-all`. |
+| `task` | `maintenance` | `cleanup-old-diagnostics`, `cleanup-compaction-markers`, `cleanup-all`, or `knowledge-fact-defrag`. |
 | `retention_days` | `maintenance` | Age threshold for cleanup tasks. |
+| `scope_query` | `maintenance` (`knowledge-fact-defrag`) | Search scope used to discover candidate fact pages (default `learning/facts/`). |
+| `max_candidates` | `maintenance` (`knowledge-fact-defrag`) | Upper bound for fact pages inspected per run (clamped to 1000). |
+| `min_age_days` | `maintenance` (`knowledge-fact-defrag`) | Do not retire pages newer than this age threshold. |
+| `normalization_mode` | `maintenance` (`knowledge-fact-defrag`) | `hybrid` (default) or `deterministic`; hybrid uses opt-in LLM repairs for partial 5W1H normalization. |
+| `max_llm_repairs_per_run` | `maintenance` (`knowledge-fact-defrag`) | Maximum number of partial pages that can trigger LLM-assisted repair per run. |
+
+`knowledge-fact-defrag` also rewrites scanned fact pages into a consistent 5W1H structure (`Who`, `What`, `When`, `Where`, `Why`, `How`) so new chat-generated pages converge toward uniform format over repeated runs. Missing fields are not filled with synthetic defaults; partial normalization is marked in-page and logged.
 
 ## LeanKernel:Hardening
 
