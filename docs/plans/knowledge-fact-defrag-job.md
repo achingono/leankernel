@@ -22,6 +22,8 @@ Use scheduler job type `maintenance` with:
 - optional `max_candidates` (default `200`, clamped to `1000`)
 - optional `min_age_days` (default `14`)
 - optional `normalization_mode` (`hybrid` default, `deterministic` alternative)
+- optional `normalization_context_mode` (`related-pages` default, `isolated` alternative)
+- optional related-page limits (`related_pages_max`, `same_session_max`, `semantic_neighbors_max`)
 - optional `max_llm_repairs_per_run` (bounds hybrid LLM repair volume)
 
 ## Algorithm
@@ -41,6 +43,7 @@ Use scheduler job type `maintenance` with:
    - retired pages keep retired status and include `## 5W1H`
    - missing fields are not silently defaulted; page is marked `NormalizationStatus: partial`
 8. In hybrid mode, attempt LLM repair on partial pages up to `max_llm_repairs_per_run`.
+9. In `related-pages` context mode, provide deterministic evidence pack from related pages (links, same session, semantic neighbors).
 
 ## Review notes
 - Safety: no hard delete; retirement is idempotent and reversible.

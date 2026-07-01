@@ -136,7 +136,11 @@ The shipped appsettings examples define two disabled-by-default worker shapes:
 | `scope_query` | `maintenance` (`knowledge-fact-defrag`) | Search scope used to discover candidate fact pages (default `learning/facts/`). |
 | `max_candidates` | `maintenance` (`knowledge-fact-defrag`) | Upper bound for fact pages inspected per run (clamped to 1000). |
 | `min_age_days` | `maintenance` (`knowledge-fact-defrag`) | Do not retire pages newer than this age threshold. |
-| `normalization_mode` | `maintenance` (`knowledge-fact-defrag`) | `hybrid` (default) or `deterministic`; hybrid uses opt-in LLM repairs for partial 5W1H normalization. |
+| `normalization_mode` | `maintenance` (`knowledge-fact-defrag`) | `hybrid` (default) or `deterministic`; hybrid uses LLM repairs for partial 5W1H normalization. |
+| `normalization_context_mode` | `maintenance` (`knowledge-fact-defrag`) | `related-pages` (default) or `isolated`; controls whether hybrid repairs include deterministic related-page evidence. |
+| `related_pages_max` | `maintenance` (`knowledge-fact-defrag`) | Max related pages attached to one repair prompt. |
+| `same_session_max` | `maintenance` (`knowledge-fact-defrag`) | Max same-session related pages selected before semantic neighbors. |
+| `semantic_neighbors_max` | `maintenance` (`knowledge-fact-defrag`) | Max semantic-neighbor pages selected for context. |
 | `max_llm_repairs_per_run` | `maintenance` (`knowledge-fact-defrag`) | Maximum number of partial pages that can trigger LLM-assisted repair per run. |
 
 `knowledge-fact-defrag` also rewrites scanned fact pages into a consistent 5W1H structure (`Who`, `What`, `When`, `Where`, `Why`, `How`) so new chat-generated pages converge toward uniform format over repeated runs. Missing fields are not filled with synthetic defaults; partial normalization is marked in-page and logged.

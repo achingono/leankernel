@@ -35,7 +35,7 @@ The current scheduler supports three job types.
 | `knowledge-refresh` | Rehydrates one page by key or searches and rewrites matching knowledge pages. |
 | `maintenance` | Runs housekeeping tasks including persistence cleanup and knowledge fact defragmentation/retirement with 5W1H normalization. |
 
-The `knowledge-fact-defrag` maintenance task defaults to `normalization_mode=hybrid`: deterministic normalization first, then bounded LLM-assisted repair for partial pages. Missing 5W1H fields are marked as partial (not silently defaulted).
+The `knowledge-fact-defrag` maintenance task defaults to `normalization_mode=hybrid` with `normalization_context_mode=related-pages`: deterministic normalization first, then bounded LLM-assisted repair for partial pages using deterministic related-page evidence (links, same-session pages, semantic neighbors). Missing 5W1H fields are marked as partial (not silently defaulted).
 
 The important pattern is consistency: `agent-prompt` jobs do not bypass the main agent runtime.
 
