@@ -2,10 +2,12 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
+using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
+using LeanKernel.Abstractions.Models;
 using LeanKernel.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -77,6 +79,97 @@ public class SignalChannelTests
     }
 
     [Fact]
+    public async Task StartAsync_maps_attachment_only_messages_and_downloads_attachment_data()
+    {
+        await using var server = await TestWebSocketServer.CreateAsync(port => port);
+
+        var attachmentBytes = Encoding.UTF8.GetBytes("image-bytes");
+        var receivedMessage = new TaskCompletionSource<ChannelMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        server.OnConnectAsync = async (webSocket, _reqPath) =>
+        {
+            var payload = new
+            {
+                envelope = new
+                {
+                    sourceNumber = "+15550002",
+                    timestamp = 1720000000001L,
+                    dataMessage = new
+                    {
+                        attachments = new[]
+                        {
+                            new
+                            {
+                                id = "attachment-1",
+                                filename = "invoice.pdf",
+                                contentType = "application/pdf"
+                            }
+                        }
+                    }
+                },
+                account = "+15550001"
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            var bytes = Encoding.UTF8.GetBytes(json);
+            await webSocket.SendAsync(bytes, WebSocketMessageType.Text, endOfMessage: true, cancellationToken: CancellationToken.None);
+            await Task.Delay(50);
+            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+        };
+
+        var handler = new RecordingHttpMessageHandler((request, _) =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/v1/attachments/attachment-1")
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(attachmentBytes)
+                };
+                response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+                return response;
+            }
+
+            return CreateJsonResponse(new { timestamp = 0L });
+        });
+
+        var channel = CreateChannel(handler, new ChannelsConfig
+        {
+            Signal = new SignalChannelConfig
+            {
+                Enabled = true,
+                PhoneNumber = "+15550001",
+                PollIntervalSeconds = 0,
+                ReconnectDelaySeconds = 0,
+                MaxReconnectAttempts = 3,
+                DaemonUrl = server.DaemonUrl
+            }
+        });
+
+        channel.MessageReceived += message =>
+        {
+            receivedMessage.TrySetResult(message);
+            return Task.CompletedTask;
+        };
+
+        await channel.StartAsync();
+        ChannelMessage message;
+        try
+        {
+            message = await receivedMessage.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            await channel.StopAsync();
+        }
+
+        message.Content.Should().Be("[Received attachment: invoice.pdf]");
+        message.Attachments.Should().NotBeNull();
+        message.Attachments!.Should().ContainSingle();
+        message.Attachments[0].FileName.Should().Be("invoice.pdf");
+        message.Attachments[0].ContentType.Should().Be("application/pdf");
+        message.Attachments[0].Data.Should().Equal(attachmentBytes);
+    }
+
+    [Fact]
     public async Task SendAsync_posts_the_expected_payload_to_the_signal_daemon()
     {
         var handler = new RecordingHttpMessageHandler((_, _) => CreateJsonResponse(new { timestamp = 123L }));
@@ -97,6 +190,40 @@ public class SignalChannelTests
         document.RootElement.GetProperty("number").GetString().Should().Be("+15550001");
         document.RootElement.GetProperty("recipients")[0].GetString().Should().Be("+15550002");
         document.RootElement.GetProperty("message").GetString().Should().Be("reply message");
+    }
+
+    [Fact]
+    public async Task SendAsync_includes_base64_attachments_when_provided()
+    {
+        var handler = new RecordingHttpMessageHandler((_, _) => CreateJsonResponse(new { timestamp = 123L }));
+        var channel = CreateChannel(handler, new ChannelsConfig
+        {
+            Signal = new SignalChannelConfig
+            {
+                Enabled = true,
+                PhoneNumber = "+15550001"
+            }
+        });
+
+        await channel.SendAsync(
+            "+15550002",
+            "reply with file",
+            [
+                new Attachment
+                {
+                    FileName = "report.pdf",
+                    ContentType = "application/pdf",
+                    Data = Encoding.UTF8.GetBytes("file-bytes")
+                }
+            ]);
+
+        handler.RequestUris.Should().ContainSingle();
+        handler.RequestUris[0].AbsolutePath.Should().Be("/v2/send");
+        using var document = JsonDocument.Parse(handler.RequestBodies.Single());
+        document.RootElement.GetProperty("base64_attachments").GetArrayLength().Should().Be(1);
+        var encodedAttachment = document.RootElement.GetProperty("base64_attachments")[0].GetString();
+        encodedAttachment.Should().NotBeNull();
+        encodedAttachment!.Should().StartWith("data:application/pdf;filename=report.pdf;base64,");
     }
 
     [Fact]

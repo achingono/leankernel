@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Enums;
 using LeanKernel.Abstractions.Interfaces;
@@ -11,6 +13,7 @@ using LeanKernel.Agents.ToolSelection;
 using LeanKernel.Context;
 using LeanKernel.Context.Identity;
 using LeanKernel.Diagnostics;
+using LeanKernel.Tools.BuiltIn.Common;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -51,6 +54,12 @@ public sealed class TurnPipeline : ITurnPipeline
         "browser_get_artifact",
         "browser_cancel_run"
     };
+
+    private static readonly Regex SignalAttachmentDirectiveRegex = new(
+        "```signal-attachments\\s*(?<json>\\{[\\s\\S]*?\\})\\s*```",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private const int MaxPromptAttachmentCount = 4;
+    private const int MaxPromptAttachmentTextChars = 3000;
 
     private readonly IContextGatekeeper _gatekeeper;
     private readonly ISessionStore _sessions;
@@ -129,6 +138,9 @@ public sealed class TurnPipeline : ITurnPipeline
     }
 
     public async Task<string> ProcessAsync(LeanKernelMessage message, CancellationToken ct = default)
+        => (await ProcessDetailedAsync(message, ct).ConfigureAwait(false)).Content;
+
+    public async Task<AgentResponse> ProcessDetailedAsync(LeanKernelMessage message, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -177,7 +189,7 @@ public sealed class TurnPipeline : ITurnPipeline
             {
                 SessionId = sessionId,
                 TurnId = turnId,
-                UserMessage = turnScopedMessage.Content,
+                UserMessage = await BuildUserMessageForModelAsync(turnScopedMessage, ct).ConfigureAwait(false),
                 SystemMessage = systemMessage,
                 History = context.History,
                 Tools = visibleTools.Select(ToolDefinitionAIToolAdapter.Create).ToArray(),
@@ -259,6 +271,8 @@ public sealed class TurnPipeline : ITurnPipeline
             }
 
             response = AppendWarnings(response, warnings);
+            var finalResponse = BuildFinalResponse(response, turnScopedMessage.Attachments);
+            response = finalResponse.Content;
 
             var assistantTimestamp = DateTimeOffset.UtcNow;
             await AppendAssistantTurnAsync(response, sessionId, assistantTimestamp, ct);
@@ -273,7 +287,7 @@ public sealed class TurnPipeline : ITurnPipeline
 
             LogToolExecutionSummary(turnId, sessionId, visibleToolsForLogging, toolInvocationTracker);
 
-            return response;
+            return finalResponse;
         }
         catch
         {
@@ -1009,6 +1023,311 @@ public sealed class TurnPipeline : ITurnPipeline
             HistoryDiagnostics = context.HistoryDiagnostics,
             RetrievalDiagnostics = context.RetrievalDiagnostics,
         };
+
+    private async Task<string> BuildUserMessageForModelAsync(LeanKernelMessage message, CancellationToken ct)
+    {
+        if (message.Attachments is not { Count: > 0 })
+        {
+            return message.Content;
+        }
+
+        var builder = new StringBuilder(message.Content.TrimEnd());
+        if (builder.Length > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine();
+        }
+
+        builder.AppendLine("## Incoming Attachments");
+        builder.AppendLine("The user included the following attachments:");
+
+        var attachmentsToDescribe = message.Attachments.Take(MaxPromptAttachmentCount).ToArray();
+        for (var index = 0; index < attachmentsToDescribe.Length; index++)
+        {
+            var attachment = attachmentsToDescribe[index];
+            var persistedPath = await PersistAttachmentForToolAccessAsync(attachment, ct).ConfigureAwait(false);
+            builder.Append("- #")
+                .Append(index + 1)
+                .Append(": ")
+                .Append(attachment.FileName)
+                .Append(" (")
+                .Append(attachment.ContentType)
+                .Append(", ")
+                .Append(attachment.Data.Length)
+                .AppendLine(" bytes)");
+
+            if (!string.IsNullOrWhiteSpace(persistedPath.RelativePath))
+            {
+                builder.Append("  File tool path (extract_text): ")
+                    .AppendLine(persistedPath.RelativePath)
+                    .AppendLine("  If you call extract_text, use this exact relative path.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(persistedPath.AbsolutePath))
+            {
+                builder.Append("  OCR skill path (screenshot-ocr_* tools): ")
+                    .AppendLine(persistedPath.AbsolutePath)
+                    .AppendLine("  If you call screenshot-ocr_* tools, use this exact absolute path.");
+            }
+
+            var extractedText = await TryExtractAttachmentTextAsync(attachment, ct).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(extractedText))
+            {
+                builder.AppendLine("  Extracted content:");
+                builder.AppendLine("  ```text");
+                builder.AppendLine(extractedText.Replace("\n", "\n  "));
+                builder.AppendLine("  ```");
+            }
+            else
+            {
+                builder.AppendLine("  Extracted content: unavailable (unsupported file type or extraction failure).");
+            }
+        }
+
+        if (message.Attachments.Count > attachmentsToDescribe.Length)
+        {
+            builder.AppendLine($"- +{message.Attachments.Count - attachmentsToDescribe.Length} more attachments omitted from prompt for brevity");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("If you want your Signal reply to include one or more of these same files, append this fenced block to the END of your response:");
+        builder.AppendLine("```signal-attachments");
+        builder.AppendLine("{\"attachments\":[{\"source\":\"incoming\",\"index\":1}]}");
+        builder.AppendLine("```");
+        builder.AppendLine("Use 1-based indexes. Keep your normal user-facing text outside the fenced block.");
+
+        return builder.ToString();
+    }
+
+    private async Task<string?> TryExtractAttachmentTextAsync(Attachment attachment, CancellationToken ct)
+    {
+        if (attachment.Data.Length == 0)
+        {
+            return null;
+        }
+
+        var extension = ResolveAttachmentExtension(attachment);
+        var tempRoot = _config.FileSystem.ScratchRoot;
+        if (string.IsNullOrWhiteSpace(tempRoot))
+        {
+            tempRoot = Path.GetTempPath();
+        }
+
+        try
+        {
+            Directory.CreateDirectory(tempRoot);
+        }
+        catch
+        {
+            tempRoot = Path.GetTempPath();
+            Directory.CreateDirectory(tempRoot);
+        }
+        var tempPath = Path.Combine(tempRoot, $"channel-attachment-{Guid.NewGuid():N}{extension}");
+
+        try
+        {
+            await File.WriteAllBytesAsync(tempPath, attachment.Data, ct).ConfigureAwait(false);
+            var extracted = await TextExtractionHelper.ExtractAsync(tempPath, _config.FileSystem, ct).ConfigureAwait(false);
+            return TruncateAttachmentPromptText(extracted);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(
+                ex,
+                "Attachment text extraction failed for {FileName} ({ContentType})",
+                attachment.FileName,
+                attachment.ContentType);
+            return null;
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(tempPath);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private static string ResolveAttachmentExtension(Attachment attachment)
+    {
+        var extension = Path.GetExtension(attachment.FileName);
+        if (!string.IsNullOrWhiteSpace(extension))
+        {
+            return extension;
+        }
+
+        return attachment.ContentType.ToLowerInvariant() switch
+        {
+            "text/plain" => ".txt",
+            "text/markdown" => ".md",
+            "application/json" => ".json",
+            "application/pdf" => ".pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => ".docx",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation" => ".pptx",
+            "application/epub+zip" => ".epub",
+            "image/jpeg" => ".jpg",
+            "image/png" => ".png",
+            "image/webp" => ".webp",
+            "image/gif" => ".gif",
+            _ => ".bin"
+        };
+    }
+
+    private async Task<PersistedAttachmentPath> PersistAttachmentForToolAccessAsync(Attachment attachment, CancellationToken ct)
+    {
+        if (attachment.Data.Length == 0)
+        {
+            return PersistedAttachmentPath.Empty;
+        }
+
+        try
+        {
+            var allowedRoot = _config.FileSystem.AllowedRoot;
+            var storageRoot = Path.Combine(allowedRoot, ".scratch", "incoming-attachments");
+            Directory.CreateDirectory(storageRoot);
+
+            var extension = ResolveAttachmentExtension(attachment);
+            var originalName = Path.GetFileNameWithoutExtension(attachment.FileName);
+            if (string.IsNullOrWhiteSpace(originalName))
+            {
+                originalName = "attachment";
+            }
+
+            var safeName = string.Concat(originalName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+            if (string.IsNullOrWhiteSpace(safeName))
+            {
+                safeName = "attachment";
+            }
+
+            var fileName = $"{safeName}-{Guid.NewGuid():N}{extension}";
+            var fullPath = Path.Combine(storageRoot, fileName);
+            await File.WriteAllBytesAsync(fullPath, attachment.Data, ct).ConfigureAwait(false);
+
+            return new PersistedAttachmentPath(
+                RelativePath: Path.GetRelativePath(allowedRoot, fullPath).Replace('\\', '/'),
+                AbsolutePath: fullPath.Replace('\\', '/'));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(
+                ex,
+                "Failed to persist incoming attachment for tool access: {FileName}",
+                attachment.FileName);
+            return PersistedAttachmentPath.Empty;
+        }
+    }
+
+    private sealed record PersistedAttachmentPath(string? RelativePath, string? AbsolutePath)
+    {
+        public static PersistedAttachmentPath Empty { get; } = new(null, null);
+    }
+
+    private static string TruncateAttachmentPromptText(string text)
+    {
+        var normalized = text.Replace("\r\n", "\n").Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        if (normalized.Length <= MaxPromptAttachmentTextChars)
+        {
+            return normalized;
+        }
+
+        return normalized[..MaxPromptAttachmentTextChars] + "\n\n[Attachment content truncated for prompt budget.]";
+    }
+
+    private AgentResponse BuildFinalResponse(string rawResponse, IReadOnlyList<Attachment>? incomingAttachments)
+    {
+        if (string.IsNullOrWhiteSpace(rawResponse))
+        {
+            return new AgentResponse { Content = rawResponse };
+        }
+
+        var match = SignalAttachmentDirectiveRegex.Match(rawResponse);
+        if (!match.Success)
+        {
+            return new AgentResponse { Content = rawResponse.TrimEnd() };
+        }
+
+        var content = SignalAttachmentDirectiveRegex.Replace(rawResponse, string.Empty, 1).TrimEnd();
+        if (incomingAttachments is not { Count: > 0 })
+        {
+            _logger.LogWarning("Signal attachment directive was ignored because no incoming attachments were present");
+            return new AgentResponse { Content = content };
+        }
+
+        try
+        {
+            var directive = JsonSerializer.Deserialize<SignalAttachmentDirective>(
+                match.Groups["json"].Value,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var responseAttachments = ResolveResponseAttachments(directive, incomingAttachments);
+            return new AgentResponse
+            {
+                Content = content,
+                Attachments = responseAttachments.Count == 0 ? null : responseAttachments,
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse signal-attachments directive; sending text-only response");
+            return new AgentResponse { Content = content };
+        }
+    }
+
+    private List<Attachment> ResolveResponseAttachments(
+        SignalAttachmentDirective? directive,
+        IReadOnlyList<Attachment> incomingAttachments)
+    {
+        if (directive?.Attachments is not { Count: > 0 })
+        {
+            return [];
+        }
+
+        var resolved = new List<Attachment>(directive.Attachments.Count);
+        foreach (var entry in directive.Attachments)
+        {
+            if (!string.Equals(entry.Source, "incoming", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var zeroBasedIndex = entry.Index - 1;
+            if (zeroBasedIndex < 0 || zeroBasedIndex >= incomingAttachments.Count)
+            {
+                continue;
+            }
+
+            resolved.Add(incomingAttachments[zeroBasedIndex]);
+        }
+
+        return resolved;
+    }
+
+    private sealed class SignalAttachmentDirective
+    {
+        public List<SignalAttachmentDirectiveEntry> Attachments { get; set; } = [];
+    }
+
+    private sealed class SignalAttachmentDirectiveEntry
+    {
+        public string Source { get; set; } = string.Empty;
+
+        public int Index { get; set; }
+    }
 
     private sealed class TurnToolInvocationTracker
     {

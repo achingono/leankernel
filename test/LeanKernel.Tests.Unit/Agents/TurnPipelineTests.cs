@@ -483,4 +483,143 @@ public class TurnPipelineTests
         toolRegistry.VerifyAll();
         strategy.VerifyAll();
     }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_surfaces_attachment_metadata_in_prompt_and_parses_signal_attachment_directive()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+
+        var attachmentData = new byte[] { 1, 2, 3, 4 };
+        var message = new LeanKernelMessage
+        {
+            Content = "Please send this back",
+            SenderId = "user-3",
+            ChannelId = "signal",
+            Attachments =
+            [
+                new Attachment
+                {
+                    FileName = "invoice.pdf",
+                    ContentType = "application/pdf",
+                    Data = attachmentData,
+                }
+            ]
+        };
+
+        sessions
+            .Setup(store => store.GetOrCreateSessionIdAsync("signal", "user-3", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("session-3");
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-3", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-3", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-3")))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        AgentStrategyContext? capturedStrategyContext = null;
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .Callback<AgentStrategyContext, CancellationToken>((context, _) => capturedStrategyContext = context)
+            .ReturnsAsync("Here you go.\n```signal-attachments\n{\"attachments\":[{\"source\":\"incoming\",\"index\":1}]}\n```");
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig()),
+            NullLogger<TurnPipeline>.Instance);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        capturedStrategyContext.Should().NotBeNull();
+        capturedStrategyContext!.UserMessage.Should().Contain("## Incoming Attachments");
+        capturedStrategyContext.UserMessage.Should().Contain("invoice.pdf");
+        capturedStrategyContext.UserMessage.Should().Contain("```signal-attachments");
+
+        response.Content.Should().Be("Here you go.");
+        response.Attachments.Should().NotBeNull();
+        response.Attachments!.Should().ContainSingle();
+        response.Attachments[0].FileName.Should().Be("invoice.pdf");
+        response.Attachments[0].Data.Should().Equal(attachmentData);
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_includes_extracted_attachment_text_in_user_message()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Read attached note",
+            SenderId = "user-attachment-text",
+            ChannelId = "signal",
+            Attachments =
+            [
+                new Attachment
+                {
+                    FileName = "note.txt",
+                    ContentType = "text/plain",
+                    Data = "line one\nline two"u8.ToArray(),
+                }
+            ]
+        };
+
+        sessions
+            .Setup(store => store.GetOrCreateSessionIdAsync("signal", "user-attachment-text", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("session-attachment-text");
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-attachment-text", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-attachment-text", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.IsAny<ToolVisibilityContext>()))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        AgentStrategyContext? capturedStrategyContext = null;
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .Callback<AgentStrategyContext, CancellationToken>((context, _) => capturedStrategyContext = context)
+            .ReturnsAsync("ack");
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig
+            {
+                FileSystem = new FileSystemConfig
+                {
+                    ScratchRoot = Path.GetTempPath(),
+                    MaxExtractedCharacters = 500
+                }
+            }),
+            NullLogger<TurnPipeline>.Instance);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Be("ack");
+        capturedStrategyContext.Should().NotBeNull();
+        capturedStrategyContext!.UserMessage.Should().Contain("Extracted content:");
+        capturedStrategyContext.UserMessage.Should().Contain("line one");
+        capturedStrategyContext.UserMessage.Should().Contain("line two");
+    }
 }

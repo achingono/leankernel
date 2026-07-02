@@ -302,6 +302,12 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
             LastMessage = message;
             return Task.FromResult("stub-response");
         }
+
+        public Task<AgentResponse> RunTurnDetailedAsync(LeanKernelMessage message, CancellationToken ct = default)
+        {
+            LastMessage = message;
+            return Task.FromResult(new AgentResponse { Content = "stub-response" });
+        }
     }
 
     public sealed class RecordingSessionStore : ISessionStore

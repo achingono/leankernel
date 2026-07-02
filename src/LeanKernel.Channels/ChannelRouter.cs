@@ -108,8 +108,8 @@ public sealed class ChannelRouter : IChannelRouter
 
         try
         {
-            var response = await _runtime.RunTurnAsync(runtimeMessage, ct).ConfigureAwait(false);
-            await channel.SendAsync(message.SenderId, response, ct).ConfigureAwait(false);
+            var response = await _runtime.RunTurnDetailedAsync(runtimeMessage, ct).ConfigureAwait(false);
+            await channel.SendAsync(message.SenderId, response.Content, response.Attachments, ct).ConfigureAwait(false);
         }
         finally
         {

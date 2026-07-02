@@ -52,9 +52,10 @@ public interface IChannel
     /// </summary>
     /// <param name="recipientId">The recipient identifier.</param>
     /// <param name="message">The message content.</param>
+    /// <param name="attachments">Optional attachments to include with the message.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    Task SendAsync(string recipientId, string message, CancellationToken ct = default);
+    Task SendAsync(string recipientId, string message, IReadOnlyList<Attachment>? attachments = null, CancellationToken ct = default);
 
     /// <summary>
     /// Occurs when a message is received on the channel.

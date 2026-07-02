@@ -24,13 +24,13 @@ public class ChannelRouterTests
         };
 
         runtime
-            .Setup(candidate => candidate.RunTurnAsync(
+            .Setup(candidate => candidate.RunTurnDetailedAsync(
                 It.Is<LeanKernelMessage>(payload =>
                     payload.ChannelId == "signal"
                     && payload.SenderId == "+15550001"
                     && payload.Content == "hello"),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync("hi back");
+            .ReturnsAsync(new AgentResponse { Content = "hi back" });
 
         var router = CreateRouter(runtime.Object, channel, new ChannelsConfig
         {
@@ -80,10 +80,55 @@ public class ChannelRouterTests
             Content = "hello"
         });
 
-        runtime.Verify(candidate => candidate.RunTurnAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+        runtime.Verify(candidate => candidate.RunTurnDetailedAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<CancellationToken>()), Times.Never);
         channel.SentMessages.Should().BeEmpty();
         channel.TypingStarts.Should().Be(0);
         channel.TypingStops.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RouteInboundAsync_forwards_runtime_attachments_to_channel_send()
+    {
+        var runtime = new Mock<IAgentRuntime>(MockBehavior.Strict);
+        var channel = new TestChannel("signal");
+        var attachment = new Attachment
+        {
+            FileName = "sample.txt",
+            ContentType = "text/plain",
+            Data = [1, 2, 3]
+        };
+
+        runtime
+            .Setup(candidate => candidate.RunTurnDetailedAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse
+            {
+                Content = "with attachment",
+                Attachments = [attachment]
+            });
+
+        var router = CreateRouter(runtime.Object, channel, new ChannelsConfig
+        {
+            ChannelAuth =
+            [
+                new ChannelAuthConfig
+                {
+                    ChannelId = "signal",
+                    RequireAuth = false
+                }
+            ]
+        });
+
+        await router.RouteInboundAsync(new ChannelMessage
+        {
+            ChannelId = "signal",
+            SenderId = "+15550001",
+            Content = "hello"
+        });
+
+        channel.SentMessages.Should().ContainSingle();
+        channel.SentMessages[0].Attachments.Should().NotBeNull();
+        channel.SentMessages[0].Attachments!.Should().ContainSingle();
+        channel.SentMessages[0].Attachments![0].FileName.Should().Be("sample.txt");
     }
 
     [Fact]
@@ -110,7 +155,7 @@ public class ChannelRouterTests
             Content = "hello"
         });
 
-        runtime.Verify(candidate => candidate.RunTurnAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+        runtime.Verify(candidate => candidate.RunTurnDetailedAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<CancellationToken>()), Times.Never);
         channel.SentMessages.Should().BeEmpty();
         channel.TypingStarts.Should().Be(0);
         channel.TypingStops.Should().Be(0);
@@ -130,7 +175,7 @@ public class ChannelRouterTests
 
         public bool IsConnected { get; private set; }
 
-        public List<(string RecipientId, string Message)> SentMessages { get; } = [];
+        public List<(string RecipientId, string Message, IReadOnlyList<Attachment>? Attachments)> SentMessages { get; } = [];
 
         public int TypingStarts { get; private set; }
 
@@ -166,9 +211,9 @@ public class ChannelRouterTests
             return Task.CompletedTask;
         }
 
-        public Task SendAsync(string recipientId, string message, CancellationToken ct = default)
+        public Task SendAsync(string recipientId, string message, IReadOnlyList<Attachment>? attachments = null, CancellationToken ct = default)
         {
-            SentMessages.Add((recipientId, message));
+            SentMessages.Add((recipientId, message, attachments));
             return Task.CompletedTask;
         }
     }

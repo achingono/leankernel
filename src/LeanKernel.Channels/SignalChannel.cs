@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
+using LeanKernel.Abstractions.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -130,16 +131,41 @@ public sealed class SignalChannel : IChannel
     }
 
     /// <inheritdoc/>
-    public async Task SendAsync(string recipientId, string message, CancellationToken ct = default)
+    public async Task SendAsync(string recipientId, string message, IReadOnlyList<Attachment>? attachments = null, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(recipientId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        if (string.IsNullOrWhiteSpace(message) && (attachments is null || attachments.Count == 0))
+        {
+            throw new ArgumentException("Message or attachments must be provided.", nameof(message));
+        }
+
+        message ??= string.Empty;
 
         var sourceNumber = GetSourceNumber(recipientId);
         using var timeoutCts = new CancellationTokenSource(SignalSendTimeout);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
         var client = _httpClientFactory.CreateClient("signal-daemon");
+        var encodedAttachments = EncodeSignalAttachments(attachments);
+
+        if (encodedAttachments.Count > 0)
+        {
+            using var response = await client.PostAsJsonAsync(
+                "/v2/send",
+                new SignalSendRequest
+                {
+                    Number = sourceNumber,
+                    Recipients = [recipientId],
+                    Message = message,
+                    Base64Attachments = encodedAttachments
+                },
+                SerializerOptions,
+                linkedCts.Token).ConfigureAwait(false);
+
+            await EnsureSignalSendSucceededAsync(response, recipientId, sourceNumber, ct).ConfigureAwait(false);
+            return;
+        }
+
         var chunks = SplitMessage(message);
         if (chunks.Count > 1)
         {
@@ -163,29 +189,57 @@ public sealed class SignalChannel : IChannel
                 SerializerOptions,
                 linkedCts.Token).ConfigureAwait(false);
 
-            if (!response.IsSuccessStatusCode)
-            {
-                var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                var statusCode = (int)response.StatusCode;
-
-                if (statusCode == 429)
-                {
-                    _logger.LogError(
-                        "Signal send rate-limited (429) for {RecipientId} from {SourceNumber}: {Body}",
-                        recipientId, sourceNumber, body);
-                    _logger.LogError(
-                        "Resolve via POST /v1/accounts/{{number}}/rate-limit-challenge with a captcha");
-                }
-                else
-                {
-                    _logger.LogError(
-                        "Signal send failed ({StatusCode}) for {RecipientId} from {SourceNumber}: {Body}",
-                        statusCode, recipientId, sourceNumber, body);
-                }
-
-                response.EnsureSuccessStatusCode();
-            }
+            await EnsureSignalSendSucceededAsync(response, recipientId, sourceNumber, ct).ConfigureAwait(false);
         }
+    }
+
+    private async Task EnsureSignalSendSucceededAsync(HttpResponseMessage response, string recipientId, string sourceNumber, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        var statusCode = (int)response.StatusCode;
+
+        if (statusCode == 429)
+        {
+            _logger.LogError(
+                "Signal send rate-limited (429) for {RecipientId} from {SourceNumber}: {Body}",
+                recipientId, sourceNumber, body);
+            _logger.LogError(
+                "Resolve via POST /v1/accounts/{{number}}/rate-limit-challenge with a captcha");
+        }
+        else
+        {
+            _logger.LogError(
+                "Signal send failed ({StatusCode}) for {RecipientId} from {SourceNumber}: {Body}",
+                statusCode, recipientId, sourceNumber, body);
+        }
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static List<string> EncodeSignalAttachments(IReadOnlyList<Attachment>? attachments)
+    {
+        if (attachments is null || attachments.Count == 0)
+        {
+            return [];
+        }
+
+        var encoded = new List<string>(attachments.Count);
+        foreach (var attachment in attachments)
+        {
+            var mimeType = string.IsNullOrWhiteSpace(attachment.ContentType)
+                ? "application/octet-stream"
+                : attachment.ContentType;
+            var fileName = Uri.EscapeDataString(string.IsNullOrWhiteSpace(attachment.FileName) ? "attachment.bin" : attachment.FileName);
+            var base64Data = Convert.ToBase64String(attachment.Data);
+            encoded.Add($"data:{mimeType};filename={fileName};base64,{base64Data}");
+        }
+
+        return encoded;
     }
 
     /// <summary>
@@ -289,7 +343,7 @@ public sealed class SignalChannel : IChannel
         messageBuffer.Clear();
 
         var envelope = JsonSerializer.Deserialize<SignalReceiveEnvelope>(json, SerializerOptions);
-        var channelMessage = CreateChannelMessage(envelope, phoneNumber);
+        var channelMessage = await CreateChannelMessageAsync(envelope, phoneNumber, ct).ConfigureAwait(false);
         if (channelMessage is not null)
         {
             _senderNumber[channelMessage.SenderId] = phoneNumber;
@@ -388,17 +442,28 @@ public sealed class SignalChannel : IChannel
         }
     }
 
-    private static ChannelMessage? CreateChannelMessage(SignalReceiveEnvelope? item, string recipientId)
+    private async Task<ChannelMessage?> CreateChannelMessageAsync(SignalReceiveEnvelope? item, string recipientId, CancellationToken ct)
     {
         if (item is null) return null;
 
         var envelope = item.Envelope;
         var senderId = envelope?.SourceNumber ?? envelope?.Source;
+        var attachments = await LoadAttachmentsAsync(envelope?.DataMessage?.Attachments, ct).ConfigureAwait(false);
         var content = envelope?.DataMessage?.Message;
 
-        if (string.IsNullOrWhiteSpace(senderId) || string.IsNullOrWhiteSpace(content))
+        if (string.IsNullOrWhiteSpace(senderId))
         {
             return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            if (attachments.Count == 0)
+            {
+                return null;
+            }
+
+            content = BuildAttachmentFallbackContent(attachments);
         }
 
         return new ChannelMessage
@@ -407,10 +472,84 @@ public sealed class SignalChannel : IChannel
             SenderId = senderId,
             RecipientId = recipientId,
             Content = content,
+            Attachments = attachments.Count == 0 ? null : attachments,
             Timestamp = envelope?.Timestamp is > 0
                 ? DateTimeOffset.FromUnixTimeMilliseconds(envelope.Timestamp.Value)
                 : DateTimeOffset.UtcNow
         };
+    }
+
+    private async Task<List<Attachment>> LoadAttachmentsAsync(IReadOnlyList<SignalAttachment>? signalAttachments, CancellationToken ct)
+    {
+        if (signalAttachments is null || signalAttachments.Count == 0)
+        {
+            return [];
+        }
+
+        var client = _httpClientFactory.CreateClient("signal-daemon");
+        var attachments = new List<Attachment>(signalAttachments.Count);
+
+        foreach (var signalAttachment in signalAttachments)
+        {
+            var attachmentId = signalAttachment.Id?.Trim();
+            if (string.IsNullOrWhiteSpace(attachmentId))
+            {
+                continue;
+            }
+
+            try
+            {
+                using var response = await client.GetAsync($"/v1/attachments/{Uri.EscapeDataString(attachmentId)}", ct).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning(
+                        "Signal attachment download failed for {AttachmentId}: {StatusCode}",
+                        attachmentId,
+                        (int)response.StatusCode);
+                    continue;
+                }
+
+                var contentType = signalAttachment.ContentType;
+                if (string.IsNullOrWhiteSpace(contentType))
+                {
+                    contentType = response.Content.Headers.ContentType?.MediaType;
+                }
+
+                attachments.Add(new Attachment
+                {
+                    FileName = string.IsNullOrWhiteSpace(signalAttachment.Filename) ? attachmentId : signalAttachment.Filename,
+                    ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
+                    Data = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false)
+                });
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "Signal attachment download failed for {AttachmentId}", attachmentId);
+            }
+        }
+
+        return attachments;
+    }
+
+    private static string BuildAttachmentFallbackContent(IReadOnlyList<Attachment> attachments)
+    {
+        if (attachments.Count == 1)
+        {
+            return $"[Received attachment: {attachments[0].FileName}]";
+        }
+
+        var names = attachments
+            .Take(3)
+            .Select(attachment => attachment.FileName)
+            .ToArray();
+
+        var namesText = string.Join(", ", names);
+        if (attachments.Count > names.Length)
+        {
+            namesText = $"{namesText}, +{attachments.Count - names.Length} more";
+        }
+
+        return $"[Received attachments: {namesText}]";
     }
 
     private TimeSpan GetReconnectDelay(int reconnectAttempt)
@@ -551,6 +690,36 @@ internal sealed class SignalDataMessage
     /// Gets or sets message.
     /// </summary>
     public string? Message { get; set; }
+
+    [JsonPropertyName("attachments")]
+    /// <summary>
+    /// Gets or sets attachments.
+    /// </summary>
+    public List<SignalAttachment>? Attachments { get; set; }
+}
+
+/// <summary>
+/// Provides functionality for signal attachment metadata.
+/// </summary>
+internal sealed class SignalAttachment
+{
+    [JsonPropertyName("id")]
+    /// <summary>
+    /// Gets or sets id.
+    /// </summary>
+    public string? Id { get; set; }
+
+    [JsonPropertyName("filename")]
+    /// <summary>
+    /// Gets or sets filename.
+    /// </summary>
+    public string? Filename { get; set; }
+
+    [JsonPropertyName("contentType")]
+    /// <summary>
+    /// Gets or sets content type.
+    /// </summary>
+    public string? ContentType { get; set; }
 }
 
 /// <summary>
@@ -575,4 +744,10 @@ internal sealed class SignalSendRequest
     /// Gets or sets message.
     /// </summary>
     public string Message { get; set; } = string.Empty;
+
+    [JsonPropertyName("base64_attachments")]
+    /// <summary>
+    /// Gets or sets base64 encoded attachments.
+    /// </summary>
+    public List<string>? Base64Attachments { get; set; }
 }

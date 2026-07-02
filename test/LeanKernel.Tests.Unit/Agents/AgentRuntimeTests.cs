@@ -42,6 +42,29 @@ public class AgentRuntimeTests
     }
 
     [Fact]
+    public async Task RunTurnDetailedAsync_delegates_to_the_pipeline()
+    {
+        var pipeline = new Mock<ITurnPipeline>(MockBehavior.Strict);
+        var message = new LeanKernelMessage
+        {
+            Content = "Hello",
+            SenderId = "user-1",
+            ChannelId = "channel-1"
+        };
+
+        pipeline
+            .Setup(p => p.ProcessDetailedAsync(message, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentResponse { Content = "response" });
+
+        var runtime = new AgentRuntime(pipeline.Object);
+
+        var response = await runtime.RunTurnDetailedAsync(message);
+
+        response.Content.Should().Be("response");
+        pipeline.VerifyAll();
+    }
+
+    [Fact]
     public void AgentFactory_test_constructor_exposes_the_supplied_chat_client()
     {
         var chatClient = new Mock<IChatClient>();

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
+using LeanKernel.Abstractions.Models;
 using LeanKernel.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -107,7 +108,7 @@ public class ChannelHostedServiceTests
         public Task StopTypingAsync(string recipientId, CancellationToken ct = default)
             => Task.CompletedTask;
 
-        public Task SendAsync(string recipientId, string message, CancellationToken ct = default)
+        public Task SendAsync(string recipientId, string message, IReadOnlyList<Attachment>? attachments = null, CancellationToken ct = default)
             => Task.CompletedTask;
 
         public async Task PublishAsync(ChannelMessage message)

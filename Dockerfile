@@ -28,12 +28,13 @@ WORKDIR /src
 
 # Install OS deps needed by the runtime image (OCR-backed extraction)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv poppler-utils \
+    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv poppler-utils tesseract-ocr tesseract-ocr-eng libgl1 libglib2.0-0 libgomp1 \
     && python3 -m venv /opt/ocr-venv \
-    && /opt/ocr-venv/bin/pip install --no-cache-dir paddlepaddle paddleocr pdf2image \
+    && /opt/ocr-venv/bin/pip install --no-cache-dir paddlepaddle paddleocr pdf2image pytesseract \
     && rm -rf /var/lib/apt/lists/*
 
 ENV LeanKernel__FileSystem__PythonExecutable=/opt/ocr-venv/bin/python
+ENV PATH="/opt/ocr-venv/bin:${PATH}"
 
 # DOTNET_USE_POLLING_FILE_WATCHER is intentionally NOT set.
 # Native file system events work reliably with modern Docker for Mac
@@ -67,12 +68,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl python3 python3-pip python3-venv poppler-utils \
+    && apt-get install -y --no-install-recommends curl python3 python3-pip python3-venv poppler-utils tesseract-ocr tesseract-ocr-eng libgl1 libglib2.0-0 libgomp1 \
     && python3 -m venv /opt/ocr-venv \
-    && /opt/ocr-venv/bin/pip install --no-cache-dir paddlepaddle paddleocr pdf2image \
+    && /opt/ocr-venv/bin/pip install --no-cache-dir paddlepaddle paddleocr pdf2image pytesseract \
     && rm -rf /var/lib/apt/lists/*
 
 ENV LeanKernel__FileSystem__PythonExecutable=/opt/ocr-venv/bin/python
+ENV PATH="/opt/ocr-venv/bin:${PATH}"
 
 COPY --from=build /app/publish .
 

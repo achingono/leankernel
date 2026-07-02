@@ -18,4 +18,7 @@ public sealed class AgentRuntime : IAgentRuntime
 
     public Task<string> RunTurnAsync(LeanKernelMessage message, CancellationToken ct = default)
         => _pipeline.ProcessAsync(message, ct);
+
+    public Task<AgentResponse> RunTurnDetailedAsync(LeanKernelMessage message, CancellationToken ct = default)
+        => _pipeline.ProcessDetailedAsync(message, ct);
 }

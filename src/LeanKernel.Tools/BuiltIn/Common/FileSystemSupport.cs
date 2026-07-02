@@ -234,7 +234,7 @@ internal static class FileSystemSupport
 /// <summary>
 /// Provides functionality for text extraction helper.
 /// </summary>
-internal static class TextExtractionHelper
+public static class TextExtractionHelper
 {
     /// <summary>
     /// Executes extract async.
@@ -380,7 +380,7 @@ print('\n'.join(text_parts))
             throw new InvalidOperationException($"Unsupported file type '{Path.GetExtension(path)}' for text extraction.");
         }
 
-        var script = """
+        var paddleOcrScript = """
 import json
 import sys
 from pathlib import Path
@@ -422,8 +422,53 @@ else:
     print("\n".join(collect_text(ocr.ocr(str(path), cls=True))))
 """;
 
-        var output = await FileSystemSupport.RunPythonAsync(config, script, [path], ct);
-        return Truncate(output, config.MaxExtractedCharacters);
+        try
+        {
+            var output = await FileSystemSupport.RunPythonAsync(config, paddleOcrScript, [path], ct);
+            return Truncate(output, config.MaxExtractedCharacters);
+        }
+        catch (InvalidOperationException paddleError)
+        {
+            var tesseractOcrScript = """
+import sys
+from pathlib import Path
+
+import pytesseract
+from PIL import Image
+
+try:
+    from pdf2image import convert_from_path
+except Exception:
+    convert_from_path = None
+
+path = Path(sys.argv[1])
+
+if path.suffix.lower() == '.pdf':
+    if convert_from_path is None:
+        raise SystemExit('pdf2image is not available.')
+    pages = convert_from_path(str(path))
+    chunks = []
+    for page in pages:
+        text = pytesseract.image_to_string(page)
+        if text and text.strip():
+            chunks.append(text.strip())
+    print("\n\n".join(chunks))
+else:
+    with Image.open(path) as img:
+        print(pytesseract.image_to_string(img))
+""";
+
+            try
+            {
+                var fallbackOutput = await FileSystemSupport.RunPythonAsync(config, tesseractOcrScript, [path], ct);
+                return Truncate(fallbackOutput, config.MaxExtractedCharacters);
+            }
+            catch (InvalidOperationException fallbackError)
+            {
+                throw new InvalidOperationException(
+                    $"OCR extraction failed with PaddleOCR and Tesseract fallback. PaddleOCR error: {paddleError.Message} | Tesseract error: {fallbackError.Message}");
+            }
+        }
     }
 
     private static string Truncate(string value, int limit)
