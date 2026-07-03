@@ -167,6 +167,7 @@ public sealed class TurnPipeline : ITurnPipeline
             var gatedContext = await _gatekeeper.GateContextAsync(turnScopedMessage, budget, sessionId, ct).ConfigureAwait(false);
 
             var visibleTools = await SelectVisibleToolsAsync(turnScopedMessage, ct);
+            visibleTools = FilterToolsForChannel(turnScopedMessage, visibleTools);
             visibleToolsForLogging = visibleTools;
             toolInvocationTracker = new TurnToolInvocationTracker();
             visibleTools = WrapToolsForTurn(visibleTools, turnId, sessionId, toolInvocationTracker);
@@ -1327,6 +1328,18 @@ public sealed class TurnPipeline : ITurnPipeline
         public string Source { get; set; } = string.Empty;
 
         public int Index { get; set; }
+    }
+
+    private static IReadOnlyList<ToolDefinition> FilterToolsForChannel(LeanKernelMessage message, IReadOnlyList<ToolDefinition> tools)
+    {
+        if (!string.Equals(message.ChannelId, "signal", StringComparison.OrdinalIgnoreCase))
+        {
+            return tools;
+        }
+
+        return tools
+            .Where(tool => !tool.Name.StartsWith("screenshot-ocr_", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
     }
 
     private sealed class TurnToolInvocationTracker
