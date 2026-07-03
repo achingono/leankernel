@@ -71,8 +71,11 @@ public sealed class PromptAssembler
         if (hasKnowledge || context.ActiveToolNames.Any(n => n.StartsWith("wiki_", StringComparison.Ordinal)))
         {
             parts.Add("\n## Knowledge-First Policy");
-            parts.Add("Always check your available knowledge before asking the user for information they may have already provided. First, review the knowledge sections above — the answer may already be there. If not, use wiki_search or wiki_read to look it up. Only ask the user for clarification if you cannot find the information anywhere in your knowledge base.");
+            parts.Add("Always check your available knowledge before asking the user for information they may have already provided. First, review the knowledge sections above — the answer may already be there. If not, use `wiki_search`, `wiki_read`, or `file_search` to look it up. Only ask the user for clarification if you cannot find the information anywhere in your knowledge base.");
         }
+
+        parts.Add("\n## Task Status Directive");
+        parts.Add("For multi-step tasks, append this fenced JSON block at the end of your response: ```task-status {\"status\":\"complete|in_progress|blocked\",\"note\":\"short progress note\"} ```. Keep all user-facing text outside the fenced block.");
 
         var assembled = string.Join("\n", parts);
         var tokens = _tokenEstimator.EstimateTokens(assembled);

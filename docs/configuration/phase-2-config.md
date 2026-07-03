@@ -60,8 +60,17 @@ Entity expansion depth still comes from `LeanKernel:Context:EntityExpansionDepth
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `LeanKernel:Channels:Enabled` | boolean | `true` | Enables channel hosted-service startup and inbound routing. |
+| `LeanKernel:Channels:Typing` | object | see below | Typing keepalive settings for channel turns. |
 | `LeanKernel:Channels:Signal` | object | see below | Signal adapter settings. |
 | `LeanKernel:Channels:ChannelAuth` | array | empty | Per-channel sender authorization rules. |
+
+### LeanKernel:Channels:Typing
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Enabled` | boolean | `true` | Enables typing refreshes for channel turns. |
+| `KeepAliveSeconds` | integer | `8` | Refresh interval used while a turn is in flight. |
+| `StopTimeoutSeconds` | integer | `5` | Timeout used when clearing the typing indicator. |
 
 ### LeanKernel:Channels:Signal
 

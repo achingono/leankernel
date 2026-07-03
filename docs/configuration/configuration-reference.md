@@ -17,6 +17,7 @@ Canonical runtime settings are loaded from `LeanKernel` and `OpenTelemetry` sect
 - `LeanKernel:DatabaseQuery`
 - `LeanKernel:Diagnostics`
 - `LeanKernel:Channels`
+- `LeanKernel:Continuation`
 - `LeanKernel:Enhancement`
 - `LeanKernel:Learning`
 - `LeanKernel:FileSystem`
@@ -34,6 +35,8 @@ Canonical runtime settings are loaded from `LeanKernel` and `OpenTelemetry` sect
 - `LeanKernel:ForwardedAuth`: forwarded identity auth settings (`Enabled`, `RequireAuthenticatedUser`, `RequireUserHeader`, `UserHeader`, `FallbackUserHeader`).
 - `LeanKernel:Skills`: dynamic skill scan settings (`BasePaths`) are consumed by runtime skill loading.
 - `LeanKernel:DocumentIngestion`: controls queue limits and watch-folder ingestion behavior for document import.
+- `LeanKernel:Channels:Typing`: typing keepalive refresh cadence and stop timeout for channel turns.
+- `LeanKernel:Continuation`: automatic continuation limits, progress throttling, and task-completion detection settings.
 - `OpenTelemetry`: supports `OpenTelemetry:ConsoleExporterEnabled` and `OpenTelemetry:Otlp:Endpoint`.
 
 ## Related Pages

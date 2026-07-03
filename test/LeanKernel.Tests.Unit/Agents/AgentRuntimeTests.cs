@@ -112,7 +112,10 @@ public class AgentRuntimeTests
 
         services.Should().Contain(descriptor =>
             descriptor.ServiceType == typeof(ITurnPipeline)
-            && descriptor.ImplementationType == typeof(TurnPipeline)
+            && descriptor.ImplementationFactory != null
+            && descriptor.Lifetime == ServiceLifetime.Scoped);
+        services.Should().Contain(descriptor =>
+            descriptor.ServiceType == typeof(TurnPipeline)
             && descriptor.Lifetime == ServiceLifetime.Scoped);
         services.Should().Contain(descriptor =>
             descriptor.ServiceType == typeof(IAgentRuntime)

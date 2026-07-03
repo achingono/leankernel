@@ -41,6 +41,11 @@ public sealed class TurnEntity
     public string? CompactionSourceId { get; set; }
 
     /// <summary>
+    /// Gets or sets optional turn metadata persisted as JSON.
+    /// </summary>
+    public string? Metadata { get; set; }
+
+    /// <summary>
     /// Gets or sets the parent session navigation property.
     /// </summary>
     public SessionEntity Session { get; set; } = null!;

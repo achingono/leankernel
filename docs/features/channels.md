@@ -21,6 +21,7 @@ flowchart LR
 | `ChannelRouter` | Validates the channel, authenticates the sender, maps to `LeanKernelMessage`, invokes `IAgentRuntime`, and sends the reply back through the same adapter. |
 | `ChannelAuthenticator` | Enforces per-channel allowlists from `LeanKernel:Channels:ChannelAuth`. |
 | `SignalChannel` | Polling HTTP adapter for the Signal daemon API. |
+| `TypingIndicatorKeepAlive` | Refreshes typing state while a channel turn is in flight. |
 | `AddLeanKernelChannels` | Registers the router, authenticator, hosted service, and optional Signal adapter. |
 ## Shared routing flow
 When a channel raises `MessageReceived`, LeanKernel follows one path:
@@ -30,7 +31,8 @@ When a channel raises `MessageReceived`, LeanKernel follows one path:
 3. `ChannelAuthenticator` authorizes the sender for that channel
 4. the router maps the message to `LeanKernelMessage`
 5. `IAgentRuntime.RunTurnAsync` processes the turn
-6. the adapter sends the response back to the original sender
+6. the router keeps typing active and relays progress updates when available
+7. the adapter sends the response back to the original sender
 
 This keeps transport details separate from reasoning. `ChannelRouter` does not create a special channel-only agent flow.
 ## Authentication model
@@ -89,6 +91,9 @@ Channel behavior is configured under `LeanKernel:Channels`.
 | Key | Default | Purpose |
 | --- | --- | --- |
 | `Enabled` | `true` | Enables hosted-service startup and inbound routing. |
+| `Typing:Enabled` | `true` | Enables typing keepalive refreshes for channel turns. |
+| `Typing:KeepAliveSeconds` | `8` | Interval used to keep the typing indicator visible. |
+| `Typing:StopTimeoutSeconds` | `5` | Timeout used when stopping the typing indicator. |
 ### Signal settings
 | Key | Default | Purpose |
 | --- | --- | --- |
@@ -132,4 +137,5 @@ That is why the feature belongs in its own package but still routes through the 
 - [Gateway API](gateway-api.md)
 - [Authentication and Authorization](authentication.md)
 - [Phase 2 Configuration](../configuration/phase-2-config.md)
+- [Long-Running Tasks, Progress Updates, and Continuation](long-running-tasks.md)
 - [Phase 2 Channel Expansion PRD](../plans/phase-2-channel-expansion-prd.md)

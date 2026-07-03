@@ -4,9 +4,11 @@ using LeanKernel.Abstractions.Enums;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Agents;
+using LeanKernel.Agents.ToolSelection;
 using LeanKernel.Agents.Strategies;
 using LeanKernel.Context;
 using LeanKernel.Diagnostics;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -15,6 +17,141 @@ namespace LeanKernel.Tests.Unit.Agents;
 
 public class TurnPipelineTests
 {
+    [Fact]
+    public async Task ProcessDetailedAsync_skips_persisting_internal_continuation_user_turn()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+        var persistedRoles = new List<string>();
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-1", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Callback<string, ConversationTurn, CancellationToken>((_, turn, _) => persistedRoles.Add(turn.Role))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.IsAny<ToolVisibilityContext>()))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("continued output");
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig
+            {
+                LiteLlm = new LiteLlmConfig
+                {
+                    ContextWindowTokens = 128,
+                    DefaultModel = "gpt-4o-mini"
+                },
+                Context = new ContextConfig()
+            }),
+            NullLogger<TurnPipeline>.Instance);
+
+        var response = await pipeline.ProcessDetailedAsync(new LeanKernelMessage
+        {
+            Content = "Continue working on the task. Do not repeat completed steps; pick up where you left off.",
+            SenderId = "user-1",
+            ChannelId = "channel-1",
+            SessionId = "session-1",
+            Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["turn_id"] = "root-turn-1",
+                ["turnId"] = "root-turn-1",
+                ["root_turn_id"] = "root-turn-1",
+                ["rootTurnId"] = "root-turn-1",
+                ["internal_turn"] = "true",
+                ["internal_reason"] = "auto_continuation_prompt"
+            }
+        });
+
+        response.Content.Should().Be("continued output");
+        persistedRoles.Should().Equal("assistant");
+        gatekeeper.VerifyAll();
+        sessions.VerifyAll();
+        strategy.VerifyAll();
+        toolRegistry.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_skips_persisting_legacy_auto_continuation_user_turn()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+        var persistedRoles = new List<string>();
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-1", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Callback<string, ConversationTurn, CancellationToken>((_, turn, _) => persistedRoles.Add(turn.Role))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.IsAny<ToolVisibilityContext>()))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("continued output");
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig
+            {
+                LiteLlm = new LiteLlmConfig
+                {
+                    ContextWindowTokens = 128,
+                    DefaultModel = "gpt-4o-mini"
+                },
+                Context = new ContextConfig()
+            }),
+            NullLogger<TurnPipeline>.Instance);
+
+        var response = await pipeline.ProcessDetailedAsync(new LeanKernelMessage
+        {
+            Content = "Continue working on the task. Do not repeat completed steps; pick up where you left off.",
+            SenderId = "user-1",
+            ChannelId = "channel-1",
+            SessionId = "session-1",
+            Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["turn_id"] = "root-turn-1",
+                ["turnId"] = "root-turn-1",
+                ["root_turn_id"] = "root-turn-1",
+                ["rootTurnId"] = "root-turn-1",
+                ["auto_continuation"] = "true"
+            }
+        });
+
+        response.Content.Should().Be("continued output");
+        persistedRoles.Should().Equal("assistant");
+        gatekeeper.VerifyAll();
+        sessions.VerifyAll();
+        strategy.VerifyAll();
+        toolRegistry.VerifyAll();
+    }
+
     [Fact]
     public async Task ProcessAsync_persists_turns_merges_visible_tools_stores_context_snapshot_and_publishes_event()
     {
@@ -492,7 +629,6 @@ public class TurnPipelineTests
         var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
         var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
 
-        var attachmentData = new byte[] { 1, 2, 3, 4 };
         var message = new LeanKernelMessage
         {
             Content = "Please send this back",
@@ -504,7 +640,7 @@ public class TurnPipelineTests
                 {
                     FileName = "invoice.pdf",
                     ContentType = "application/pdf",
-                    Data = attachmentData,
+                    Data = Array.Empty<byte>(),
                 }
             ]
         };
@@ -550,11 +686,11 @@ public class TurnPipelineTests
         response.Attachments.Should().NotBeNull();
         response.Attachments!.Should().ContainSingle();
         response.Attachments[0].FileName.Should().Be("invoice.pdf");
-        response.Attachments[0].Data.Should().Equal(attachmentData);
+        response.Attachments[0].Data.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task ProcessDetailedAsync_includes_extracted_attachment_text_in_user_message()
+    public async Task ProcessDetailedAsync_parses_task_status_directives_into_execution_metadata()
     {
         var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
         var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
@@ -563,40 +699,316 @@ public class TurnPipelineTests
 
         var message = new LeanKernelMessage
         {
-            Content = "Read attached note",
-            SenderId = "user-attachment-text",
+            Content = "Please continue",
+            SenderId = "user-task-status",
             ChannelId = "signal",
-            Attachments =
-            [
-                new Attachment
-                {
-                    FileName = "note.txt",
-                    ContentType = "text/plain",
-                    Data = "line one\nline two"u8.ToArray(),
-                }
-            ]
+            SessionId = "session-task-status"
         };
 
         sessions
-            .Setup(store => store.GetOrCreateSessionIdAsync("signal", "user-attachment-text", It.IsAny<CancellationToken>()))
-            .ReturnsAsync("session-attachment-text");
-        sessions
-            .Setup(store => store.AppendTurnAsync("session-attachment-text", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Setup(store => store.AppendTurnAsync("session-task-status", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         gatekeeper
-            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-attachment-text", It.IsAny<CancellationToken>()))
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-task-status", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
 
         toolRegistry
             .Setup(registry => registry.GetVisibleTools(It.IsAny<ToolVisibilityContext>()))
             .Returns(Array.Empty<ToolDefinition>());
 
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Drafting the final answer.\n```task-status\n{\"status\":\"in_progress\",\"note\":\"Still refining the answer.\"}\n```");
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig()),
+            NullLogger<TurnPipeline>.Instance);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Be("Drafting the final answer.");
+        response.Execution.Should().NotBeNull();
+        response.Execution!.ToolInvocationCount.Should().Be(0);
+        response.Execution.TaskStatus.Should().NotBeNull();
+        response.Execution.TaskStatus!.Status.Should().Be("in_progress");
+        response.Execution.TaskStatus.Note.Should().Be("Still refining the answer.");
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_ignores_malformed_task_status_directives()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Please continue",
+            SenderId = "user-task-status-malformed",
+            ChannelId = "signal",
+            SessionId = "session-task-status-malformed"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-task-status-malformed", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-task-status-malformed", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-task-status-malformed")))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Work in progress.\n```task-status\n{\"status\":\n```");
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig()),
+            NullLogger<TurnPipeline>.Instance);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Contain("Work in progress.");
+        response.Execution.Should().NotBeNull();
+        response.Execution!.TaskStatus.Should().BeNull();
+
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        strategy.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_ignores_signal_attachment_directives_when_no_incoming_attachments_are_present()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Please send this back",
+            SenderId = "user-attachment-none",
+            ChannelId = "signal",
+            SessionId = "session-attachment-none"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-attachment-none", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-attachment-none", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-attachment-none")))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Here you go.\n```signal-attachments\n{\"attachments\":[{\"source\":\"incoming\",\"index\":1}]}\n```");
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig()),
+            NullLogger<TurnPipeline>.Instance);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Be("Here you go.");
+        response.Attachments.Should().BeNull();
+
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        strategy.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_returns_empty_content_when_the_model_returns_only_whitespace()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Status?",
+            SenderId = "user-empty-response",
+            ChannelId = "signal",
+            SessionId = "session-empty-response"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-empty-response", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-empty-response", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-empty-response")))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(string.Empty);
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig()),
+            NullLogger<TurnPipeline>.Instance);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().BeEmpty();
+        response.Execution.Should().NotBeNull();
+        response.Execution!.ToolInvocationCount.Should().Be(0);
+
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        strategy.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_filters_browser_tools_selects_core_tools_and_redacts_sensitive_arguments()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+        var toolSelector = new Mock<IToolSelector>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Use the browser tool and summarize the result",
+            SenderId = "user-tooling",
+            ChannelId = "signal",
+            SessionId = "session-tooling"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-tooling", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-tooling", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        var browserRunTask = new ToolDefinition
+        {
+            Name = "browser_run_task",
+            Description = "Run browser task",
+            Handler = (_, _) => Task.FromResult(new ToolResult
+            {
+                ToolName = "browser_run_task",
+                Success = true,
+                Output = "browser ok"
+            })
+        };
+
+        var toolDefinitions = new[]
+        {
+            browserRunTask,
+            new ToolDefinition
+            {
+                Name = "browser_get_run",
+                Description = "Get browser run",
+                Handler = (_, _) => Task.FromResult(new ToolResult { ToolName = "browser_get_run", Success = true, Output = "run ok" })
+            },
+            new ToolDefinition
+            {
+                Name = "browser_get_artifact",
+                Description = "Get browser artifact",
+                Handler = (_, _) => Task.FromResult(new ToolResult { ToolName = "browser_get_artifact", Success = true, Output = "artifact ok" })
+            },
+            new ToolDefinition
+            {
+                Name = "browser_cancel_run",
+                Description = "Cancel browser run",
+                Handler = (_, _) => Task.FromResult(new ToolResult { ToolName = "browser_cancel_run", Success = true, Output = "cancel ok" })
+            },
+            new ToolDefinition
+            {
+                Name = "web_actions_legacy",
+                Description = "Legacy browser wrapper",
+                Handler = (_, _) => Task.FromResult(new ToolResult { ToolName = "web_actions_legacy", Success = true, Output = "legacy ok" })
+            },
+            new ToolDefinition
+            {
+                Name = "ms-todo-plan",
+                Description = "List todo items",
+                Handler = (_, _) => Task.FromResult(new ToolResult { ToolName = "ms-todo-plan", Success = true, Output = "todo ok" })
+            },
+            new ToolDefinition
+            {
+                Name = "wiki_read",
+                Description = "Read wiki",
+                Handler = (_, _) => Task.FromResult(new ToolResult { ToolName = "wiki_read", Success = true, Output = "wiki ok" })
+            }
+        };
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-tooling")))
+            .Returns(toolDefinitions);
+
+        toolSelector
+            .Setup(selector => selector.SelectToolsAsync(
+                It.IsAny<string>(),
+                It.Is<IReadOnlyList<ToolDefinition>>(tools => tools.Count == 6 && tools.All(tool => tool.Name != "web_actions_legacy")),
+                2,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([browserRunTask]);
+
         AgentStrategyContext? capturedStrategyContext = null;
         strategy
             .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
             .Callback<AgentStrategyContext, CancellationToken>((context, _) => capturedStrategyContext = context)
-            .ReturnsAsync("ack");
+            .Returns<AgentStrategyContext, CancellationToken>(async (context, ct) =>
+            {
+                var function = context.Tools!.First().GetService<AIFunction>();
+                function.Should().NotBeNull();
+                if (function is not null)
+                {
+                    await function.InvokeAsync(new AIFunctionArguments(
+                        new Dictionary<string, object?>
+                        {
+                            ["token"] = "super-secret-token",
+                            ["query"] = "browser query"
+                        }), ct).ConfigureAwait(false);
+                }
+
+                context.ModelUsed = "gpt-4o";
+                return "tooling complete";
+            });
 
         var pipeline = new TurnPipeline(
             gatekeeper.Object,
@@ -606,20 +1018,494 @@ public class TurnPipelineTests
             toolRegistry.Object,
             Options.Create(new LeanKernelConfig
             {
-                FileSystem = new FileSystemConfig
+                LiteLlm = new LiteLlmConfig
                 {
-                    ScratchRoot = Path.GetTempPath(),
-                    MaxExtractedCharacters = 500
+                    ContextWindowTokens = 100,
+                    DefaultModel = "gpt-4o-mini",
+                    MaxTools = 2
+                }
+            }),
+            NullLogger<TurnPipeline>.Instance,
+            toolSelector: toolSelector.Object);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Be("tooling complete");
+        capturedStrategyContext.Should().NotBeNull();
+        capturedStrategyContext!.Tools.Should().NotBeNull();
+        capturedStrategyContext.Tools!.Select(tool => tool.Name).Should().Contain("browser_run_task");
+        capturedStrategyContext.Tools!.Select(tool => tool.Name).Should().Contain("browser_get_run");
+        capturedStrategyContext.Tools!.Select(tool => tool.Name).Should().NotContain("web_actions_legacy");
+
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        toolSelector.VerifyAll();
+        strategy.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_returns_degraded_response_when_model_invocation_fails()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+        var providerHealthTracker = new Mock<IProviderHealthTracker>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Explain the rollout",
+            SenderId = "user-model-failure",
+            ChannelId = "signal",
+            SessionId = "session-model-failure"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-model-failure", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-model-failure", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-model-failure")))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("model failed"));
+
+        providerHealthTracker
+            .Setup(tracker => tracker.RecordProbeResult(
+                ProviderNames.LiteLlm,
+                It.Is<ProviderProbeResult>(result =>
+                    !result.IsHealthy
+                    && result.Description == "Model invocation failed."
+                    && result.ErrorMessage == "model failed")));
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig
+            {
+                LiteLlm = new LiteLlmConfig
+                {
+                    ContextWindowTokens = 100,
+                    DefaultModel = "gpt-4o-mini"
+                }
+            }),
+            NullLogger<TurnPipeline>.Instance,
+            providerHealthTracker: providerHealthTracker.Object);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Be("LeanKernel cannot reach the configured model provider right now. Please try again shortly.");
+        response.Execution.Should().NotBeNull();
+        response.Execution!.ToolInvocationCount.Should().Be(0);
+        response.Execution.SuccessfulToolInvocations.Should().Be(0);
+        providerHealthTracker.VerifyAll();
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        strategy.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_returns_the_spend_guard_reason_without_invoking_the_model_when_blocked()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+        var spendGuardService = new Mock<ISpendGuardService>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Explain the rollout",
+            SenderId = "user-spend-block",
+            ChannelId = "signal",
+            SessionId = "session-spend-block"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-spend-block", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-spend-block", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-spend-block")))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        spendGuardService
+            .Setup(service => service.Evaluate("session-spend-block", ModelTier.Standard, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTimeOffset?>()))
+            .Returns(new SpendGuardDecision
+            {
+                Action = SpendGuardAction.Block,
+                Reason = "Budget exhausted",
+                DailyLimitUsd = 10,
+                DailySpendUsd = 10,
+            });
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig
+            {
+                LiteLlm = new LiteLlmConfig
+                {
+                    ContextWindowTokens = 100,
+                    DefaultModel = "gpt-4o-mini"
+                }
+            }),
+            NullLogger<TurnPipeline>.Instance,
+            spendGuardService: spendGuardService.Object);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Be("Budget exhausted");
+        response.Execution.Should().NotBeNull();
+        response.Execution!.ToolInvocationCount.Should().Be(0);
+        response.Execution.SuccessfulToolInvocations.Should().Be(0);
+        strategy.Verify(candidate => candidate.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()), Times.Never);
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        spendGuardService.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_keeps_the_original_response_when_enhancement_fails()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+        var responseEnhancer = new Mock<IResponseEnhancer>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Explain the rollout",
+            SenderId = "user-enhancement-failure",
+            ChannelId = "signal",
+            SessionId = "session-enhancement-failure"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-enhancement-failure", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-enhancement-failure", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-enhancement-failure")))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("draft response");
+
+        responseEnhancer
+            .Setup(enhancer => enhancer.EnhanceAsync(It.IsAny<EnhancementStepInput>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("enhancement failed"));
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig
+            {
+                LiteLlm = new LiteLlmConfig
+                {
+                    ContextWindowTokens = 100,
+                    DefaultModel = "gpt-4o-mini"
+                }
+            }),
+            NullLogger<TurnPipeline>.Instance,
+            responseEnhancer: responseEnhancer.Object);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Be("draft response");
+        response.Execution.Should().NotBeNull();
+        response.Execution!.ToolInvocationCount.Should().Be(0);
+        response.Execution.SuccessfulToolInvocations.Should().Be(0);
+
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        strategy.VerifyAll();
+        responseEnhancer.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_appends_system_notices_and_records_failed_tool_invocations_when_a_tool_throws()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+        var degradationPolicy = new Mock<IGracefulDegradationPolicy>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Review the latest plan",
+            SenderId = "user-tool-failure",
+            ChannelId = "signal",
+            SessionId = "session-tool-failure"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-tool-failure", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-tool-failure", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-tool-failure")))
+            .Returns(
+            [
+                new ToolDefinition
+                {
+                    Name = "flaky_tool",
+                    Description = "Fails when invoked",
+                    Handler = (_, _) => Task.FromException<ToolResult>(new InvalidOperationException("boom"))
+                }
+            ]);
+
+        degradationPolicy
+            .Setup(policy => policy.Evaluate())
+            .Returns(new GracefulDegradationDecision
+            {
+                Warnings = ["Model capacity is reduced", "Model capacity is reduced"]
+            });
+
+        AgentStrategyContext? capturedStrategyContext = null;
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .Returns<AgentStrategyContext, CancellationToken>(async (context, ct) =>
+            {
+                capturedStrategyContext = context;
+                var function = context.Tools!.Single().GetService<AIFunction>();
+                function.Should().NotBeNull();
+
+                if (function is not null)
+                {
+                    try
+                    {
+                        await function.InvokeAsync(
+                            new AIFunctionArguments(new Dictionary<string, object?>()),
+                            ct).ConfigureAwait(false);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                    }
+                }
+
+                context.ModelUsed = "gpt-4o";
+                return "Draft response";
+            });
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig
+            {
+                LiteLlm = new LiteLlmConfig
+                {
+                    ContextWindowTokens = 100,
+                    DefaultModel = "gpt-4o-mini"
+                }
+            }),
+            NullLogger<TurnPipeline>.Instance,
+            gracefulDegradationPolicy: degradationPolicy.Object);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Be(
+            $"Draft response{Environment.NewLine}{Environment.NewLine}System notices:{Environment.NewLine}- Model capacity is reduced");
+        response.Execution.Should().NotBeNull();
+        response.Execution!.ToolInvocationCount.Should().Be(1);
+        response.Execution.SuccessfulToolInvocations.Should().Be(0);
+        response.Execution.TaskStatus.Should().BeNull();
+        response.Execution.ModelUsed.Should().Be("gpt-4o");
+        capturedStrategyContext.Should().NotBeNull();
+        capturedStrategyContext!.Tools.Should().HaveCount(1);
+
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        degradationPolicy.VerifyAll();
+        strategy.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_records_cancelled_tool_invocations_and_recovers()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Continue the investigation",
+            SenderId = "user-tool-cancel",
+            ChannelId = "signal",
+            SessionId = "session-tool-cancel"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-tool-cancel", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-tool-cancel", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-tool-cancel")))
+            .Returns(
+            [
+                new ToolDefinition
+                {
+                    Name = "cancelled_tool",
+                    Description = "Cancels when invoked",
+                    Handler = (_, _) => Task.FromException<ToolResult>(new OperationCanceledException("cancelled"))
+                }
+            ]);
+
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .Returns<AgentStrategyContext, CancellationToken>(async (context, ct) =>
+            {
+                var function = context.Tools!.Single().GetService<AIFunction>();
+                function.Should().NotBeNull();
+
+                if (function is not null)
+                {
+                    try
+                    {
+                        await function.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>()), ct)
+                            .ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+
+                context.ModelUsed = "gpt-4o";
+                return "Recovered response";
+            });
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig
+            {
+                LiteLlm = new LiteLlmConfig
+                {
+                    ContextWindowTokens = 100,
+                    DefaultModel = "gpt-4o-mini"
                 }
             }),
             NullLogger<TurnPipeline>.Instance);
 
         var response = await pipeline.ProcessDetailedAsync(message);
 
-        response.Content.Should().Be("ack");
-        capturedStrategyContext.Should().NotBeNull();
-        capturedStrategyContext!.UserMessage.Should().Contain("Extracted content:");
-        capturedStrategyContext.UserMessage.Should().Contain("line one");
-        capturedStrategyContext.UserMessage.Should().Contain("line two");
+        response.Content.Should().Be("Recovered response");
+        response.Execution.Should().NotBeNull();
+        response.Execution!.ToolInvocationCount.Should().Be(1);
+        response.Execution.SuccessfulToolInvocations.Should().Be(0);
+        response.Execution.TaskStatus.Should().BeNull();
+
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        strategy.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ProcessDetailedAsync_ignores_invalid_task_status_directives()
+    {
+        var gatekeeper = new Mock<IContextGatekeeper>(MockBehavior.Strict);
+        var sessions = new Mock<ISessionStore>(MockBehavior.Strict);
+        var strategy = new Mock<IAgentStrategy>(MockBehavior.Strict);
+        var toolRegistry = new Mock<IToolRegistry>(MockBehavior.Strict);
+
+        var message = new LeanKernelMessage
+        {
+            Content = "Please continue",
+            SenderId = "user-task-status-invalid",
+            ChannelId = "signal",
+            SessionId = "session-task-status-invalid"
+        };
+
+        sessions
+            .Setup(store => store.AppendTurnAsync("session-task-status-invalid", It.IsAny<ConversationTurn>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        gatekeeper
+            .Setup(g => g.GateContextAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<ContextBudget>(), "session-task-status-invalid", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationContext { SystemPrompt = "Base policy" });
+
+        toolRegistry
+            .Setup(registry => registry.GetVisibleTools(It.Is<ToolVisibilityContext>(context => context.UserId == "user-task-status-invalid")))
+            .Returns(Array.Empty<ToolDefinition>());
+
+        strategy
+            .Setup(s => s.InvokeAsync(It.IsAny<AgentStrategyContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Work in progress.\n```task-status\n{\"status\":\"maybe\",\"note\":\"Nope\"}\n```");
+
+        var pipeline = new TurnPipeline(
+            gatekeeper.Object,
+            sessions.Object,
+            strategy.Object,
+            new PromptAssembler(new SimpleTokenEstimator(), NullLogger<PromptAssembler>.Instance),
+            toolRegistry.Object,
+            Options.Create(new LeanKernelConfig
+            {
+                LiteLlm = new LiteLlmConfig
+                {
+                    ContextWindowTokens = 100,
+                    DefaultModel = "gpt-4o-mini"
+                }
+            }),
+            NullLogger<TurnPipeline>.Instance);
+
+        var response = await pipeline.ProcessDetailedAsync(message);
+
+        response.Content.Should().Be("Work in progress.");
+        response.Execution.Should().NotBeNull();
+        response.Execution!.ToolInvocationCount.Should().Be(0);
+        response.Execution.SuccessfulToolInvocations.Should().Be(0);
+        response.Execution.TaskStatus.Should().BeNull();
+
+        sessions.VerifyAll();
+        gatekeeper.VerifyAll();
+        toolRegistry.VerifyAll();
+        strategy.VerifyAll();
     }
 }

@@ -99,6 +99,25 @@ The shipped appsettings examples define two disabled-by-default worker shapes:
 | `LeanKernel:Learning:ExtractionTemperature` | number | `0.1` | Low temperature used for fact extraction. |
 | `LeanKernel:Learning:MinTurnLengthForExtraction` | integer | `50` | Combined user+assistant text threshold before fact extraction runs. |
 
+## LeanKernel:Continuation
+
+| Key | Type | Gateway default | Description |
+| --- | --- | --- | --- |
+| `LeanKernel:Continuation:Enabled` | boolean | `true` | Enables automatic continuation of incomplete turns. |
+| `LeanKernel:Continuation:MaxAutoContinuations` | integer | `3` | Maximum synthetic follow-up rounds allowed for one turn. |
+| `LeanKernel:Continuation:MaxTotalDurationSeconds` | integer | `600` | Maximum wall-clock time allowed for one turn. |
+| `LeanKernel:Continuation:UseClassifier` | boolean | `false` | Enables the classifier fallback for ambiguous completion checks. |
+| `LeanKernel:Continuation:ContinuePhrases` | string array | empty | Optional extra completion phrases used by the heuristic detector. |
+
+### LeanKernel:Continuation:Progress
+
+| Key | Type | Gateway default | Description |
+| --- | --- | --- | --- |
+| `LeanKernel:Continuation:Progress:Enabled` | boolean | `true` | Enables user-visible progress updates during long turns. |
+| `LeanKernel:Continuation:Progress:InitialSilenceSeconds` | integer | `20` | Quiet period before the first progress update. |
+| `LeanKernel:Continuation:Progress:MinIntervalSeconds` | integer | `45` | Minimum interval between progress updates. |
+| `LeanKernel:Continuation:Progress:HeartbeatSeconds` | integer | `90` | Fallback interval used when no progress events arrive. |
+
 ## LeanKernel:Scheduler
 
 | Key | Type | Gateway default | Description |
@@ -214,6 +233,7 @@ OpenTelemetry export is configured at the top level, not under `LeanKernel:Harde
 
 - [Phase 1 Configuration](phase-1-config.md)
 - [Phase 2 Configuration](phase-2-config.md)
+- [Long-Running Tasks, Progress Updates, and Continuation](../features/long-running-tasks.md)
 - [Model Routing](../features/model-routing.md)
 - [Response Enhancement](../features/response-enhancement.md)
 - [Scheduler](../features/scheduler.md)

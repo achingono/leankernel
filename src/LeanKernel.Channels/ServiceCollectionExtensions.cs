@@ -1,6 +1,7 @@
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels;
@@ -22,6 +23,7 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(config);
 
         services.AddSingleton<IOptions<ChannelsConfig>>(Options.Create(config));
+        services.TryAddSingleton<IOptions<LeanKernelConfig>>(Options.Create(new LeanKernelConfig()));
         services.AddSingleton<IChannelRouter, ChannelRouter>();
         services.AddSingleton<ChannelAuthenticator>();
 

@@ -19,6 +19,10 @@ public sealed class LeanKernelMetrics : IDisposable
     private readonly Histogram<double> _requestsDuration;
     private readonly Counter<long> _requestErrors;
     private readonly Counter<long> _rateLimitRejected;
+    private readonly Counter<long> _continuationRounds;
+    private readonly Counter<long> _continuationTerminations;
+    private readonly Counter<long> _progressMessagesSent;
+    private readonly Counter<long> _typingRefreshes;
     private readonly object _sync = new();
     private decimal _dailySpendUsd;
     private decimal _monthlySpendUsd;
@@ -45,6 +49,10 @@ public sealed class LeanKernelMetrics : IDisposable
         _requestsDuration = _meter.CreateHistogram<double>("leankernel.requests.duration", "ms", "HTTP request duration");
         _requestErrors = _meter.CreateCounter<long>("leankernel.requests.errors", "errors", "HTTP request errors");
         _rateLimitRejected = _meter.CreateCounter<long>("leankernel.ratelimit.rejected", "requests", "Rate-limited requests");
+        _continuationRounds = _meter.CreateCounter<long>("leankernel.continuation.rounds", "rounds", "Auto-continuation rounds started");
+        _continuationTerminations = _meter.CreateCounter<long>("leankernel.continuation.terminations", "terminations", "Auto-continuation termination reasons");
+        _progressMessagesSent = _meter.CreateCounter<long>("leankernel.progress.messages", "messages", "Progress updates sent to channels");
+        _typingRefreshes = _meter.CreateCounter<long>("leankernel.typing.refreshes", "refreshes", "Typing indicator refresh calls");
         _meter.CreateObservableGauge("leankernel.spend.total_usd", ObserveSpendTotalUsd, "usd", "Current tracked spend totals");
         _meter.CreateObservableGauge("leankernel.providers.health", ObserveProviderHealth, description: "Provider health (1=healthy, 0=unhealthy)");
     }
@@ -138,6 +146,32 @@ public sealed class LeanKernelMetrics : IDisposable
     /// <param name="partitionKey">The rate-limit partition key.</param>
     public void RecordRateLimitRejected(string partitionKey) =>
         _rateLimitRejected.Add(1, new KeyValuePair<string, object?>("partition", partitionKey));
+
+    /// <summary>
+    /// Records a continuation round.
+    /// </summary>
+    public void RecordContinuationRound() => _continuationRounds.Add(1);
+
+    /// <summary>
+    /// Records a continuation termination reason.
+    /// </summary>
+    /// <param name="reason">The termination reason code.</param>
+    public void RecordContinuationTermination(string reason) =>
+        _continuationTerminations.Add(1, new KeyValuePair<string, object?>("reason", reason));
+
+    /// <summary>
+    /// Records a progress message dispatch.
+    /// </summary>
+    /// <param name="kind">The progress message kind.</param>
+    public void RecordProgressMessageSent(string kind) =>
+        _progressMessagesSent.Add(1, new KeyValuePair<string, object?>("kind", kind));
+
+    /// <summary>
+    /// Records a typing-indicator refresh attempt.
+    /// </summary>
+    /// <param name="channelId">The channel identifier.</param>
+    public void RecordTypingRefresh(string channelId) =>
+        _typingRefreshes.Add(1, new KeyValuePair<string, object?>("channel", channelId));
 
     /// <summary>
     /// Updates observable spend totals.

@@ -68,13 +68,15 @@ public class PostgresSessionStoreTests
             TurnId = "turn-1",
             Role = "user",
             Content = "Hello",
-            Timestamp = DateTimeOffset.Parse("2025-05-20T10:00:00Z")
+            Timestamp = DateTimeOffset.Parse("2025-05-20T10:00:00Z"),
+            Metadata = new Dictionary<string, string> { ["auto_continuation"] = "true" }
         });
 
         await using var db = await factory.CreateDbContextAsync();
         db.Turns.Should().ContainSingle();
         db.Turns.Single().Id.Should().Be("turn-1");
         db.Turns.Single().Content.Should().Be("Hello");
+        db.Turns.Single().Metadata.Should().Contain("auto_continuation");
         db.Sessions.Single().UpdatedAt.Should().BeAfter(session.UpdatedAt);
     }
 
@@ -107,6 +109,31 @@ public class PostgresSessionStoreTests
 
         history.Select(turn => turn.Content).Should().Equal("second", "third");
         history.Select(turn => turn.TurnId).Should().Equal("t2", "t3");
+    }
+
+    [Fact]
+    public async Task GetHistoryAsync_ignores_invalid_metadata_json()
+    {
+        var factory = CreateFactory();
+        await SeedAsync(factory, db =>
+        {
+            db.Sessions.Add(new SessionEntity { Id = "session-1", ChannelId = "channel-1", UserId = "user-1" });
+            db.Turns.Add(new TurnEntity
+            {
+                Id = "t1",
+                SessionId = "session-1",
+                Role = "assistant",
+                Content = "hello",
+                Timestamp = DateTimeOffset.Parse("2025-05-20T10:00:00Z"),
+                Metadata = "{not-json}"
+            });
+        });
+        var store = CreateStore(factory);
+
+        var history = await store.GetHistoryAsync("session-1", 10);
+
+        history.Should().ContainSingle();
+        history[0].Metadata.Should().BeNull();
     }
 
     [Fact]

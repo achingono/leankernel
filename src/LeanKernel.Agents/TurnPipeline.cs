@@ -57,9 +57,19 @@ public sealed class TurnPipeline : ITurnPipeline
 
     private static readonly Regex SignalAttachmentDirectiveRegex = new(
         "```signal-attachments\\s*(?<json>\\{[\\s\\S]*?\\})\\s*```",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        RegexOptions.Compiled | RegexOptions.IgnoreCase,
+        TimeSpan.FromMilliseconds(200));
+    private static readonly Regex TaskStatusDirectiveRegex = new(
+        "```task-status\\s*(?<json>\\{[\\s\\S]*?\\})\\s*```",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase,
+        TimeSpan.FromMilliseconds(200));
     private const int MaxPromptAttachmentCount = 4;
     private const int MaxPromptAttachmentTextChars = 3000;
+    private const int MaxTaskStatusDirectivePayloadChars = 2048;
+    private const string InternalTurnMetadataKey = "internal_turn";
+    private const string InternalReasonMetadataKey = "internal_reason";
+    private const string AutoContinuationPromptReason = "auto_continuation_prompt";
+    private const string AutoContinuationMetadataKey = "auto_continuation";
 
     private readonly IContextGatekeeper _gatekeeper;
     private readonly ISessionStore _sessions;
@@ -82,6 +92,7 @@ public sealed class TurnPipeline : ITurnPipeline
     private readonly TaskComplexityScorer? _taskComplexityScorer;
     private readonly PolicyModelSelector? _policyModelSelector;
     private readonly IToolSelector _toolSelector;
+    private readonly ITurnProgressBroker? _turnProgressBroker;
 
     public TurnPipeline(
         IContextGatekeeper gatekeeper,
@@ -104,7 +115,8 @@ public sealed class TurnPipeline : ITurnPipeline
         IProviderHealthTracker? providerHealthTracker = null,
         TaskComplexityScorer? taskComplexityScorer = null,
         PolicyModelSelector? policyModelSelector = null,
-        IToolSelector? toolSelector = null)
+        IToolSelector? toolSelector = null,
+        ITurnProgressBroker? turnProgressBroker = null)
     {
         ArgumentNullException.ThrowIfNull(gatekeeper);
         ArgumentNullException.ThrowIfNull(sessions);
@@ -135,6 +147,7 @@ public sealed class TurnPipeline : ITurnPipeline
         _taskComplexityScorer = taskComplexityScorer;
         _policyModelSelector = policyModelSelector;
         _toolSelector = toolSelector ?? NullToolSelector.Instance;
+        _turnProgressBroker = turnProgressBroker;
     }
 
     public async Task<string> ProcessAsync(LeanKernelMessage message, CancellationToken ct = default)
@@ -150,6 +163,7 @@ public sealed class TurnPipeline : ITurnPipeline
             : await _sessions.GetOrCreateSessionIdAsync(message.ChannelId, message.SenderId, ct).ConfigureAwait(false);
         var turnId = ResolveTurnId(message.Metadata);
         var turnScopedMessage = CreateTurnScopedMessage(message, sessionId, turnId);
+        var progressTurnId = ResolveProgressTurnId(turnScopedMessage.Metadata, turnId);
         TurnToolInvocationTracker? toolInvocationTracker = null;
         IReadOnlyList<ToolDefinition>? visibleToolsForLogging = null;
         using var turnActivity = _diagnosticsCollector?.StartTurnActivity(sessionId, turnId);
@@ -170,7 +184,7 @@ public sealed class TurnPipeline : ITurnPipeline
             visibleTools = FilterToolsForChannel(turnScopedMessage, visibleTools);
             visibleToolsForLogging = visibleTools;
             toolInvocationTracker = new TurnToolInvocationTracker();
-            visibleTools = WrapToolsForTurn(visibleTools, turnId, sessionId, toolInvocationTracker);
+            visibleTools = WrapToolsForTurn(visibleTools, turnId, progressTurnId, sessionId, toolInvocationTracker);
 
             LogToolAvailability(turnId, sessionId, visibleTools);
             var visibleToolNames = MergeToolNames(gatedContext.ActiveToolNames, visibleTools.Select(tool => tool.Name));
@@ -272,7 +286,11 @@ public sealed class TurnPipeline : ITurnPipeline
             }
 
             response = AppendWarnings(response, warnings);
-            var finalResponse = BuildFinalResponse(response, turnScopedMessage.Attachments);
+            var finalResponse = BuildFinalResponse(
+                response,
+                turnScopedMessage.Attachments,
+                toolInvocationTracker,
+                strategyContext.ModelUsed ?? _config.LiteLlm.DefaultModel);
             response = finalResponse.Content;
 
             var assistantTimestamp = DateTimeOffset.UtcNow;
@@ -303,13 +321,19 @@ public sealed class TurnPipeline : ITurnPipeline
 
     private async Task AppendUserTurnAsync(LeanKernelMessage turnScopedMessage, string sessionId, CancellationToken ct)
     {
+        if (IsInternalContinuationPrompt(turnScopedMessage.Metadata))
+        {
+            return;
+        }
+
         await _sessions.AppendTurnAsync(
             sessionId,
             new ConversationTurn
             {
                 Role = "user",
                 Content = turnScopedMessage.Content,
-                Timestamp = turnScopedMessage.Timestamp
+                Timestamp = turnScopedMessage.Timestamp,
+                Metadata = turnScopedMessage.Metadata,
             },
             ct).ConfigureAwait(false);
     }
@@ -420,6 +444,7 @@ public sealed class TurnPipeline : ITurnPipeline
     private IReadOnlyList<ToolDefinition> WrapToolsForTurn(
         IReadOnlyList<ToolDefinition> tools,
         string turnId,
+        string progressTurnId,
         string sessionId,
         TurnToolInvocationTracker tracker)
     {
@@ -455,6 +480,16 @@ public sealed class TurnPipeline : ITurnPipeline
                         toolName,
                         SummarizeArguments(arguments));
 
+                    await PublishProgressAsync(
+                        new TurnProgressUpdate(
+                            sessionId,
+                            progressTurnId,
+                            TurnProgressKind.ToolStarted,
+                            toolName,
+                            Message: null,
+                            DateTimeOffset.UtcNow),
+                        cancellationToken).ConfigureAwait(false);
+
                     try
                     {
                         var result = await originalHandler(arguments, cancellationToken).ConfigureAwait(false);
@@ -483,6 +518,16 @@ public sealed class TurnPipeline : ITurnPipeline
                                 durationMs,
                                 Truncate(result.Error, 320));
                         }
+
+                        await PublishProgressAsync(
+                            new TurnProgressUpdate(
+                                sessionId,
+                                progressTurnId,
+                                TurnProgressKind.ToolCompleted,
+                                toolName,
+                                result.Success ? $"Completed {toolName}." : $"{toolName} returned an error.",
+                                DateTimeOffset.UtcNow),
+                            cancellationToken).ConfigureAwait(false);
 
                         return result;
                     }
@@ -645,6 +690,27 @@ public sealed class TurnPipeline : ITurnPipeline
         return value.Length <= maxLength
             ? value
             : value[..maxLength] + "...";
+    }
+
+    private async Task PublishProgressAsync(TurnProgressUpdate update, CancellationToken ct)
+    {
+        if (_turnProgressBroker is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _turnProgressBroker.PublishAsync(update, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            // Progress publish errors are intentionally isolated from turn execution.
+        }
     }
 
     private async Task StoreContextDiagnosticsAsync(string sessionId, string turnId, ConversationContext context, ContextBudget budget, CancellationToken ct)
@@ -980,6 +1046,58 @@ public sealed class TurnPipeline : ITurnPipeline
         return Guid.NewGuid().ToString();
     }
 
+    private static string ResolveProgressTurnId(IReadOnlyDictionary<string, string>? metadata, string fallbackTurnId)
+    {
+        if (metadata is not null)
+        {
+            if (metadata.TryGetValue("root_turn_id", out var rootTurnId) && !string.IsNullOrWhiteSpace(rootTurnId))
+            {
+                return rootTurnId.Trim();
+            }
+
+            if (metadata.TryGetValue("rootTurnId", out rootTurnId) && !string.IsNullOrWhiteSpace(rootTurnId))
+            {
+                return rootTurnId.Trim();
+            }
+        }
+
+        return fallbackTurnId;
+    }
+
+    private static bool IsInternalContinuationPrompt(IReadOnlyDictionary<string, string>? metadata)
+    {
+        if (metadata is null)
+        {
+            return false;
+        }
+
+        var hasExplicitInternalMarker = TryGetTrueMetadataValue(metadata, InternalTurnMetadataKey)
+            && metadata.TryGetValue(InternalReasonMetadataKey, out var reason)
+            && string.Equals(reason, AutoContinuationPromptReason, StringComparison.OrdinalIgnoreCase);
+
+        if (hasExplicitInternalMarker)
+        {
+            return true;
+        }
+
+        return TryGetTrueMetadataValue(metadata, AutoContinuationMetadataKey);
+    }
+
+    private static bool TryGetTrueMetadataValue(IReadOnlyDictionary<string, string> metadata, string key)
+    {
+        if (!metadata.TryGetValue(key, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
+        {
+            return false;
+        }
+
+        if (bool.TryParse(rawValue, out var boolValue))
+        {
+            return boolValue;
+        }
+
+        return string.Equals(rawValue.Trim(), "1", StringComparison.Ordinal);
+    }
+
     private static IReadOnlyList<string> MergeToolNames(
         IReadOnlyList<string> existingToolNames,
         IEnumerable<string> visibleToolNames)
@@ -1108,21 +1226,21 @@ public sealed class TurnPipeline : ITurnPipeline
         }
 
         var extension = ResolveAttachmentExtension(attachment);
-        var tempRoot = _config.FileSystem.ScratchRoot;
-        if (string.IsNullOrWhiteSpace(tempRoot))
-        {
-            tempRoot = Path.GetTempPath();
-        }
+        var tempRoot = Path.Combine(_config.FileSystem.AllowedRoot, ".scratch", "incoming-attachments", "extraction");
 
         try
         {
             Directory.CreateDirectory(tempRoot);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogDebug(
+                ex,
+                "Failed to create temp directory for attachment text extraction: {TempRoot}",
+                tempRoot);
             tempRoot = Path.GetTempPath();
-            Directory.CreateDirectory(tempRoot);
         }
+
         var tempPath = Path.Combine(tempRoot, $"channel-attachment-{Guid.NewGuid():N}{extension}");
 
         try
@@ -1250,42 +1368,111 @@ public sealed class TurnPipeline : ITurnPipeline
         return normalized[..MaxPromptAttachmentTextChars] + "\n\n[Attachment content truncated for prompt budget.]";
     }
 
-    private AgentResponse BuildFinalResponse(string rawResponse, IReadOnlyList<Attachment>? incomingAttachments)
+    private AgentResponse BuildFinalResponse(
+        string rawResponse,
+        IReadOnlyList<Attachment>? incomingAttachments,
+        TurnToolInvocationTracker? tracker,
+        string? modelUsed)
     {
+        var content = rawResponse ?? string.Empty;
+        var taskStatus = TryParseTaskStatusDirective(ref content);
+
+        var attachments = default(List<Attachment>);
+
+        var match = SignalAttachmentDirectiveRegex.Match(content);
+        if (match.Success)
+        {
+            content = SignalAttachmentDirectiveRegex.Replace(content, string.Empty, 1).TrimEnd();
+            if (incomingAttachments is not { Count: > 0 })
+            {
+                _logger.LogWarning("Signal attachment directive was ignored because no incoming attachments were present");
+            }
+            else
+            {
+                try
+                {
+                    var directive = JsonSerializer.Deserialize<SignalAttachmentDirective>(
+                        match.Groups["json"].Value,
+                        new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                    attachments = ResolveResponseAttachments(directive, incomingAttachments);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse signal-attachments directive; sending text-only response");
+                }
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(rawResponse))
         {
-            return new AgentResponse { Content = rawResponse };
+            return new AgentResponse
+            {
+                Content = rawResponse?.Trim() ?? string.Empty,
+                Execution = new TurnExecutionInfo(
+                    tracker?.TotalInvocations ?? 0,
+                    tracker?.SuccessfulInvocations ?? 0,
+                    taskStatus,
+                    modelUsed),
+            };
         }
 
-        var match = SignalAttachmentDirectiveRegex.Match(rawResponse);
+        return new AgentResponse
+        {
+            Content = content.TrimEnd(),
+            Attachments = attachments is { Count: > 0 } ? attachments : null,
+            Execution = new TurnExecutionInfo(
+                tracker?.TotalInvocations ?? 0,
+                tracker?.SuccessfulInvocations ?? 0,
+                taskStatus,
+                modelUsed),
+        };
+    }
+
+    private TaskStatusDirective? TryParseTaskStatusDirective(ref string content)
+    {
+        var match = TaskStatusDirectiveRegex.Match(content);
         if (!match.Success)
         {
-            return new AgentResponse { Content = rawResponse.TrimEnd() };
+            return null;
         }
 
-        var content = SignalAttachmentDirectiveRegex.Replace(rawResponse, string.Empty, 1).TrimEnd();
-        if (incomingAttachments is not { Count: > 0 })
+        content = TaskStatusDirectiveRegex.Replace(content, string.Empty, 1).TrimEnd();
+        var payload = match.Groups["json"].Value;
+        if (payload.Length > MaxTaskStatusDirectivePayloadChars)
         {
-            _logger.LogWarning("Signal attachment directive was ignored because no incoming attachments were present");
-            return new AgentResponse { Content = content };
+            _logger.LogWarning("Ignored task-status directive because payload exceeded limit ({Length})", payload.Length);
+            return null;
         }
 
         try
         {
-            var directive = JsonSerializer.Deserialize<SignalAttachmentDirective>(
-                match.Groups["json"].Value,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            var responseAttachments = ResolveResponseAttachments(directive, incomingAttachments);
-            return new AgentResponse
+            using var document = JsonDocument.Parse(payload);
+            var root = document.RootElement;
+            if (!root.TryGetProperty("status", out var statusElement)
+                || statusElement.ValueKind != JsonValueKind.String)
             {
-                Content = content,
-                Attachments = responseAttachments.Count == 0 ? null : responseAttachments,
-            };
+                return null;
+            }
+
+            var status = statusElement.GetString()?.Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(status) || status is not ("complete" or "in_progress" or "blocked"))
+            {
+                return null;
+            }
+
+            string? note = null;
+            if (root.TryGetProperty("note", out var noteElement)
+                && noteElement.ValueKind == JsonValueKind.String)
+            {
+                note = noteElement.GetString();
+            }
+
+            return new TaskStatusDirective(status, string.IsNullOrWhiteSpace(note) ? null : note.Trim());
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to parse signal-attachments directive; sending text-only response");
-            return new AgentResponse { Content = content };
+            _logger.LogWarning(ex, "Failed to parse task-status directive");
+            return null;
         }
     }
 

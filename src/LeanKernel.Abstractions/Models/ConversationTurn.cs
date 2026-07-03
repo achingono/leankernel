@@ -34,4 +34,9 @@ public sealed record ConversationTurn
     /// Gets or sets the ID of the turn that was used as a source for compaction.
     /// </summary>
     public string? CompactionSourceId { get; init; }
+
+    /// <summary>
+    /// Gets optional metadata associated with the turn.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Metadata { get; init; }
 }

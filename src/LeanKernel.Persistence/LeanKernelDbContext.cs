@@ -64,6 +64,7 @@ public sealed class LeanKernelDbContext(DbContextOptions<LeanKernelDbContext> op
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => x.SessionId);
             entity.HasIndex(x => x.Timestamp);
+            entity.Property(x => x.Metadata).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<CapabilityGapEntity>(entity =>

@@ -16,9 +16,35 @@ public sealed class ChannelsConfig
     public SignalChannelConfig Signal { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets typing indicator behavior for channel turns.
+    /// </summary>
+    public TypingConfig Typing { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the list of channel authentication configurations.
     /// </summary>
     public List<ChannelAuthConfig> ChannelAuth { get; set; } = [];
+}
+
+/// <summary>
+/// Configuration settings for channel typing indicators.
+/// </summary>
+public sealed class TypingConfig
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether typing keepalive is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the interval in seconds between typing keepalive refreshes.
+    /// </summary>
+    public int KeepAliveSeconds { get; set; } = 8;
+
+    /// <summary>
+    /// Gets or sets the timeout in seconds used for stop-typing cleanup.
+    /// </summary>
+    public int StopTimeoutSeconds { get; set; } = 5;
 }
 
 /// <summary>
@@ -34,7 +60,7 @@ public sealed class SignalChannelConfig
     /// <summary>
     /// Gets or sets the daemon URL.
     /// </summary>
-    public string DaemonUrl { get; set; } = "http://signal:8080";
+    public string DaemonUrl { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the phone number.

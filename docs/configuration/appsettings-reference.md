@@ -11,6 +11,7 @@ Gateway runtime defaults are defined in appsettings files.
 
 - API key auth is optional by default (`LeanKernel:Gateway:ApiKey` empty).
 - Diagnostics and context diagnostics are enabled by default.
+- Channel typing keepalive and continuation are enabled by default.
 - Hardening rate limit is enabled by default.
 - Spend guard is disabled by default.
 

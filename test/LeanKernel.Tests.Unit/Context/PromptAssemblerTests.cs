@@ -17,7 +17,8 @@ public class PromptAssemblerTests
             SystemPrompt = "Base policy"
         });
 
-        systemMessage.Should().Be("Base policy");
+        systemMessage.Should().StartWith("Base policy");
+        systemMessage.Should().Contain("## Task Status Directive");
     }
 
     [Fact]
@@ -60,11 +61,13 @@ public class PromptAssemblerTests
         systemMessage.Should().Contain("## Retrieved Context");
         systemMessage.Should().Contain("- [gbrain:doc-1] Atlas shipped");
         systemMessage.Should().Contain("## Available Tools: search, notes");
+        systemMessage.Should().Contain("## Task Status Directive");
         systemMessage.IndexOf("Base policy", StringComparison.Ordinal).Should().BeLessThan(systemMessage.IndexOf("## Identity Context", StringComparison.Ordinal));
         systemMessage.IndexOf("## Identity Context", StringComparison.Ordinal).Should().BeLessThan(systemMessage.IndexOf("## Onboarding Guidance", StringComparison.Ordinal));
         systemMessage.IndexOf("## Onboarding Guidance", StringComparison.Ordinal).Should().BeLessThan(systemMessage.IndexOf("## Relevant Knowledge", StringComparison.Ordinal));
         systemMessage.IndexOf("## Relevant Knowledge", StringComparison.Ordinal).Should().BeLessThan(systemMessage.IndexOf("## Retrieved Context", StringComparison.Ordinal));
         systemMessage.IndexOf("## Retrieved Context", StringComparison.Ordinal).Should().BeLessThan(systemMessage.IndexOf("## Available Tools", StringComparison.Ordinal));
+        systemMessage.IndexOf("## Available Tools", StringComparison.Ordinal).Should().BeLessThan(systemMessage.IndexOf("## Task Status Directive", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Persistence.Entities;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -13,6 +14,8 @@ public sealed class PostgresSessionStore(
     IDbContextFactory<LeanKernelDbContext> dbFactory,
     ILogger<PostgresSessionStore> logger) : ISessionStore
 {
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+
     private readonly IDbContextFactory<LeanKernelDbContext> _dbFactory = dbFactory ?? throw new ArgumentNullException(nameof(dbFactory));
     private readonly ILogger<PostgresSessionStore> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -116,6 +119,9 @@ public sealed class PostgresSessionStore(
             Timestamp = turn.Timestamp,
             IsCompacted = turn.IsCompacted,
             CompactionSourceId = turn.CompactionSourceId,
+            Metadata = turn.Metadata is null
+                ? null
+                : JsonSerializer.Serialize(turn.Metadata, JsonOptions),
         };
 
         db.Turns.Add(entity);
@@ -174,7 +180,39 @@ public sealed class PostgresSessionStore(
                 TurnId = t.Id,
                 IsCompacted = t.IsCompacted,
                 CompactionSourceId = t.CompactionSourceId,
+                Metadata = ParseMetadata(t.Metadata, _logger),
             })
             .ToList();
+    }
+
+    private static IReadOnlyDictionary<string, string>? ParseMetadata(string? metadata, ILogger logger)
+    {
+        if (string.IsNullOrWhiteSpace(metadata))
+        {
+            return null;
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(metadata, JsonOptions);
+            return parsed is null
+                ? null
+                : new Dictionary<string, string>(parsed, StringComparer.OrdinalIgnoreCase);
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(ex, "Failed to deserialize turn metadata.");
+            return null;
+        }
+        catch (NotSupportedException ex)
+        {
+            logger.LogWarning(ex, "Unsupported turn metadata payload encountered.");
+            return null;
+        }
+    }
+
+    private static JsonSerializerOptions CreateJsonOptions()
+    {
+        return new JsonSerializerOptions(JsonSerializerDefaults.Web);
     }
 }

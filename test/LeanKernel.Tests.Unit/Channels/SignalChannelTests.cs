@@ -227,6 +227,29 @@ public class SignalChannelTests
     }
 
     [Fact]
+    public async Task SendAsync_throws_when_the_signal_daemon_returns_an_error_response()
+    {
+        var handler = new RecordingHttpMessageHandler((_, _) => new HttpResponseMessage(HttpStatusCode.InternalServerError)
+        {
+            Content = new StringContent("failure")
+        });
+        var channel = CreateChannel(handler, new ChannelsConfig
+        {
+            Signal = new SignalChannelConfig
+            {
+                Enabled = true,
+                PhoneNumber = "+15550001"
+            }
+        });
+
+        var act = () => channel.SendAsync("+15550002", "reply message");
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+        handler.RequestUris.Should().ContainSingle();
+        handler.RequestUris[0].AbsolutePath.Should().Be("/v2/send");
+    }
+
+    [Fact]
     public async Task StartTypingAsync_and_StopTypingAsync_use_the_signal_typing_indicator_endpoint()
     {
         var handler = new RecordingHttpMessageHandler((_, _) => CreateJsonResponse(new { timestamp = 123L }));
@@ -325,10 +348,17 @@ public class SignalChannelTests
     }
 
     private static SignalChannel CreateChannel(HttpMessageHandler handler, ChannelsConfig config)
-        => new(
+    {
+        if (string.IsNullOrWhiteSpace(config.Signal.DaemonUrl))
+        {
+            config.Signal.DaemonUrl = "http://localhost:8080";
+        }
+
+        return new SignalChannel(
             new StubHttpClientFactory(new HttpClient(handler) { BaseAddress = new Uri(config.Signal.DaemonUrl) }),
             Options.Create(config),
             NullLogger<SignalChannel>.Instance);
+    }
 
     private static HttpResponseMessage CreateJsonResponse(object payload)
         => new(HttpStatusCode.OK)

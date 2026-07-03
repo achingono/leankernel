@@ -1,6 +1,7 @@
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Persistence;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +20,10 @@ public sealed class ChatService(
 
     public const string ChannelPrefix = "blazor";
     private const int MaxHistoryTurns = 100;
+    private const string InternalTurnMetadataKey = "internal_turn";
+    private const string InternalReasonMetadataKey = "internal_reason";
+    private const string InternalContinuationReason = "auto_continuation_prompt";
+    private const string AutoContinuationMetadataKey = "auto_continuation";
 
     private readonly IAgentRuntime _agentRuntime = agentRuntime ?? throw new ArgumentNullException(nameof(agentRuntime));
     private readonly ISessionStore _sessionStore = sessionStore ?? throw new ArgumentNullException(nameof(sessionStore));
@@ -366,13 +371,22 @@ public sealed class ChatService(
     private async Task LoadHistoryAsync(string sessionId, CancellationToken ct)
     {
         var turns = await _sessionStore.GetHistoryAsync(sessionId, MaxHistoryTurns, ct).ConfigureAwait(false);
+        var visibleTurns = turns
+            .Where(turn => !IsInternalContinuationPrompt(turn))
+            .ToList();
         var compactionKinds = await LoadCompactionKindsAsync(sessionId, ct).ConfigureAwait(false);
 
         Messages.Clear();
-        Messages.AddRange(turns.Select(turn => MapTurn(turn, compactionKinds)));
+        Messages.AddRange(visibleTurns.Select(turn => MapTurn(turn, compactionKinds)));
 
         var channelId = CurrentChannelId ?? await ResolveChannelIdAsync(sessionId, ct).ConfigureAwait(false);
-        TouchSession(sessionId, channelId, turns.LastOrDefault()?.Content, turns.LastOrDefault()?.Timestamp ?? DateTimeOffset.UtcNow, turns);
+        var previewTurn = visibleTurns.LastOrDefault();
+        TouchSession(
+            sessionId,
+            channelId,
+            previewTurn?.Content,
+            previewTurn?.Timestamp ?? turns.LastOrDefault()?.Timestamp ?? DateTimeOffset.UtcNow,
+            visibleTurns);
     }
 
     private async Task RefreshSessionsAsync(CancellationToken ct)
@@ -421,17 +435,25 @@ public sealed class ChatService(
                     turn.Role,
                     turn.Content,
                     turn.Timestamp,
-                    turn.Id))
+                    turn.Id,
+                    turn.Metadata))
                 .ToListAsync(ct)
                 .ConfigureAwait(false);
 
-            var latestTurnLookup = turnSnapshots
+            var latestVisibleTurnLookup = turnSnapshots
                 .GroupBy(turn => turn.SessionId, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .Where(turn => !IsInternalContinuationPrompt(turn.Metadata))
+                        .OrderByDescending(turn => turn.Timestamp)
+                        .ThenByDescending(turn => turn.TurnId, StringComparer.Ordinal)
+                        .FirstOrDefault(),
+                    StringComparer.Ordinal);
 
             var mergedSessions = persistedSessions.Select(session =>
             {
-                latestTurnLookup.TryGetValue(session.SessionId, out var latestTurn);
+                latestVisibleTurnLookup.TryGetValue(session.SessionId, out var latestTurn);
                 return BuildSessionSummary(session, latestTurn);
             });
 
@@ -641,6 +663,7 @@ public sealed class ChatService(
     {
         var userTurn = turns?
             .FirstOrDefault(turn => string.Equals(turn.Role, "user", StringComparison.OrdinalIgnoreCase)
+                && !IsInternalContinuationPrompt(turn)
                 && !string.IsNullOrWhiteSpace(turn.Content))
             ?.Content;
 
@@ -681,7 +704,77 @@ public sealed class ChatService(
         string Role,
         string Content,
         DateTimeOffset Timestamp,
-        string TurnId);
+        string TurnId,
+        string? Metadata);
+
+    private static bool IsInternalContinuationPrompt(ConversationTurn turn)
+    {
+        ArgumentNullException.ThrowIfNull(turn);
+        return IsInternalContinuationPrompt(turn.Metadata);
+    }
+
+    private static bool IsInternalContinuationPrompt(IReadOnlyDictionary<string, string>? metadata)
+    {
+        if (metadata is null)
+        {
+            return false;
+        }
+
+        var hasExplicitMarker = IsTrueMetadataValue(metadata, InternalTurnMetadataKey)
+            && metadata.TryGetValue(InternalReasonMetadataKey, out var reason)
+            && string.Equals(reason, InternalContinuationReason, StringComparison.OrdinalIgnoreCase);
+
+        if (hasExplicitMarker)
+        {
+            return true;
+        }
+
+        return IsTrueMetadataValue(metadata, AutoContinuationMetadataKey);
+    }
+
+    private static bool IsInternalContinuationPrompt(string? metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+        {
+            return false;
+        }
+
+        try
+        {
+            var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
+            if (metadata is null)
+            {
+                return false;
+            }
+
+            var normalizedMetadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, value) in metadata)
+            {
+                normalizedMetadata[key] = value;
+            }
+
+            return IsInternalContinuationPrompt(normalizedMetadata);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsTrueMetadataValue(IReadOnlyDictionary<string, string> metadata, string key)
+    {
+        if (!metadata.TryGetValue(key, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
+        {
+            return false;
+        }
+
+        if (bool.TryParse(rawValue, out var boolValue))
+        {
+            return boolValue;
+        }
+
+        return string.Equals(rawValue.Trim(), "1", StringComparison.Ordinal);
+    }
 }
 
 /// <summary>

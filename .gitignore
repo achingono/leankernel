@@ -87,3 +87,4 @@ playwright-report/
 
 # OpenCode
 .opencode/
+.github/actions/test-reporter/node_modules/

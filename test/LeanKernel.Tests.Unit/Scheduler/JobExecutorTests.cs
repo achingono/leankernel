@@ -1,4 +1,5 @@
 using FluentAssertions;
+using System.Reflection;
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
@@ -255,7 +256,7 @@ public class JobExecutorTests
             .ReturnsAsync(new KnowledgePage
             {
                 Key = key,
-                Content = "# Learned Fact\n\nI work best in the mornings.\n\n- Session: session-c\n- Turn: turn-9\n- RecordedAt: 2025-05-18T00:00:00Z",
+                Content = "# Learned Fact\n\nI work best in the mornings.\n\n- Session: session-c\n- Turn: turn-9\n- RecordedAt: 2025-05-18T00:00:00Z\n- Supersedes: learning/facts/session-c/turn-8/01\n- SupersededBy: learning/facts/session-c/turn-10/01",
             });
         knowledge
             .Setup(candidate => candidate.PutPageAsync(
@@ -264,7 +265,9 @@ public class JobExecutorTests
                     content.Contains("# Learned Fact", StringComparison.Ordinal) &&
                     content.Contains("## 5W1H", StringComparison.Ordinal) &&
                     content.Contains("- What: I work best in the mornings.", StringComparison.Ordinal) &&
-                    content.Contains("- Session: session-c", StringComparison.Ordinal)),
+                    content.Contains("- Session: session-c", StringComparison.Ordinal) &&
+                    content.Contains("- Supersedes: learning/facts/session-c/turn-8/01", StringComparison.Ordinal) &&
+                    content.Contains("- SupersededBy: learning/facts/session-c/turn-10/01", StringComparison.Ordinal)),
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
@@ -453,6 +456,115 @@ public class JobExecutorTests
         execution.Error.Should().Contain("Unsupported scheduled job type");
         await using var db = await factory.CreateDbContextAsync();
         db.ScheduledJobExecutions.Should().ContainSingle(entity => !entity.Success && entity.JobName == "bad-job");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_skips_jobs_when_the_required_boundary_does_not_match()
+    {
+        var runtime = new Mock<IAgentRuntime>(MockBehavior.Strict);
+        var knowledge = new Mock<IKnowledgeService>(MockBehavior.Strict);
+        var factory = CreateFactory();
+        var timeProvider = new TestTimeProvider(DateTimeOffset.Parse("2025-05-20T08:00:00Z"));
+        var executor = CreateExecutor(runtime.Object, knowledge.Object, factory, timeProvider);
+        var job = new ScheduledJobDefinition
+        {
+            Name = "boundary-gated",
+            CronExpression = "0 8 * * *",
+            JobType = "agent-prompt",
+            Prompt = "Provide a summary",
+            Parameters = new Dictionary<string, string>
+            {
+                ["required_boundary"] = "Afternoon",
+            }
+        };
+
+        var execution = await executor.ExecuteAsync(job, DateTimeOffset.Parse("2025-05-20T08:00:00Z"));
+
+        execution.Success.Should().BeTrue();
+        execution.Result.Should().Contain("Skipped job 'boundary-gated'");
+        runtime.Verify(candidate => candidate.RunTurnAsync(It.IsAny<LeanKernelMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+        knowledge.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void Private_helper_methods_handle_empty_and_invalid_inputs()
+    {
+        var executorType = typeof(JobExecutor);
+
+        var createFactSnapshot = executorType.GetMethod("CreateFactSnapshot", BindingFlags.NonPublic | BindingFlags.Static);
+        createFactSnapshot.Should().NotBeNull();
+        createFactSnapshot!.Invoke(null, [new KnowledgePage { Key = "learning/facts/session-1/turn-1/01", Content = string.Empty }]).Should().BeNull();
+        createFactSnapshot.Invoke(null, [new KnowledgePage { Key = "learning/facts/session-1/turn-1/01", Content = "No learned fact here." }]).Should().BeNull();
+
+        var tryGetSegment = executorType.GetMethod("TryGetSegmentFromFactKey", BindingFlags.NonPublic | BindingFlags.Static);
+        tryGetSegment.Should().NotBeNull();
+        var segmentArgs = new object?[] { "learning/facts", 3 };
+        tryGetSegment!.Invoke(null, segmentArgs).Should().BeNull();
+        tryGetSegment.Invoke(null, ["learning/facts/session-1/turn-1/01", 3]).Should().Be("turn-1");
+
+        var normalizeFactText = executorType.GetMethod("NormalizeFactText", BindingFlags.NonPublic | BindingFlags.Static);
+        normalizeFactText.Should().NotBeNull();
+        normalizeFactText!.Invoke(null, ["   \n\t  "]).Should().Be(string.Empty);
+
+        var extractListMetadata = executorType.GetMethod("ExtractListMetadata", BindingFlags.NonPublic | BindingFlags.Static);
+        extractListMetadata.Should().NotBeNull();
+        var listResult = (IReadOnlyList<string>)extractListMetadata!.Invoke(null, [new[] { "- Supersedes: one, one, two" }, "- Supersedes:"])!;
+        listResult.Should().Equal("one", "two");
+        var emptyListResult = (IReadOnlyList<string>)extractListMetadata.Invoke(null, [Array.Empty<string>(), "- Supersedes:"])!;
+        emptyListResult.Should().BeEmpty();
+
+        var extractTimestampMetadata = executorType.GetMethod("ExtractTimestampMetadata", BindingFlags.NonPublic | BindingFlags.Static);
+        extractTimestampMetadata.Should().NotBeNull();
+        extractTimestampMetadata!.Invoke(null, [new[] { "- Other: value" }, "- RecordedAt:"]).Should().BeNull();
+        extractTimestampMetadata!.Invoke(null, [new[] { "- RecordedAt: not-a-date" }, "- RecordedAt:"]).Should().BeNull();
+
+        var tryExtractJsonObject = executorType.GetMethod("TryExtractJsonObject", BindingFlags.NonPublic | BindingFlags.Static);
+        tryExtractJsonObject.Should().NotBeNull();
+        var jsonArgs = new object?[] { "{\"a\":1}", null };
+        ((bool)tryExtractJsonObject!.Invoke(null, jsonArgs)!).Should().BeTrue();
+        jsonArgs[1].Should().Be("{\"a\":1}");
+        var wrappedJsonArgs = new object?[] { "prefix {\"a\":1} suffix", null };
+        ((bool)tryExtractJsonObject.Invoke(null, wrappedJsonArgs)!).Should().BeTrue();
+        wrappedJsonArgs[1].Should().Be("{\"a\":1}");
+        var noJsonArgs = new object?[] { "not json", null };
+        ((bool)tryExtractJsonObject.Invoke(null, noJsonArgs)!).Should().BeFalse();
+        noJsonArgs[1].Should().Be(string.Empty);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_records_cancellations_for_agent_prompt_jobs()
+    {
+        var runtime = new Mock<IAgentRuntime>(MockBehavior.Strict);
+        var knowledge = new Mock<IKnowledgeService>(MockBehavior.Strict);
+        var factory = CreateFactory();
+        var timeProvider = new TestTimeProvider(DateTimeOffset.Parse("2025-05-20T08:00:00Z"));
+        var cts = new CancellationTokenSource();
+
+        runtime
+            .Setup(candidate => candidate.RunTurnAsync(
+                It.IsAny<LeanKernelMessage>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<LeanKernelMessage, CancellationToken>((_, token) => Task.FromCanceled<string>(token));
+
+        var executor = CreateExecutor(runtime.Object, knowledge.Object, factory, timeProvider);
+        var job = new ScheduledJobDefinition
+        {
+            Name = "cancelled-job",
+            CronExpression = "0 8 * * *",
+            JobType = "agent-prompt",
+            Prompt = "Provide a summary",
+            ChannelId = "scheduler",
+            UserId = "system",
+        };
+
+        cts.Cancel();
+        var execution = await executor.ExecuteAsync(job, DateTimeOffset.Parse("2025-05-20T08:00:00Z"), cts.Token);
+
+        execution.Success.Should().BeFalse();
+        execution.Error.Should().Be("The scheduled job was cancelled.");
+        runtime.VerifyAll();
+        await using var db = await factory.CreateDbContextAsync();
+        db.ScheduledJobExecutions.Should().ContainSingle(entity => !entity.Success && entity.JobName == "cancelled-job");
     }
 
     private static JobExecutor CreateExecutor(

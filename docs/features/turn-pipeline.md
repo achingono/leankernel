@@ -1,6 +1,8 @@
 # Turn Pipeline
 `TurnPipeline` is the canonical execution path for every LeanKernel chat turn. It turns a user message into a persisted session turn, a gated prompt, a model invocation, and a final assistant response.
 The runtime keeps this path deliberately linear even as Phase 3 adds routed execution, response enhancement, and richer diagnostics, which makes the flow easier to inspect and extend.
+
+Long-running task handling now layers on top of this pipeline. The core turn still owns persistence, prompt assembly, strategy invocation, and response enhancement; the continuation decorator can add bounded follow-up rounds when the response is clearly incomplete.
 ## Why the pipeline exists
 A single turn touches session persistence, context gating, prompt assembly, tool visibility, model invocation, optional post-processing, and turn events. `TurnPipeline` keeps those responsibilities in one stable sequence while `AgentRuntime` exposes that sequence through the public `IAgentRuntime` interface.
 ```mermaid
@@ -145,3 +147,4 @@ That sequencing is what makes the rest of the runtime explainable.
 - [Diagnostics](diagnostics.md)
 - [Gateway API](gateway-api.md)
 - [Phase 1 Configuration](../configuration/phase-1-config.md)
+- [Long-Running Tasks, Progress Updates, and Continuation](long-running-tasks.md)
