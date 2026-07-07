@@ -64,4 +64,25 @@ public sealed class DocumentIngestionConfig
     /// Gets or sets the service-owned storage path for uploaded document copies.
     /// </summary>
     public string ManagedStoragePath { get; set; } = "/app/data/managed-documents";
+
+    /// <summary>
+    /// Gets or sets the timeout in seconds for enqueueing a document.
+    /// When the queue is full, the producer waits up to this duration.
+    /// </summary>
+    public int WatchEnqueueTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the maximum number of retry attempts for enqueueing a watched file.
+    /// </summary>
+    public int WatchMaxRetries { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets the base delay in seconds for exponential backoff on retry.
+    /// </summary>
+    public int WatchRetryBaseDelaySeconds { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets the maximum delay in seconds for exponential backoff on retry.
+    /// </summary>
+    public int WatchRetryMaxDelaySeconds { get; set; } = 300;
 }

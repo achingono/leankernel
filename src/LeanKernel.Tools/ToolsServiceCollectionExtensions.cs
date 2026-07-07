@@ -6,6 +6,7 @@ using LeanKernel.Tools.BuiltIn.FileSystem;
 using LeanKernel.Tools.BuiltIn.Browser;
 using LeanKernel.Tools.BuiltIn.Internet;
 using LeanKernel.Tools.BuiltIn.Knowledge;
+using LeanKernel.Tools.Ingestion;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -32,11 +33,14 @@ public static class ToolsServiceCollectionExtensions
         services.AddSingleton(sp =>
         {
             var config = sp.GetRequiredService<IOptions<LeanKernelConfig>>().Value.DocumentIngestion;
-            return new DocumentIngestionQueue(config?.MaxQueuedDocuments ?? 100);
+            var maxQueued = config?.MaxQueuedDocuments ?? 100;
+            var enqueueTimeoutMs = (config?.WatchEnqueueTimeoutSeconds ?? 30) * 1000;
+            return new DocumentIngestionQueue(maxQueued, enqueueTimeoutMs);
         });
         services.AddSingleton<IDocumentIngestionQueue>(sp => sp.GetRequiredService<DocumentIngestionQueue>());
         services.AddHostedService<DocumentIngestionHostedService>();
         services.AddHostedService<DocumentFolderIngestionHostedService>();
+        services.AddTransient<DocumentBackfillService>();
 
         services.TryAddSingleton<IWebwrightClient, WebwrightClient>();
         services.AddSingleton<ToolGovernancePolicy>();

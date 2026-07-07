@@ -1,29 +1,29 @@
 using LeanKernel.Abstractions.Configuration;
+using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools;
 
-/// <summary>
-/// Processes queued document ingestion jobs in the background.
-/// </summary>
 public sealed class DocumentIngestionHostedService(
     DocumentIngestionQueue queue,
     DocumentLibraryService libraryService,
+    IServiceScopeFactory scopeFactory,
     IOptions<LeanKernelConfig> config,
     ILogger<DocumentIngestionHostedService> logger) : IHostedService
 {
     private readonly DocumentIngestionQueue _queue = queue ?? throw new ArgumentNullException(nameof(queue));
     private readonly DocumentLibraryService _libraryService = libraryService ?? throw new ArgumentNullException(nameof(libraryService));
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
     private readonly bool _enabled = (config ?? throw new ArgumentNullException(nameof(config))).Value.DocumentIngestion?.Enabled ?? true;
     private readonly int _maxConcurrentJobs = (config ?? throw new ArgumentNullException(nameof(config))).Value.DocumentIngestion?.MaxConcurrentJobs ?? 3;
     private readonly ILogger<DocumentIngestionHostedService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private CancellationTokenSource? _shutdownCts;
     private Task? _runTask;
 
-    /// <inheritdoc />
     public Task StartAsync(CancellationToken cancellationToken)
     {
         if (!_enabled)
@@ -38,7 +38,6 @@ public sealed class DocumentIngestionHostedService(
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         if (_runTask is null || _shutdownCts is null)
@@ -88,10 +87,8 @@ public sealed class DocumentIngestionHostedService(
                     continue;
                 }
 
-                // Clean up completed tasks
                 inFlight.RemoveWhere(t => t.IsCompleted);
 
-                // Wait for a slot
                 await semaphore.WaitAsync(ct).ConfigureAwait(false);
 
                 var task = ProcessJobAsync(job, semaphore, ct);
@@ -109,7 +106,6 @@ public sealed class DocumentIngestionHostedService(
         finally
         {
             semaphore.Dispose();
-            // Wait for all in-flight jobs to complete
             if (inFlight.Count > 0)
             {
                 await Task.WhenAll(inFlight).ConfigureAwait(false);
@@ -121,8 +117,11 @@ public sealed class DocumentIngestionHostedService(
     {
         try
         {
+            await PersistJobAsync(job, ct).ConfigureAwait(false);
+
             job.Status = DocumentIngestionStatus.Processing;
             job.StartedAt = DateTimeOffset.UtcNow;
+            await PersistJobAsync(job, ct).ConfigureAwait(false);
 
             var result = job switch
             {
@@ -143,6 +142,7 @@ public sealed class DocumentIngestionHostedService(
             job.Status = DocumentIngestionStatus.Completed;
             job.Result = result;
             job.CompletedAt = DateTimeOffset.UtcNow;
+            await PersistJobAsync(job, ct).ConfigureAwait(false);
 
             _logger.LogInformation("Document ingestion completed: {JobId} → {PageSlug}", job.JobId, result.PageSlug);
         }
@@ -150,6 +150,7 @@ public sealed class DocumentIngestionHostedService(
         {
             job.Status = DocumentIngestionStatus.Cancelled;
             job.CompletedAt = DateTimeOffset.UtcNow;
+            await PersistJobAsync(job, ct).ConfigureAwait(false);
             _logger.LogInformation("Document ingestion was cancelled: {JobId}", job.JobId);
         }
         catch (Exception ex)
@@ -157,6 +158,7 @@ public sealed class DocumentIngestionHostedService(
             job.Status = DocumentIngestionStatus.Failed;
             job.ErrorMessage = ex.Message;
             job.CompletedAt = DateTimeOffset.UtcNow;
+            await PersistJobAsync(job, ct).ConfigureAwait(false);
             _logger.LogError(ex, "Document ingestion failed: {JobId}", job.JobId);
         }
         finally
@@ -174,6 +176,20 @@ public sealed class DocumentIngestionHostedService(
             }
 
             semaphore.Release();
+        }
+    }
+
+    private async Task PersistJobAsync(DocumentIngestionJob job, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IDocumentIngestionJobRepository>();
+            await repo.SaveJobAsync(job, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to persist job {JobId} with status {Status}", job.JobId, job.Status);
         }
     }
 }

@@ -43,6 +43,11 @@ public sealed class LeanKernelDbContext(DbContextOptions<LeanKernelDbContext> op
     /// </summary>
     public DbSet<DocumentIngestionJobEntity> DocumentIngestionJobs => Set<DocumentIngestionJobEntity>();
 
+    /// <summary>
+    /// Gets the persisted document fingerprints for deduplication.
+    /// </summary>
+    public DbSet<DocumentFingerprintEntity> DocumentFingerprints => Set<DocumentFingerprintEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -101,6 +106,13 @@ public sealed class LeanKernelDbContext(DbContextOptions<LeanKernelDbContext> op
             entity.HasIndex(x => x.Status);
             entity.HasIndex(x => x.CreatedAt);
             entity.HasIndex(x => x.CompletedAt);
+        });
+
+        modelBuilder.Entity<DocumentFingerprintEntity>(entity =>
+        {
+            entity.HasKey(x => x.Fingerprint);
+            entity.HasIndex(x => x.FilePath);
+            entity.Property(x => x.FilePath).IsRequired();
         });
 
         base.OnModelCreating(modelBuilder);

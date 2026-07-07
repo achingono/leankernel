@@ -39,7 +39,8 @@ public sealed class DocumentIngestionJobRepository(
                 CreatedAt = job.CreatedAt,
                 StartedAt = job.StartedAt,
                 CompletedAt = job.CompletedAt,
-                RetryCount = job.RetryCount
+                RetryCount = job.RetryCount,
+                SourcePath = job is PathDocumentIngestionJob pathJob ? pathJob.SourcePath : null
             };
             if (job.Result is not null)
             {
@@ -57,6 +58,10 @@ public sealed class DocumentIngestionJobRepository(
             entity.StartedAt = job.StartedAt;
             entity.CompletedAt = job.CompletedAt;
             entity.RetryCount = job.RetryCount;
+            if (job is PathDocumentIngestionJob pathJob)
+            {
+                entity.SourcePath = pathJob.SourcePath;
+            }
             if (job.Result is not null)
             {
                 entity.Result = JsonSerializer.Serialize(job.Result);
@@ -271,7 +276,39 @@ public sealed class DocumentIngestionJobRepository(
             }
         }
 
-        var job = new DocumentIngestionJob
+        DocumentIngestionResult? result = null;
+        if (!string.IsNullOrEmpty(entity.Result))
+        {
+            try
+            {
+                result = JsonSerializer.Deserialize<DocumentIngestionResult>(entity.Result);
+            }
+            catch (JsonException)
+            {
+                // Result deserialization failed - stays null
+            }
+        }
+
+        if (!string.IsNullOrEmpty(entity.SourcePath))
+        {
+            return new PathDocumentIngestionJob
+            {
+                JobId = entity.JobId,
+                Filename = entity.Filename,
+                Title = entity.Title,
+                Tags = tags,
+                Status = status,
+                SourcePath = entity.SourcePath,
+                CreatedAt = entity.CreatedAt,
+                StartedAt = entity.StartedAt,
+                CompletedAt = entity.CompletedAt,
+                ErrorMessage = entity.ErrorMessage,
+                RetryCount = entity.RetryCount,
+                Result = result
+            };
+        }
+
+        return new DocumentIngestionJob
         {
             JobId = entity.JobId,
             Filename = entity.Filename,
@@ -282,21 +319,8 @@ public sealed class DocumentIngestionJobRepository(
             StartedAt = entity.StartedAt,
             CompletedAt = entity.CompletedAt,
             ErrorMessage = entity.ErrorMessage,
-            RetryCount = entity.RetryCount
+            RetryCount = entity.RetryCount,
+            Result = result
         };
-
-        if (!string.IsNullOrEmpty(entity.Result))
-        {
-            try
-            {
-                job.Result = JsonSerializer.Deserialize<DocumentIngestionResult>(entity.Result);
-            }
-            catch (JsonException)
-            {
-                // Result deserialization failed - Result stays null, job state is preserved
-            }
-        }
-
-        return job;
     }
 }

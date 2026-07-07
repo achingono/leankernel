@@ -1,8 +1,10 @@
 using FluentAssertions;
 using LeanKernel.Abstractions.Configuration;
+using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Tools;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 
 namespace LeanKernel.Tests.Unit.Tools;
 
@@ -146,6 +148,18 @@ public sealed class DocumentFolderIngestionHostedServiceTests
             WatchDefaultTags = ["auto-import"]
         };
 
+    private static IDocumentFingerprintService CreateFingerprintService()
+    {
+        var mock = new Mock<IDocumentFingerprintService>();
+        mock.Setup(x => x.IsKnownFingerprintAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        mock.Setup(x => x.RecordFingerprintAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        mock.Setup(x => x.ComputeFingerprint(It.IsAny<string>()))
+            .Returns<string>(p => $"unittest|{p.Length}|0");
+        return mock.Object;
+    }
+
     private static DocumentFolderIngestionHostedService CreateService(
         string watchFolder,
         DocumentIngestionConfig ingestionConfig,
@@ -160,6 +174,7 @@ public sealed class DocumentFolderIngestionHostedServiceTests
 
         return new DocumentFolderIngestionHostedService(
             queue ?? new DocumentIngestionQueue(),
+            CreateFingerprintService(),
             Options.Create(config),
             NullLogger<DocumentFolderIngestionHostedService>.Instance);
     }

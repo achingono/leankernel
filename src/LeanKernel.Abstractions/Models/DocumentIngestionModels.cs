@@ -102,6 +102,32 @@ public enum DocumentIngestionStatus
 }
 
 /// <summary>
+/// Represents the outcome of an enqueue attempt.
+/// </summary>
+public record EnqueueResult(
+    DocumentIngestionJob? Job,
+    EnqueueOutcome Outcome,
+    string? Reason = null);
+
+/// <summary>
+/// Describes the outcome of an enqueue attempt.
+/// </summary>
+public enum EnqueueOutcome
+{
+    /// <summary>The job was successfully enqueued.</summary>
+    Queued,
+
+    /// <summary>The enqueue timed out because the queue was full.</summary>
+    TimedOut,
+
+    /// <summary>The enqueue was cancelled.</summary>
+    Cancelled,
+
+    /// <summary>The job is invalid or the path is not stable.</summary>
+    Rejected
+}
+
+/// <summary>
 /// Represents the result of a successful document ingestion.
 /// </summary>
 public sealed class DocumentIngestionResult

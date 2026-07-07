@@ -85,6 +85,9 @@ config/litellm/litellm_config.generated.yaml
 playwright-report/
 .playwright-mcp/
 
+# SonarQube reports
+sonar-reports/
+
 # OpenCode
 .opencode/
 .github/actions/test-reporter/node_modules/

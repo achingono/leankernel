@@ -50,6 +50,56 @@ public static class LeanKernelDbContextSchemaExtensions
     }
 
     /// <summary>
+    /// Ensures the DocumentIngestionJobs table has the SourcePath column for path-based ingestion retries.
+    /// </summary>
+    /// <param name="dbContext">The database context to initialize.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>A task that completes when the column is present.</returns>
+    public static async Task EnsureDocumentIngestionJobsSourcePathColumnAsync(this LeanKernelDbContext dbContext, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(dbContext);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            ALTER TABLE engine."DocumentIngestionJobs"
+            ADD COLUMN IF NOT EXISTS "SourcePath" text NULL
+            """,
+            ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ensures the document fingerprints table exists for deduplication.
+    /// </summary>
+    /// <param name="dbContext">The database context to initialize.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>A task that completes when the fingerprint schema is present.</returns>
+    public static async Task EnsureFingerprintSchemaAsync(this LeanKernelDbContext dbContext, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(dbContext);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE SCHEMA IF NOT EXISTS engine
+            """,
+            ct).ConfigureAwait(false);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS engine."DocumentFingerprints" (
+                "Fingerprint" text NOT NULL,
+                "FilePath" text NOT NULL,
+                "FileSize" bigint NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                CONSTRAINT "PK_DocumentFingerprints" PRIMARY KEY ("Fingerprint")
+            )
+            """,
+            ct).ConfigureAwait(false);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """CREATE INDEX IF NOT EXISTS "IX_DocumentFingerprints_FilePath" ON engine."DocumentFingerprints" ("FilePath")""",
+            ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Ensures an index on <c>SessionEntity.UserId</c> for user-scoped session queries and migration lookups.
     /// </summary>
     /// <param name="dbContext">The database context to initialize.</param>

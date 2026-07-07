@@ -101,6 +101,8 @@ try
         }
         await dbContext.EnsureSchedulerSchemaAsync().ConfigureAwait(false);
         await dbContext.EnsureUserIdIndexAsync().ConfigureAwait(false);
+        await dbContext.EnsureDocumentIngestionJobsSourcePathColumnAsync().ConfigureAwait(false);
+        await dbContext.EnsureFingerprintSchemaAsync().ConfigureAwait(false);
     }
     catch (Exception ex)
     {

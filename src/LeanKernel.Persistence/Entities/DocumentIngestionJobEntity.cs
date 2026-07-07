@@ -59,4 +59,10 @@ public sealed class DocumentIngestionJobEntity
     /// Gets or sets the number of retry attempts.
     /// </summary>
     public int RetryCount { get; set; }
+
+    /// <summary>
+    /// Gets or sets the source file path for path-based ingestion jobs.
+    /// Null for stream-based jobs.
+    /// </summary>
+    public string? SourcePath { get; set; }
 }

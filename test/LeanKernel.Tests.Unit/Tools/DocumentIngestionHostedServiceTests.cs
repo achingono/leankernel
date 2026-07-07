@@ -6,8 +6,10 @@ using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Knowledge;
 using LeanKernel.Tools;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 
 namespace LeanKernel.Tests.Unit.Tools;
 
@@ -140,6 +142,7 @@ public sealed class DocumentIngestionHostedServiceTests
         return new DocumentIngestionHostedService(
             queue,
             libraryService,
+            Mock.Of<IServiceScopeFactory>(),
             Options.Create(config),
             NullLogger<DocumentIngestionHostedService>.Instance);
     }

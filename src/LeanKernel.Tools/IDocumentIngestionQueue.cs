@@ -8,13 +8,9 @@ namespace LeanKernel.Tools;
 public interface IDocumentIngestionQueue
 {
     /// <summary>
-    /// Queues a document for background ingestion and returns the job.
+    /// Queues a document for background ingestion.
+    /// Throws <see cref="InvalidOperationException"/> if the queue is full.
     /// </summary>
-    /// <param name="filename">The document filename.</param>
-    /// <param name="fileContent">The document content stream.</param>
-    /// <param name="title">The optional document title.</param>
-    /// <param name="tags">The document tags.</param>
-    /// <returns>The queued job with JobId and status.</returns>
     DocumentIngestionJob Queue(
         string filename,
         Stream fileContent,
@@ -22,22 +18,36 @@ public interface IDocumentIngestionQueue
         List<string> tags);
 
     /// <summary>
-    /// Queues an existing file path for background ingestion and returns the job.
+    /// Queues an existing file path for background ingestion.
+    /// Throws <see cref="InvalidOperationException"/> if the queue is full.
     /// </summary>
-    /// <param name="sourcePath">The existing document path.</param>
-    /// <param name="title">The optional document title.</param>
-    /// <param name="tags">The document tags.</param>
-    /// <returns>The queued job with JobId and status.</returns>
     PathDocumentIngestionJob QueuePath(
         string sourcePath,
         string? title,
         List<string> tags);
 
     /// <summary>
+    /// Asynchronously queues a document with backpressure and timeout.
+    /// </summary>
+    Task<EnqueueResult> QueueAsync(
+        string filename,
+        Stream fileContent,
+        string? title,
+        List<string> tags,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Asynchronously queues an existing file path with backpressure and timeout.
+    /// </summary>
+    Task<EnqueueResult> QueuePathAsync(
+        string sourcePath,
+        string? title,
+        List<string> tags,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Gets the status and result of a previously queued job.
     /// </summary>
-    /// <param name="jobId">The job identifier.</param>
-    /// <returns>The job if found; null otherwise.</returns>
     DocumentIngestionJob? GetJobStatus(string jobId);
 
     /// <summary>
