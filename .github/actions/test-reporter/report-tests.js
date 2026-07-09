@@ -12,14 +12,19 @@ const COVERAGE_THRESHOLD_VERY_LOW = 0.4;
 const MAX_COVERAGE_ANNOTATIONS = 50;
 
 // GitHub Actions annotations
+function buildLocation(file, line) {
+  if (!file) return '';
+  let loc = `file=${file}`;
+  if (line) loc += `,line=${line}`;
+  return loc;
+}
+
 function error(message, file, line) {
-  const location = file ? `file=${file}${line ? `,line=${line}` : ''}` : '';
-  console.log(`::error ${location}::${message}`);
+  console.log(`::error ${buildLocation(file, line)}::${message}`);
 }
 
 function warning(message, file, line) {
-  const location = file ? `file=${file}${line ? `,line=${line}` : ''}` : '';
-  console.log(`::warning ${location}::${message}`);
+  console.log(`::warning ${buildLocation(file, line)}::${message}`);
 }
 
 function notice(message) {
@@ -35,6 +40,28 @@ function createEmptyCoverage() {
     branchesCovered: 0,
     branchesValid: 0,
     files: []
+  };
+}
+
+function parseCoberturaClass(cls) {
+  const fileName = cls.$.filename;
+  if (!fileName || typeof fileName !== 'string') return null;
+  const classLineRate = parseFloat(cls.$['line-rate'] || 0) || 0;
+  const classBranchRate = parseFloat(cls.$['branch-rate'] || 0) || 0;
+
+  const lines = cls.lines?.[0]?.line || [];
+  const uncoveredLines = [];
+  for (const line of lines) {
+    if (parseInt(line.$.hits || 0) === 0) {
+      uncoveredLines.push(parseInt(line.$.number));
+    }
+  }
+
+  return {
+    name: fileName,
+    lineRate: classLineRate,
+    branchRate: classBranchRate,
+    uncoveredLines: uncoveredLines.sort((a, b) => a - b)
   };
 }
 
@@ -62,25 +89,10 @@ async function parseCoberturaFile(filePath) {
     for (const pkg of packages) {
       const classes = pkg.classes?.[0]?.class || [];
       for (const cls of classes) {
-        const fileName = cls.$.filename;
-        if (!fileName || typeof fileName !== 'string') continue;
-        const classLineRate = parseFloat(cls.$['line-rate'] || 0) || 0;
-        const classBranchRate = parseFloat(cls.$['branch-rate'] || 0) || 0;
-
-        const lines = cls.lines?.[0]?.line || [];
-        const uncoveredLines = [];
-        for (const line of lines) {
-          if (parseInt(line.$.hits || 0) === 0) {
-            uncoveredLines.push(parseInt(line.$.number));
-          }
+        const fileEntry = parseCoberturaClass(cls);
+        if (fileEntry) {
+          coverage.files.push(fileEntry);
         }
-
-        coverage.files.push({
-          name: fileName,
-          lineRate: classLineRate,
-          branchRate: classBranchRate,
-          uncoveredLines: uncoveredLines.sort((a, b) => a - b)
-        });
       }
     }
 
@@ -121,7 +133,7 @@ async function parseJUnitFile(filePath) {
       const hasFailure = tc.failure || tc.error;
       if (hasFailure) {
         const failNode = (tc.failure || tc.error)[0];
-        const message = typeof failNode === 'string' ? failNode : (failNode.$ ?.message || failNode._ || 'Test failed');
+        const message = typeof failNode === 'string' ? failNode : (failNode.$?.message || failNode._ || 'Test failed');
 
         // Try to extract file and line from the failure message/body
         let file = null;
@@ -146,6 +158,27 @@ async function parseJUnitFile(filePath) {
   }
 
   return testResults;
+}
+
+function parseTrxFailure(testResult, testDefinitions) {
+  const testId = testResult.$.testId;
+  const testDef = testDefinitions.get(testId) || {};
+  const testName = testResult.$.testName || testDef.name || 'Unknown Test';
+  const className = testDef.className || '';
+  const output = testResult.Output?.[0];
+  const errorInfo = output?.ErrorInfo?.[0];
+  const message = errorInfo?.Message?.[0] || 'Test failed';
+  const stackTrace = errorInfo?.StackTrace?.[0] || '';
+
+  let file = null;
+  let line = null;
+  const stackMatch = stackTrace.match(/in (.+\.cs):line (\d+)/);
+  if (stackMatch) {
+    file = stackMatch[1];
+    line = parseInt(stackMatch[2]);
+  }
+
+  return { name: testName, className, message, stackTrace, file, line };
 }
 
 // Parse TRX file (.NET test results)
@@ -189,33 +222,8 @@ async function parseTrxFile(filePath) {
 
   if (result.TestRun.Results?.[0]?.UnitTestResult) {
     for (const testResult of result.TestRun.Results[0].UnitTestResult) {
-      const outcome = testResult.$.outcome;
-      if (outcome === 'Failed') {
-        const testId = testResult.$.testId;
-        const testDef = testDefinitions.get(testId) || {};
-        const testName = testResult.$.testName || testDef.name || 'Unknown Test';
-        const className = testDef.className || '';
-        const output = testResult.Output?.[0];
-        const errorInfo = output?.ErrorInfo?.[0];
-        const message = errorInfo?.Message?.[0] || 'Test failed';
-        const stackTrace = errorInfo?.StackTrace?.[0] || '';
-
-        let file = null;
-        let line = null;
-        const stackMatch = stackTrace.match(/in (.+\.cs):line (\d+)/);
-        if (stackMatch) {
-          file = stackMatch[1];
-          line = parseInt(stackMatch[2]);
-        }
-
-        testResults.failures.push({
-          name: testName,
-          className,
-          message,
-          stackTrace,
-          file,
-          line
-        });
+      if (testResult.$.outcome === 'Failed') {
+        testResults.failures.push(parseTrxFailure(testResult, testDefinitions));
       }
     }
   }
@@ -237,74 +245,137 @@ async function parseResultFile(filePath) {
   return parseJUnitFile(filePath);
 }
 
+function coverageIcon(rate) {
+  if (rate >= COVERAGE_THRESHOLD_HIGH) return '✅';
+  if (rate >= COVERAGE_THRESHOLD_LOW) return '⚠️';
+  return '❌';
+}
+
+function buildTestResultsTable(results, passRate) {
+  let table = `### 📊 Test Results\n\n`;
+  table += `| Status | Count |\n`;
+  table += `|--------|-------|\n`;
+  table += `| Total | ${results.total} |\n`;
+  table += `| Passed | ${results.passed} |\n`;
+  table += `| Failed | ${results.failed} |\n`;
+  table += `| Skipped | ${results.skipped} |\n`;
+  table += `| Pass Rate | ${passRate}% |\n`;
+  return table;
+}
+
+function buildCoverageSection(coverage) {
+  if (!coverage || coverage.linesValid <= 0) return '';
+  const lineCoveragePercent = (coverage.lineRate * 100).toFixed(1);
+  const branchCoveragePercent = (coverage.branchRate * 100).toFixed(1);
+  const icon = coverageIcon(coverage.lineRate);
+
+  let section = `\n### ${icon} Code Coverage\n\n`;
+  section += `| Metric | Coverage |\n`;
+  section += `|--------|----------|\n`;
+  section += `| Line Coverage | ${lineCoveragePercent}% (${coverage.linesCovered}/${coverage.linesValid}) |\n`;
+  section += `| Branch Coverage | ${branchCoveragePercent}% (${coverage.branchesCovered}/${coverage.branchesValid}) |\n`;
+
+  const lowCoverageFiles = coverage.files
+    .filter(f => f.lineRate < COVERAGE_THRESHOLD_LOW)
+    .sort((a, b) => a.lineRate - b.lineRate);
+  if (lowCoverageFiles.length > 0) {
+    section += `\n#### ⚠️ Files with Low Coverage (< ${(COVERAGE_THRESHOLD_LOW * 100).toFixed(0)}%)\n\n`;
+    section += `| File | Line Coverage |\n`;
+    section += `|------|---------------|\n`;
+    for (const file of lowCoverageFiles.slice(0, 10)) {
+      const fileName = file.name.split('/').pop();
+      const coveragePercent = (file.lineRate * 100).toFixed(1);
+      section += `| \`${fileName}\` | ${coveragePercent}% |\n`;
+    }
+    if (lowCoverageFiles.length > 10) {
+      section += `\n_... and ${lowCoverageFiles.length - 10} more files_\n`;
+    }
+  }
+  return section;
+}
+
+function buildFailuresSection(failures) {
+  if (failures.length === 0) return '';
+  let section = `\n### ❌ Failed Tests\n\n`;
+  for (const failure of failures) {
+    section += `#### ${failure.name}\n`;
+    if (failure.className) {
+      section += `**Class:** \`${failure.className}\`\n\n`;
+    }
+    section += `**Error:**\n\`\`\`\n${failure.message}\n\`\`\`\n\n`;
+    if (failure.stackTrace) {
+      let stackTrace = failure.stackTrace;
+      if (stackTrace.length > 1000) {
+        stackTrace = stackTrace.substring(0, 1000) + '\n... (truncated)';
+      }
+      section += `<details>\n<summary>Stack Trace</summary>\n\n\`\`\`\n${stackTrace}\n\`\`\`\n</details>\n\n`;
+    }
+    section += '---\n\n';
+  }
+  return section;
+}
+
 // Create summary comment
 function createSummary(results, coverage, reportName) {
   const passRate = results.total > 0
     ? ((results.passed / results.total) * 100).toFixed(1)
     : 0;
-
   const icon = results.failed === 0 ? '✅' : '❌';
 
   let summary = `## ${icon} ${reportName}\n\n`;
-
-  summary += `### 📊 Test Results\n\n`;
-  summary += `| Status | Count |\n`;
-  summary += `|--------|-------|\n`;
-  summary += `| Total | ${results.total} |\n`;
-  summary += `| Passed | ${results.passed} |\n`;
-  summary += `| Failed | ${results.failed} |\n`;
-  summary += `| Skipped | ${results.skipped} |\n`;
-  summary += `| Pass Rate | ${passRate}% |\n`;
-
-  if (coverage && coverage.linesValid > 0) {
-    const lineCoveragePercent = (coverage.lineRate * 100).toFixed(1);
-    const branchCoveragePercent = (coverage.branchRate * 100).toFixed(1);
-    const coverageIcon = coverage.lineRate >= COVERAGE_THRESHOLD_HIGH ? '✅' : coverage.lineRate >= COVERAGE_THRESHOLD_LOW ? '⚠️' : '❌';
-
-    summary += `\n### ${coverageIcon} Code Coverage\n\n`;
-    summary += `| Metric | Coverage |\n`;
-    summary += `|--------|----------|\n`;
-    summary += `| Line Coverage | ${lineCoveragePercent}% (${coverage.linesCovered}/${coverage.linesValid}) |\n`;
-    summary += `| Branch Coverage | ${branchCoveragePercent}% (${coverage.branchesCovered}/${coverage.branchesValid}) |\n`;
-
-    const lowCoverageFiles = coverage.files
-      .filter(f => f.lineRate < COVERAGE_THRESHOLD_LOW)
-      .sort((a, b) => a.lineRate - b.lineRate);
-    if (lowCoverageFiles.length > 0) {
-      summary += `\n#### ⚠️ Files with Low Coverage (< ${(COVERAGE_THRESHOLD_LOW * 100).toFixed(0)}%)\n\n`;
-      summary += `| File | Line Coverage |\n`;
-      summary += `|------|---------------|\n`;
-      for (const file of lowCoverageFiles.slice(0, 10)) {
-        const fileName = file.name.split('/').pop();
-        const coveragePercent = (file.lineRate * 100).toFixed(1);
-        summary += `| \`${fileName}\` | ${coveragePercent}% |\n`;
-      }
-      if (lowCoverageFiles.length > 10) {
-        summary += `\n_... and ${lowCoverageFiles.length - 10} more files_\n`;
-      }
-    }
-  }
-
-  if (results.failures.length > 0) {
-    summary += `\n### ❌ Failed Tests\n\n`;
-    for (const failure of results.failures) {
-      summary += `#### ${failure.name}\n`;
-      if (failure.className) {
-        summary += `**Class:** \`${failure.className}\`\n\n`;
-      }
-      summary += `**Error:**\n\`\`\`\n${failure.message}\n\`\`\`\n\n`;
-      if (failure.stackTrace) {
-        let stackTrace = failure.stackTrace;
-        if (stackTrace.length > 1000) {
-          stackTrace = stackTrace.substring(0, 1000) + '\n... (truncated)';
-        }
-        summary += `<details>\n<summary>Stack Trace</summary>\n\n\`\`\`\n${stackTrace}\n\`\`\`\n</details>\n\n`;
-      }
-      summary += '---\n\n';
-    }
-  }
-
+  summary += buildTestResultsTable(results, passRate);
+  summary += buildCoverageSection(coverage);
+  summary += buildFailuresSection(results.failures);
   return summary;
+}
+
+async function findExistingBotComment(fetch, commentsUrl, token) {
+  const commentsResponse = await fetch(commentsUrl, {
+    headers: {
+      'Authorization': `token ${token}`,
+      'Accept': 'application/vnd.github.v3+json'
+    }
+  });
+
+  if (!commentsResponse.ok) return null;
+  const comments = await commentsResponse.json();
+  return comments.find(c => c.user.type === 'Bot' && c.body.includes('Test Results')) || null;
+}
+
+async function updateComment(fetch, updateUrl, summary, token) {
+  const response = await fetch(updateUrl, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `token ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ body: summary })
+  });
+
+  if (response.ok) {
+    console.log('Updated existing PR comment');
+    return true;
+  }
+  return false;
+}
+
+async function createComment(fetch, commentsUrl, summary, token) {
+  const response = await fetch(commentsUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `token ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ body: summary })
+  });
+
+  if (response.ok) {
+    console.log('Posted test results to PR');
+  } else {
+    console.log(`Failed to post PR comment: ${response.statusText}`);
+  }
 }
 
 // Post comment to PR
@@ -324,56 +395,96 @@ async function postPrComment(summary) {
   try {
     const fetch = (await import('node-fetch')).default;
 
-    const commentsResponse = await fetch(commentsUrl, {
-      headers: {
-        'Authorization': `token ${token}`,
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
-
-    if (commentsResponse.ok) {
-      const comments = await commentsResponse.json();
-      const botComment = comments.find(c =>
-        c.user.type === 'Bot' &&
-        c.body.includes('Test Results')
-      );
-
-      if (botComment) {
-        const updateUrl = `https://api.github.com/repos/${owner}/${repo}/issues/comments/${botComment.id}`;
-        const updateResponse = await fetch(updateUrl, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `token ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ body: summary })
-        });
-
-        if (updateResponse.ok) {
-          console.log('Updated existing PR comment');
-          return;
-        }
-      }
+    const botComment = await findExistingBotComment(fetch, commentsUrl, token);
+    if (botComment) {
+      const updateUrl = `https://api.github.com/repos/${owner}/${repo}/issues/comments/${botComment.id}`;
+      if (await updateComment(fetch, updateUrl, summary, token)) return;
     }
 
-    const response = await fetch(commentsUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `token ${token}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ body: summary })
-    });
-
-    if (response.ok) {
-      console.log('Posted test results to PR');
-    } else {
-      console.log(`Failed to post PR comment: ${response.statusText}`);
-    }
+    await createComment(fetch, commentsUrl, summary, token);
   } catch (err) {
     console.log(`Error posting PR comment: ${err.message}`);
+  }
+}
+
+async function aggregateCoverage(coveragePath) {
+  console.log(`Looking for coverage files: ${coveragePath}`);
+  const coverageFiles = await glob(coveragePath, {
+    windowsPathsNoEscape: true,
+    absolute: false
+  });
+
+  if (coverageFiles.length === 0) {
+    console.log('No coverage files found');
+    return null;
+  }
+
+  console.log(`Found ${coverageFiles.length} coverage file(s)`);
+  const allCoverage = createEmptyCoverage();
+
+  for (const file of coverageFiles) {
+    console.log(`Parsing coverage: ${file}`);
+    try {
+      const coverage = await parseCoberturaFile(file);
+      allCoverage.linesCovered += coverage.linesCovered;
+      allCoverage.linesValid += coverage.linesValid;
+      allCoverage.branchesCovered += coverage.branchesCovered;
+      allCoverage.branchesValid += coverage.branchesValid;
+
+      for (const newFile of coverage.files) {
+        const existingFile = allCoverage.files.find(f => f.name === newFile.name);
+        if (existingFile) {
+          const uncoveredSet = new Set([...existingFile.uncoveredLines, ...newFile.uncoveredLines]);
+          existingFile.uncoveredLines = Array.from(uncoveredSet).sort((a, b) => a - b);
+          existingFile.lineRate = Math.min(existingFile.lineRate, newFile.lineRate);
+          existingFile.branchRate = Math.min(existingFile.branchRate, newFile.branchRate);
+        } else {
+          allCoverage.files.push(newFile);
+        }
+      }
+    } catch (err) {
+      console.log(`Warning: Failed to parse coverage file ${file}: ${err.message}`);
+    }
+  }
+
+  if (allCoverage.linesValid > 0) {
+    allCoverage.lineRate = allCoverage.linesCovered / allCoverage.linesValid;
+  }
+  if (allCoverage.branchesValid > 0) {
+    allCoverage.branchRate = allCoverage.branchesCovered / allCoverage.branchesValid;
+  }
+
+  return allCoverage;
+}
+
+function emitCoverageAnnotations(allCoverage) {
+  if (!allCoverage) return;
+  let annotationCount = 0;
+  const sortedFiles = allCoverage.files.slice().sort((a, b) => a.lineRate - b.lineRate);
+  for (const file of sortedFiles) {
+    if (annotationCount >= MAX_COVERAGE_ANNOTATIONS) break;
+    if (file.lineRate < COVERAGE_THRESHOLD_VERY_LOW && file.uncoveredLines.length > 0) {
+      const lineRange = file.uncoveredLines.length > 5
+        ? `${file.uncoveredLines.slice(0, 5).join(', ')}, ...`
+        : file.uncoveredLines.join(', ');
+      warning(
+        `Low coverage: ${(file.lineRate * 100).toFixed(1)}% - ${file.uncoveredLines.length} uncovered lines (${lineRange})`,
+        file.name,
+        file.uncoveredLines[0]
+      );
+      annotationCount++;
+    }
+  }
+}
+
+function emitFailureAnnotations(failures) {
+  for (const failure of failures) {
+    const message = `${failure.name}: ${failure.message}`;
+    if (failure.file && failure.line) {
+      error(message, failure.file, failure.line);
+    } else {
+      error(message);
+    }
   }
 }
 
@@ -399,13 +510,7 @@ async function main() {
 
     console.log(`Found ${files.length} test result file(s)`);
 
-    const allResults = {
-      total: 0,
-      passed: 0,
-      failed: 0,
-      skipped: 0,
-      failures: []
-    };
+    const allResults = { total: 0, passed: 0, failed: 0, skipped: 0, failures: [] };
 
     for (const file of files) {
       console.log(`Parsing: ${file}`);
@@ -417,90 +522,15 @@ async function main() {
       allResults.failures.push(...results.failures);
     }
 
-    // Parse coverage files if provided
-    let allCoverage = null;
-    if (coveragePath) {
-      console.log(`Looking for coverage files: ${coveragePath}`);
-      const coverageFiles = await glob(coveragePath, {
-        windowsPathsNoEscape: true,
-        absolute: false
-      });
+    const allCoverage = coveragePath ? await aggregateCoverage(coveragePath) : null;
+    emitCoverageAnnotations(allCoverage);
+    emitFailureAnnotations(allResults.failures);
 
-      if (coverageFiles.length > 0) {
-        console.log(`Found ${coverageFiles.length} coverage file(s)`);
-        allCoverage = createEmptyCoverage();
-
-        for (const file of coverageFiles) {
-          console.log(`Parsing coverage: ${file}`);
-          try {
-            const coverage = await parseCoberturaFile(file);
-            allCoverage.linesCovered += coverage.linesCovered;
-            allCoverage.linesValid += coverage.linesValid;
-            allCoverage.branchesCovered += coverage.branchesCovered;
-            allCoverage.branchesValid += coverage.branchesValid;
-
-            for (const newFile of coverage.files) {
-              const existingFile = allCoverage.files.find(f => f.name === newFile.name);
-              if (existingFile) {
-                const uncoveredSet = new Set([...existingFile.uncoveredLines, ...newFile.uncoveredLines]);
-                existingFile.uncoveredLines = Array.from(uncoveredSet).sort((a, b) => a - b);
-                existingFile.lineRate = Math.min(existingFile.lineRate, newFile.lineRate);
-                existingFile.branchRate = Math.min(existingFile.branchRate, newFile.branchRate);
-              } else {
-                allCoverage.files.push(newFile);
-              }
-            }
-          } catch (err) {
-            console.log(`Warning: Failed to parse coverage file ${file}: ${err.message}`);
-          }
-        }
-
-        if (allCoverage.linesValid > 0) {
-          allCoverage.lineRate = allCoverage.linesCovered / allCoverage.linesValid;
-        }
-        if (allCoverage.branchesValid > 0) {
-          allCoverage.branchRate = allCoverage.branchesCovered / allCoverage.branchesValid;
-        }
-
-        let annotationCount = 0;
-        const sortedFiles = allCoverage.files.slice().sort((a, b) => a.lineRate - b.lineRate);
-        for (const file of sortedFiles) {
-          if (annotationCount >= MAX_COVERAGE_ANNOTATIONS) break;
-          if (file.lineRate < COVERAGE_THRESHOLD_VERY_LOW && file.uncoveredLines.length > 0) {
-            const lineRange = file.uncoveredLines.length > 5
-              ? `${file.uncoveredLines.slice(0, 5).join(', ')}, ...`
-              : file.uncoveredLines.join(', ');
-            warning(
-              `Low coverage: ${(file.lineRate * 100).toFixed(1)}% - ${file.uncoveredLines.length} uncovered lines (${lineRange})`,
-              file.name,
-              file.uncoveredLines[0]
-            );
-            annotationCount++;
-          }
-        }
-      } else {
-        console.log('No coverage files found');
-      }
-    }
-
-    // Create annotations for test failures
-    for (const failure of allResults.failures) {
-      const message = `${failure.name}: ${failure.message}`;
-      if (failure.file && failure.line) {
-        error(message, failure.file, failure.line);
-      } else {
-        error(message);
-      }
-    }
-
-    // Create summary
     const summary = createSummary(allResults, allCoverage, reportName);
     console.log('\n' + summary);
 
-    // Post to PR if applicable
     await postPrComment(summary);
 
-    // Create job summary
     if (process.env.GITHUB_STEP_SUMMARY) {
       fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
     }
