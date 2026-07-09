@@ -1,101 +1,213 @@
 using FluentAssertions;
 using LeanKernel.Abstractions.Configuration;
+using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Agents.Routing;
 using LeanKernel.Agents.Strategies;
-using LeanKernel.Context;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 
 namespace LeanKernel.Tests.Unit.Agents.Routing;
 
 public class TaskComplexityScorerTests
 {
     [Fact]
-    public void Score_returns_economy_friendly_score_for_a_simple_prompt()
+    public void Score_throws_ArgumentNullException_when_context_is_null()
     {
         var scorer = CreateScorer();
 
-        var result = scorer.Score(new AgentStrategyContext
-        {
-            SessionId = "session-1",
-            TurnId = "turn-1",
-            UserMessage = "Summarize the latest project status.",
-            SystemMessage = "You are a helpful assistant.",
-            History = []
-        });
+        var act = () => scorer.Score(null!);
 
-        result.Score.Should().BeLessThan(0.3);
-        result.Factors.Should().ContainSingle(factor => factor.Contains("message-tokens", StringComparison.Ordinal));
+        act.Should().Throw<ArgumentNullException>();
     }
 
     [Fact]
-    public void Score_returns_standard_score_for_a_medium_prompt_with_history()
+    public void Score_returns_zero_for_empty_message_with_no_tools_or_history()
     {
-        var scorer = CreateScorer();
-        var mediumPrompt = new string('m', 2400);
+        var tokenEstimator = new Mock<ITokenEstimator>();
+        tokenEstimator.Setup(x => x.EstimateTokens(It.IsAny<string>())).Returns(0);
+        var scorer = CreateScorer(tokenEstimator.Object);
 
         var result = scorer.Score(new AgentStrategyContext
         {
-            SessionId = "session-1",
-            TurnId = "turn-2",
-            UserMessage = mediumPrompt,
-            SystemMessage = "You are a helpful assistant.",
+            SessionId = "s",
+            TurnId = "t",
+            UserMessage = "",
+            SystemMessage = "",
+            History = []
+        });
+
+        result.Score.Should().Be(0);
+        result.Factors.Should().BeEmpty();
+        result.MessageTokens.Should().Be(0);
+    }
+
+    [Fact]
+    public void Score_returns_low_score_for_low_token_count()
+    {
+        var tokenEstimator = new Mock<ITokenEstimator>();
+        tokenEstimator.Setup(x => x.EstimateTokens(It.IsAny<string>())).Returns(100);
+        var scorer = CreateScorer(tokenEstimator.Object);
+
+        var result = scorer.Score(new AgentStrategyContext
+        {
+            SessionId = "s",
+            TurnId = "t",
+            UserMessage = "some message",
+            SystemMessage = "",
+            History = []
+        });
+
+        result.Score.Should().BeGreaterThan(0).And.BeLessThan(0.25);
+        result.Factors.Should().Contain(f => f.Contains("message-tokens") && f.Contains(":low"));
+    }
+
+    [Fact]
+    public void Score_returns_medium_score_for_medium_token_count()
+    {
+        var tokenEstimator = new Mock<ITokenEstimator>();
+        tokenEstimator.Setup(x => x.EstimateTokens("medium message")).Returns(1000);
+        tokenEstimator.Setup(x => x.EstimateTokens(It.Is<string>(s => s != "medium message"))).Returns(0);
+        var scorer = CreateScorer(tokenEstimator.Object);
+
+        var result = scorer.Score(new AgentStrategyContext
+        {
+            SessionId = "s",
+            TurnId = "t",
+            UserMessage = "medium message",
+            SystemMessage = "",
+            History = []
+        });
+
+        result.Score.Should().Be(0.35);
+        result.Factors.Should().Contain(f => f.StartsWith("message-tokens:") && f.EndsWith(":medium"));
+    }
+
+    [Fact]
+    public void Score_returns_high_score_for_high_token_count()
+    {
+        var tokenEstimator = new Mock<ITokenEstimator>();
+        tokenEstimator.Setup(x => x.EstimateTokens("long message")).Returns(2000);
+        tokenEstimator.Setup(x => x.EstimateTokens(It.Is<string>(s => s != "long message"))).Returns(0);
+        var scorer = CreateScorer(tokenEstimator.Object);
+
+        var result = scorer.Score(new AgentStrategyContext
+        {
+            SessionId = "s",
+            TurnId = "t",
+            UserMessage = "long message",
+            SystemMessage = "",
+            History = []
+        });
+
+        result.Score.Should().Be(0.7);
+        result.Factors.Should().Contain(f => f.StartsWith("message-tokens:") && f.EndsWith(":high"));
+    }
+
+    [Fact]
+    public void Score_adds_tooling_factor_when_three_or_more_tools_present()
+    {
+        var tokenEstimator = new Mock<ITokenEstimator>();
+        tokenEstimator.Setup(x => x.EstimateTokens(It.IsAny<string>())).Returns(100);
+        var scorer = CreateScorer(tokenEstimator.Object);
+
+        var result = scorer.Score(new AgentStrategyContext
+        {
+            SessionId = "s",
+            TurnId = "t",
+            UserMessage = "use tools",
+            SystemMessage = "",
+            History = [],
+            AvailableToolNames = ["tool_a", "tool_b", "tool_c"]
+        });
+
+        result.Factors.Should().Contain("tooling:3");
+        result.Score.Should().BeGreaterThanOrEqualTo(0.3);
+    }
+
+    [Fact]
+    public void Score_adds_history_turns_factor_when_multiple_turns_exist()
+    {
+        var tokenEstimator = new Mock<ITokenEstimator>();
+        tokenEstimator.Setup(x => x.EstimateTokens(It.IsAny<string>())).Returns(100);
+        var scorer = CreateScorer(tokenEstimator.Object);
+
+        var result = scorer.Score(new AgentStrategyContext
+        {
+            SessionId = "s",
+            TurnId = "t",
+            UserMessage = "continue",
+            SystemMessage = "",
             History =
             [
-                new() { Role = "user", Content = "Prior requirement details", Timestamp = DateTimeOffset.UtcNow },
-                new() { Role = "assistant", Content = "Prior draft response", Timestamp = DateTimeOffset.UtcNow }
+                new() { Role = "user", Content = "first", Timestamp = DateTimeOffset.UtcNow },
+                new() { Role = "assistant", Content = "response", Timestamp = DateTimeOffset.UtcNow }
             ]
         });
 
-        result.Score.Should().BeGreaterThanOrEqualTo(0.3).And.BeLessThanOrEqualTo(0.7);
-        result.Factors.Should().Contain(factor => factor.Contains("medium", StringComparison.OrdinalIgnoreCase));
         result.Factors.Should().Contain("history-turns:2");
     }
 
     [Fact]
-    public void Score_returns_premium_score_for_a_complex_multi_step_prompt()
+    public void Score_adds_multi_step_instructions_factor_when_ordered_list_detected()
     {
-        var scorer = CreateScorer();
-        var complexPrompt = string.Join(' ', Enumerable.Repeat("analyze implement verify ", 900));
-        var longSystemMessage = new string('s', 2600);
+        var tokenEstimator = new Mock<ITokenEstimator>();
+        tokenEstimator.Setup(x => x.EstimateTokens(It.IsAny<string>())).Returns(100);
+        var scorer = CreateScorer(tokenEstimator.Object);
 
         var result = scorer.Score(new AgentStrategyContext
         {
-            SessionId = "session-1",
-            TurnId = "turn-3",
-            UserMessage = $"First inspect the code. Then implement the change. Finally verify the results. {complexPrompt}",
-            SystemMessage = longSystemMessage,
-            History =
-            [
-                new() { Role = "user", Content = new string('h', 2200), Timestamp = DateTimeOffset.UtcNow },
-                new() { Role = "assistant", Content = new string('a', 2200), Timestamp = DateTimeOffset.UtcNow },
-                new() { Role = "user", Content = new string('b', 2200), Timestamp = DateTimeOffset.UtcNow }
-            ],
-            AvailableToolNames = ["wiki_read", "wiki_search", "database_query"]
+            SessionId = "s",
+            TurnId = "t",
+            UserMessage = "1. First do this\n2. Then do that",
+            SystemMessage = "",
+            History = []
         });
 
-        result.Score.Should().BeGreaterThan(0.7);
         result.Factors.Should().Contain("multi-step-instructions");
-        result.Factors.Should().Contain("tooling:3");
-        result.Factors.Should().Contain(factor => factor.StartsWith("system-tokens:", StringComparison.Ordinal));
+        result.Score.Should().BeGreaterThan(0.1);
     }
 
-    private static TaskComplexityScorer CreateScorer()
-        => new(
-            new SimpleTokenEstimator(),
-            Options.Create(new LeanKernelConfig
+    [Fact]
+    public void Score_adds_multi_step_instructions_factor_when_keyword_markers_detected()
+    {
+        var tokenEstimator = new Mock<ITokenEstimator>();
+        tokenEstimator.Setup(x => x.EstimateTokens(It.IsAny<string>())).Returns(100);
+        var scorer = CreateScorer(tokenEstimator.Object);
+
+        var result = scorer.Score(new AgentStrategyContext
+        {
+            SessionId = "s",
+            TurnId = "t",
+            UserMessage = "First analyze the code. Then implement the fix. Finally verify.",
+            SystemMessage = "",
+            History = []
+        });
+
+        result.Factors.Should().Contain("multi-step-instructions");
+    }
+
+    private static TaskComplexityScorer CreateScorer(ITokenEstimator? tokenEstimator = null)
+    {
+        var configMock = new Mock<IOptions<LeanKernelConfig>>();
+        configMock.Setup(x => x.Value).Returns(new LeanKernelConfig
+        {
+            Routing = new RoutingConfig
             {
-                Routing = new RoutingConfig
+                Scoring = new ComplexityScoringConfig
                 {
-                    Scoring = new ComplexityScoringConfig
-                    {
-                        HighComplexityTokenThreshold = 2000,
-                        MediumComplexityTokenThreshold = 500,
-                        ToolUsageComplexityBoost = 0.3,
-                        MultiTurnComplexityBoost = 0.2,
-                        LongContextComplexityBoost = 0.2,
-                    }
+                    HighComplexityTokenThreshold = 2000,
+                    MediumComplexityTokenThreshold = 500,
+                    ToolUsageComplexityBoost = 0.3,
+                    MultiTurnComplexityBoost = 0.2,
+                    LongContextComplexityBoost = 0.2,
                 }
-            }),
+            }
+        });
+
+        return new TaskComplexityScorer(
+            tokenEstimator ?? Mock.Of<ITokenEstimator>(),
+            configMock.Object,
             NullLogger<TaskComplexityScorer>.Instance);
+    }
 }

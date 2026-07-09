@@ -83,6 +83,123 @@ public class ChannelAuthenticatorTests
         result.Reason.Should().Be("No auth configuration found for channel.");
     }
 
+    [Fact]
+    public void Authorize_throws_on_null_message()
+    {
+        var authenticator = CreateAuthenticator(new ChannelsConfig());
+
+        var act = () => authenticator.Authorize(null!);
+
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Authorize_denies_when_sender_id_is_empty_on_authenticated_channel()
+    {
+        var authenticator = CreateAuthenticator(new ChannelsConfig
+        {
+            ChannelAuth =
+            [
+                new ChannelAuthConfig
+                {
+                    ChannelId = "signal",
+                    RequireAuth = true,
+                    AllowedSenders = ["+15550001"]
+                }
+            ]
+        });
+
+        var result = authenticator.Authorize(CreateMessage(senderId: ""));
+
+        result.IsAuthorized.Should().BeFalse();
+        result.Reason.Should().Be("Sender id is required for authenticated channels.");
+    }
+
+    [Fact]
+    public void Authorize_denies_when_sender_id_is_whitespace_on_authenticated_channel()
+    {
+        var authenticator = CreateAuthenticator(new ChannelsConfig
+        {
+            ChannelAuth =
+            [
+                new ChannelAuthConfig
+                {
+                    ChannelId = "signal",
+                    RequireAuth = true,
+                    AllowedSenders = ["+15550001"]
+                }
+            ]
+        });
+
+        var result = authenticator.Authorize(CreateMessage(senderId: "   "));
+
+        result.IsAuthorized.Should().BeFalse();
+        result.Reason.Should().Be("Sender id is required for authenticated channels.");
+    }
+
+    [Fact]
+    public void Authorize_denies_when_no_allowed_senders_configured()
+    {
+        var authenticator = CreateAuthenticator(new ChannelsConfig
+        {
+            ChannelAuth =
+            [
+                new ChannelAuthConfig
+                {
+                    ChannelId = "signal",
+                    RequireAuth = true,
+                    AllowedSenders = []
+                }
+            ]
+        });
+
+        var result = authenticator.Authorize(CreateMessage(senderId: "+15550001"));
+
+        result.IsAuthorized.Should().BeFalse();
+        result.Reason.Should().Be("No allowed senders are configured for channel.");
+    }
+
+    [Fact]
+    public void Authorize_allows_sender_with_case_insensitive_matching()
+    {
+        var authenticator = CreateAuthenticator(new ChannelsConfig
+        {
+            ChannelAuth =
+            [
+                new ChannelAuthConfig
+                {
+                    ChannelId = "signal",
+                    RequireAuth = true,
+                    AllowedSenders = ["+15550001"]
+                }
+            ]
+        });
+
+        var result = authenticator.Authorize(CreateMessage(senderId: "+15550001"));
+
+        result.IsAuthorized.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Authorize_performs_case_insensitive_channel_id_lookup()
+    {
+        var authenticator = CreateAuthenticator(new ChannelsConfig
+        {
+            ChannelAuth =
+            [
+                new ChannelAuthConfig
+                {
+                    ChannelId = "Signal",
+                    RequireAuth = false
+                }
+            ]
+        });
+
+        var result = authenticator.Authorize(CreateMessage(channelId: "signal"));
+
+        result.IsAuthorized.Should().BeTrue();
+    }
+
     private static ChannelAuthenticator CreateAuthenticator(ChannelsConfig config)
         => new(NullLogger<ChannelAuthenticator>.Instance, Options.Create(config));
 

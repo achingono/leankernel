@@ -56,6 +56,69 @@ public class OrchestrationDeciderTests
         decision.Reason.Should().ContainEquivalentOf("below orchestration threshold");
     }
 
+    [Fact]
+    public void Decide_throws_on_null_context()
+    {
+        var decider = CreateDecider();
+
+        var act = () => decider.Decide(null!);
+
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Decide_returns_false_for_empty_message()
+    {
+        var decider = CreateDecider();
+
+        var decision = decider.Decide(CreateContext(""));
+
+        decision.ShouldOrchestrate.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Decide_returns_true_for_ordered_list_pattern()
+    {
+        var decider = CreateDecider();
+
+        var decision = decider.Decide(CreateContext("1. Analyze the code\n2. Implement the fix"));
+
+        decision.ShouldOrchestrate.Should().BeTrue();
+        decision.Reason.Should().ContainEquivalentOf("multi-step");
+    }
+
+    [Fact]
+    public void Decide_returns_false_for_single_multi_step_marker()
+    {
+        var decider = CreateDecider();
+
+        var decision = decider.Decide(CreateContext("Then summarize the result."));
+
+        decision.ShouldOrchestrate.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Decide_returns_true_for_parallel_keyword()
+    {
+        var decider = CreateDecider();
+
+        var decision = decider.Decide(CreateContext("Parallelize these tasks for faster execution."));
+
+        decision.ShouldOrchestrate.Should().BeTrue();
+        decision.Reason.Should().ContainEquivalentOf("delegation");
+    }
+
+    [Fact]
+    public void Decide_returns_true_for_coordinate_keyword()
+    {
+        var decider = CreateDecider();
+
+        var decision = decider.Decide(CreateContext("Coordinate the work between multiple specialists."));
+
+        decision.ShouldOrchestrate.Should().BeTrue();
+        decision.Reason.Should().ContainEquivalentOf("delegation");
+    }
+
     private static AgentStrategyContext CreateContext(string userMessage) => new()
     {
         SessionId = "session-1",

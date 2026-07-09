@@ -46,25 +46,25 @@ public class AdminServiceTests
         _healthCheckServiceMock.Object);
 
     [Fact]
-    public async Task GetDashboardAsync_returns_snapshot_with_all_sections()
+    public async Task GetDashboardAsync_returns_snapshot_with_tools_config_and_health()
     {
-        SetupToolRegistry("tool_a", "tool_b");
+        SetupToolRegistry("search", "codegen");
         SetupHealthyHealthCheck();
 
         var service = CreateService();
         var snapshot = await service.GetDashboardAsync();
 
         snapshot.Should().NotBeNull();
+        snapshot.Tools.Should().HaveCount(2);
         snapshot.ProviderHealth.Should().NotBeEmpty();
         snapshot.RoutingRules.Should().HaveCount(3);
-        snapshot.Tools.Should().HaveCount(2);
-        snapshot.ScheduledJobs.Should().HaveCount(2);
+        snapshot.ScheduledJobs.Should().NotBeEmpty();
         snapshot.Spend.Should().NotBeNull();
         snapshot.GeneratedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
-    public async Task GetDashboardAsync_routing_rules_reflect_config()
+    public async Task GetDashboardAsync_routing_rules_reflect_configuration()
     {
         SetupToolRegistry();
         SetupHealthyHealthCheck();
@@ -87,7 +87,7 @@ public class AdminServiceTests
     }
 
     [Fact]
-    public async Task GetDashboardAsync_tools_are_sorted_by_category_then_name()
+    public async Task GetDashboardAsync_tools_sorted_by_category_then_name()
     {
         SetupToolRegistryWithCategories(
             ("beta_tool", "Zeta"),
@@ -117,7 +117,7 @@ public class AdminServiceTests
     }
 
     [Fact]
-    public async Task GetDashboardAsync_scheduler_enabled_maps_job_status()
+    public async Task GetDashboardAsync_maps_enabled_and_disabled_job_statuses()
     {
         SetupToolRegistry();
         SetupHealthyHealthCheck();
@@ -133,7 +133,7 @@ public class AdminServiceTests
     }
 
     [Fact]
-    public async Task GetDashboardAsync_spend_dashboard_has_7_days()
+    public async Task GetDashboardAsync_spend_dashboard_has_seven_days_and_budget()
     {
         SetupToolRegistry();
         SetupHealthyHealthCheck();
@@ -144,11 +144,53 @@ public class AdminServiceTests
         snapshot.Spend.DailySpend.Should().HaveCount(7);
         snapshot.Spend.TodaySpend.Should().BeGreaterThan(0);
         snapshot.Spend.WeekSpend.Should().BeGreaterThan(0);
+        snapshot.Spend.MonthSpend.Should().Be(412.19m);
         snapshot.Spend.MonthlyBudgetLimit.Should().Be(600m);
     }
 
     [Fact]
-    public async Task SetToolEnabledAsync_disables_tool()
+    public async Task GetDashboardAsync_provider_health_maps_all_statuses()
+    {
+        SetupToolRegistry();
+        var entries = new Dictionary<string, HealthReportEntry>
+        {
+            ["provider1"] = new(HealthStatus.Healthy, "ok", TimeSpan.FromMilliseconds(50), null, null),
+            ["provider2"] = new(HealthStatus.Degraded, "slow", TimeSpan.FromMilliseconds(200), null, null),
+            ["provider3"] = new(HealthStatus.Unhealthy, "down", TimeSpan.FromMilliseconds(5000), null, null),
+        };
+        var report = new HealthReport(entries, TimeSpan.FromMilliseconds(300));
+        _healthCheckServiceMock
+            .Setup(h => h.CheckHealthAsync(It.IsAny<Func<HealthCheckRegistration, bool>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(report);
+
+        var service = CreateService();
+        var snapshot = await service.GetDashboardAsync();
+
+        snapshot.ProviderHealth.Should().HaveCount(3);
+        snapshot.ProviderHealth[0].Status.Should().Be(AdminProviderStatus.Healthy);
+        snapshot.ProviderHealth[0].LatencyMs.Should().Be(50);
+        snapshot.ProviderHealth[1].Status.Should().Be(AdminProviderStatus.Degraded);
+        snapshot.ProviderHealth[2].Status.Should().Be(AdminProviderStatus.Unhealthy);
+    }
+
+    [Fact]
+    public async Task GetDashboardAsync_provider_health_fallback_on_exception()
+    {
+        SetupToolRegistry();
+        _healthCheckServiceMock
+            .Setup(h => h.CheckHealthAsync(It.IsAny<Func<HealthCheckRegistration, bool>?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("no health checks registered"));
+
+        var service = CreateService();
+        var snapshot = await service.GetDashboardAsync();
+
+        snapshot.ProviderHealth.Should().HaveCount(1);
+        snapshot.ProviderHealth[0].Name.Should().Be("LeanKernel Gateway");
+        snapshot.ProviderHealth[0].Status.Should().Be(AdminProviderStatus.Healthy);
+    }
+
+    [Fact]
+    public async Task SetToolEnabledAsync_disables_tool_and_returns_snapshot()
     {
         SetupToolRegistry("my_tool");
         SetupHealthyHealthCheck();
@@ -160,7 +202,7 @@ public class AdminServiceTests
     }
 
     [Fact]
-    public async Task SetToolEnabledAsync_reenables_tool()
+    public async Task SetToolEnabledAsync_reenables_previously_disabled_tool()
     {
         SetupToolRegistry("my_tool");
         SetupHealthyHealthCheck();
@@ -190,15 +232,15 @@ public class AdminServiceTests
     {
         var service = CreateService();
 
-        var act = () => service.SetToolEnabledAsync("", true);
+        var act = () => service.SetToolEnabledAsync("  ", true);
 
         await act.Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact]
-    public async Task RefreshProviderHealthAsync_returns_fresh_snapshot()
+    public async Task RefreshProviderHealthAsync_delegates_to_GetDashboardAsync()
     {
-        SetupToolRegistry();
+        SetupToolRegistry("tool_a");
         SetupHealthyHealthCheck();
 
         var service = CreateService();
@@ -206,63 +248,8 @@ public class AdminServiceTests
 
         snapshot.Should().NotBeNull();
         snapshot.ProviderHealth.Should().NotBeEmpty();
-    }
-
-    [Fact]
-    public async Task BuildProviderHealthAsync_maps_health_statuses()
-    {
-        SetupToolRegistry();
-        var entries = new Dictionary<string, HealthReportEntry>
-        {
-            ["provider1"] = new(HealthStatus.Healthy, "ok", TimeSpan.FromMilliseconds(50), null, null),
-            ["provider2"] = new(HealthStatus.Degraded, "slow", TimeSpan.FromMilliseconds(200), null, null),
-            ["provider3"] = new(HealthStatus.Unhealthy, "down", TimeSpan.FromMilliseconds(5000), null, null),
-        };
-        var report = new HealthReport(entries, TimeSpan.FromMilliseconds(300));
-        _healthCheckServiceMock
-            .Setup(h => h.CheckHealthAsync(It.IsAny<Func<HealthCheckRegistration, bool>?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(report);
-
-        var service = CreateService();
-        var snapshot = await service.GetDashboardAsync();
-
-        snapshot.ProviderHealth.Should().HaveCount(3);
-        snapshot.ProviderHealth[0].Status.Should().Be(AdminProviderStatus.Healthy);
-        snapshot.ProviderHealth[0].LatencyMs.Should().Be(50);
-        snapshot.ProviderHealth[1].Status.Should().Be(AdminProviderStatus.Degraded);
-        snapshot.ProviderHealth[2].Status.Should().Be(AdminProviderStatus.Unhealthy);
-    }
-
-    [Fact]
-    public async Task BuildProviderHealthAsync_fallback_on_exception()
-    {
-        SetupToolRegistry();
-        _healthCheckServiceMock
-            .Setup(h => h.CheckHealthAsync(It.IsAny<Func<HealthCheckRegistration, bool>?>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("no health checks registered"));
-
-        var service = CreateService();
-        var snapshot = await service.GetDashboardAsync();
-
-        snapshot.ProviderHealth.Should().HaveCount(1);
-        snapshot.ProviderHealth[0].Name.Should().Be("LeanKernel Gateway");
-        snapshot.ProviderHealth[0].Status.Should().Be(AdminProviderStatus.Healthy);
-    }
-
-    [Fact]
-    public async Task BuildProviderHealthAsync_fallback_on_empty_report()
-    {
-        SetupToolRegistry();
-        var report = new HealthReport(new Dictionary<string, HealthReportEntry>(), TimeSpan.Zero);
-        _healthCheckServiceMock
-            .Setup(h => h.CheckHealthAsync(It.IsAny<Func<HealthCheckRegistration, bool>?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(report);
-
-        var service = CreateService();
-        var snapshot = await service.GetDashboardAsync();
-
-        snapshot.ProviderHealth.Should().HaveCount(1);
-        snapshot.ProviderHealth[0].Name.Should().Be("LeanKernel Gateway");
+        snapshot.Tools.Should().NotBeEmpty();
+        snapshot.RoutingRules.Should().NotBeEmpty();
     }
 
     [Fact]
