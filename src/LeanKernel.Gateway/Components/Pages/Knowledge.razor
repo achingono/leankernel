@@ -7,6 +7,7 @@
 @inject DocumentUiService DocumentUiService
 @inject IDocumentIngestionQueue DocumentIngestionQueue
 @inject ILogger<Knowledge> _logger
+@inject DocumentBackfillService DocumentBackfillService
 @implements IAsyncDisposable
 @rendermode InteractiveServer
 
@@ -450,6 +451,10 @@
                         Upload document
                     </FluentButton>
 
+                    <FluentButton Appearance="Appearance.Outline" @onclick="OpenBackfillModal" Style="width: 100%; margin-bottom: 1rem;">
+                        Backfill from directory
+                    </FluentButton>
+
                     @if (_isDocsLoading)
                     {
                         <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Class="lk-loading" role="status">
@@ -692,6 +697,104 @@
                               @onclick="UploadDocumentAsync"
                               Disabled="@IsUploadSubmitDisabled">
                     Upload & index
+                </FluentButton>
+            </FluentDialogFooter>
+        </FluentDialog>
+
+        <!-- Backfill Dialog -->
+        <FluentDialog @bind-Hidden:get="@(!_isBackfillOpen)"
+                      @bind-Hidden:set="@(value => { if (value) CloseBackfillModal(); })"
+                      aria-label="Backfill documents from directory"
+                      Modal="true"
+                      TrapFocus="true"
+                      PreventScroll="true">
+            <FluentDialogBody>
+                <FluentStack Orientation="Orientation.Vertical" Style="gap: 1.25rem; min-width: min(90vw, 540px);">
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0;">
+                            <FluentLabel Typo="Typography.Subject" Weight="FontWeight.Bold">Backfill documents from directory</FluentLabel>
+                            <FluentLabel Typo="Typography.Body" Color="Color.Neutral">Batch-import a legacy corpus into the knowledge base.</FluentLabel>
+                        </FluentStack>
+                        <FluentButton Appearance="Appearance.Outline" @onclick="CloseBackfillModal" Disabled="@_isBackfilling">Close</FluentButton>
+                    </FluentStack>
+
+                    @if (!string.IsNullOrWhiteSpace(_backfillError))
+                    {
+                        <FluentMessageBar Title="Backfill failed" Intent="@MessageIntent.Error">
+                            @_backfillError
+                        </FluentMessageBar>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(_backfillResultMessage))
+                    {
+                        <FluentMessageBar Title="Backfill complete" Intent="@(string.IsNullOrWhiteSpace(_backfillError) ? MessageIntent.Success : MessageIntent.Warning)">
+                            @_backfillResultMessage
+                        </FluentMessageBar>
+                    }
+
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Source directory</FluentLabel>
+                        <FluentTextField @bind-Value="_backfillSourceDirectory"
+                                         Placeholder="e.g. /app/data/managed-documents/legacy"
+                                         AutoComplete="off"
+                                         Disabled="@_isBackfilling"
+                                         Style="width: 100%;" />
+                    </FluentStack>
+
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">File filter (glob pattern)</FluentLabel>
+                        <FluentTextField @bind-Value="_backfillFilter"
+                                         Placeholder="e.g. *.md, *.*"
+                                         AutoComplete="off"
+                                         Disabled="@_isBackfilling"
+                                         Style="width: 100%;" />
+                    </FluentStack>
+
+                    <FluentStack Orientation="Orientation.Horizontal" Style="gap: 1rem;" Wrap="true">
+                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; min-width: 120px;">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Recursive</FluentLabel>
+                            <FluentSwitch @bind-Value="_backfillRecursive" Disabled="@_isBackfilling" />
+                        </FluentStack>
+
+                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; min-width: 120px;">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Max concurrency</FluentLabel>
+                            <FluentNumberField @bind-Value="_backfillMaxConcurrency"
+                                               Min="1"
+                                               Max="8"
+                                               Disabled="@_isBackfilling"
+                                               Style="width: 100px;" />
+                        </FluentStack>
+
+                        <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem; min-width: 100px;">
+                            <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Dry run</FluentLabel>
+                            <FluentSwitch @bind-Value="_backfillDryRun" Disabled="@_isBackfilling" />
+                        </FluentStack>
+                    </FluentStack>
+
+                    <FluentStack Orientation="Orientation.Vertical" Style="gap: 0.25rem;">
+                        <FluentLabel Typo="Typography.Body" Weight="FontWeight.Bold">Tags (comma-separated)</FluentLabel>
+                        <FluentTextField @bind-Value="_backfillTagsString"
+                                         Placeholder="e.g. legacy, import, docs"
+                                         AutoComplete="off"
+                                         Disabled="@_isBackfilling"
+                                         Style="width: 100%;" />
+                    </FluentStack>
+
+                    @if (_isBackfilling)
+                    {
+                        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="gap: 12px; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 4px; border-left: 3px solid var(--accent-fill-rest);">
+                            <FluentProgressRing Style="width: 20px; height: 20px;" />
+                            <FluentLabel Typo="Typography.Body">Processing backfill — ingesting files...</FluentLabel>
+                        </FluentStack>
+                    }
+                </FluentStack>
+            </FluentDialogBody>
+            <FluentDialogFooter>
+                <FluentButton Appearance="Appearance.Outline" @onclick="CloseBackfillModal" Disabled="@_isBackfilling">Cancel</FluentButton>
+                <FluentButton Appearance="Appearance.Accent"
+                              @onclick="RunBackfillAsync"
+                              Disabled="@IsBackfillSubmitDisabled">
+                    @(_backfillDryRun ? "Dry run" : "Start backfill")
                 </FluentButton>
             </FluentDialogFooter>
         </FluentDialog>
@@ -1281,6 +1384,100 @@
         finally
         {
             _isUploading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // =========================================================================
+    // Backfill Dialog Fields & Methods
+    // =========================================================================
+
+    private bool _isBackfillOpen;
+    private bool _isBackfilling;
+    private string? _backfillError;
+    private string? _backfillResultMessage;
+    private string _backfillSourceDirectory = string.Empty;
+    private string _backfillFilter = "*.*";
+    private bool _backfillRecursive = true;
+    private int _backfillMaxConcurrency = 2;
+    private bool _backfillDryRun;
+    private string _backfillTagsString = string.Empty;
+
+    private bool IsBackfillSubmitDisabled => _isBackfilling || string.IsNullOrWhiteSpace(_backfillSourceDirectory);
+
+    private void OpenBackfillModal()
+    {
+        _backfillError = null;
+        _backfillResultMessage = null;
+        _backfillSourceDirectory = string.Empty;
+        _backfillFilter = "*.*";
+        _backfillRecursive = true;
+        _backfillMaxConcurrency = 2;
+        _backfillDryRun = false;
+        _backfillTagsString = string.Empty;
+        _isBackfillOpen = true;
+    }
+
+    private void CloseBackfillModal()
+    {
+        if (_isBackfilling)
+        {
+            return;
+        }
+        _isBackfillOpen = false;
+    }
+
+    private async Task RunBackfillAsync()
+    {
+        if (IsBackfillSubmitDisabled)
+        {
+            return;
+        }
+
+        _isBackfilling = true;
+        _backfillError = null;
+        _backfillResultMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var tagsList = string.IsNullOrWhiteSpace(_backfillTagsString)
+                ? null
+                : _backfillTagsString
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToList();
+
+            var count = await DocumentBackfillService.RunBackfillAsync(
+                _backfillSourceDirectory.Trim(),
+                _backfillFilter.Trim(),
+                _backfillRecursive,
+                tagsList,
+                _backfillMaxConcurrency,
+                checkpointPath: null,
+                _backfillDryRun,
+                _disposeCts.Token).ConfigureAwait(false);
+
+            _backfillResultMessage = _backfillDryRun
+                ? $"Dry-run complete: would import {count} documents from '{_backfillSourceDirectory}'."
+                : $"Backfill complete: {count} documents ingested from '{_backfillSourceDirectory}'.";
+
+            if (!_backfillDryRun)
+            {
+                await LoadDocumentsAsync(selectFirst: false);
+            }
+        }
+        catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+        {
+            _backfillError = "Backfill cancelled.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Backfill failed for {SourceDirectory}", _backfillSourceDirectory);
+            _backfillError = $"Backfill failed: {ex.Message}";
+        }
+        finally
+        {
+            _isBackfilling = false;
             await InvokeAsync(StateHasChanged);
         }
     }

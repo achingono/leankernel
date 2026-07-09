@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Gateway.Auth;
+using LeanKernel.Tools.Ingestion;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LeanKernel.Gateway;
@@ -63,6 +64,14 @@ public static class Endpoints
             .Produces<HistoryDiagnosticsResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/admin/ingestion/backfill", HandleBackfillAsync)
+            .WithName("RunDocumentBackfill")
+            .WithTags("Admin")
+            .WithSummary("Run a one-time bulk backfill of documents from a directory into the knowledge base.")
+            .Produces<BackfillResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized);
     }
 
     private static async Task<IResult> HandleChatAsync(
@@ -333,6 +342,46 @@ public static class Endpoints
         return response is null
             ? Results.NotFound(new { error = CreateNotFoundMessage("History diagnostics", sessionId, turnId) })
             : Results.Ok(response);
+    }
+
+    private static async Task<IResult> HandleBackfillAsync(
+        BackfillRequest request,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        if (!ValidateApiKey(httpContext))
+        {
+            return Results.Unauthorized();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.SourceDirectory))
+        {
+            return Results.BadRequest(new BackfillResponse
+            {
+                Message = "SourceDirectory is required."
+            });
+        }
+
+        var backfillService = httpContext.RequestServices.GetRequiredService<DocumentBackfillService>();
+
+        var count = await backfillService.RunBackfillAsync(
+            request.SourceDirectory,
+            request.Filter,
+            request.Recursive,
+            request.Tags,
+            request.MaxConcurrency,
+            checkpointPath: null,
+            request.DryRun,
+            ct).ConfigureAwait(false);
+
+        return Results.Ok(new BackfillResponse
+        {
+            DocumentsIngested = count,
+            DryRun = request.DryRun,
+            Message = request.DryRun
+                ? $"Dry-run complete: would import {count} documents."
+                : $"Backfill complete: {count} documents ingested."
+        });
     }
 
     private static string CreateNotFoundMessage(string diagnosticName, string sessionId, string? turnId)
