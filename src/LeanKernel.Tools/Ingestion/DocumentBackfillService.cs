@@ -1,47 +1,35 @@
 using System.Collections.Concurrent;
-using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Tools.Ingestion;
 
-/// <summary>
-/// Provides controlled batch backfill of documents into the knowledge base.
-/// Designed for one-time bulk imports of legacy corpora, separate from live watcher mode.
-/// </summary>
+public sealed record BackfillOptions(
+    string SourceDirectory,
+    string Filter = "*.*",
+    bool Recursive = true,
+    List<string>? Tags = null,
+    int MaxConcurrency = 2,
+    string? CheckpointPath = null,
+    bool DryRun = false);
+
 public sealed class DocumentBackfillService
 {
     private readonly DocumentLibraryService _libraryService;
     private readonly IDocumentFingerprintService _fingerprintService;
-    private readonly IOptions<LeanKernelConfig> _config;
     private readonly ILogger<DocumentBackfillService> _logger;
 
     public DocumentBackfillService(
         DocumentLibraryService libraryService,
         IDocumentFingerprintService fingerprintService,
-        IOptions<LeanKernelConfig> config,
         ILogger<DocumentBackfillService> logger)
     {
         _libraryService = libraryService ?? throw new ArgumentNullException(nameof(libraryService));
         _fingerprintService = fingerprintService ?? throw new ArgumentNullException(nameof(fingerprintService));
-        _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>
-    /// Runs a controlled backfill from the specified source directory.
-    /// </summary>
-    /// <param name="sourceDirectory">Directory to scan for documents.</param>
-    /// <param name="filter">File glob pattern (e.g. "*.md", "*.*").</param>
-    /// <param name="recursive">Whether to recurse into subdirectories.</param>
-    /// <param name="tags">Tags to apply to imported documents.</param>
-    /// <param name="maxConcurrency">Maximum concurrent ingestion tasks.</param>
-    /// <param name="checkpointPath">Optional path to a checkpoint file for resumability.</param>
-    /// <param name="dryRun">If true, only enumerate and log would-be imports without ingesting.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>The number of documents successfully ingested.</returns>
     public async Task<int> RunBackfillAsync(
         string sourceDirectory,
         string filter = "*.*",
@@ -51,124 +39,102 @@ public sealed class DocumentBackfillService
         string? checkpointPath = null,
         bool dryRun = false,
         CancellationToken ct = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceDirectory);
+        => await RunBackfillAsync(new BackfillOptions(sourceDirectory, filter, recursive, tags, maxConcurrency, checkpointPath, dryRun), ct).ConfigureAwait(false);
 
-        var resolvedDir = Path.GetFullPath(sourceDirectory);
+    public async Task<int> RunBackfillAsync(BackfillOptions options, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.SourceDirectory);
+
+        var resolvedDir = Path.GetFullPath(options.SourceDirectory);
         if (!Directory.Exists(resolvedDir))
         {
             throw new DirectoryNotFoundException($"Backfill source directory not found: {resolvedDir}");
         }
 
-        var effectiveTags = tags ?? [];
-        var concurrency = Math.Max(1, maxConcurrency);
-        var semaphore = new SemaphoreSlim(concurrency);
-        var completed = 0;
-        var skipped = 0;
-        var failed = 0;
-        var lastCheckpoint = await ReadCheckpointAsync(checkpointPath, ct).ConfigureAwait(false);
-        var checkpointReached = lastCheckpoint is null;
+        var effectiveTags = options.Tags ?? [];
+        var lastCheckpoint = await ReadCheckpointAsync(options.CheckpointPath, ct).ConfigureAwait(false);
 
         var files = Directory.EnumerateFiles(
             resolvedDir,
-            NormalizeFilter(filter),
+            NormalizeFilter(options.Filter),
             new EnumerationOptions
             {
-                RecurseSubdirectories = recursive,
+                RecurseSubdirectories = options.Recursive,
                 IgnoreInaccessible = true,
                 MatchCasing = MatchCasing.PlatformDefault
             }).OrderBy(f => f).ToList();
 
         _logger.LogInformation(
             "Backfill: discovered {FileCount} files in {SourceDir} with filter {Filter}",
-            files.Count, resolvedDir, filter);
+            files.Count, resolvedDir, options.Filter);
 
+        var (completed, skipped, failed) = await ProcessFilesWithCheckpointAsync(
+            files, effectiveTags, options.MaxConcurrency, options.CheckpointPath, options.DryRun, lastCheckpoint, ct).ConfigureAwait(false);
+
+        _logger.LogInformation(
+            "Backfill complete: {Completed} imported, {Skipped} skipped (dedupe), {Failed} failed in {SourceDir}",
+            completed, skipped, failed, resolvedDir);
+
+        await TryClearCheckpointAsync(options.CheckpointPath, failed, ct);
+
+        return completed;
+    }
+
+    private sealed class MutableInt
+    {
+        public int Value;
+        public MutableInt(int value) { Value = value; }
+    }
+
+    private async Task<(int Completed, int Skipped, int Failed)> ProcessFilesWithCheckpointAsync(
+        List<string> files,
+        List<string> effectiveTags,
+        int maxConcurrency,
+        string? checkpointPath,
+        bool dryRun,
+        string? lastCheckpoint,
+        CancellationToken ct)
+    {
+        var concurrency = Math.Max(1, maxConcurrency);
+        var semaphore = new SemaphoreSlim(concurrency);
+        var completedFlags = new ConcurrentDictionary<int, byte>();
+        var nextCheckpointIndex = new MutableInt(lastCheckpoint is not null
+            ? files.FindIndex(f => string.Equals(f, lastCheckpoint, StringComparison.Ordinal)) + 1
+            : 0);
         var inFlight = new List<Task>();
+        var completed = 0;
+        var skipped = 0;
+        var failed = 0;
 
         try
         {
-            // Shared state for sequential checkpoint advancement:
-            //   completedFlags — set of file indices (in sorted order) that completed ingestion
-            //   nextCheckpointIndex — the index of the next file to checkpoint; only advances
-            //     through files that completed in sorted order (see TryAdvanceCheckpoint).
-            //   checkpointLock — serializes checkpoint writes so only one thread writes at a time.
-            var completedFlags = new ConcurrentDictionary<int, byte>();
-            var nextCheckpointIndex = lastCheckpoint is not null
-                ? files.FindIndex(f => string.Equals(f, lastCheckpoint, StringComparison.Ordinal)) + 1
-                : 0;
-            var checkpointLock = new object();
-
-            for (var fileIndex = 0; fileIndex < files.Count; fileIndex++)
+            for (var fileIndex = nextCheckpointIndex.Value; fileIndex < files.Count; fileIndex++)
             {
                 var file = files[fileIndex];
-
                 if (ct.IsCancellationRequested) break;
 
-                // Skip ahead to last checkpoint if resuming
-                if (!checkpointReached)
+                var result = await ProcessSingleFileAsync(
+                    file, dryRun, effectiveTags, semaphore, ct).ConfigureAwait(false);
+
+                switch (result.Action)
                 {
-                    if (string.Equals(file, lastCheckpoint, StringComparison.Ordinal))
-                    {
-                        checkpointReached = true;
-                    }
-                    continue;
+                    case FileAction.SkippedDuplicate:
+                        skipped++;
+                        continue;
+                    case FileAction.DryRunCompleted:
+                        completed++;
+                        continue;
+                    case FileAction.Scheduled:
+                        var task = result.Task!;
+                        var index = fileIndex;
+                        _ = task.ContinueWith(t =>
+                            HandleFileCompletion(t, index, completedFlags, nextCheckpointIndex,
+                                checkpointPath, files, ct),
+                            ct, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                        inFlight.Add(task);
+                        inFlight.RemoveAll(t => t.IsCompleted);
+                        break;
                 }
-
-                // Check fingerprint for dedupe
-                var fingerprint = _fingerprintService.ComputeFingerprint(file);
-                var isDuplicate = false;
-                try
-                {
-                    isDuplicate = await _fingerprintService.IsKnownFingerprintAsync(fingerprint, ct).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Fingerprint check failed for {Path}, proceeding", file);
-                }
-
-                if (isDuplicate)
-                {
-                    skipped++;
-                    _logger.LogDebug("Backfill: skipped unchanged file {Path}", file);
-                    continue;
-                }
-
-                if (dryRun)
-                {
-                    _logger.LogInformation("Backfill (dry-run): would import {Path}", file);
-                    completed++;
-                    continue;
-                }
-
-                await semaphore.WaitAsync(ct).ConfigureAwait(false);
-
-                var index = fileIndex;
-
-                var task = IngestFileAsync(file, fingerprint, effectiveTags, semaphore, ct);
-
-                // On completion, mark this file's index in completedFlags and try to advance
-                // the sequential checkpoint (see TryAdvanceCheckpoint).
-                // Checkpoint is NOT written at scheduling time — only after the file
-                // has been ingested and fingerprint recorded. This prevents silently
-                // losing files on crash between scheduling and completion.
-                _ = task.ContinueWith(t =>
-                {
-                    if (t.IsCompletedSuccessfully)
-                    {
-                        Interlocked.Increment(ref completed);
-                        completedFlags.TryAdd(index, 0);
-                        TryAdvanceCheckpoint();
-                    }
-                    else
-                    {
-                        Interlocked.Increment(ref failed);
-                    }
-                }, ct, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-
-                inFlight.Add(task);
-
-                // Clean completed tasks
-                inFlight.RemoveAll(t => t.IsCompleted);
             }
 
             if (inFlight.Count > 0)
@@ -176,60 +142,126 @@ public sealed class DocumentBackfillService
                 await Task.WhenAll(inFlight).ConfigureAwait(false);
             }
 
-            // Advance checkpoint through any remaining sequentially completed files
-            TryAdvanceCheckpoint();
-
-            /// <summary>
-            /// Advances the checkpoint through consecutively completed files in sorted order.
-            /// Out-of-order completions are safe: if index 7 completes before index 6,
-            /// TryRemove(6) fails and the checkpoint stays at 5. Once 6 completes,
-            /// the while loop drains 6 then 7 and advances past both.
-            /// Checkpoint is written only for the last consecutively completed file.
-            /// </summary>
-            void TryAdvanceCheckpoint()
-            {
-                if (checkpointPath is null) return;
-                lock (checkpointLock)
-                {
-                    while (completedFlags.TryRemove(nextCheckpointIndex, out _))
-                    {
-                        nextCheckpointIndex++;
-                    }
-
-                    if (nextCheckpointIndex > 0)
-                    {
-                        WriteCheckpointAsync(checkpointPath, files[nextCheckpointIndex - 1], ct)
-                            .ConfigureAwait(false).GetAwaiter().GetResult();
-                    }
-                }
-            }
+            TryAdvanceCheckpoint(checkpointPath, completedFlags, nextCheckpointIndex, files, ct);
         }
         finally
         {
             semaphore.Dispose();
         }
 
-        _logger.LogInformation(
-            "Backfill complete: {Completed} imported, {Skipped} skipped (dedupe), {Failed} failed in {SourceDir}",
-            completed, skipped, failed, resolvedDir);
+        return (completed, skipped, failed);
+    }
 
-        // Clear checkpoint on successful completion
-        if (checkpointPath is not null && failed == 0 && !ct.IsCancellationRequested)
+    private enum FileAction { SkippedDuplicate, DryRunCompleted, Scheduled }
+
+    private sealed class FileActionResult
+    {
+        public FileAction Action { get; }
+        public Task? Task { get; }
+
+        private FileActionResult(FileAction action, Task? task = null)
         {
-            try
-            {
-                if (File.Exists(checkpointPath))
-                {
-                    File.Delete(checkpointPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to clear checkpoint file {Path}", checkpointPath);
-            }
+            Action = action;
+            Task = task;
         }
 
-        return completed;
+        public static readonly FileActionResult SkippedDuplicate = new(FileAction.SkippedDuplicate);
+        public static readonly FileActionResult DryRunCompleted = new(FileAction.DryRunCompleted);
+        public static FileActionResult Scheduled(Task task) => new(FileAction.Scheduled, task);
+    }
+
+    private async Task<FileActionResult> ProcessSingleFileAsync(
+        string file,
+        bool dryRun,
+        List<string> effectiveTags,
+        SemaphoreSlim semaphore,
+        CancellationToken ct)
+    {
+        var fingerprint = _fingerprintService.ComputeFingerprint(file);
+        var isDuplicate = false;
+        try
+        {
+            isDuplicate = await _fingerprintService.IsKnownFingerprintAsync(fingerprint, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fingerprint check failed for {Path}, proceeding", file);
+        }
+
+        if (isDuplicate)
+        {
+            _logger.LogDebug("Backfill: skipped unchanged file {Path}", file);
+            return FileActionResult.SkippedDuplicate;
+        }
+
+        if (dryRun)
+        {
+            _logger.LogInformation("Backfill (dry-run): would import {Path}", file);
+            return FileActionResult.DryRunCompleted;
+        }
+
+        await semaphore.WaitAsync(ct).ConfigureAwait(false);
+
+        var task = IngestFileAsync(file, fingerprint, effectiveTags, semaphore, ct);
+
+        return FileActionResult.Scheduled(task);
+    }
+
+    private static void HandleFileCompletion(
+        Task task,
+        int index,
+        ConcurrentDictionary<int, byte> completedFlags,
+        MutableInt nextCheckpointIndex,
+        string? checkpointPath,
+        IReadOnlyList<string> files,
+        CancellationToken ct)
+    {
+        if (task.IsCompletedSuccessfully)
+        {
+            completedFlags.TryAdd(index, 0);
+            TryAdvanceCheckpoint(checkpointPath, completedFlags, nextCheckpointIndex, files, ct);
+        }
+    }
+
+    private static void TryAdvanceCheckpoint(
+        string? checkpointPath,
+        ConcurrentDictionary<int, byte> completedFlags,
+        MutableInt nextCheckpointIndex,
+        IReadOnlyList<string> files,
+        CancellationToken ct)
+    {
+        if (checkpointPath is null) return;
+
+        while (completedFlags.TryRemove(nextCheckpointIndex.Value, out _))
+        {
+            nextCheckpointIndex.Value++;
+        }
+
+        if (nextCheckpointIndex.Value > 0)
+        {
+            WriteCheckpointAsync(checkpointPath, files[nextCheckpointIndex.Value - 1], ct)
+                .ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+    }
+
+    private static async Task TryClearCheckpointAsync(string? checkpointPath, int failed, CancellationToken ct)
+    {
+        if (checkpointPath is null || failed != 0 || ct.IsCancellationRequested)
+        {
+            return;
+        }
+
+        try
+        {
+            if (File.Exists(checkpointPath))
+            {
+                File.Delete(checkpointPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to clear checkpoint: {ex.Message}");
+        }
     }
 
     private async Task IngestFileAsync(

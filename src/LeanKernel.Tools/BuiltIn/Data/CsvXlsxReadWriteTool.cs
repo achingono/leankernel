@@ -61,7 +61,7 @@ public static class CsvXlsxReadWriteTool
                 {
                     return resolved.Operation switch
                     {
-                        "read" => await HandleReadAsync(resolved.FullPath, resolved.RelativePath, resolved.Format, resolved.Sheet, resolved.HasHeader, resolved.MaxRows, ct),
+                        "read" => await HandleReadAsync(resolved.FullPath, resolved.RelativePath, resolved.Format, resolved.Sheet, resolved.HasHeader, resolved.RowLimit, ct),
                         "write" => await HandleWriteAsync(args, resolved.FullPath, resolved.RelativePath, resolved.Format, resolved.Sheet, resolved.HasHeader, resolved.Append, ct),
                         _ => Error("Operation must be either 'read' or 'write'")
                     };
@@ -89,7 +89,7 @@ public static class CsvXlsxReadWriteTool
         string Format,
         string? Sheet,
         bool HasHeader,
-        int MaxRows,
+        int RowLimit,
         bool Append,
         string? ErrorMessage);
 

@@ -26,6 +26,15 @@ public sealed class EntityExpander(
     private readonly ContextConfig _contextConfig = (contextConfig ?? throw new ArgumentNullException(nameof(contextConfig))).Value;
     private readonly ILogger<EntityExpander> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+    private sealed class ExpansionState
+    {
+        public IDictionary<string, RetrievalCandidate> Candidates { get; init; } = default!;
+        public ISet<string> BoostedKeys { get; init; } = default!;
+        public ISet<string> ExpandedEntities { get; init; } = default!;
+        public HashSet<string> VisitedKeys { get; init; } = default!;
+        public HashSet<string> SearchedTerms { get; init; } = default!;
+    }
+
     /// <summary>
     /// Expands deterministic entity references from the supplied query and seed candidates.
     /// </summary>
@@ -46,31 +55,34 @@ public sealed class EntityExpander(
             return new EntityExpansionResult();
         }
 
-        var expandedCandidates = new Dictionary<string, RetrievalCandidate>(StringComparer.OrdinalIgnoreCase);
-        var boostedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var expandedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var searchedTerms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var visitedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var state = new ExpansionState
+        {
+            Candidates = new Dictionary<string, RetrievalCandidate>(StringComparer.OrdinalIgnoreCase),
+            BoostedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            ExpandedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            SearchedTerms = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            VisitedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        };
         var queue = new Queue<(string Key, int Depth)>();
 
         foreach (var entity in ExtractEntityTerms(query, seedCandidates))
         {
-            if (expandedEntities.Add(entity))
+            if (state.ExpandedEntities.Add(entity))
             {
-                await CollectSearchResultsAsync(entity, expandedCandidates, boostedKeys, expandedEntities, searchedTerms, ct).ConfigureAwait(false);
+                await CollectSearchResultsAsync(entity, state, ct).ConfigureAwait(false);
             }
         }
 
         foreach (var seed in SortCandidates(seedCandidates).Take(_retrievalConfig.MaxEntityExpansionResults))
         {
-            if (visitedKeys.Add(seed.Key))
+            if (state.VisitedKeys.Add(seed.Key))
             {
-                boostedKeys.Add(seed.Key);
+                state.BoostedKeys.Add(seed.Key);
                 queue.Enqueue((seed.Key, 0));
             }
         }
 
-        while (queue.Count > 0 && expandedCandidates.Count < _retrievalConfig.MaxEntityExpansionResults)
+        while (queue.Count > 0 && state.Candidates.Count < _retrievalConfig.MaxEntityExpansionResults)
         {
             var (key, depth) = queue.Dequeue();
             if (depth >= _contextConfig.EntityExpansionDepth)
@@ -84,36 +96,33 @@ public sealed class EntityExpander(
                 continue;
             }
 
-            await ProcessLinkedPagesAsync(page, depth, queue, expandedCandidates, boostedKeys, expandedEntities, visitedKeys, searchedTerms, ct);
+            await ProcessLinkedPagesAsync(page, depth, queue, state, ct);
         }
 
         _logger.LogDebug(
             "Expanded {EntityCount} entities and discovered {CandidateCount} related candidates",
-            expandedEntities.Count,
-            expandedCandidates.Count);
+            state.ExpandedEntities.Count,
+            state.Candidates.Count);
 
         return new EntityExpansionResult
         {
-            ExpandedCandidates = SortCandidates(expandedCandidates.Values),
-            ExpandedEntities = expandedEntities.OrderBy(entity => entity, StringComparer.OrdinalIgnoreCase).ToList(),
-            BoostedCandidateKeys = boostedKeys
+            ExpandedCandidates = SortCandidates(state.Candidates.Values),
+            ExpandedEntities = state.ExpandedEntities.OrderBy(entity => entity, StringComparer.OrdinalIgnoreCase).ToList(),
+            BoostedCandidateKeys = (IReadOnlySet<string>)state.BoostedKeys
         };
     }
 
     private async Task CollectSearchResultsAsync(
         string searchTerm,
-        IDictionary<string, RetrievalCandidate> expandedCandidates,
-        ISet<string> boostedKeys,
-        ISet<string> expandedEntities,
-        ISet<string> searchedTerms,
+        ExpansionState state,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(searchTerm) || !searchedTerms.Add(searchTerm))
+        if (string.IsNullOrWhiteSpace(searchTerm) || !state.SearchedTerms.Add(searchTerm))
         {
             return;
         }
 
-        var remaining = _retrievalConfig.MaxEntityExpansionResults - expandedCandidates.Count;
+        var remaining = _retrievalConfig.MaxEntityExpansionResults - state.Candidates.Count;
         if (remaining <= 0)
         {
             return;
@@ -122,23 +131,23 @@ public sealed class EntityExpander(
         var searchResults = await _knowledge.SearchAsync(searchTerm, remaining, ct).ConfigureAwait(false);
         foreach (var candidate in SortCandidates(searchResults))
         {
-            if (expandedCandidates.Count >= _retrievalConfig.MaxEntityExpansionResults)
+            if (state.Candidates.Count >= _retrievalConfig.MaxEntityExpansionResults)
             {
                 break;
             }
 
-            expandedCandidates[candidate.Key] = candidate;
-            boostedKeys.Add(candidate.Key);
+            state.Candidates[candidate.Key] = candidate;
+            state.BoostedKeys.Add(candidate.Key);
 
             if (TryGetMetadataValue(candidate.Metadata, "subject", out var subject))
             {
-                expandedEntities.Add(subject);
+                state.ExpandedEntities.Add(subject);
             }
 
             var keyEntity = ExtractKeyEntity(candidate.Key);
             if (!string.IsNullOrWhiteSpace(keyEntity))
             {
-                expandedEntities.Add(keyEntity);
+                state.ExpandedEntities.Add(keyEntity);
             }
         }
     }
@@ -147,11 +156,7 @@ public sealed class EntityExpander(
         KnowledgePage page,
         int depth,
         Queue<(string Key, int Depth)> queue,
-        IDictionary<string, RetrievalCandidate> expandedCandidates,
-        ISet<string> boostedKeys,
-        ISet<string> expandedEntities,
-        HashSet<string> visitedKeys,
-        HashSet<string> searchedTerms,
+        ExpansionState state,
         CancellationToken ct)
     {
         var linkedPages = page.LinkedPages;
@@ -164,21 +169,21 @@ public sealed class EntityExpander(
             .Where(link => !string.IsNullOrWhiteSpace(link))
             .OrderBy(link => link, StringComparer.Ordinal))
         {
-            boostedKeys.Add(linkedKey);
+            state.BoostedKeys.Add(linkedKey);
 
             var entityName = ExtractKeyEntity(linkedKey);
             if (!string.IsNullOrWhiteSpace(entityName))
             {
-                expandedEntities.Add(entityName);
-                await CollectSearchResultsAsync(entityName, expandedCandidates, boostedKeys, expandedEntities, searchedTerms, ct).ConfigureAwait(false);
+                state.ExpandedEntities.Add(entityName);
+                await CollectSearchResultsAsync(entityName, state, ct).ConfigureAwait(false);
             }
 
-            if (visitedKeys.Add(linkedKey))
+            if (state.VisitedKeys.Add(linkedKey))
             {
                 queue.Enqueue((linkedKey, depth + 1));
             }
 
-            if (expandedCandidates.Count >= _retrievalConfig.MaxEntityExpansionResults)
+            if (state.Candidates.Count >= _retrievalConfig.MaxEntityExpansionResults)
             {
                 break;
             }

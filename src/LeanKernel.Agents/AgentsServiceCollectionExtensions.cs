@@ -89,15 +89,16 @@ public static class AgentsServiceCollectionExtensions
         services.AddSingleton<TaskCompletionEvaluator>();
         services.AddScoped<TurnPipeline>();
         services.AddScoped<ITurnPipeline>(provider => new ContinuationTurnPipeline(
-            provider.GetRequiredService<TurnPipeline>(),
-            provider.GetRequiredService<TaskCompletionEvaluator>(),
-            provider.GetRequiredService<ISessionTurnCoordinator>(),
-            provider.GetRequiredService<ISessionStore>(),
-            provider.GetRequiredService<IOptions<LeanKernelConfig>>(),
-            provider.GetRequiredService<ILogger<ContinuationTurnPipeline>>(),
-            provider.GetService<ITurnProgressBroker>(),
-            provider.GetService<ISpendGuardService>(),
-            provider.GetService<LeanKernel.Diagnostics.LeanKernelMetrics>()));
+            new ContinuationTurnPipeline.ContinuationPipelineOptions(
+                provider.GetRequiredService<TurnPipeline>(),
+                provider.GetRequiredService<TaskCompletionEvaluator>(),
+                provider.GetRequiredService<ISessionTurnCoordinator>(),
+                provider.GetRequiredService<ISessionStore>(),
+                provider.GetRequiredService<IOptions<LeanKernelConfig>>(),
+                provider.GetRequiredService<ILogger<ContinuationTurnPipeline>>(),
+                provider.GetService<ITurnProgressBroker>(),
+                provider.GetService<ISpendGuardService>(),
+                provider.GetService<LeanKernel.Diagnostics.LeanKernelMetrics>())));
         services.AddScoped<IAgentRuntime, AgentRuntime>();
 
         return services;

@@ -247,30 +247,12 @@ public sealed class TurnPipeline : ITurnPipeline
                 response = await _identityUpdateProjector.EnhanceAsync(response, context, ct).ConfigureAwait(false);
             }
 
-            EnhancementResult? enhancementResult = null;
-            if (modelExecutedSuccessfully && _responseEnhancer is not null)
+            var enhancementResult = await TryEnhanceResponseAsync(
+                modelExecutedSuccessfully, response, turnScopedMessage, sessionId, turnId, context, ct).ConfigureAwait(false);
+
+            if (enhancementResult is not null)
             {
-                try
-                {
-                    enhancementResult = await _responseEnhancer.EnhanceAsync(
-                        new EnhancementStepInput
-                        {
-                            Response = response,
-                            UserMessage = turnScopedMessage.Content,
-                            SessionId = sessionId,
-                            RetrievedKnowledge = context.RetrievedKnowledge,
-                        },
-                        ct).ConfigureAwait(false);
-                    response = enhancementResult.EnhancedResponse;
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Response enhancement failed for session {SessionId} turn {TurnId}; returning original response", sessionId, turnId);
-                }
+                response = enhancementResult.EnhancedResponse;
             }
 
             await RecordResponseEnhancementDiagnosticsAsync(sessionId, turnId, enhancementResult, ct);
@@ -464,105 +446,83 @@ public sealed class TurnPipeline : ITurnPipeline
                 continue;
             }
 
-            var originalHandler = tool.Handler;
             var toolName = tool.Name;
             wrapped.Add(tool with
             {
-                Handler = async (arguments, cancellationToken) =>
-                {
-                    var invocationId = tracker.NextInvocationId();
-                    var startedAt = Stopwatch.GetTimestamp();
-                    _logger.LogInformation(
-                        "Tool invocation started (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, args={Arguments})",
-                        turnId,
-                        sessionId,
-                        invocationId,
-                        toolName,
-                        SummarizeArguments(arguments));
-
-                    await PublishProgressAsync(
-                        new TurnProgressUpdate(
-                            sessionId,
-                            progressTurnId,
-                            TurnProgressKind.ToolStarted,
-                            toolName,
-                            Message: null,
-                            DateTimeOffset.UtcNow),
-                        cancellationToken).ConfigureAwait(false);
-
-                    try
-                    {
-                        var result = await originalHandler(arguments, cancellationToken).ConfigureAwait(false);
-                        var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-                        tracker.Record(toolName, result.Success, durationMs);
-
-                        if (result.Success)
-                        {
-                            _logger.LogInformation(
-                                "Tool invocation succeeded (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1}, outputLength={OutputLength})",
-                                turnId,
-                                sessionId,
-                                invocationId,
-                                toolName,
-                                durationMs,
-                                result.Output?.Length ?? 0);
-                        }
-                        else
-                        {
-                            _logger.LogWarning(
-                                "Tool invocation failed (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1}, error={Error})",
-                                turnId,
-                                sessionId,
-                                invocationId,
-                                toolName,
-                                durationMs,
-                                Truncate(result.Error, 320));
-                        }
-
-                        await PublishProgressAsync(
-                            new TurnProgressUpdate(
-                                sessionId,
-                                progressTurnId,
-                                TurnProgressKind.ToolCompleted,
-                                toolName,
-                                result.Success ? $"Completed {toolName}." : $"{toolName} returned an error.",
-                                DateTimeOffset.UtcNow),
-                            cancellationToken).ConfigureAwait(false);
-
-                        return result;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-                        tracker.Record(toolName, success: false, durationMs);
-                        _logger.LogWarning(
-                            "Tool invocation cancelled (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1})",
-                            turnId,
-                            sessionId,
-                            invocationId,
-                            toolName,
-                            durationMs);
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-                        tracker.Record(toolName, success: false, durationMs);
-                        _logger.LogError(
-                            ex,
-                            "Tool invocation threw exception (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1})",
-                            turnId,
-                            sessionId,
-                            invocationId,
-                            toolName,
-                            durationMs);
-                        throw;
-                    }
-                }
+                Handler = CreateWrappedHandler(
+                    tool.Handler, toolName, turnId, progressTurnId, sessionId, tracker)
             });
         }
 
         return wrapped;
+    }
+
+    private Func<IDictionary<string, object?>, CancellationToken, Task<ToolResult>> CreateWrappedHandler(
+        Func<IDictionary<string, object?>, CancellationToken, Task<ToolResult>>? originalHandler,
+        string toolName,
+        string turnId,
+        string progressTurnId,
+        string sessionId,
+        TurnToolInvocationTracker tracker)
+    {
+        return async (arguments, cancellationToken) =>
+        {
+            var invocationId = tracker.NextInvocationId();
+            var startedAt = Stopwatch.GetTimestamp();
+            _logger.LogInformation(
+                "Tool invocation started (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, args={Arguments})",
+                turnId, sessionId, invocationId, toolName, SummarizeArguments(arguments));
+
+            await PublishProgressAsync(
+                new TurnProgressUpdate(sessionId, progressTurnId, TurnProgressKind.ToolStarted, toolName, Message: null, DateTimeOffset.UtcNow),
+                cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                var result = await originalHandler!(arguments, cancellationToken).ConfigureAwait(false);
+                var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+                tracker.Record(toolName, result.Success, durationMs);
+
+                if (result.Success)
+                {
+                    _logger.LogInformation(
+                        "Tool invocation succeeded (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1}, outputLength={OutputLength})",
+                        turnId, sessionId, invocationId, toolName, durationMs, result.Output?.Length ?? 0);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Tool invocation failed (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1}, error={Error})",
+                        turnId, sessionId, invocationId, toolName, durationMs, Truncate(result.Error, 320));
+                }
+
+                await PublishProgressAsync(
+                    new TurnProgressUpdate(sessionId, progressTurnId, TurnProgressKind.ToolCompleted, toolName,
+                        result.Success ? $"Completed {toolName}." : $"{toolName} returned an error.",
+                        DateTimeOffset.UtcNow),
+                    cancellationToken).ConfigureAwait(false);
+
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+                tracker.Record(toolName, success: false, durationMs);
+                _logger.LogWarning(
+                    "Tool invocation cancelled (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1})",
+                    turnId, sessionId, invocationId, toolName, durationMs);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+                tracker.Record(toolName, success: false, durationMs);
+                _logger.LogError(ex,
+                    "Tool invocation threw exception (turn={TurnId}, session={SessionId}, invocation={InvocationId}, tool={ToolName}, durationMs={DurationMs:F1})",
+                    turnId, sessionId, invocationId, toolName, durationMs);
+                throw;
+            }
+        };
     }
 
     private void LogToolAvailability(string turnId, string sessionId, IReadOnlyList<ToolDefinition> tools)
@@ -759,9 +719,23 @@ public sealed class TurnPipeline : ITurnPipeline
 
         try
         {
-            var response = await _strategy.InvokeAsync(strategyContext, ct).ConfigureAwait(false);
+            var timeoutSeconds = Math.Max(1, _config.Hardening.Resilience.TimeoutSeconds);
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
+            var response = await _strategy.InvokeAsync(strategyContext, timeoutCts.Token).ConfigureAwait(false);
             _providerHealthTracker?.RecordProbeResult(ProviderNames.LiteLlm, ProviderProbeResult.Healthy("Model invocation succeeded."));
             return (response, true);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _providerHealthTracker?.RecordProbeResult(ProviderNames.LiteLlm, ProviderProbeResult.Unhealthy("Model invocation timed out."));
+            _logger.LogWarning(
+                "Model invocation timed out after {TimeoutSeconds}s for session {SessionId} turn {TurnId}; returning degraded response",
+                Math.Max(1, _config.Hardening.Resilience.TimeoutSeconds),
+                sessionId,
+                turnId);
+            return ("LeanKernel timed out while waiting for the model provider. Please try again.", false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -817,6 +791,44 @@ public sealed class TurnPipeline : ITurnPipeline
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "{Label} diagnostics persistence failed for session {SessionId} turn {TurnId}", label, sessionId, turnId);
+        }
+    }
+
+    private async Task<EnhancementResult?> TryEnhanceResponseAsync(
+        bool modelExecutedSuccessfully,
+        string response,
+        LeanKernelMessage turnScopedMessage,
+        string sessionId,
+        string turnId,
+        ConversationContext context,
+        CancellationToken ct)
+    {
+        if (!modelExecutedSuccessfully || _responseEnhancer is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var enhancementResult = await _responseEnhancer.EnhanceAsync(
+                new EnhancementStepInput
+                {
+                    Response = response,
+                    UserMessage = turnScopedMessage.Content,
+                    SessionId = sessionId,
+                    RetrievedKnowledge = context.RetrievedKnowledge,
+                },
+                ct).ConfigureAwait(false);
+            return enhancementResult;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Response enhancement failed for session {SessionId} turn {TurnId}; returning original response", sessionId, turnId);
+            return null;
         }
     }
 

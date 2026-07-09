@@ -73,6 +73,16 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
     {
         var originalMessages = messages as IList<ChatMessage> ?? messages.ToList();
         var response = await _functionInvokingClient.GetResponseAsync(originalMessages, options, cancellationToken).ConfigureAwait(false);
+
+        return await TryHandleLegacyFunctionCallAsync(response, originalMessages, options, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ChatResponse> TryHandleLegacyFunctionCallAsync(
+        ChatResponse response,
+        IList<ChatMessage> originalMessages,
+        ChatOptions? options,
+        CancellationToken cancellationToken)
+    {
         if (!TryParseLegacyFunctionCall(response.Text, out var legacyCall))
         {
             return response;
@@ -172,47 +182,61 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
             });
 
             var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
-            {
-                return false;
-            }
-
-            if (!TryGetProperty(root, "type", out var typeElement)
-                || !TryGetProperty(root, "name", out var nameElement)
-                || !TryGetProperty(root, "parameters", out var parametersElement))
-            {
-                return false;
-            }
-
-            if (root.EnumerateObject().Count() != 3)
-            {
-                return false;
-            }
-
-            if (typeElement.ValueKind != JsonValueKind.String || !string.Equals(typeElement.GetString(), "function", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            if (nameElement.ValueKind != JsonValueKind.String)
-            {
-                return false;
-            }
-
-            if (parametersElement.ValueKind != JsonValueKind.Object)
+            if (!ValidateFunctionCallShape(root, out var name, out var parameters))
             {
                 return false;
             }
 
             legacyCall = new LegacyFunctionCall(
-                nameElement.GetString()!,
-                ConvertObject(parametersElement));
+                name.GetString()!,
+                ConvertObject(parameters));
             return true;
         }
         catch (JsonException)
         {
             return false;
         }
+    }
+
+    private static bool ValidateFunctionCallShape(JsonElement root, out JsonElement name, out JsonElement parameters)
+    {
+        name = default;
+        parameters = default;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        if (!TryGetProperty(root, "type", out var typeElement)
+            || !TryGetProperty(root, "name", out var nameElement)
+            || !TryGetProperty(root, "parameters", out var parametersElement))
+        {
+            return false;
+        }
+
+        if (root.EnumerateObject().Count() != 3)
+        {
+            return false;
+        }
+
+        if (typeElement.ValueKind != JsonValueKind.String || !string.Equals(typeElement.GetString(), "function", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (nameElement.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        if (parametersElement.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        name = nameElement;
+        parameters = parametersElement;
+        return true;
     }
 
     private static bool TryGetProperty(JsonElement root, string propertyName, out JsonElement value)

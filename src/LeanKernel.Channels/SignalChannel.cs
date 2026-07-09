@@ -491,44 +491,54 @@ public sealed class SignalChannel : IChannel
 
         foreach (var signalAttachment in signalAttachments)
         {
-            var attachmentId = signalAttachment.Id?.Trim();
-            if (string.IsNullOrWhiteSpace(attachmentId))
+            var attachment = await DownloadSingleAttachmentAsync(client, signalAttachment, ct).ConfigureAwait(false);
+            if (attachment is not null)
             {
-                continue;
-            }
-
-            try
-            {
-                using var response = await client.GetAsync($"/v1/attachments/{Uri.EscapeDataString(attachmentId)}", ct).ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogWarning(
-                        "Signal attachment download failed for {AttachmentId}: {StatusCode}",
-                        attachmentId,
-                        (int)response.StatusCode);
-                    continue;
-                }
-
-                var contentType = signalAttachment.ContentType;
-                if (string.IsNullOrWhiteSpace(contentType))
-                {
-                    contentType = response.Content.Headers.ContentType?.MediaType;
-                }
-
-                attachments.Add(new Attachment
-                {
-                    FileName = string.IsNullOrWhiteSpace(signalAttachment.Filename) ? attachmentId : signalAttachment.Filename,
-                    ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
-                    Data = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false)
-                });
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-            {
-                _logger.LogWarning(ex, "Signal attachment download failed for {AttachmentId}", attachmentId);
+                attachments.Add(attachment);
             }
         }
 
         return attachments;
+    }
+
+    private async Task<Attachment?> DownloadSingleAttachmentAsync(HttpClient client, SignalAttachment signalAttachment, CancellationToken ct)
+    {
+        var attachmentId = signalAttachment.Id?.Trim();
+        if (string.IsNullOrWhiteSpace(attachmentId))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var response = await client.GetAsync($"/v1/attachments/{Uri.EscapeDataString(attachmentId)}", ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "Signal attachment download failed for {AttachmentId}: {StatusCode}",
+                    attachmentId,
+                    (int)response.StatusCode);
+                return null;
+            }
+
+            var contentType = signalAttachment.ContentType;
+            if (string.IsNullOrWhiteSpace(contentType))
+            {
+                contentType = response.Content.Headers.ContentType?.MediaType;
+            }
+
+            return new Attachment
+            {
+                FileName = string.IsNullOrWhiteSpace(signalAttachment.Filename) ? attachmentId : signalAttachment.Filename,
+                ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
+                Data = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false)
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Signal attachment download failed for {AttachmentId}", attachmentId);
+            return null;
+        }
     }
 
     private static string BuildAttachmentFallbackContent(IReadOnlyList<Attachment> attachments)

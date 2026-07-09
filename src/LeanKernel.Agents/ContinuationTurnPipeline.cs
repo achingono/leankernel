@@ -29,6 +29,45 @@ public sealed class ContinuationTurnPipeline : ITurnPipeline
     private readonly LeanKernelMetrics? _metrics;
     private readonly TimeProvider _timeProvider;
 
+    public sealed record ContinuationPipelineOptions(
+        TurnPipeline Inner,
+        TaskCompletionEvaluator Evaluator,
+        ISessionTurnCoordinator SessionTurnCoordinator,
+        ISessionStore SessionStore,
+        IOptions<LeanKernelConfig> Config,
+        ILogger<ContinuationTurnPipeline> Logger,
+        ITurnProgressBroker? ProgressBroker = null,
+        ISpendGuardService? SpendGuardService = null,
+        LeanKernelMetrics? Metrics = null,
+        TimeProvider? TimeProvider = null);
+
+    private sealed class ContinuationRoundState
+    {
+        public AgentResponse Response { get; set; } = default!;
+        public LeanKernelMessage InitialMessage { get; set; } = default!;
+        public string SessionId { get; set; } = string.Empty;
+        public string RootTurnId { get; set; } = string.Empty;
+        public int Rounds { get; set; }
+        public string PreviousNormalized { get; set; } = string.Empty;
+        public DateTimeOffset StartedAt { get; set; }
+        public ITurnLease Lease { get; set; } = default!;
+        public CancellationToken CancellationToken { get; set; }
+    }
+
+    public ContinuationTurnPipeline(ContinuationPipelineOptions options)
+    {
+        _inner = options.Inner ?? throw new ArgumentNullException(nameof(options.Inner));
+        _evaluator = options.Evaluator ?? throw new ArgumentNullException(nameof(options.Evaluator));
+        _sessionTurnCoordinator = options.SessionTurnCoordinator ?? throw new ArgumentNullException(nameof(options.SessionTurnCoordinator));
+        _sessionStore = options.SessionStore ?? throw new ArgumentNullException(nameof(options.SessionStore));
+        _config = (options.Config ?? throw new ArgumentNullException(nameof(options.Config))).Value.Continuation;
+        _logger = options.Logger ?? throw new ArgumentNullException(nameof(options.Logger));
+        _progressBroker = options.ProgressBroker;
+        _spendGuardService = options.SpendGuardService;
+        _metrics = options.Metrics;
+        _timeProvider = options.TimeProvider ?? TimeProvider.System;
+    }
+
     public ContinuationTurnPipeline(
         TurnPipeline inner,
         TaskCompletionEvaluator evaluator,
@@ -79,105 +118,136 @@ public sealed class ContinuationTurnPipeline : ITurnPipeline
             return response;
         }
 
-        while (!ct.IsCancellationRequested)
+        response = await RunContinuationLoopAsync(new ContinuationRoundState
         {
-            var elapsed = _timeProvider.GetUtcNow() - startedAt;
-            if (rounds >= Math.Max(0, _config.MaxAutoContinuations))
+            Response = response,
+            InitialMessage = initialMessage,
+            SessionId = sessionId,
+            RootTurnId = rootTurnId,
+            Rounds = rounds,
+            PreviousNormalized = previousNormalized,
+            StartedAt = startedAt,
+            Lease = lease,
+            CancellationToken = ct,
+        }).ConfigureAwait(false);
+
+        return response;
+    }
+
+    private async Task<AgentResponse> RunContinuationLoopAsync(ContinuationRoundState state)
+    {
+        while (!state.CancellationToken.IsCancellationRequested)
+        {
+            AgentResponse? terminalResponse;
+            (terminalResponse, state.Response, state.Rounds, state.PreviousNormalized) = await TryContinuationRoundAsync(state).ConfigureAwait(false);
+
+            if (terminalResponse is not null)
             {
-                _metrics?.RecordContinuationTermination("max_rounds");
-                return AppendPauseNote(response, "I've paused here after several continuation rounds. Say 'continue' to resume.");
+                return terminalResponse;
             }
-
-            if (elapsed > TimeSpan.FromSeconds(Math.Max(0, _config.MaxTotalDurationSeconds)))
-            {
-                _metrics?.RecordContinuationTermination("max_duration");
-                return AppendPauseNote(response, "I've paused here due to turn time limits. Say 'continue' to resume.");
-            }
-
-            if (lease.PreemptionRequested)
-            {
-                _metrics?.RecordContinuationTermination("preempted");
-                return AppendPauseNote(response, "I've paused here because a newer message arrived in this chat.");
-            }
-
-            if (response.Execution?.ToolInvocationCount <= 0)
-            {
-                _metrics?.RecordContinuationTermination("zero_tool_round");
-                return response;
-            }
-
-            var assessment = _evaluator.Assess(initialMessage.Content, response);
-            if (assessment.IsComplete)
-            {
-                _metrics?.RecordContinuationTermination("complete");
-                return response;
-            }
-
-            if (_spendGuardService is not null)
-            {
-                var spendDecision = _spendGuardService.Evaluate(sessionId, ModelTier.Standard, 128, 128);
-                if (spendDecision.Action == SpendGuardAction.Block)
-                {
-                    _metrics?.RecordContinuationTermination("spend_block");
-                    return AppendPauseNote(response, spendDecision.Reason);
-                }
-            }
-
-            var normalized = NormalizeText(response.Content);
-            if (!string.IsNullOrEmpty(previousNormalized) && string.Equals(previousNormalized, normalized, StringComparison.Ordinal))
-            {
-                _metrics?.RecordContinuationTermination("no_progress");
-                return AppendPauseNote(response, "I've paused because recent continuation rounds produced the same result.");
-            }
-
-            previousNormalized = normalized;
-            rounds++;
-            _metrics?.RecordContinuationRound();
-
-            var continuationTurnId = Guid.NewGuid().ToString();
-            await PublishProgressAsync(
-                new TurnProgressUpdate(
-                    sessionId,
-                    rootTurnId,
-                    TurnProgressKind.ContinuationStarted,
-                    ToolName: null,
-                    Message: $"Continuing work (round {rounds})...",
-                    _timeProvider.GetUtcNow()),
-                ct).ConfigureAwait(false);
-
-            if (!string.IsNullOrWhiteSpace(assessment.ProgressNote))
-            {
-                await PublishProgressAsync(
-                    new TurnProgressUpdate(
-                        sessionId,
-                        rootTurnId,
-                        TurnProgressKind.StatusNote,
-                        ToolName: null,
-                        Message: assessment.ProgressNote,
-                        _timeProvider.GetUtcNow()),
-                    ct).ConfigureAwait(false);
-            }
-
-            var continuationMessage = new LeanKernelMessage
-            {
-                Content = ContinuePrompt,
-                SenderId = initialMessage.SenderId,
-                ChannelId = initialMessage.ChannelId,
-                SessionId = sessionId,
-                Timestamp = _timeProvider.GetUtcNow(),
-                Metadata = BuildContinuationMetadata(initialMessage.Metadata, rounds, continuationTurnId, rootTurnId),
-            };
-
-            _logger.LogInformation(
-                "Starting continuation round {Round} for session {SessionId}",
-                rounds,
-                sessionId);
-
-            response = await _inner.ProcessDetailedAsync(continuationMessage, ct).ConfigureAwait(false);
         }
 
         _metrics?.RecordContinuationTermination("cancelled");
-        return response;
+        return state.Response;
+    }
+
+    private async Task<(AgentResponse? Result, AgentResponse UpdatedResponse, int Rounds, string PreviousNormalized)> TryContinuationRoundAsync(ContinuationRoundState state)
+    {
+        var elapsed = _timeProvider.GetUtcNow() - state.StartedAt;
+
+        if (state.Rounds >= Math.Max(0, _config.MaxAutoContinuations))
+        {
+            _metrics?.RecordContinuationTermination("max_rounds");
+            return (AppendPauseNote(state.Response, "I've paused here after several continuation rounds. Say 'continue' to resume."), state.Response, state.Rounds, state.PreviousNormalized);
+        }
+
+        if (elapsed > TimeSpan.FromSeconds(Math.Max(0, _config.MaxTotalDurationSeconds)))
+        {
+            _metrics?.RecordContinuationTermination("max_duration");
+            return (AppendPauseNote(state.Response, "I've paused here due to turn time limits. Say 'continue' to resume."), state.Response, state.Rounds, state.PreviousNormalized);
+        }
+
+        if (state.Lease.PreemptionRequested)
+        {
+            _metrics?.RecordContinuationTermination("preempted");
+            return (AppendPauseNote(state.Response, "I've paused here because a newer message arrived in this chat."), state.Response, state.Rounds, state.PreviousNormalized);
+        }
+
+        if (state.Response.Execution?.ToolInvocationCount <= 0)
+        {
+            _metrics?.RecordContinuationTermination("zero_tool_round");
+            return (AppendPauseNote(state.Response, "The tool returned no data — can't proceed."), state.Response, state.Rounds, state.PreviousNormalized);
+        }
+
+        var assessment = _evaluator.Assess(state.InitialMessage.Content, state.Response);
+        if (assessment.IsComplete)
+        {
+            _metrics?.RecordContinuationTermination("complete");
+            return (state.Response, state.Response, state.Rounds, state.PreviousNormalized);
+        }
+
+        if (_spendGuardService is not null)
+        {
+            var spendDecision = _spendGuardService.Evaluate(state.SessionId, ModelTier.Standard, 128, 128);
+            if (spendDecision.Action == SpendGuardAction.Block)
+            {
+                _metrics?.RecordContinuationTermination("spend_block");
+                return (AppendPauseNote(state.Response, spendDecision.Reason), state.Response, state.Rounds, state.PreviousNormalized);
+            }
+        }
+
+        var normalized = NormalizeText(state.Response.Content);
+        if (!string.IsNullOrEmpty(state.PreviousNormalized) && string.Equals(state.PreviousNormalized, normalized, StringComparison.Ordinal))
+        {
+            _metrics?.RecordContinuationTermination("no_progress");
+            return (AppendPauseNote(state.Response, "I've paused because recent continuation rounds produced the same result."), state.Response, state.Rounds, state.PreviousNormalized);
+        }
+
+        state.PreviousNormalized = normalized;
+        state.Rounds++;
+        _metrics?.RecordContinuationRound();
+
+        var continuationTurnId = Guid.NewGuid().ToString();
+        await PublishProgressAsync(
+            new TurnProgressUpdate(
+                state.SessionId,
+                state.RootTurnId,
+                TurnProgressKind.ContinuationStarted,
+                ToolName: null,
+                Message: $"Continuing work (round {state.Rounds})...",
+                _timeProvider.GetUtcNow()),
+            state.CancellationToken).ConfigureAwait(false);
+
+        if (!string.IsNullOrWhiteSpace(assessment.ProgressNote))
+        {
+            await PublishProgressAsync(
+                new TurnProgressUpdate(
+                    state.SessionId,
+                    state.RootTurnId,
+                    TurnProgressKind.StatusNote,
+                    ToolName: null,
+                    Message: assessment.ProgressNote,
+                    _timeProvider.GetUtcNow()),
+                state.CancellationToken).ConfigureAwait(false);
+        }
+
+        var continuationMessage = new LeanKernelMessage
+        {
+            Content = ContinuePrompt,
+            SenderId = state.InitialMessage.SenderId,
+            ChannelId = state.InitialMessage.ChannelId,
+            SessionId = state.SessionId,
+            Timestamp = _timeProvider.GetUtcNow(),
+            Metadata = BuildContinuationMetadata(state.InitialMessage.Metadata, state.Rounds, continuationTurnId, state.RootTurnId),
+        };
+
+        _logger.LogInformation(
+            "Starting continuation round {Round} for session {SessionId}",
+            state.Rounds,
+            state.SessionId);
+
+        var newResponse = await _inner.ProcessDetailedAsync(continuationMessage, state.CancellationToken).ConfigureAwait(false);
+        return (null, newResponse, state.Rounds, state.PreviousNormalized);
     }
 
     private async Task PublishProgressAsync(TurnProgressUpdate update, CancellationToken ct)

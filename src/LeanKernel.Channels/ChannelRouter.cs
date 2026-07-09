@@ -23,7 +23,55 @@ public sealed class ChannelRouter : IChannelRouter
     private readonly IReadOnlyDictionary<string, IChannel> _channels;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref:ChannelRouter/> class.
+    /// Parameter object for <see cref="ChannelRouter"/> constructor.
+    /// </summary>
+    public sealed record ChannelRouterOptions(
+        IAgentRuntime Runtime,
+        ChannelAuthenticator Authenticator,
+        IEnumerable<IChannel> Channels,
+        IOptions<ChannelsConfig> ChannelsConfig,
+        IOptions<LeanKernelConfig> LeanKernelConfig,
+        ISessionStore SessionStore,
+        ILogger<ChannelRouter> Logger,
+        ITurnProgressBroker? ProgressBroker = null,
+        ISessionTurnCoordinator? SessionTurnCoordinator = null,
+        TimeProvider? TimeProvider = null);
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ChannelRouter"/> class.
+    /// </summary>
+    public ChannelRouter(ChannelRouterOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        _runtime = options.Runtime ?? throw new ArgumentNullException(nameof(options.Runtime));
+        _authenticator = options.Authenticator ?? throw new ArgumentNullException(nameof(options.Authenticator));
+        _channelsConfig = (options.ChannelsConfig ?? throw new ArgumentNullException(nameof(options.ChannelsConfig))).Value;
+        _progressConfig = (options.LeanKernelConfig ?? throw new ArgumentNullException(nameof(options.LeanKernelConfig))).Value.Continuation.Progress;
+        _sessionStore = options.SessionStore ?? throw new ArgumentNullException(nameof(options.SessionStore));
+        _logger = options.Logger ?? throw new ArgumentNullException(nameof(options.Logger));
+        _progressBroker = options.ProgressBroker;
+        _sessionTurnCoordinator = options.SessionTurnCoordinator;
+        _timeProvider = options.TimeProvider ?? TimeProvider.System;
+
+        var channels = options.Channels ?? throw new ArgumentNullException(nameof(options.Channels));
+        var groupedChannels = channels
+            .GroupBy(channel => channel.ChannelId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        foreach (var duplicate in groupedChannels.Where(group => group.Count() > 1))
+        {
+            _logger.LogWarning("Multiple channels were registered for {ChannelId}; the first registration will be used", duplicate.Key);
+        }
+
+        _channels = groupedChannels.ToDictionary(
+            group => group.Key,
+            group => group.First(),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ChannelRouter"/> class.
     /// </summary>
     /// <param name="runtime">The agent runtime.</param>
     /// <param name="authenticator">The channel authenticator.</param>
@@ -41,32 +89,18 @@ public sealed class ChannelRouter : IChannelRouter
         ITurnProgressBroker? progressBroker = null,
         ISessionTurnCoordinator? sessionTurnCoordinator = null,
         TimeProvider? timeProvider = null)
+        : this(new ChannelRouterOptions(
+            runtime,
+            authenticator,
+            channels,
+            channelsConfig,
+            leanKernelConfig,
+            sessionStore,
+            logger,
+            progressBroker,
+            sessionTurnCoordinator,
+            timeProvider))
     {
-        ArgumentNullException.ThrowIfNull(channels);
-
-        _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
-        _authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
-        _channelsConfig = (channelsConfig ?? throw new ArgumentNullException(nameof(channelsConfig))).Value;
-        _progressConfig = (leanKernelConfig ?? throw new ArgumentNullException(nameof(leanKernelConfig))).Value.Continuation.Progress;
-        _sessionStore = sessionStore ?? throw new ArgumentNullException(nameof(sessionStore));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _progressBroker = progressBroker;
-        _sessionTurnCoordinator = sessionTurnCoordinator;
-        _timeProvider = timeProvider ?? TimeProvider.System;
-
-        var groupedChannels = channels
-            .GroupBy(channel => channel.ChannelId, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        foreach (var duplicate in groupedChannels.Where(group => group.Count() > 1))
-        {
-            _logger.LogWarning("Multiple channels were registered for {ChannelId}; the first registration will be used", duplicate.Key);
-        }
-
-        _channels = groupedChannels.ToDictionary(
-            group => group.Key,
-            group => group.First(),
-            StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>

@@ -219,33 +219,93 @@ public sealed class JobExecutor(
         DateTimeOffset startedAt,
         CancellationToken ct)
     {
-        var scopeQuery = TryGetParameter(job, "scope_query", out var configuredScope)
-            ? configuredScope
-            : "learning/facts/";
-        var maxCandidates = Math.Min(GetIntParameter(job, "max_candidates", 200, minimumValue: 1), 1000);
-        var minAgeDays = GetIntParameter(job, "min_age_days", 14, minimumValue: 0);
-        var normalizationContextMode = TryGetParameter(job, "normalization_context_mode", out var configuredContextMode)
-            ? configuredContextMode.Trim().ToLowerInvariant()
-            : "related-pages";
-        if (normalizationContextMode is not ("isolated" or "related-pages"))
+        var p = new DefragParameters(job, startedAt);
+        var snapshots = await BuildFactPageSnapshotsAsync(p.ScopeQuery, p.MaxCandidates, ct).ConfigureAwait(false);
+        if (snapshots.Count == 0)
         {
-            throw new ArgumentException($"Unsupported normalization context mode '{normalizationContextMode}'.", nameof(job));
+            return $"Knowledge fact defrag scanned 0 candidates for query '{p.ScopeQuery}'.";
         }
 
-        var relatedPagesMax = Math.Min(GetIntParameter(job, "related_pages_max", 12, minimumValue: 0), 50);
-        var sameSessionMax = Math.Min(GetIntParameter(job, "same_session_max", 8, minimumValue: 0), 50);
-        var semanticNeighborsMax = Math.Min(GetIntParameter(job, "semantic_neighbors_max", 6, minimumValue: 0), 50);
-        var normalizationMode = TryGetParameter(job, "normalization_mode", out var configuredNormalizationMode)
-            ? configuredNormalizationMode.Trim().ToLowerInvariant()
-            : "hybrid";
-        if (normalizationMode is not ("deterministic" or "hybrid"))
+        var retirementResult = await ComputeAndExecuteRetirementsAsync(snapshots, p, startedAt, ct).ConfigureAwait(false);
+        var remainingSnapshots = retirementResult.RemainingSnapshots;
+        if (remainingSnapshots.Count == 0)
         {
-            throw new ArgumentException($"Unsupported normalization mode '{normalizationMode}'.", nameof(job));
+            return $"Knowledge fact defrag found no fact pages in {snapshots.Count} candidates for query '{p.ScopeQuery}'.";
         }
 
-        var maxLlmRepairsPerRun = Math.Min(GetIntParameter(job, "max_llm_repairs_per_run", 25, minimumValue: 0), 500);
-        var retirementCutoff = startedAt.AddDays(-minAgeDays);
+        var (normalizedFull, normalizedPartial, llmRepairsAttempted, llmRepairsSucceeded,
+            llmRepairsWithRelatedContext, relatedEvidenceTotal) = await NormalizeSnapshotsAsync(
+            remainingSnapshots, p, ct).ConfigureAwait(false);
 
+        return BuildDefragResultMessage(snapshots, p, retirementResult, normalizedFull, normalizedPartial,
+            llmRepairsAttempted, llmRepairsSucceeded, llmRepairsWithRelatedContext, relatedEvidenceTotal);
+    }
+
+    private static string BuildDefragResultMessage(
+        List<FactPageSnapshot> snapshots,
+        DefragParameters p,
+        RetirementResult retirementResult,
+        int normalizedFull,
+        int normalizedPartial,
+        int llmRepairsAttempted,
+        int llmRepairsSucceeded,
+        int llmRepairsWithRelatedContext,
+        int relatedEvidenceTotal)
+    {
+        var llmRepairsFailed = llmRepairsAttempted - llmRepairsSucceeded;
+        var averageRelatedEvidence = llmRepairsAttempted == 0 ? 0 : relatedEvidenceTotal / llmRepairsAttempted;
+        return $"Knowledge fact defrag scanned {snapshots.Count} fact pages, planned {retirementResult.PlanCount} retirements ({retirementResult.DuplicateCount} duplicate, {retirementResult.SupersededCount} superseded), retired {retirementResult.ExecutedCount} facts older than {p.MinAgeDays} days, normalized {normalizedFull} pages fully, normalized {normalizedPartial} pages partially, and attempted {llmRepairsAttempted} LLM repairs ({llmRepairsSucceeded} succeeded, {llmRepairsFailed} failed, {llmRepairsWithRelatedContext} with related-page context, avg {averageRelatedEvidence} related pages per attempt).";
+    }
+
+    private sealed record RetirementResult(
+        List<FactPageSnapshot> RemainingSnapshots,
+        int PlanCount,
+        int DuplicateCount,
+        int SupersededCount,
+        int ExecutedCount);
+
+    private sealed record DefragParameters(
+        string ScopeQuery,
+        int MaxCandidates,
+        int MinAgeDays,
+        string NormalizationContextMode,
+        int RelatedPagesMax,
+        int SameSessionMax,
+        int SemanticNeighborsMax,
+        string NormalizationMode,
+        int MaxLlmRepairsPerRun,
+        DateTimeOffset RetirementCutoff)
+    {
+        public DefragParameters(ScheduledJobDefinition job, DateTimeOffset startedAt) : this(
+            TryGetParameter(job, "scope_query", out var configuredScope) ? configuredScope : "learning/facts/",
+            Math.Min(GetIntParameter(job, "max_candidates", 200, minimumValue: 1), 1000),
+            GetIntParameter(job, "min_age_days", 14, minimumValue: 0),
+            NormalizeStringParam(job, "normalization_context_mode", "related-pages", ["isolated", "related-pages"]),
+            Math.Min(GetIntParameter(job, "related_pages_max", 12, minimumValue: 0), 50),
+            Math.Min(GetIntParameter(job, "same_session_max", 8, minimumValue: 0), 50),
+            Math.Min(GetIntParameter(job, "semantic_neighbors_max", 6, minimumValue: 0), 50),
+            NormalizeStringParam(job, "normalization_mode", "hybrid", ["deterministic", "hybrid"]),
+            Math.Min(GetIntParameter(job, "max_llm_repairs_per_run", 25, minimumValue: 0), 500),
+            startedAt.AddDays(-GetIntParameter(job, "min_age_days", 14, minimumValue: 0)))
+        {
+        }
+
+        private static string NormalizeStringParam(ScheduledJobDefinition job, string key, string defaultValue, string[] allowedValues)
+        {
+            var value = TryGetParameter(job, key, out var configured)
+                ? configured.Trim().ToLowerInvariant()
+                : defaultValue;
+            if (!allowedValues.Contains(value, StringComparer.Ordinal))
+            {
+                throw new ArgumentException($"Unsupported {key} '{value}'.", nameof(job));
+            }
+
+            return value;
+        }
+    }
+
+    private async Task<List<FactPageSnapshot>> BuildFactPageSnapshotsAsync(string scopeQuery, int maxCandidates, CancellationToken ct)
+    {
         var candidates = await _knowledgeService.SearchAsync(scopeQuery, maxCandidates, ct).ConfigureAwait(false);
         var candidateKeys = candidates
             .Select(candidate => candidate.Key)
@@ -253,177 +313,50 @@ public sealed class JobExecutor(
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        if (candidateKeys.Count == 0)
-        {
-            return $"Knowledge fact defrag scanned 0 candidates for query '{scopeQuery}'.";
-        }
-
         var snapshots = new List<FactPageSnapshot>(candidateKeys.Count);
         foreach (var key in candidateKeys)
         {
             var page = await _knowledgeService.GetPageAsync(key, ct).ConfigureAwait(false);
-            if (page is null)
-            {
-                continue;
-            }
+            if (page is null) continue;
 
             var snapshot = CreateFactSnapshot(page);
-            if (snapshot is null)
-            {
-                continue;
-            }
+            if (snapshot is null) continue;
 
             snapshots.Add(snapshot);
         }
 
-        if (snapshots.Count == 0)
-        {
-            return $"Knowledge fact defrag found no fact pages in {candidateKeys.Count} candidates for query '{scopeQuery}'.";
-        }
+        return snapshots;
+    }
 
+    private async Task<RetirementResult> ComputeAndExecuteRetirementsAsync(
+        List<FactPageSnapshot> snapshots, DefragParameters p, DateTimeOffset startedAt, CancellationToken ct)
+    {
         var activeByKey = snapshots
-            .Where(static snapshot => !snapshot.IsRetired)
-            .ToDictionary(snapshot => snapshot.Key, StringComparer.Ordinal);
+            .Where(static s => !s.IsRetired)
+            .ToDictionary(s => s.Key, StringComparer.Ordinal);
 
         var retirePlans = new Dictionary<string, FactRetirementPlan>(StringComparer.Ordinal);
-        var supersededPlans = 0;
-        var duplicatePlans = 0;
+        var supersededCount = ComputeSupersessionRetirements(activeByKey, retirePlans);
+        var duplicateCount = ComputeDuplicateRetirements(activeByKey, retirePlans);
 
-        foreach (var source in activeByKey.Values)
-        {
-            foreach (var supersededKey in source.Supersedes)
-            {
-                if (!activeByKey.TryGetValue(supersededKey, out var superseded) ||
-                    superseded.Key.Equals(source.Key, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                if (source.EffectiveTimestamp <= superseded.EffectiveTimestamp)
-                {
-                    continue;
-                }
-
-                if (TryAddRetirementPlan(retirePlans, superseded, source, "superseded-by-newer-page"))
-                {
-                    supersededPlans++;
-                }
-            }
-
-            if (source.SupersededBy is not null && activeByKey.TryGetValue(source.SupersededBy, out var superseding))
-            {
-                if (superseding.EffectiveTimestamp >= source.EffectiveTimestamp &&
-                    TryAddRetirementPlan(retirePlans, source, superseding, "explicit-superseded-by"))
-                {
-                    supersededPlans++;
-                }
-            }
-        }
-
-        foreach (var group in activeByKey.Values
-                     .Where(static snapshot => !string.IsNullOrWhiteSpace(snapshot.NormalizedFactText))
-                     .GroupBy(snapshot => snapshot.NormalizedFactText, StringComparer.Ordinal))
-        {
-            var ordered = group
-                .OrderByDescending(snapshot => snapshot.EffectiveTimestamp)
-                .ThenBy(snapshot => snapshot.Key, StringComparer.Ordinal)
-                .ToList();
-            if (ordered.Count <= 1)
-            {
-                continue;
-            }
-
-            var canonical = ordered[0];
-            foreach (var olderDuplicate in ordered.Skip(1))
-            {
-                if (TryAddRetirementPlan(retirePlans, olderDuplicate, canonical, "duplicate-fact"))
-                {
-                    duplicatePlans++;
-                }
-            }
-        }
-
-        var executedPlans = retirePlans
-            .Values
-            .Where(plan => plan.Target.EffectiveTimestamp <= retirementCutoff)
+        var executedPlans = retirePlans.Values
+            .Where(plan => plan.Target.EffectiveTimestamp <= p.RetirementCutoff)
             .OrderBy(plan => plan.Target.Key, StringComparer.Ordinal)
             .ToList();
 
-        var executedPlansByKey = executedPlans.ToDictionary(plan => plan.Target.Key, StringComparer.Ordinal);
+        var executedByKey = executedPlans.ToDictionary(plan => plan.Target.Key, StringComparer.Ordinal);
         var pagesToWrite = new Dictionary<string, string>(StringComparer.Ordinal);
-        var normalizedFull = 0;
-        var normalizedPartial = 0;
-        var llmRepairsAttempted = 0;
-        var llmRepairsSucceeded = 0;
-        var llmRepairsWithRelatedContext = 0;
-        var relatedEvidenceTotal = 0;
+        var result = new List<FactPageSnapshot>(snapshots.Count);
 
         foreach (var snapshot in snapshots)
         {
-            string desiredContent;
-            IReadOnlyList<string> missingFields;
-            if (executedPlansByKey.TryGetValue(snapshot.Key, out var plan))
+            if (executedByKey.TryGetValue(snapshot.Key, out var plan))
             {
-                desiredContent = BuildRetiredFactContent(plan, startedAt);
-                missingFields = [];
-            }
-            else if (snapshot.IsRetired)
-            {
-                var retiredNormalization = BuildRetiredFact5W1HContent(snapshot, startedAt);
-                desiredContent = retiredNormalization.Content;
-                missingFields = retiredNormalization.MissingFields;
+                pagesToWrite[snapshot.Key] = BuildRetiredFactContent(plan, startedAt);
             }
             else
             {
-                var learnedNormalization = BuildLearnedFact5W1HContent(snapshot, "deterministic");
-                if (learnedNormalization.IsPartial &&
-                    normalizationMode.Equals("hybrid", StringComparison.Ordinal) &&
-                    llmRepairsAttempted < maxLlmRepairsPerRun)
-                {
-                    var relatedEvidence = normalizationContextMode.Equals("related-pages", StringComparison.Ordinal)
-                        ? CollectRelatedEvidence(snapshot, snapshots, relatedPagesMax, sameSessionMax, semanticNeighborsMax)
-                        : [];
-                    relatedEvidenceTotal += relatedEvidence.Count;
-
-                    llmRepairsAttempted++;
-                    if (relatedEvidence.Count > 0)
-                    {
-                        llmRepairsWithRelatedContext++;
-                    }
-
-                    var llmFields = await TryRepair5W1HWithLlmAsync(
-                        snapshot,
-                        learnedNormalization.Fields,
-                        learnedNormalization.MissingFields,
-                        relatedEvidence,
-                        ct).ConfigureAwait(false);
-                    if (llmFields.Count > 0)
-                    {
-                        llmRepairsSucceeded++;
-                        learnedNormalization = BuildLearnedFact5W1HContent(snapshot, "hybrid-llm", llmFields);
-                    }
-                }
-
-                desiredContent = learnedNormalization.Content;
-                missingFields = learnedNormalization.MissingFields;
-            }
-
-            if (missingFields.Count > 0)
-            {
-                normalizedPartial++;
-                _logger.LogWarning(
-                    "Knowledge fact defrag partially normalized page {PageKey}; missing 5W1H fields: {MissingFields}",
-                    snapshot.Key,
-                    string.Join(", ", missingFields));
-            }
-            else
-            {
-                normalizedFull++;
-            }
-
-            if (!HasEquivalentContent(snapshot.Content, desiredContent))
-            {
-                pagesToWrite[snapshot.Key] = desiredContent;
+                result.Add(snapshot);
             }
         }
 
@@ -432,11 +365,202 @@ public sealed class JobExecutor(
             await _knowledgeService.PutPageAsync(entry.Key, entry.Value, ct).ConfigureAwait(false);
         }
 
-        var llmRepairsFailed = llmRepairsAttempted - llmRepairsSucceeded;
-        var averageRelatedEvidence = llmRepairsAttempted == 0
-            ? 0
-            : relatedEvidenceTotal / llmRepairsAttempted;
-        return $"Knowledge fact defrag scanned {snapshots.Count} fact pages, planned {retirePlans.Count} retirements ({duplicatePlans} duplicate, {supersededPlans} superseded), retired {executedPlans.Count} facts older than {minAgeDays} days, normalized {normalizedFull} pages fully, normalized {normalizedPartial} pages partially, and attempted {llmRepairsAttempted} LLM repairs ({llmRepairsSucceeded} succeeded, {llmRepairsFailed} failed, {llmRepairsWithRelatedContext} with related-page context, avg {averageRelatedEvidence} related pages per attempt).";
+        return new RetirementResult(result, retirePlans.Count, duplicateCount, supersededCount, executedPlans.Count);
+    }
+
+    private static int ComputeSupersessionRetirements(
+        Dictionary<string, FactPageSnapshot> activeByKey,
+        Dictionary<string, FactRetirementPlan> retirePlans)
+    {
+        var count = 0;
+        foreach (var source in activeByKey.Values)
+        {
+            if (ProcessSupersedes(source, activeByKey, retirePlans)) count++;
+            if (ProcessSupersededBy(source, activeByKey, retirePlans)) count++;
+        }
+        return count;
+    }
+
+    private static bool ProcessSupersedes(
+        FactPageSnapshot source,
+        Dictionary<string, FactPageSnapshot> activeByKey,
+        Dictionary<string, FactRetirementPlan> retirePlans)
+    {
+        var added = false;
+        foreach (var supersededKey in source.Supersedes)
+        {
+            if (!activeByKey.TryGetValue(supersededKey, out var superseded) ||
+                superseded.Key.Equals(source.Key, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (source.EffectiveTimestamp <= superseded.EffectiveTimestamp)
+            {
+                continue;
+            }
+
+            if (TryAddRetirementPlan(retirePlans, superseded, source, "superseded-by-newer-page"))
+            {
+                added = true;
+            }
+        }
+        return added;
+    }
+
+    private static bool ProcessSupersededBy(
+        FactPageSnapshot source,
+        Dictionary<string, FactPageSnapshot> activeByKey,
+        Dictionary<string, FactRetirementPlan> retirePlans)
+    {
+        if (source.SupersededBy is null || !activeByKey.TryGetValue(source.SupersededBy, out var superseding))
+        {
+            return false;
+        }
+
+        if (superseding.EffectiveTimestamp >= source.EffectiveTimestamp)
+        {
+            return TryAddRetirementPlan(retirePlans, source, superseding, "explicit-superseded-by");
+        }
+
+        return false;
+    }
+
+    private static int ComputeDuplicateRetirements(
+        Dictionary<string, FactPageSnapshot> activeByKey,
+        Dictionary<string, FactRetirementPlan> retirePlans)
+    {
+        var count = 0;
+        foreach (var group in activeByKey.Values
+                     .Where(static s => !string.IsNullOrWhiteSpace(s.NormalizedFactText))
+                     .GroupBy(s => s.NormalizedFactText, StringComparer.Ordinal))
+        {
+            var ordered = group
+                .OrderByDescending(s => s.EffectiveTimestamp)
+                .ThenBy(s => s.Key, StringComparer.Ordinal)
+                .ToList();
+
+            if (ordered.Count <= 1) continue;
+
+            var canonical = ordered[0];
+            foreach (var olderDuplicate in ordered.Skip(1))
+            {
+                if (TryAddRetirementPlan(retirePlans, olderDuplicate, canonical, "duplicate-fact"))
+                {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private async Task<(int NormalizedFull, int NormalizedPartial, int LlmAttempted, int LlmSucceeded,
+        int LlmWithContext, int RelatedEvidenceTotal)> NormalizeSnapshotsAsync(
+        List<FactPageSnapshot> activeSnapshots,
+        DefragParameters p,
+        CancellationToken ct)
+    {
+        var pagesToWrite = new Dictionary<string, string>(StringComparer.Ordinal);
+        var normalizedFull = 0;
+        var normalizedPartial = 0;
+        var llmRepairsAttempted = 0;
+        var llmRepairsSucceeded = 0;
+        var llmRepairsWithRelatedContext = 0;
+        var relatedEvidenceTotal = 0;
+
+        foreach (var snapshot in activeSnapshots)
+        {
+            var (result, attempted, succeeded, withContext, evidenceTotal) = await NormalizeOneSnapshotAsync(
+                snapshot, activeSnapshots, p, llmRepairsAttempted, ct).ConfigureAwait(false);
+
+            llmRepairsAttempted += attempted;
+            llmRepairsSucceeded += succeeded;
+            if (withContext) llmRepairsWithRelatedContext++;
+            relatedEvidenceTotal += evidenceTotal;
+
+            if (result.MissingFields.Count > 0)
+            {
+                normalizedPartial++;
+                _logger.LogWarning(
+                    "Knowledge fact defrag partially normalized page {PageKey}; missing 5W1H fields: {MissingFields}",
+                    snapshot.Key, string.Join(", ", result.MissingFields));
+            }
+            else
+            {
+                normalizedFull++;
+            }
+
+            if (!HasEquivalentContent(snapshot.Content, result.Content))
+            {
+                pagesToWrite[snapshot.Key] = result.Content;
+            }
+        }
+
+        foreach (var entry in pagesToWrite)
+        {
+            await _knowledgeService.PutPageAsync(entry.Key, entry.Value, ct).ConfigureAwait(false);
+        }
+
+        return (normalizedFull, normalizedPartial, llmRepairsAttempted, llmRepairsSucceeded,
+            llmRepairsWithRelatedContext, relatedEvidenceTotal);
+    }
+
+    private async Task<(PageNormalizationResult Result, int LlmAttempted, int LlmSucceeded, bool WithContext, int EvidenceTotal)> NormalizeOneSnapshotAsync(
+        FactPageSnapshot snapshot,
+        List<FactPageSnapshot> allSnapshots,
+        DefragParameters p,
+        int currentLlmRepairsAttempted,
+        CancellationToken ct)
+    {
+        if (snapshot.IsRetired)
+        {
+            return (BuildRetiredFact5W1HContent(snapshot, DateTimeOffset.UtcNow), 0, 0, false, 0);
+        }
+
+        var learnedNormalization = BuildLearnedFact5W1HContent(snapshot, "deterministic");
+        if (!learnedNormalization.IsPartial ||
+            !p.NormalizationMode.Equals("hybrid", StringComparison.Ordinal) ||
+            currentLlmRepairsAttempted >= p.MaxLlmRepairsPerRun)
+        {
+            return (learnedNormalization, 0, 0, false, 0);
+        }
+
+        var (withContext, evidenceTotal, llmFields) = await TryLlmRepairAsync(
+            snapshot, allSnapshots, p, learnedNormalization, ct).ConfigureAwait(false);
+
+        if (llmFields.Count > 0)
+        {
+            learnedNormalization = BuildLearnedFact5W1HContent(snapshot, "hybrid-llm", llmFields);
+        }
+
+        return (learnedNormalization,
+            LlmAttempted: 1,
+            LlmSucceeded: llmFields.Count > 0 ? 1 : 0,
+            WithContext: withContext,
+            EvidenceTotal: evidenceTotal);
+    }
+
+    private async Task<(bool WithContext, int EvidenceTotal, Dictionary<string, string> LlmFields)> TryLlmRepairAsync(
+        FactPageSnapshot snapshot,
+        List<FactPageSnapshot> allSnapshots,
+        DefragParameters p,
+        PageNormalizationResult learnedNormalization,
+        CancellationToken ct)
+    {
+        var relatedEvidence = p.NormalizationContextMode.Equals("related-pages", StringComparison.Ordinal)
+            ? CollectRelatedEvidence(snapshot, allSnapshots, p.RelatedPagesMax, p.SameSessionMax, p.SemanticNeighborsMax)
+            : [];
+        var evidenceTotal = relatedEvidence.Count;
+        var withContext = evidenceTotal > 0;
+
+        var llmFields = await TryRepair5W1HWithLlmAsync(
+            snapshot,
+            learnedNormalization.Fields,
+            learnedNormalization.MissingFields,
+            relatedEvidence,
+            ct).ConfigureAwait(false);
+
+        return (withContext, evidenceTotal, llmFields);
     }
 
     private async Task PersistExecutionAsync(ScheduledJobExecution execution)
@@ -589,28 +713,41 @@ public sealed class JobExecutor(
         foreach (var rawLine in lines)
         {
             var line = rawLine.TrimEnd();
-            if (!started)
-            {
-                if (line.StartsWith("# Learned Fact", StringComparison.OrdinalIgnoreCase))
-                {
-                    started = true;
-                }
-
-                continue;
-            }
-
-            if (line.StartsWith("- ", StringComparison.Ordinal))
+            var action = ClassifyFactLine(line, ref started);
+            if (action == FactLineAction.Break)
             {
                 break;
             }
 
-            if (!string.IsNullOrWhiteSpace(line) || factLines.Count > 0)
+            if (action == FactLineAction.Add && (!string.IsNullOrWhiteSpace(line) || factLines.Count > 0))
             {
                 factLines.Add(line);
             }
         }
 
         return string.Join("\n", factLines).Trim();
+    }
+
+    private enum FactLineAction { Skip, Add, Break }
+
+    private static FactLineAction ClassifyFactLine(string line, ref bool started)
+    {
+        if (!started)
+        {
+            if (line.StartsWith("# Learned Fact", StringComparison.OrdinalIgnoreCase))
+            {
+                started = true;
+            }
+
+            return FactLineAction.Skip;
+        }
+
+        if (line.StartsWith("- ", StringComparison.Ordinal))
+        {
+            return FactLineAction.Break;
+        }
+
+        return FactLineAction.Add;
     }
 
     private static string NormalizeFactText(string factText)
@@ -898,34 +1035,39 @@ public sealed class JobExecutor(
                 return [];
             }
 
-            using var document = JsonDocument.Parse(json);
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return [];
-            }
-
-            var repaired = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var field in missingFields)
-            {
-                if (!document.RootElement.TryGetProperty(field, out var element) || element.ValueKind != JsonValueKind.String)
-                {
-                    continue;
-                }
-
-                var value = element.GetString();
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    repaired[field] = value.Trim();
-                }
-            }
-
-            return repaired;
+            return ApplyLlmFieldRepairs(json, missingFields);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Knowledge fact defrag LLM repair failed for page {PageKey}", snapshot.Key);
             return [];
         }
+    }
+
+    private static Dictionary<string, string> ApplyLlmFieldRepairs(string json, IReadOnlyList<string> missingFields)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            return [];
+        }
+
+        var repaired = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var field in missingFields)
+        {
+            if (!document.RootElement.TryGetProperty(field, out var element) || element.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            var value = element.GetString();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                repaired[field] = value.Trim();
+            }
+        }
+
+        return repaired;
     }
 
     private static IReadOnlyList<RelatedEvidencePage> CollectRelatedEvidence(
@@ -940,56 +1082,7 @@ public sealed class JobExecutor(
             return [];
         }
 
-        var candidates = new Dictionary<string, RelatedEvidenceCandidate>(StringComparer.Ordinal);
-        foreach (var candidate in snapshots)
-        {
-            if (candidate.Key.Equals(target.Key, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var score = 0;
-            var reasons = new List<string>();
-
-            var explicitlyLinked =
-                target.Supersedes.Contains(candidate.Key, StringComparer.Ordinal) ||
-                string.Equals(target.SupersededBy, candidate.Key, StringComparison.Ordinal) ||
-                candidate.Supersedes.Contains(target.Key, StringComparer.Ordinal) ||
-                string.Equals(candidate.SupersededBy, target.Key, StringComparison.Ordinal);
-            if (explicitlyLinked)
-            {
-                score += 100;
-                reasons.Add("linked");
-            }
-
-            if (!string.IsNullOrWhiteSpace(target.SessionId) &&
-                target.SessionId.Equals(candidate.SessionId, StringComparison.Ordinal))
-            {
-                score += 70;
-                reasons.Add("same-session");
-
-                if (!string.IsNullOrWhiteSpace(target.TurnId) &&
-                    target.TurnId.Equals(candidate.TurnId, StringComparison.Ordinal))
-                {
-                    score += 20;
-                    reasons.Add("same-turn");
-                }
-            }
-
-            var similarity = ComputeFactSimilarity(target.NormalizedFactText, candidate.NormalizedFactText);
-            if (similarity > 0.2)
-            {
-                score += (int)Math.Round(similarity * 30, MidpointRounding.AwayFromZero);
-                reasons.Add("semantic");
-            }
-
-            if (score <= 0 || reasons.Count == 0)
-            {
-                continue;
-            }
-
-            candidates[candidate.Key] = new RelatedEvidenceCandidate(candidate, score, reasons, similarity);
-        }
+        var candidates = ScoreAndCollectCandidates(target, snapshots);
 
         var selected = new List<RelatedEvidencePage>();
         var selectedKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -1004,6 +1097,71 @@ public sealed class JobExecutor(
         }
 
         return selected;
+    }
+
+    private static Dictionary<string, RelatedEvidenceCandidate> ScoreAndCollectCandidates(
+        FactPageSnapshot target,
+        IReadOnlyList<FactPageSnapshot> snapshots)
+    {
+        var candidates = new Dictionary<string, RelatedEvidenceCandidate>(StringComparer.Ordinal);
+        foreach (var candidate in snapshots)
+        {
+            if (candidate.Key.Equals(target.Key, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var (score, reasons, similarity) = ScoreCandidate(target, candidate);
+            if (score <= 0 || reasons.Count == 0)
+            {
+                continue;
+            }
+
+            candidates[candidate.Key] = new RelatedEvidenceCandidate(candidate, score, reasons, similarity);
+        }
+
+        return candidates;
+    }
+
+    private static (int Score, List<string> Reasons, double Similarity) ScoreCandidate(
+        FactPageSnapshot target, FactPageSnapshot candidate)
+    {
+        var score = 0;
+        var reasons = new List<string>();
+
+        var explicitlyLinked =
+            target.Supersedes.Contains(candidate.Key, StringComparer.Ordinal) ||
+            string.Equals(target.SupersededBy, candidate.Key, StringComparison.Ordinal) ||
+            candidate.Supersedes.Contains(target.Key, StringComparer.Ordinal) ||
+            string.Equals(candidate.SupersededBy, target.Key, StringComparison.Ordinal);
+        if (explicitlyLinked)
+        {
+            score += 100;
+            reasons.Add("linked");
+        }
+
+        if (!string.IsNullOrWhiteSpace(target.SessionId) &&
+            target.SessionId.Equals(candidate.SessionId, StringComparison.Ordinal))
+        {
+            score += 70;
+            reasons.Add("same-session");
+
+            if (!string.IsNullOrWhiteSpace(target.TurnId) &&
+                target.TurnId.Equals(candidate.TurnId, StringComparison.Ordinal))
+            {
+                score += 20;
+                reasons.Add("same-turn");
+            }
+        }
+
+        var similarity = ComputeFactSimilarity(target.NormalizedFactText, candidate.NormalizedFactText);
+        if (similarity > 0.2)
+        {
+            score += (int)Math.Round(similarity * 30, MidpointRounding.AwayFromZero);
+            reasons.Add("semantic");
+        }
+
+        return (score, reasons, similarity);
     }
 
     private static void AddCandidatesByReason(
@@ -1105,28 +1263,33 @@ public sealed class JobExecutor(
         var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var line in lines)
         {
-            if (!line.StartsWith("- ", StringComparison.Ordinal))
+            if (TryExtractMetadataEntry(line, out var key, out var value))
             {
-                continue;
+                metadata[key] = value;
             }
-
-            var separatorIndex = line.IndexOf(':');
-            if (separatorIndex <= 2)
-            {
-                continue;
-            }
-
-            var key = line[2..separatorIndex].Trim();
-            var value = line[(separatorIndex + 1)..].Trim();
-            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
-            {
-                continue;
-            }
-
-            metadata[key] = value;
         }
 
         return metadata;
+    }
+
+    private static bool TryExtractMetadataEntry(string line, out string key, out string value)
+    {
+        key = string.Empty;
+        value = string.Empty;
+        if (!line.StartsWith("- ", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var separatorIndex = line.IndexOf(':');
+        if (separatorIndex <= 2)
+        {
+            return false;
+        }
+
+        key = line[2..separatorIndex].Trim();
+        value = line[(separatorIndex + 1)..].Trim();
+        return !string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value);
     }
 
     private static string? GetMetadataValue(IReadOnlyDictionary<string, string> metadata, string key)
