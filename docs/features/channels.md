@@ -136,6 +136,6 @@ That is why the feature belongs in its own package but still routes through the 
 ## Related documentation
 - [Gateway API](gateway-api.md)
 - [Authentication and Authorization](authentication.md)
-- [Phase 2 Configuration](../configuration/phase-2-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)
 - [Long-Running Tasks, Progress Updates, and Continuation](long-running-tasks.md)
 - [Phase 2 Channel Expansion PRD](../plans/phase-2-channel-expansion-prd.md)

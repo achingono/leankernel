@@ -60,13 +60,11 @@ public sealed class ContextCandidateRetriever
         if (_retrievalConfig.ScopingEnabled)
         {
             var scope = _scopePolicy.ResolveScope(message);
-            var scopedResult = await _scopedKnowledge.RetrieveWithScopeAsync(message.Content, scope, maxResults: 20, ct).ConfigureAwait(false);
+            var scopedResult = await _scopedKnowledge.RetrieveWithScopeAsync(
+                message.Content, scope, maxResults: 20,
+                sessionId: sessionId, turnId: ResolveTurnId(message), ct).ConfigureAwait(false);
             knowledgeCandidates = scopedResult.Candidates;
-            diagnostics = scopedResult.Diagnostics with
-            {
-                SessionId = sessionId,
-                TurnId = ResolveTurnId(message),
-            };
+            diagnostics = scopedResult.Diagnostics;
 
             _logger.LogDebug(
                 "Retrieved {KnowledgeCount} scoped knowledge candidates for scope {Scope}",

@@ -89,24 +89,11 @@ try
         await using var scope = app.Services.CreateAsyncScope();
         var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<LeanKernelDbContext>>();
         await using var dbContext = await dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
-        await dbContext.Database.ExecuteSqlRawAsync("CREATE SCHEMA IF NOT EXISTS engine").ConfigureAwait(false);
-        var hasSessionsTable = await dbContext.Database
-            .SqlQueryRaw<int>("""SELECT CAST(COUNT(*) AS int) AS "Value" FROM information_schema.tables WHERE table_schema = 'engine' AND table_name = 'Sessions'""")
-            .FirstOrDefaultAsync().ConfigureAwait(false);
-        if (hasSessionsTable == 0)
-        {
-            await dbContext.Database.ExecuteSqlRawAsync("""DROP TABLE IF EXISTS engine."ScheduledJobExecutions" CASCADE""").ConfigureAwait(false);
-            var script = dbContext.Database.GenerateCreateScript();
-            await dbContext.Database.ExecuteSqlRawAsync(script).ConfigureAwait(false);
-        }
-        await dbContext.EnsureSchedulerSchemaAsync().ConfigureAwait(false);
-        await dbContext.EnsureUserIdIndexAsync().ConfigureAwait(false);
-        await dbContext.EnsureDocumentIngestionJobsSourcePathColumnAsync().ConfigureAwait(false);
-        await dbContext.EnsureFingerprintSchemaAsync().ConfigureAwait(false);
+        await dbContext.Database.MigrateAsync().ConfigureAwait(false);
     }
     catch (Exception ex)
     {
-        Log.Warning(ex, "Database initialization skipped because persistence is unavailable; continuing in degraded mode");
+        Log.Warning(ex, "Database migrations failed; running in degraded mode with persistence unavailable");
     }
 
     app.UseMiddleware<CorrelationIdMiddleware>();

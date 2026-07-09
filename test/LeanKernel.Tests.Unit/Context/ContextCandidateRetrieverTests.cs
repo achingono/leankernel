@@ -46,7 +46,7 @@ public class ContextCandidateRetrieverTests
         var retrievalConfig = new RetrievalConfig { ScopingEnabled = true, DefaultScope = "global" };
 
         scopedKnowledge
-            .Setup(service => service.RetrieveWithScopeAsync("Need status", "personal", 20, It.IsAny<CancellationToken>()))
+            .Setup(service => service.RetrieveWithScopeAsync("Need status", "personal", 20, "session-1", "turn-7", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ScopedRetrievalResult
             {
                 Candidates =
@@ -55,8 +55,8 @@ public class ContextCandidateRetrieverTests
                 ],
                 Diagnostics = new RetrievalDiagnostics
                 {
-                    SessionId = "unknown",
-                    TurnId = "unknown",
+                    SessionId = "session-1",
+                    TurnId = "turn-7",
                     EffectiveScope = "personal",
                     Decisions =
                     [

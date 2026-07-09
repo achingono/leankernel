@@ -42,7 +42,11 @@ public class DynamicSkillToolHttpTests
             Runtime = new SkillRuntimeConfig
             {
                 Type = "http",
-                BaseUrl = "https://api.example.com"
+                BaseUrl = "https://api.example.com",
+                Egress = new SkillEgressConfig
+                {
+                    AllowHosts = ["api.example.com"]
+                }
             },
             Operations = [operation ?? new SkillOperation
             {
@@ -274,7 +278,6 @@ public class DynamicSkillToolHttpTests
     [Fact]
     public async Task Handler_with_bearer_auth_includes_authorization_header()
     {
-        const string secretKey = "LEANKERNEL_TEST_SKILL_TOKEN";
         var skill = new SkillDefinition
         {
             Name = "test", Description = "desc",
@@ -282,16 +285,20 @@ public class DynamicSkillToolHttpTests
             {
                 Type = "http",
                 BaseUrl = "https://api.example.com",
+                Egress = new SkillEgressConfig
+                {
+                    AllowHosts = ["api.example.com"]
+                },
                 Auth = new SkillAuthConfig
                 {
                     Type = "bearer",
-                    SecretRef = secretKey
+                    SecretRef = "skill/test-token"
                 }
             },
             Operations = [new SkillOperation { Id = "op", Summary = "op", Invoke = new SkillInvokeConfig { HttpMethod = "GET" } }]
         };
 
-        Environment.SetEnvironmentVariable(secretKey, "test-token-value");
+        Environment.SetEnvironmentVariable("SKILL__SKILL_TEST_TOKEN", "test-token-value");
         try
         {
             var (tool, handler) = CreateHttpTool(skill);
@@ -305,8 +312,60 @@ public class DynamicSkillToolHttpTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable(secretKey, null);
+            Environment.SetEnvironmentVariable("SKILL__SKILL_TEST_TOKEN", null);
         }
+    }
+
+    [Fact]
+    public async Task Handler_blocks_requests_to_disallowed_hosts()
+    {
+        var skill = new SkillDefinition
+        {
+            Name = "test",
+            Description = "desc",
+            Runtime = new SkillRuntimeConfig
+            {
+                Type = "http",
+                BaseUrl = "https://api.example.com",
+                Egress = new SkillEgressConfig
+                {
+                    AllowHosts = ["other.example.com"]
+                }
+            },
+            Operations = [new SkillOperation { Id = "op", Summary = "op", Invoke = new SkillInvokeConfig { HttpMethod = "GET" } }]
+        };
+
+        var (tool, _) = CreateHttpTool(skill);
+        var result = await tool.Handler!(new Dictionary<string, object?>(), CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("not in runtime.egress.allowHosts");
+    }
+
+    [Fact]
+    public async Task Handler_blocks_non_http_schemes()
+    {
+        var skill = new SkillDefinition
+        {
+            Name = "test",
+            Description = "desc",
+            Runtime = new SkillRuntimeConfig
+            {
+                Type = "http",
+                BaseUrl = "file:///tmp",
+                Egress = new SkillEgressConfig
+                {
+                    AllowHosts = ["tmp"]
+                }
+            },
+            Operations = [new SkillOperation { Id = "op", Summary = "op", Invoke = new SkillInvokeConfig { HttpMethod = "GET" } }]
+        };
+
+        var (tool, _) = CreateHttpTool(skill);
+        var result = await tool.Handler!(new Dictionary<string, object?>(), CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("unsupported scheme");
     }
 
     [Fact]
@@ -319,6 +378,10 @@ public class DynamicSkillToolHttpTests
             {
                 Type = "http",
                 BaseUrl = "https://api.example.com",
+                Egress = new SkillEgressConfig
+                {
+                    AllowHosts = ["api.example.com"]
+                },
                 Auth = new SkillAuthConfig { Type = "basic" }
             },
             Operations = [new SkillOperation { Id = "op", Summary = "op", Invoke = new SkillInvokeConfig { HttpMethod = "GET" } }]
@@ -341,6 +404,10 @@ public class DynamicSkillToolHttpTests
             {
                 Type = "http",
                 BaseUrl = "https://api.example.com",
+                Egress = new SkillEgressConfig
+                {
+                    AllowHosts = ["api.example.com"]
+                },
                 Auth = new SkillAuthConfig { Type = "bearer" }
             },
             Operations = [new SkillOperation { Id = "op", Summary = "op", Invoke = new SkillInvokeConfig { HttpMethod = "GET" } }]

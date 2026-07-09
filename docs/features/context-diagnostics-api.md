@@ -139,4 +139,4 @@ The best way to think about context diagnostics now is:
 - [Scoped Retrieval](scoped-retrieval.md)
 - [History Shaping](history-shaping.md)
 - [Gateway API](gateway-api.md)
-- [Phase 2 Configuration](../configuration/phase-2-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

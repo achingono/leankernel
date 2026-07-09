@@ -8,7 +8,6 @@ This section covers the LeanKernel runtime skill system — how skills are defin
 |----------|-------------|
 | [skill-format.md](skill-format.md) | Implemented `SKILL.md` frontmatter contract and runtime execution behavior. |
 | [runtime-skills.md](runtime-skills.md) | Canonical overview of skill discovery, loading, and execution lifecycle. |
-| [runtime-skills-plan.md](runtime-skills-plan.md) | Roadmap/remediation notes for future skill system hardening. |
 
 ## How Skills Work
 

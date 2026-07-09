@@ -9,7 +9,11 @@ Gateway runtime defaults are defined in appsettings files.
 
 ## Important Defaults
 
-- API key auth is optional by default (`LeanKernel:Gateway:ApiKey` empty).
+- Gateway API auth is fail-closed by default:
+  - `LeanKernel:Gateway:RequireApiKey=true`
+  - `LeanKernel:Gateway:AllowAnonymous=false`
+  - `LeanKernel:Gateway:ApiKey` / `LeanKernel:Gateway:ApiKeys` provide accepted keys
+- Development overrides set `LeanKernel:Gateway:AllowAnonymous=true` for local DX.
 - Diagnostics and context diagnostics are enabled by default.
 - Channel typing keepalive and continuation are enabled by default.
 - Hardening rate limit is enabled by default.

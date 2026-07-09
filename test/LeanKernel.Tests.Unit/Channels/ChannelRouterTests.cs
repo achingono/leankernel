@@ -4,6 +4,7 @@ using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Agents;
 using LeanKernel.Channels;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -779,16 +780,22 @@ public class ChannelRouterTests
         LeanKernelConfig? leanKernelConfig = null,
         ITurnProgressBroker? progressBroker = null,
         TimeProvider? timeProvider = null)
-        => new(
-            runtime,
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(runtime);
+        services.AddSingleton(sessions);
+        var provider = services.BuildServiceProvider();
+
+        return new(
+            provider.GetRequiredService<IServiceScopeFactory>(),
             new ChannelAuthenticator(NullLogger<ChannelAuthenticator>.Instance, Options.Create(config)),
             channels,
             Options.Create(config),
             Options.Create(leanKernelConfig ?? new LeanKernelConfig()),
-            sessions,
             NullLogger<ChannelRouter>.Instance,
             progressBroker,
             timeProvider: timeProvider);
+    }
 
     private sealed class MutableTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {

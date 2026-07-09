@@ -114,4 +114,4 @@ Response enhancement is a last-mile improvement layer. It does not replace routi
 - [Turn Pipeline](turn-pipeline.md)
 - [Quality Gates](quality-gates.md)
 - [Learning Pipeline](learning-pipeline.md)
-- [Phase 3 Configuration](../configuration/phase-3-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

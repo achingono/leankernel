@@ -33,29 +33,29 @@ public class GatewayEndpointTests
     [Fact]
     public async Task Chat_endpoint_returns_response_for_a_valid_request()
     {
-        await using var factory = new GatewayTestApplicationFactory();
+        await using var factory = new GatewayTestApplicationFactory(allowAnonymous: true);
         using var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest { Message = "Hello" });
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest { Message = "Hello", UserId = "user-42" });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = JsonNode.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal("stub-response", payload?["response"]?.GetValue<string>());
-        Assert.Equal("generated-api-session", payload?["sessionId"]?.GetValue<string>());
-        Assert.Equal("generated-api-session", factory.Runtime.LastMessage?.SessionId);
+        Assert.Equal("generated-user-42-session", payload?["sessionId"]?.GetValue<string>());
+        Assert.Equal("generated-user-42-session", factory.Runtime.LastMessage?.SessionId);
         Assert.Equal("Hello", factory.Runtime.LastMessage?.Content);
-        Assert.Equal("api-user", factory.Runtime.LastMessage?.SenderId);
+        Assert.Equal("user-42", factory.Runtime.LastMessage?.SenderId);
         Assert.Equal("api", factory.Runtime.LastMessage?.ChannelId);
     }
 
     [Fact]
     public async Task Chat_endpoint_rejects_requests_with_missing_message()
     {
-        await using var factory = new GatewayTestApplicationFactory();
+        await using var factory = new GatewayTestApplicationFactory(allowAnonymous: true);
         using var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest { Message = "  " });
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest { Message = "  ", UserId = "user-42" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -100,8 +100,101 @@ public class GatewayEndpointTests
         Assert.Equal("session-123", payload?["sessionId"]?.GetValue<string>());
         Assert.Equal("session-123", factory.Runtime.LastMessage?.SessionId);
         Assert.Equal("user-42", factory.Runtime.LastMessage?.SenderId);
-        Assert.Equal("channel-42", factory.Runtime.LastMessage?.ChannelId);
+        Assert.Equal("api", factory.Runtime.LastMessage?.ChannelId);
         Assert.Equal("personal", factory.Runtime.LastMessage?.Metadata?["retrieval_scope"]);
+    }
+
+    [Fact]
+    public async Task Chat_endpoint_rejects_requests_by_default_when_no_keys_are_configured()
+    {
+        await using var factory = new GatewayTestApplicationFactory(allowAnonymous: false);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest { Message = "Hello", UserId = "user-42" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Chat_endpoint_allows_requests_when_no_keys_are_configured_and_allow_anonymous_is_enabled()
+    {
+        await using var factory = new GatewayTestApplicationFactory(allowAnonymous: true);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest { Message = "Hello", UserId = "user-42" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Chat_endpoint_forces_api_channel_for_unauthenticated_requests()
+    {
+        await using var factory = new GatewayTestApplicationFactory(allowAnonymous: true);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest
+        {
+            Message = "Hello",
+            UserId = "user-42",
+            ChannelId = "foreign-channel"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("api", factory.Runtime.LastMessage?.ChannelId);
+    }
+
+    [Fact]
+    public async Task Chat_endpoint_rejects_session_ids_that_do_not_belong_to_the_caller_even_when_unauthenticated()
+    {
+        await using var factory = new GatewayTestApplicationFactory(allowAnonymous: true);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest
+        {
+            Message = "Hello",
+            UserId = "user-42",
+            SessionId = "session-not-owned"
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Chat_endpoint_requires_user_id_for_unauthenticated_requests()
+    {
+        await using var factory = new GatewayTestApplicationFactory(allowAnonymous: true);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/chat", new ChatRequest { Message = "Hello" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_callers_do_not_share_a_session()
+    {
+        await using var factory = new GatewayTestApplicationFactory(allowAnonymous: true);
+        using var client = factory.CreateClient();
+
+        var responseA = await client.PostAsJsonAsync("/api/chat", new ChatRequest { Message = "Hello", UserId = "anon-a" });
+        var payloadA = JsonNode.Parse(await responseA.Content.ReadAsStringAsync());
+        var responseB = await client.PostAsJsonAsync("/api/chat", new ChatRequest { Message = "Hello", UserId = "anon-b" });
+        var payloadB = JsonNode.Parse(await responseB.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, responseA.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, responseB.StatusCode);
+        Assert.NotEqual(payloadA?["sessionId"]?.GetValue<string>(), payloadB?["sessionId"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Admin_backfill_endpoint_always_requires_an_api_key()
+    {
+        await using var factory = new GatewayTestApplicationFactory(apiKey: "secret-key", allowAnonymous: true);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/admin/ingestion/backfill", new BackfillRequest { SourceDirectory = "/tmp" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -231,17 +324,20 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
     private readonly bool _registerDiagnosticsSink;
     private readonly bool _enableForwardedAuth;
     private readonly bool _forwardedAuthRequireAuthenticatedUser;
+    private readonly bool _allowAnonymous;
 
     public GatewayTestApplicationFactory(
         string? apiKey = null,
         bool registerDiagnosticsSink = true,
         bool enableForwardedAuth = false,
-        bool forwardedAuthRequireAuthenticatedUser = false)
+        bool forwardedAuthRequireAuthenticatedUser = false,
+        bool allowAnonymous = false)
     {
         _apiKey = apiKey;
         _registerDiagnosticsSink = registerDiagnosticsSink;
         _enableForwardedAuth = enableForwardedAuth;
         _forwardedAuthRequireAuthenticatedUser = forwardedAuthRequireAuthenticatedUser;
+        _allowAnonymous = allowAnonymous;
     }
 
     public RecordingAgentRuntime Runtime { get; } = new();
@@ -256,6 +352,8 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
             var configValues = new Dictionary<string, string?>
             {
                 ["LeanKernel:Gateway:ApiKey"] = _apiKey ?? string.Empty,
+                ["LeanKernel:Gateway:AllowAnonymous"] = _allowAnonymous ? "true" : "false",
+                ["LeanKernel:Gateway:RequireApiKey"] = "true",
                 ["LeanKernel:Database:ConnectionString"] = "Host=localhost;Database=leankernel;Username=leankernel;Password=leankernel",
                 ["LeanKernel:GBrain:BaseUrl"] = "http://localhost:8789",
                 ["LeanKernel:GBrain:TimeoutSeconds"] = "1",
@@ -312,7 +410,6 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
 
     public sealed class RecordingSessionStore : ISessionStore
     {
-        public string GeneratedSessionId { get; set; } = "generated-api-session";
         public Dictionary<string, HashSet<string>> OwnedSessionIdsByUser { get; set; } = new(StringComparer.Ordinal)
         {
             ["user-42"] = new HashSet<string>(StringComparer.Ordinal) { "session-123" },
@@ -321,7 +418,7 @@ public sealed class GatewayTestApplicationFactory : WebApplicationFactory<Progra
         };
 
         public Task<string> GetOrCreateSessionIdAsync(string channelId, string userId, CancellationToken ct = default)
-            => Task.FromResult(GeneratedSessionId);
+            => Task.FromResult($"generated-{userId}-session");
 
         public Task AppendTurnAsync(string sessionId, ConversationTurn turn, CancellationToken ct = default)
             => Task.CompletedTask;

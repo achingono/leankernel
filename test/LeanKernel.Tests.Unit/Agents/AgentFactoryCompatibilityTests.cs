@@ -5,6 +5,7 @@ using LeanKernel.Agents;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using System.Text.Json;
 
 namespace LeanKernel.Tests.Unit.Agents;
 
@@ -271,6 +272,32 @@ public class AgentFactoryCompatibilityTests
     }
 
     [Fact]
+    public async Task ChatClient_does_not_replay_legacy_calls_for_tools_not_offered_in_chat_options()
+    {
+        var toolExecutor = new Mock<IToolExecutor>(MockBehavior.Strict);
+
+        const string legacyJson = "{\"type\":\"function\",\"name\":\"wiki_write\",\"parameters\":{\"key\":\"greeting\",\"content\":\"Hello!\"}}";
+        var chatClient = new SequencedChatClient([
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, legacyJson))
+        ]);
+
+        var factory = new AgentFactory(
+            chatClient,
+            NullLogger<AgentFactory>.Instance,
+            toolExecutor: toolExecutor.Object);
+
+        var response = await factory.ChatClient.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "Hello!")],
+            new ChatOptions
+            {
+                Tools = [new NamedTool("different_tool")]
+            });
+
+        response.Text.Should().Be(legacyJson);
+        toolExecutor.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public void ChatClient_forwards_service_queries_and_disposal()
     {
         var toolExecutor = new Mock<IToolExecutor>(MockBehavior.Strict);
@@ -367,5 +394,24 @@ public class AgentFactoryCompatibilityTests
         {
             WasDisposed = true;
         }
+    }
+
+    private sealed class NamedTool : AIFunction
+    {
+        private readonly JsonElement _schema = JsonSerializer.SerializeToElement(new { type = "object" });
+
+        public NamedTool(string name)
+        {
+            Name = name;
+        }
+
+        public override string Name { get; }
+
+        public override string Description => Name;
+
+        public override JsonElement JsonSchema => _schema;
+
+        protected override ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
+            => ValueTask.FromResult<object?>(null);
     }
 }

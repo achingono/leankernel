@@ -9,6 +9,7 @@ namespace LeanKernel.Tools;
 /// </summary>
 public sealed class ToolRegistry : IToolRegistry
 {
+    private readonly object _sync = new();
     private readonly Dictionary<string, ToolDefinition> _tools = new(StringComparer.OrdinalIgnoreCase);
     private readonly ToolGovernancePolicy _policy;
     private readonly ILogger<ToolRegistry> _logger;
@@ -37,14 +38,20 @@ public sealed class ToolRegistry : IToolRegistry
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var visible = _tools.Values
+        List<ToolDefinition> snapshot;
+        lock (_sync)
+        {
+            snapshot = [.. _tools.Values];
+        }
+
+        var visible = snapshot
             .Where(tool => _policy.IsVisible(tool, context))
             .ToList();
 
         _logger.LogDebug(
             "Tool visibility: {Visible}/{Total} tools visible for context",
             visible.Count,
-            _tools.Count);
+            snapshot.Count);
 
         return visible;
     }
@@ -53,7 +60,12 @@ public sealed class ToolRegistry : IToolRegistry
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        _tools.TryGetValue(name, out var tool);
+        ToolDefinition? tool;
+        lock (_sync)
+        {
+            _tools.TryGetValue(name, out tool);
+        }
+
         return tool;
     }
 
@@ -64,11 +76,24 @@ public sealed class ToolRegistry : IToolRegistry
         var count = 0;
         foreach (var tool in tools)
         {
-            if (_tools.TryAdd(tool.Name, tool))
-                count++;
+            lock (_sync)
+            {
+                if (_tools.TryAdd(tool.Name, tool))
+                {
+                    count++;
+                }
+            }
         }
 
         if (count > 0)
-            _logger.LogInformation("Tool registry added {Count} new tools (total: {Total})", count, _tools.Count);
+        {
+            var total = 0;
+            lock (_sync)
+            {
+                total = _tools.Count;
+            }
+
+            _logger.LogInformation("Tool registry added {Count} new tools (total: {Total})", count, total);
+        }
     }
 }

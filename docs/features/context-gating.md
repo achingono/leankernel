@@ -158,4 +158,4 @@ If another high-scoring candidate would overflow the pooled knowledge budget, it
 - [Knowledge Retrieval](knowledge-retrieval.md)
 - [Tool Governance](tool-governance.md)
 - [Diagnostics](diagnostics.md)
-- [Phase 1 Configuration](../configuration/phase-1-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

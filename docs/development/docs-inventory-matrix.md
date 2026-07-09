@@ -15,7 +15,6 @@ Status values:
 | --- | --- | --- | --- |
 | `docs/index.md` | all contributors | accurate | self |
 | `docs/CONTRIBUTING-DOCS.md` | doc contributors | partial | `docs/development/docs-style-guide.md` |
-| `docs/channel-consolidation.md` | maintainers | partial | `docs/features/channels/index.md` |
 | `docs/getting-started/index.md` | new contributors | accurate | self |
 | `docs/getting-started/quick-start.md` | new contributors | accurate | self |
 | `docs/getting-started/local-development.md` | developers | accurate | self |
@@ -31,12 +30,6 @@ Status values:
 | `docs/architecture/data-and-persistence.md` | developers | accurate | self |
 | `docs/architecture/infrastructure-and-deploy.md` | developers/operators | accurate | self |
 | `docs/architecture/solution-structure.md` | developers | accurate | self |
-| `docs/architecture/overview.md` | developers | duplicate | `docs/architecture/system-overview.md` |
-| `docs/architecture/architecture.md` | developers | duplicate | `docs/architecture/system-overview.md` |
-| `docs/architecture/key-flows.md` | developers | duplicate | `docs/architecture/runtime-flows.md` |
-| `docs/architecture/infrastructure.md` | developers/operators | duplicate | `docs/architecture/infrastructure-and-deploy.md` |
-| `docs/architecture/data-model.md` | developers | duplicate | `docs/architecture/data-and-persistence.md` |
-| `docs/architecture/gaps-and-roadmap.md` | maintainers | stale | `docs/plans/index.md` |
 | `docs/features/index.md` | developers | accurate | self |
 | `docs/features/agent-runtime/index.md` | developers | accurate | self |
 | `docs/features/channels/index.md` | developers | accurate | self |
@@ -52,9 +45,6 @@ Status values:
 | `docs/configuration/configuration-reference.md` | operators/developers | accurate | self |
 | `docs/configuration/environment-variables.md` | operators/developers | accurate | self |
 | `docs/configuration/appsettings-reference.md` | operators/developers | accurate | self |
-| `docs/configuration/phase-1-config.md` | maintainers | partial | `docs/configuration/configuration-reference.md` |
-| `docs/configuration/phase-2-config.md` | maintainers | partial | `docs/configuration/configuration-reference.md` |
-| `docs/configuration/phase-3-config.md` | maintainers | partial | `docs/configuration/configuration-reference.md` |
 | `docs/development/index.md` | contributors | accurate | self |
 | `docs/development/build-and-test.md` | contributors | accurate | self |
 | `docs/development/docs-style-guide.md` | contributors | accurate | self |
@@ -67,7 +57,6 @@ Status values:
 | `docs/skills/index.md` | contributors | accurate | self |
 | `docs/skills/skill-format.md` | contributors | accurate | self |
 | `docs/skills/runtime-skills.md` | contributors | accurate | self |
-| `docs/skills/runtime-skills-plan.md` | maintainers | partial | `docs/skills/runtime-skills.md` |
 
 ## Plans Inventory
 

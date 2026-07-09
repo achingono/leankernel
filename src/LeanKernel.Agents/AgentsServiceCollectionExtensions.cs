@@ -97,7 +97,6 @@ public static class AgentsServiceCollectionExtensions
                 provider.GetRequiredService<IOptions<LeanKernelConfig>>(),
                 provider.GetRequiredService<ILogger<ContinuationTurnPipeline>>(),
                 provider.GetService<ITurnProgressBroker>(),
-                provider.GetService<ISpendGuardService>(),
                 provider.GetService<LeanKernel.Diagnostics.LeanKernelMetrics>())));
         services.AddScoped<IAgentRuntime, AgentRuntime>();
 

@@ -151,4 +151,4 @@ The best way to think about the feature is as an observability toolkit rather th
 - [Context Diagnostics API](context-diagnostics-api.md)
 - [Gateway API](gateway-api.md)
 - [Authentication and Authorization](authentication.md)
-- [Phase 1 Configuration](../configuration/phase-1-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

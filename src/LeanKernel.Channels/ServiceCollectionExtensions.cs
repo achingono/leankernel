@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IOptions<LeanKernelConfig>>(Options.Create(new LeanKernelConfig()));
         services.AddSingleton<IChannelRouter, ChannelRouter>();
         services.AddSingleton<ChannelAuthenticator>();
+        services.AddSingleton<ISignalAttachmentParser, SignalAttachmentParser>();
 
         if (config.Signal.Enabled)
         {

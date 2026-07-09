@@ -66,6 +66,7 @@ public sealed class TurnPipeline : ITurnPipeline
     private const int MaxPromptAttachmentCount = 4;
     private const int MaxPromptAttachmentTextChars = 3000;
     private const int MaxTaskStatusDirectivePayloadChars = 2048;
+    private const int MinimumEnforcedInputBudgetTokens = 512;
     private const string InternalTurnMetadataKey = "internal_turn";
     private const string InternalReasonMetadataKey = "internal_reason";
     private const string AutoContinuationPromptReason = "auto_continuation_prompt";
@@ -93,6 +94,7 @@ public sealed class TurnPipeline : ITurnPipeline
     private readonly PolicyModelSelector? _policyModelSelector;
     private readonly IToolSelector _toolSelector;
     private readonly ITurnProgressBroker? _turnProgressBroker;
+    private readonly ISignalAttachmentParser? _signalAttachmentParser;
 
     public TurnPipeline(
         IContextGatekeeper gatekeeper,
@@ -116,7 +118,8 @@ public sealed class TurnPipeline : ITurnPipeline
         TaskComplexityScorer? taskComplexityScorer = null,
         PolicyModelSelector? policyModelSelector = null,
         IToolSelector? toolSelector = null,
-        ITurnProgressBroker? turnProgressBroker = null)
+        ITurnProgressBroker? turnProgressBroker = null,
+        ISignalAttachmentParser? signalAttachmentParser = null)
     {
         ArgumentNullException.ThrowIfNull(gatekeeper);
         ArgumentNullException.ThrowIfNull(sessions);
@@ -148,6 +151,7 @@ public sealed class TurnPipeline : ITurnPipeline
         _policyModelSelector = policyModelSelector;
         _toolSelector = toolSelector ?? NullToolSelector.Instance;
         _turnProgressBroker = turnProgressBroker;
+        _signalAttachmentParser = signalAttachmentParser;
     }
 
     public async Task<string> ProcessAsync(LeanKernelMessage message, CancellationToken ct = default)
@@ -166,6 +170,7 @@ public sealed class TurnPipeline : ITurnPipeline
         var progressTurnId = ResolveProgressTurnId(turnScopedMessage.Metadata, turnId);
         TurnToolInvocationTracker? toolInvocationTracker = null;
         IReadOnlyList<ToolDefinition>? visibleToolsForLogging = null;
+        SpendReservation? spendReservation = null;
         using var turnActivity = _diagnosticsCollector?.StartTurnActivity(sessionId, turnId);
 
         try
@@ -195,21 +200,48 @@ public sealed class TurnPipeline : ITurnPipeline
                 turnScopedMessage.SenderId);
 
             var context = CopyWithToolNames(gatedContext, visibleToolNames);
-
-            await StoreContextDiagnosticsAsync(sessionId, turnId, context, budget, ct);
-
+            var userMessageForModel = await BuildUserMessageForModelAsync(turnScopedMessage, ct).ConfigureAwait(false);
             var systemMessage = _promptAssembler.AssembleSystemMessage(context);
 
             var strategyContext = new AgentStrategyContext
             {
                 SessionId = sessionId,
                 TurnId = turnId,
-                UserMessage = await BuildUserMessageForModelAsync(turnScopedMessage, ct).ConfigureAwait(false),
+                UserMessage = userMessageForModel,
                 SystemMessage = systemMessage,
                 History = context.History,
                 Tools = visibleTools.Select(ToolDefinitionAIToolAdapter.Create).ToArray(),
                 AvailableToolNames = visibleToolNames,
             };
+
+            var budgetResult = EnforceFinalInputBudget(context, strategyContext, visibleTools, budget.TotalTokens);
+            context = budgetResult.Context;
+            strategyContext = budgetResult.StrategyContext;
+
+            if (budgetResult.WasTrimmed)
+            {
+                _logger.LogWarning(
+                    "Trimmed final provider input to fit context budget (session={SessionId}, turn={TurnId}, before={BeforeTokens}, after={AfterTokens}, budget={BudgetTokens})",
+                    sessionId,
+                    turnId,
+                    budgetResult.TokensBeforeTrim,
+                    budgetResult.TokensAfterTrim,
+                    budget.TotalTokens);
+            }
+
+            context = CopyContextWithBudgetUsage(context, budgetResult.BudgetUsage);
+
+            await StoreContextDiagnosticsAsync(sessionId, turnId, context, budget, ct);
+
+            SpendGuardDecision? budgetOverflowDecision = null;
+            if (budgetResult.OverflowedAfterTrim)
+            {
+                budgetOverflowDecision = new SpendGuardDecision
+                {
+                    Action = SpendGuardAction.Block,
+                    Reason = "This request exceeded the configured context token budget after deterministic trimming.",
+                };
+            }
 
             var projectedExecution = PredictExecution(strategyContext);
             var estimatedOutputTokens = EstimateOutputTokens(projectedExecution.InputTokens);
@@ -225,6 +257,33 @@ public sealed class TurnPipeline : ITurnPipeline
             if (spendDecision?.Action == SpendGuardAction.Warn && !string.IsNullOrWhiteSpace(spendDecision.Reason))
             {
                 warnings.Add(spendDecision.Reason);
+            }
+
+            if (spendDecision is not null
+                && spendDecision.Action is SpendGuardAction.Allow or SpendGuardAction.Warn
+                && _spendTracker is not null)
+            {
+                var reserved = _spendTracker.TryReserveSpend(
+                    sessionId,
+                    turnId,
+                    spendDecision.EstimatedCostUsd,
+                    spendDecision.DailyLimitUsd,
+                    spendDecision.SessionLimitUsd,
+                    spendDecision.MonthlyLimitUsd,
+                    out spendReservation);
+                if (!reserved)
+                {
+                    spendDecision = spendDecision with
+                    {
+                        Action = SpendGuardAction.Block,
+                        Reason = "This request was blocked because spend limits were reached by concurrent activity.",
+                    };
+                }
+            }
+
+            if (budgetOverflowDecision is not null)
+            {
+                spendDecision = budgetOverflowDecision;
             }
 
             var (response, modelExecutedSuccessfully) = await ResolveModelResponseAsync(
@@ -262,9 +321,20 @@ public sealed class TurnPipeline : ITurnPipeline
                 var actualTier = strategyContext.RoutingDecision?.SelectedTier ?? projectedExecution.Tier;
                 var outputTokens = _tokenEstimator.EstimateTokens(response);
                 var actualCostUsd = _spendGuardService.EstimateCostUsd(actualTier, projectedExecution.InputTokens, outputTokens);
-                await _spendTracker.RecordSpendAsync(sessionId, turnId, actualCostUsd, ct).ConfigureAwait(false);
+                if (spendReservation is not null)
+                {
+                    await _spendTracker.CommitReservedSpendAsync(spendReservation, actualCostUsd, ct).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _spendTracker.RecordSpendAsync(sessionId, turnId, actualCostUsd, ct).ConfigureAwait(false);
+                }
                 _metrics?.RecordTurnProcessed(strategyContext.ModelUsed ?? _config.LiteLlm.DefaultModel);
                 _metrics?.RecordTokensUsed(projectedExecution.InputTokens + outputTokens, strategyContext.ModelUsed ?? _config.LiteLlm.DefaultModel);
+            }
+            else if (spendReservation is not null)
+            {
+                _spendTracker?.ReleaseReservedSpend(spendReservation);
             }
 
             response = AppendWarnings(response, warnings);
@@ -292,6 +362,11 @@ public sealed class TurnPipeline : ITurnPipeline
         }
         catch
         {
+            if (spendReservation is not null)
+            {
+                _spendTracker?.ReleaseReservedSpend(spendReservation);
+            }
+
             LogToolExecutionSummary(turnId, sessionId, visibleToolsForLogging, toolInvocationTracker);
             throw;
         }
@@ -667,9 +742,9 @@ public sealed class TurnPipeline : ITurnPipeline
         {
             throw;
         }
-        catch
+        catch (Exception ex)
         {
-            // Progress publish errors are intentionally isolated from turn execution.
+            _logger.LogDebug(ex, "Failed to publish turn progress update for session {SessionId} turn {TurnId}", update.SessionId, update.TurnId);
         }
     }
 
@@ -1155,6 +1230,184 @@ public sealed class TurnPipeline : ITurnPipeline
             RetrievalDiagnostics = context.RetrievalDiagnostics,
         };
 
+    private ConversationContext CopyContextWithBudgetUsage(ConversationContext context, ContextBudgetUsage budgetUsage)
+        => new()
+        {
+            SystemPrompt = context.SystemPrompt,
+            SessionId = context.SessionId,
+            History = context.History,
+            WikiFacts = context.WikiFacts,
+            RetrievedKnowledge = context.RetrievedKnowledge,
+            Identity = context.Identity,
+            Onboarding = context.Onboarding,
+            ActiveToolNames = context.ActiveToolNames,
+            BudgetUsage = budgetUsage,
+            AdmissionLog = context.AdmissionLog,
+            HistoryDiagnostics = context.HistoryDiagnostics,
+            RetrievalDiagnostics = context.RetrievalDiagnostics,
+        };
+
+    private FinalInputBudgetResult EnforceFinalInputBudget(
+        ConversationContext context,
+        AgentStrategyContext strategyContext,
+        IReadOnlyList<ToolDefinition> visibleTools,
+        int maxInputTokens)
+    {
+        var toolsTokens = EstimateToolsTokens(visibleTools);
+        var initialTokens = EstimateFinalInputTokens(
+            strategyContext.SystemMessage,
+            strategyContext.UserMessage,
+            strategyContext.History,
+            toolsTokens);
+
+        if (maxInputTokens < MinimumEnforcedInputBudgetTokens)
+        {
+            var passthroughUsage = context.BudgetUsage ?? new ContextBudgetUsage
+            {
+                SystemPromptUsed = _tokenEstimator.EstimateTokens(strategyContext.SystemMessage),
+                WikiFactsUsed = context.WikiFacts.Sum(candidate => candidate.TokenCount > 0 ? candidate.TokenCount : _tokenEstimator.EstimateTokens(candidate.Content)),
+                RetrievalUsed = context.RetrievedKnowledge.Sum(candidate => candidate.TokenCount > 0 ? candidate.TokenCount : _tokenEstimator.EstimateTokens(candidate.Content)),
+                ConversationUsed = context.History.Sum(turn => _tokenEstimator.EstimateTokens(turn.Content)),
+                ToolsUsed = toolsTokens,
+            };
+
+            return new FinalInputBudgetResult(
+                context,
+                strategyContext,
+                WasTrimmed: false,
+                OverflowedAfterTrim: false,
+                TokensBeforeTrim: initialTokens,
+                TokensAfterTrim: initialTokens,
+                passthroughUsage);
+        }
+
+        var history = context.History.ToList();
+        var wikiFacts = context.WikiFacts.ToList();
+        var retrieval = context.RetrievedKnowledge.ToList();
+
+        var currentContext = BuildContextSlice(context, history, wikiFacts, retrieval);
+        var currentSystemMessage = _promptAssembler.AssembleSystemMessage(currentContext);
+        var tokensBeforeTrim = EstimateFinalInputTokens(currentSystemMessage, strategyContext.UserMessage, history, toolsTokens);
+        var currentTokens = tokensBeforeTrim;
+        var trimmed = false;
+
+        while (currentTokens > maxInputTokens && history.Count > 1)
+        {
+            history.RemoveAt(0);
+            trimmed = true;
+            currentContext = BuildContextSlice(context, history, wikiFacts, retrieval);
+            currentSystemMessage = _promptAssembler.AssembleSystemMessage(currentContext);
+            currentTokens = EstimateFinalInputTokens(currentSystemMessage, strategyContext.UserMessage, history, toolsTokens);
+        }
+
+        while (currentTokens > maxInputTokens && retrieval.Count > 0)
+        {
+            retrieval.RemoveAt(retrieval.Count - 1);
+            trimmed = true;
+            currentContext = BuildContextSlice(context, history, wikiFacts, retrieval);
+            currentSystemMessage = _promptAssembler.AssembleSystemMessage(currentContext);
+            currentTokens = EstimateFinalInputTokens(currentSystemMessage, strategyContext.UserMessage, history, toolsTokens);
+        }
+
+        while (currentTokens > maxInputTokens && wikiFacts.Count > 0)
+        {
+            wikiFacts.RemoveAt(wikiFacts.Count - 1);
+            trimmed = true;
+            currentContext = BuildContextSlice(context, history, wikiFacts, retrieval);
+            currentSystemMessage = _promptAssembler.AssembleSystemMessage(currentContext);
+            currentTokens = EstimateFinalInputTokens(currentSystemMessage, strategyContext.UserMessage, history, toolsTokens);
+        }
+
+        var budgetUsage = new ContextBudgetUsage
+        {
+            SystemPromptUsed = _tokenEstimator.EstimateTokens(currentSystemMessage),
+            WikiFactsUsed = wikiFacts.Sum(candidate => candidate.TokenCount > 0 ? candidate.TokenCount : _tokenEstimator.EstimateTokens(candidate.Content)),
+            RetrievalUsed = retrieval.Sum(candidate => candidate.TokenCount > 0 ? candidate.TokenCount : _tokenEstimator.EstimateTokens(candidate.Content)),
+            ConversationUsed = history.Sum(turn => _tokenEstimator.EstimateTokens(turn.Content)),
+            ToolsUsed = toolsTokens,
+        };
+
+        var updatedStrategyContext = new AgentStrategyContext
+        {
+            SessionId = strategyContext.SessionId,
+            TurnId = strategyContext.TurnId,
+            UserMessage = strategyContext.UserMessage,
+            SystemMessage = currentSystemMessage,
+            History = history,
+            Tools = strategyContext.Tools,
+            AvailableToolNames = strategyContext.AvailableToolNames,
+        };
+
+        return new FinalInputBudgetResult(
+            currentContext,
+            updatedStrategyContext,
+            trimmed,
+            currentTokens > maxInputTokens,
+            tokensBeforeTrim,
+            currentTokens,
+            budgetUsage);
+    }
+
+    private static ConversationContext BuildContextSlice(
+        ConversationContext source,
+        IReadOnlyList<ConversationTurn> history,
+        IReadOnlyList<RetrievalCandidate> wikiFacts,
+        IReadOnlyList<RetrievalCandidate> retrieval)
+        => new()
+        {
+            SystemPrompt = source.SystemPrompt,
+            SessionId = source.SessionId,
+            History = history,
+            WikiFacts = wikiFacts,
+            RetrievedKnowledge = retrieval,
+            Identity = source.Identity,
+            Onboarding = source.Onboarding,
+            ActiveToolNames = source.ActiveToolNames,
+            BudgetUsage = source.BudgetUsage,
+            AdmissionLog = source.AdmissionLog,
+            HistoryDiagnostics = source.HistoryDiagnostics,
+            RetrievalDiagnostics = source.RetrievalDiagnostics,
+        };
+
+    private int EstimateFinalInputTokens(
+        string systemMessage,
+        string userMessage,
+        IReadOnlyList<ConversationTurn> history,
+        int toolsTokens)
+        => _tokenEstimator.EstimateTokens(systemMessage)
+            + _tokenEstimator.EstimateTokens(userMessage)
+            + history.Sum(turn => _tokenEstimator.EstimateTokens(turn.Content))
+            + toolsTokens;
+
+    private int EstimateToolsTokens(IReadOnlyList<ToolDefinition> tools)
+    {
+        var tokens = 0;
+        foreach (var tool in tools)
+        {
+            tokens += _tokenEstimator.EstimateTokens(tool.Name);
+            tokens += _tokenEstimator.EstimateTokens(tool.Description);
+            if (tool.Parameters is { Count: > 0 })
+            {
+                foreach (var parameter in tool.Parameters)
+                {
+                    tokens += _tokenEstimator.EstimateTokens(parameter.Name);
+                    tokens += _tokenEstimator.EstimateTokens(parameter.Description ?? string.Empty);
+                }
+            }
+        }
+
+        return tokens;
+    }
+
+    private readonly record struct FinalInputBudgetResult(
+        ConversationContext Context,
+        AgentStrategyContext StrategyContext,
+        bool WasTrimmed,
+        bool OverflowedAfterTrim,
+        int TokensBeforeTrim,
+        int TokensAfterTrim,
+        ContextBudgetUsage BudgetUsage);
+
     private async Task<string> BuildUserMessageForModelAsync(LeanKernelMessage message, CancellationToken ct)
     {
         if (message.Attachments is not { Count: > 0 })
@@ -1389,28 +1642,37 @@ public sealed class TurnPipeline : ITurnPipeline
         var content = rawResponse ?? string.Empty;
         var taskStatus = TryParseTaskStatusDirective(ref content);
 
-        var attachments = default(List<Attachment>);
-
-        var match = SignalAttachmentDirectiveRegex.Match(content);
-        if (match.Success)
+        List<Attachment>? attachments = null;
+        if (_signalAttachmentParser is not null)
         {
-            content = SignalAttachmentDirectiveRegex.Replace(content, string.Empty, 1).TrimEnd();
-            if (incomingAttachments is not { Count: > 0 })
+            if (_signalAttachmentParser.TryParseAndRemoveDirective(ref content, out var resolvedAttachments, incomingAttachments))
             {
-                _logger.LogWarning("Signal attachment directive was ignored because no incoming attachments were present");
+                attachments = resolvedAttachments is { Count: > 0 } ? [.. resolvedAttachments] : null;
             }
-            else
+        }
+        else
+        {
+            var match = SignalAttachmentDirectiveRegex.Match(content);
+            if (match.Success)
             {
-                try
+                content = SignalAttachmentDirectiveRegex.Replace(content, string.Empty, 1).TrimEnd();
+                if (incomingAttachments is not { Count: > 0 })
                 {
-                    var directive = JsonSerializer.Deserialize<SignalAttachmentDirective>(
-                        match.Groups["json"].Value,
-                        new JsonSerializerOptions(JsonSerializerDefaults.Web));
-                    attachments = ResolveResponseAttachments(directive, incomingAttachments);
+                    _logger.LogWarning("Signal attachment directive was ignored because no incoming attachments were present");
                 }
-                catch (Exception ex)
+                else
                 {
-                    _logger.LogWarning(ex, "Failed to parse signal-attachments directive; sending text-only response");
+                    try
+                    {
+                        var directive = JsonSerializer.Deserialize<SignalAttachmentDirective>(
+                            match.Groups["json"].Value,
+                            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                        attachments = ResolveResponseAttachments(directive, incomingAttachments);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to parse signal-attachments directive; sending text-only response");
+                    }
                 }
             }
         }

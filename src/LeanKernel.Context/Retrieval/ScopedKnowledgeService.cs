@@ -27,6 +27,8 @@ public sealed class ScopedKnowledgeService(
         string query,
         string scope,
         int maxResults = 10,
+        string? sessionId = null,
+        string? turnId = null,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
@@ -66,7 +68,7 @@ public sealed class ScopedKnowledgeService(
 
         var sortedAdmitted = SortCandidates(admittedCandidates);
         var effectiveScope = policy?.Name ?? NormalizeScopeName(requestedScope);
-        var diagnostics = CreateDiagnostics(decisions, effectiveScope, expansion.ExpandedEntities);
+        var diagnostics = CreateDiagnostics(decisions, effectiveScope, expansion.ExpandedEntities, sessionId, turnId);
 
         _logger.LogDebug(
             "Scoped retrieval for {Scope} considered {Considered} candidates and admitted {Admitted}",
@@ -84,15 +86,17 @@ public sealed class ScopedKnowledgeService(
     private RetrievalDiagnostics CreateDiagnostics(
         IReadOnlyList<RetrievalCandidateDecision> decisions,
         string effectiveScope,
-        IReadOnlyList<string> expandedEntities)
+        IReadOnlyList<string> expandedEntities,
+        string? sessionId = null,
+        string? turnId = null)
     {
         var excludedByScore = decisions.Count(decision => string.Equals(decision.ExclusionReason, "low_score", StringComparison.Ordinal));
         var excludedByScope = decisions.Count(decision => !decision.Admitted && !string.Equals(decision.ExclusionReason, "low_score", StringComparison.Ordinal));
 
         return new RetrievalDiagnostics
         {
-            SessionId = "unknown",
-            TurnId = "unknown",
+            SessionId = sessionId ?? "unknown",
+            TurnId = turnId ?? "unknown",
             Decisions = _config.EmitRetrievalDiagnostics ? decisions : [],
             TotalConsidered = decisions.Count,
             TotalAdmitted = decisions.Count(decision => decision.Admitted),

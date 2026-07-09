@@ -1,7 +1,6 @@
 using FluentAssertions;
 using System.Reflection;
 using LeanKernel.Abstractions.Configuration;
-using LeanKernel.Abstractions.Enums;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Agents;
@@ -211,37 +210,6 @@ public class ContinuationTurnPipelineTests
     }
 
     [Fact]
-    public async Task ProcessDetailedAsync_stops_when_spend_guard_blocks_continuation()
-    {
-        var spendGuardService = new Mock<ISpendGuardService>(MockBehavior.Strict);
-        spendGuardService
-            .Setup(service => service.Evaluate("session-1", ModelTier.Standard, It.IsAny<int>(), It.IsAny<int>()))
-            .Returns(new SpendGuardDecision
-            {
-                Action = SpendGuardAction.Block,
-                Reason = "Budget exhausted"
-            });
-
-        var (pipeline, store, _) = CreatePipeline(
-            ["Working on it.\n```task-status\n{\"status\":\"in_progress\",\"note\":\"Still working.\"}\n```"],
-            continuationConfig: new ContinuationConfig
-            {
-                Enabled = true,
-                MaxAutoContinuations = 2
-            },
-            spendGuardService: spendGuardService.Object);
-
-        var response = await pipeline.ProcessDetailedAsync(CreateMessage());
-
-        response.Content.Should().Contain("Budget exhausted");
-        response.Execution.Should().NotBeNull();
-        response.Execution!.TaskStatus.Should().NotBeNull();
-        response.Execution.TaskStatus!.Status.Should().Be("in_progress");
-        store.Turns.Should().HaveCount(2);
-        spendGuardService.VerifyAll();
-    }
-
-    [Fact]
     public async Task ProcessDetailedAsync_records_cancellation_after_the_initial_response_completes()
     {
         var cts = new CancellationTokenSource();
@@ -299,7 +267,6 @@ public class ContinuationTurnPipelineTests
         IReadOnlyList<string> responses,
         ContinuationConfig? continuationConfig = null,
         ITurnProgressBroker? progressBroker = null,
-        ISpendGuardService? spendGuardService = null,
         IReadOnlyList<ToolDefinition>? toolRegistryTools = null,
         TimeProvider? timeProvider = null,
         Action<AgentStrategyContext>? onStrategyInvoke = null,
@@ -361,7 +328,6 @@ public class ContinuationTurnPipelineTests
             Options.Create(config),
             NullLogger<ContinuationTurnPipeline>.Instance,
             progressBroker,
-            spendGuardService: spendGuardService,
             metrics: null,
             timeProvider: timeProvider ?? TimeProvider.System);
 

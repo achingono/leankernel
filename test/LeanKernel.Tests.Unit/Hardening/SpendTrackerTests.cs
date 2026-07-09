@@ -134,6 +134,59 @@ public class SpendTrackerTests
         snapshot.MonthlyTotalUsd.Should().Be(0m);
     }
 
+    [Fact]
+    public async Task TryReserveSpend_and_commit_records_actual_spend_atomically()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = new SpendTracker(metrics, NullLogger<SpendTracker>.Instance, TimeProvider.System);
+
+        var reserved = tracker.TryReserveSpend(
+            "session-1",
+            "turn-1",
+            1.25m,
+            maxDailySpendUsd: 10m,
+            maxSessionSpendUsd: 10m,
+            maxMonthlySpendUsd: 10m,
+            out var reservation);
+
+        reserved.Should().BeTrue();
+        reservation.Should().NotBeNull();
+
+        await tracker.CommitReservedSpendAsync(reservation!, 1.10m);
+
+        var snapshot = tracker.GetSnapshot();
+        snapshot.DailyTotalUsd.Should().Be(1.10m);
+        snapshot.GetSessionSpendUsd("session-1").Should().Be(1.10m);
+    }
+
+    [Fact]
+    public void TryReserveSpend_fails_when_projected_limit_is_exceeded()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = new SpendTracker(metrics, NullLogger<SpendTracker>.Instance, TimeProvider.System);
+
+        var first = tracker.TryReserveSpend("session-1", "turn-1", 0.90m, 1.00m, 1.00m, 10.00m, out var reservationA);
+        var second = tracker.TryReserveSpend("session-1", "turn-2", 0.20m, 1.00m, 1.00m, 10.00m, out var reservationB);
+
+        first.Should().BeTrue();
+        reservationA.Should().NotBeNull();
+        second.Should().BeFalse();
+        reservationB.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReleaseReservedSpend_frees_capacity_for_future_reservations()
+    {
+        using var metrics = new LeanKernelMetrics();
+        var tracker = new SpendTracker(metrics, NullLogger<SpendTracker>.Instance, TimeProvider.System);
+
+        tracker.TryReserveSpend("session-1", "turn-1", 0.90m, 1.00m, 1.00m, 10.00m, out var reservation).Should().BeTrue();
+        tracker.ReleaseReservedSpend(reservation!);
+
+        var next = tracker.TryReserveSpend("session-1", "turn-2", 0.90m, 1.00m, 1.00m, 10.00m, out _);
+        next.Should().BeTrue();
+    }
+
     private sealed class AdjustableTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         private DateTimeOffset _utcNow = utcNow;

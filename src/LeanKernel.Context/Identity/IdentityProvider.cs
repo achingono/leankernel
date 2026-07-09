@@ -38,8 +38,15 @@ public sealed class IdentityProvider : IIdentityProvider
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
 
-        var agentPageTask = _knowledgeService.GetPageAsync(_config.AgentProfilePageKey, ct);
-        var userPageTask = _knowledgeService.GetPageAsync(_config.UserPreferencePageKey, ct);
+        var agentKey = _config.EnableUserScopedKeys && !string.IsNullOrWhiteSpace(userId)
+            ? $"{_config.AgentProfilePageKey}-{userId}"
+            : _config.AgentProfilePageKey;
+        var userKey = _config.EnableUserScopedKeys && !string.IsNullOrWhiteSpace(userId)
+            ? $"{_config.UserPreferencePageKey}-{userId}"
+            : _config.UserPreferencePageKey;
+
+        var agentPageTask = _knowledgeService.GetPageAsync(agentKey, ct);
+        var userPageTask = _knowledgeService.GetPageAsync(userKey, ct);
 
         await Task.WhenAll(agentPageTask, userPageTask).ConfigureAwait(false);
 

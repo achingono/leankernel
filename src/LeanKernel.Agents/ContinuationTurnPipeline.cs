@@ -23,7 +23,6 @@ public sealed class ContinuationTurnPipeline : ITurnPipeline
     private readonly ISessionTurnCoordinator _sessionTurnCoordinator;
     private readonly ISessionStore _sessionStore;
     private readonly ITurnProgressBroker? _progressBroker;
-    private readonly ISpendGuardService? _spendGuardService;
     private readonly ContinuationConfig _config;
     private readonly ILogger<ContinuationTurnPipeline> _logger;
     private readonly LeanKernelMetrics? _metrics;
@@ -37,7 +36,6 @@ public sealed class ContinuationTurnPipeline : ITurnPipeline
         IOptions<LeanKernelConfig> Config,
         ILogger<ContinuationTurnPipeline> Logger,
         ITurnProgressBroker? ProgressBroker = null,
-        ISpendGuardService? SpendGuardService = null,
         LeanKernelMetrics? Metrics = null,
         TimeProvider? TimeProvider = null);
 
@@ -63,7 +61,6 @@ public sealed class ContinuationTurnPipeline : ITurnPipeline
         _config = (options.Config ?? throw new ArgumentNullException(nameof(options.Config))).Value.Continuation;
         _logger = options.Logger ?? throw new ArgumentNullException(nameof(options.Logger));
         _progressBroker = options.ProgressBroker;
-        _spendGuardService = options.SpendGuardService;
         _metrics = options.Metrics;
         _timeProvider = options.TimeProvider ?? TimeProvider.System;
     }
@@ -76,7 +73,6 @@ public sealed class ContinuationTurnPipeline : ITurnPipeline
         IOptions<LeanKernelConfig> config,
         ILogger<ContinuationTurnPipeline> logger,
         ITurnProgressBroker? progressBroker = null,
-        ISpendGuardService? spendGuardService = null,
         LeanKernelMetrics? metrics = null,
         TimeProvider? timeProvider = null)
     {
@@ -87,7 +83,6 @@ public sealed class ContinuationTurnPipeline : ITurnPipeline
         _config = (config ?? throw new ArgumentNullException(nameof(config))).Value.Continuation;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _progressBroker = progressBroker;
-        _spendGuardService = spendGuardService;
         _metrics = metrics;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -184,16 +179,6 @@ public sealed class ContinuationTurnPipeline : ITurnPipeline
         {
             _metrics?.RecordContinuationTermination("complete");
             return (state.Response, state.Response, state.Rounds, state.PreviousNormalized);
-        }
-
-        if (_spendGuardService is not null)
-        {
-            var spendDecision = _spendGuardService.Evaluate(state.SessionId, ModelTier.Standard, 128, 128);
-            if (spendDecision.Action == SpendGuardAction.Block)
-            {
-                _metrics?.RecordContinuationTermination("spend_block");
-                return (AppendPauseNote(state.Response, spendDecision.Reason), state.Response, state.Rounds, state.PreviousNormalized);
-            }
         }
 
         var normalized = NormalizeText(state.Response.Content);

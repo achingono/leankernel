@@ -4,6 +4,7 @@ Plans currently driving or preparing implementation work.
 
 ## Current Priority
 
+- [Architecture review remediation PRD (2026-07-09)](../architecture-review-remediation-prd-2026-07-09.md) — boot-blocking DI fix, security fail-closed, correctness invariants
 - [Documentation system refresh PRD](../documentation-system-refresh-prd.md)
 - [UI rendering improvement PRD](../ui-rendering-improvement-prd.md)
 - [UI rendering improvement 2 PRD](../ui-rendering-improvement-2-prd.md)

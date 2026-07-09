@@ -103,4 +103,4 @@ The scheduler is LeanKernel's proactive entry point. It does not replace chat tu
 - [Turn Pipeline](turn-pipeline.md)
 - [Channels](channels.md)
 - [Production Operations](production-ops.md)
-- [Phase 3 Configuration](../configuration/phase-3-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

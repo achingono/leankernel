@@ -146,5 +146,5 @@ That sequencing is what makes the rest of the runtime explainable.
 - [Tool Governance](tool-governance.md)
 - [Diagnostics](diagnostics.md)
 - [Gateway API](gateway-api.md)
-- [Phase 1 Configuration](../configuration/phase-1-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)
 - [Long-Running Tasks, Progress Updates, and Continuation](long-running-tasks.md)

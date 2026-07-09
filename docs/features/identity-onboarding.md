@@ -141,4 +141,4 @@ That keeps personalization inspectable and bounded.
 - [Context Gating](context-gating.md)
 - [Turn Pipeline](turn-pipeline.md)
 - [Scoped Retrieval](scoped-retrieval.md)
-- [Phase 2 Configuration](../configuration/phase-2-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

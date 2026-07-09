@@ -37,11 +37,7 @@ public sealed class CronScheduleEvaluator(
 
         var expression = GetExpression(job.CronExpression);
         var timeZone = _timeBoundaryService.ResolveTimeZone(GetTimeZoneId(job));
-        var nextOccurrence = expression.GetNextOccurrence(fromUtc.UtcDateTime, timeZone, inclusive: false);
-
-        return nextOccurrence is null
-            ? null
-            : new DateTimeOffset(DateTime.SpecifyKind(nextOccurrence.Value, DateTimeKind.Utc));
+        return expression.GetNextOccurrence(fromUtc, timeZone, inclusive: false);
     }
 
     /// <summary>
@@ -114,13 +110,13 @@ public sealed class CronScheduleEvaluator(
         DateTimeOffset? latestOccurrence = null;
 
         foreach (var occurrence in expression.GetOccurrences(
-                     fromUtc.UtcDateTime,
-                     toUtc.UtcDateTime,
+                     fromUtc,
+                     toUtc,
                      timeZone,
                      fromInclusive: true,
                      toInclusive: true))
         {
-            latestOccurrence = new DateTimeOffset(DateTime.SpecifyKind(occurrence, DateTimeKind.Utc));
+            latestOccurrence = occurrence;
         }
 
         return latestOccurrence;

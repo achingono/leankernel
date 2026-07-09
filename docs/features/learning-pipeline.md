@@ -104,4 +104,4 @@ The learning pipeline is a background observer. It learns from completed turns, 
 - [Turn Pipeline](turn-pipeline.md)
 - [Response Enhancement](response-enhancement.md)
 - [Context Gating](context-gating.md)
-- [Phase 3 Configuration](../configuration/phase-3-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

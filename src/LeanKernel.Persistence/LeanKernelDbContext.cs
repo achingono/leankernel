@@ -59,6 +59,7 @@ public sealed class LeanKernelDbContext(DbContextOptions<LeanKernelDbContext> op
         {
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.ChannelId, x.UserId }).IsUnique();
+            entity.Property(x => x.UpdatedAt).IsConcurrencyToken();
             entity.HasMany(x => x.Turns)
                 .WithOne(x => x.Session)
                 .HasForeignKey(x => x.SessionId);

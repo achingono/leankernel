@@ -1,6 +1,7 @@
 using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,9 +12,8 @@ namespace LeanKernel.Channels;
 /// </summary>
 public sealed class ChannelRouter : IChannelRouter
 {
-    private readonly IAgentRuntime _runtime;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ChannelAuthenticator _authenticator;
-    private readonly ISessionStore _sessionStore;
     private readonly ChannelsConfig _channelsConfig;
     private readonly ContinuationProgressConfig _progressConfig;
     private readonly ILogger<ChannelRouter> _logger;
@@ -26,12 +26,11 @@ public sealed class ChannelRouter : IChannelRouter
     /// Parameter object for <see cref="ChannelRouter"/> constructor.
     /// </summary>
     public sealed record ChannelRouterOptions(
-        IAgentRuntime Runtime,
+        IServiceScopeFactory ScopeFactory,
         ChannelAuthenticator Authenticator,
         IEnumerable<IChannel> Channels,
         IOptions<ChannelsConfig> ChannelsConfig,
         IOptions<LeanKernelConfig> LeanKernelConfig,
-        ISessionStore SessionStore,
         ILogger<ChannelRouter> Logger,
         ITurnProgressBroker? ProgressBroker = null,
         ISessionTurnCoordinator? SessionTurnCoordinator = null,
@@ -44,11 +43,10 @@ public sealed class ChannelRouter : IChannelRouter
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        _runtime = options.Runtime ?? throw new ArgumentNullException(nameof(options.Runtime));
+        _scopeFactory = options.ScopeFactory ?? throw new ArgumentNullException(nameof(options.ScopeFactory));
         _authenticator = options.Authenticator ?? throw new ArgumentNullException(nameof(options.Authenticator));
         _channelsConfig = (options.ChannelsConfig ?? throw new ArgumentNullException(nameof(options.ChannelsConfig))).Value;
         _progressConfig = (options.LeanKernelConfig ?? throw new ArgumentNullException(nameof(options.LeanKernelConfig))).Value.Continuation.Progress;
-        _sessionStore = options.SessionStore ?? throw new ArgumentNullException(nameof(options.SessionStore));
         _logger = options.Logger ?? throw new ArgumentNullException(nameof(options.Logger));
         _progressBroker = options.ProgressBroker;
         _sessionTurnCoordinator = options.SessionTurnCoordinator;
@@ -73,29 +71,27 @@ public sealed class ChannelRouter : IChannelRouter
     /// <summary>
     /// Initializes a new instance of the <see cref="ChannelRouter"/> class.
     /// </summary>
-    /// <param name="runtime">The agent runtime.</param>
+    /// <param name="scopeFactory">The scope factory.</param>
     /// <param name="authenticator">The channel authenticator.</param>
     /// <param name="channels">The collection of available channels.</param>
     /// <param name="config">The channel configuration.</param>
     /// <param name="logger">The logger.</param>
     public ChannelRouter(
-        IAgentRuntime runtime,
+        IServiceScopeFactory scopeFactory,
         ChannelAuthenticator authenticator,
         IEnumerable<IChannel> channels,
         IOptions<ChannelsConfig> channelsConfig,
         IOptions<LeanKernelConfig> leanKernelConfig,
-        ISessionStore sessionStore,
         ILogger<ChannelRouter> logger,
         ITurnProgressBroker? progressBroker = null,
         ISessionTurnCoordinator? sessionTurnCoordinator = null,
         TimeProvider? timeProvider = null)
         : this(new ChannelRouterOptions(
-            runtime,
+            scopeFactory,
             authenticator,
             channels,
             channelsConfig,
             leanKernelConfig,
-            sessionStore,
             logger,
             progressBroker,
             sessionTurnCoordinator,
@@ -139,7 +135,11 @@ public sealed class ChannelRouter : IChannelRouter
             return;
         }
 
-        var sessionId = await _sessionStore.GetOrCreateSessionIdAsync(message.ChannelId, message.SenderId, ct).ConfigureAwait(false);
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var runtime = scope.ServiceProvider.GetRequiredService<IAgentRuntime>();
+        var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+
+        var sessionId = await sessionStore.GetOrCreateSessionIdAsync(message.ChannelId, message.SenderId, ct).ConfigureAwait(false);
         _sessionTurnCoordinator?.NotifyInbound(sessionId);
 
         var runtimeMessage = new LeanKernelMessage
@@ -178,7 +178,7 @@ public sealed class ChannelRouter : IChannelRouter
             AgentResponse response;
             try
             {
-                response = await _runtime.RunTurnDetailedAsync(runtimeMessage, ct).ConfigureAwait(false);
+                response = await runtime.RunTurnDetailedAsync(runtimeMessage, ct).ConfigureAwait(false);
             }
             finally
             {

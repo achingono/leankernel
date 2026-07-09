@@ -125,4 +125,4 @@ Model routing does not create a second turn pipeline. It swaps the strategy insi
 - [Turn Pipeline](turn-pipeline.md)
 - [Quality Gates](quality-gates.md)
 - [Shadow Routing](shadow-routing.md)
-- [Phase 3 Configuration](../configuration/phase-3-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

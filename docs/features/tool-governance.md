@@ -110,4 +110,4 @@ The design scales by adding more `ToolDefinition` instances rather than rewritin
 - [Knowledge Retrieval](knowledge-retrieval.md)
 - [Turn Pipeline](turn-pipeline.md)
 - [Context Gating](context-gating.md)
-- [Phase 1 Configuration](../configuration/phase-1-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

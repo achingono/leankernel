@@ -52,7 +52,7 @@ Each configuration reference must include:
 
 **File format:** `docs/configuration/phase-{n}-config.md`
 
-**Example:** `docs/configuration/phase-1-config.md`
+**Example:** `docs/configuration/configuration-reference.md`
 
 ### 4. Updated README.md
 

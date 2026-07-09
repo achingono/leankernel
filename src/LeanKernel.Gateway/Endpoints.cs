@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using LeanKernel.Abstractions.Configuration;
 using LeanKernel.Abstractions.Interfaces;
 using LeanKernel.Abstractions.Models;
 using LeanKernel.Gateway.Auth;
@@ -91,17 +92,22 @@ public static class Endpoints
             return Results.BadRequest(new { error = "Message is required" });
         }
 
-        var (senderId, isAuthenticated) = ResolveSenderId(request, httpContext);
-        if (senderId is null)
+        var senderResolution = ResolveSenderId(request, httpContext);
+        if (!string.IsNullOrWhiteSpace(senderResolution.Error))
+        {
+            return Results.BadRequest(new { error = senderResolution.Error });
+        }
+
+        if (senderResolution.SenderId is null)
         {
             return Results.Unauthorized();
         }
 
-        var channelId = string.IsNullOrWhiteSpace(request.ChannelId)
-            ? "api"
-            : request.ChannelId;
+        var channelId = senderResolution.IsAuthenticated
+            ? (string.IsNullOrWhiteSpace(request.ChannelId) ? "api" : request.ChannelId)
+            : "api";
 
-        var sessionId = await ResolveSessionIdAsync(request, sessionStore, senderId, isAuthenticated, ct).ConfigureAwait(false);
+        var sessionId = await ResolveSessionIdAsync(request, sessionStore, senderResolution.SenderId, channelId, ct).ConfigureAwait(false);
         if (sessionId is null)
         {
             return Results.NotFound(new { error = "Session not found" });
@@ -110,7 +116,7 @@ public static class Endpoints
         var message = new LeanKernelMessage
         {
             Content = request.Message,
-            SenderId = senderId,
+            SenderId = senderResolution.SenderId,
             ChannelId = channelId,
             SessionId = sessionId,
             Metadata = request.Metadata,
@@ -125,7 +131,7 @@ public static class Endpoints
         });
     }
 
-    private static (string? SenderId, bool IsAuthenticated) ResolveSenderId(ChatRequest request, HttpContext httpContext)
+    private static SenderResolution ResolveSenderId(ChatRequest request, HttpContext httpContext)
     {
         var authenticatedUserKey = GetAuthenticatedUserKey(httpContext);
         var isAuthenticated = !string.IsNullOrWhiteSpace(authenticatedUserKey);
@@ -141,7 +147,7 @@ public static class Endpoints
                     request.UserId, authenticatedUserKey);
             }
 
-            return (authenticatedUserKey!, true);
+            return new SenderResolution(authenticatedUserKey!, true, null);
         }
 
         var forwardedAuthOptions = httpContext.RequestServices
@@ -153,37 +159,35 @@ public static class Endpoints
 
         if (forwardedAuthEnabled && forwardedAuthRequiresAuth)
         {
-            return (null, false);
+            return new SenderResolution(null, false, null);
         }
 
-        var senderId = string.IsNullOrWhiteSpace(request.UserId)
-            ? "api-user"
-            : request.UserId;
+        if (string.IsNullOrWhiteSpace(request.UserId))
+        {
+            return new SenderResolution(null, false, "UserId is required for unauthenticated /api/chat requests.");
+        }
 
-        return (senderId, false);
+        return new SenderResolution(request.UserId.Trim(), false, null);
     }
 
     private static async Task<string?> ResolveSessionIdAsync(
         ChatRequest request,
         ISessionStore sessionStore,
         string senderId,
-        bool isAuthenticated,
+        string channelId,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.SessionId))
         {
             return await sessionStore.GetOrCreateSessionIdAsync(
-                string.IsNullOrWhiteSpace(request.ChannelId) ? "api" : request.ChannelId,
+                channelId,
                 senderId, ct).ConfigureAwait(false);
         }
 
-        if (isAuthenticated)
+        var belongs = await sessionStore.SessionBelongsToUserAsync(request.SessionId, senderId, ct).ConfigureAwait(false);
+        if (!belongs)
         {
-            var belongs = await sessionStore.SessionBelongsToUserAsync(request.SessionId, senderId, ct).ConfigureAwait(false);
-            if (!belongs)
-            {
-                return null;
-            }
+            return null;
         }
 
         return request.SessionId;
@@ -329,7 +333,7 @@ public static class Endpoints
         HttpContext httpContext,
         CancellationToken ct)
     {
-        if (!ValidateApiKey(httpContext))
+        if (!ValidateApiKey(httpContext, requireAdminKey: true))
         {
             return Results.Unauthorized();
         }
@@ -389,29 +393,80 @@ public static class Endpoints
             ? $"{diagnosticName} not found for session '{sessionId}'."
             : $"{diagnosticName} not found for session '{sessionId}' and turn '{turnId}'.";
 
-    private static bool ValidateApiKey(HttpContext context)
+    private static bool ValidateApiKey(HttpContext context, bool requireAdminKey = false)
     {
         var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
-        var configuredKeys = configuration
-            .GetSection("LeanKernel:Gateway:ApiKeys")
-            .Get<string[]>()?
-            .Where(key => !string.IsNullOrWhiteSpace(key))
-            .ToArray()
-            ?? [];
+        var gatewayConfig = GetGatewayConfig(configuration);
+        var configuredKeys = requireAdminKey
+            ? ResolveConfiguredAdminApiKeys(gatewayConfig)
+            : ResolveConfiguredApiKeys(gatewayConfig);
 
-        var singleKey = configuration.GetValue<string>("LeanKernel:Gateway:ApiKey");
-        if (!string.IsNullOrWhiteSpace(singleKey))
-        {
-            configuredKeys = [.. configuredKeys, singleKey];
-        }
-
-        if (configuredKeys.Length == 0)
+        if (!requireAdminKey && !gatewayConfig.RequireApiKey)
         {
             return true;
+        }
+
+        if (configuredKeys.Count == 0)
+        {
+            return requireAdminKey
+                ? false
+                : gatewayConfig.AllowAnonymous;
         }
 
         var apiKey = context.Request.Headers["X-Api-Key"].FirstOrDefault();
         return !string.IsNullOrWhiteSpace(apiKey)
             && configuredKeys.Contains(apiKey, StringComparer.Ordinal);
     }
+
+    private static GatewayConfig GetGatewayConfig(IConfiguration configuration)
+    {
+        var config = new GatewayConfig();
+        configuration.GetSection("LeanKernel:Gateway").Bind(config);
+        return config;
+    }
+
+    private static HashSet<string> ResolveConfiguredApiKeys(GatewayConfig config)
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var key in config.ApiKeys)
+        {
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                keys.Add(key);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.ApiKey))
+        {
+            keys.Add(config.ApiKey);
+        }
+
+        return keys;
+    }
+
+    private static HashSet<string> ResolveConfiguredAdminApiKeys(GatewayConfig config)
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var key in config.AdminApiKeys)
+        {
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                keys.Add(key);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(config.AdminApiKey))
+        {
+            keys.Add(config.AdminApiKey);
+        }
+
+        if (keys.Count > 0)
+        {
+            return keys;
+        }
+
+        return ResolveConfiguredApiKeys(config);
+    }
+
+    private sealed record SenderResolution(string? SenderId, bool IsAuthenticated, string? Error);
 }

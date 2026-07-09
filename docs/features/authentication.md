@@ -46,4 +46,4 @@ Broader auth flows such as admin UI auth, bearer-token APIs, and OIDC are still 
 
 - [Gateway API](gateway-api.md)
 - [Context Diagnostics API](context-diagnostics-api.md)
-- [Phase 1 Configuration](../configuration/phase-1-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

@@ -124,4 +124,4 @@ Production operations is the runtime's safety net. It does not make turns smarte
 - [Diagnostics](diagnostics.md)
 - [Gateway API](gateway-api.md)
 - [Scheduler](scheduler.md)
-- [Phase 3 Configuration](../configuration/phase-3-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

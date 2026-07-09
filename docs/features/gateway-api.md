@@ -56,7 +56,6 @@ Gateway generates its OpenAPI description from the Minimal API implementation. I
 
 - [Diagnostics](diagnostics.md)
 - [Context Diagnostics API](context-diagnostics-api.md)
-- [Phase 1 Configuration](../configuration/phase-1-config.md)
-- [Phase 2 Configuration](../configuration/phase-2-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)
 - [Channels](channels.md)
 - [Solution Structure](../architecture/solution-structure.md)

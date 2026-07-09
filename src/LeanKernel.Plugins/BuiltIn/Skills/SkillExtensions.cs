@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Net;
 
 namespace LeanKernel.Plugins;
 
@@ -24,6 +25,11 @@ public static class SkillExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton<SkillParser>();
+        services.AddHttpClient("SkillHttp")
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+            });
         services.TryAddSingleton<RuntimeSkillRegistry>(sp =>
         {
             var config = sp.GetRequiredService<IOptions<LeanKernel.Abstractions.Configuration.LeanKernelConfig>>().Value;

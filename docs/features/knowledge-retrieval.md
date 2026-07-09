@@ -161,5 +161,4 @@ The client logs MCP errors before throwing. The service then either propagates t
 - [Context Gating](context-gating.md)
 - [Tool Governance](tool-governance.md)
 - [Turn Pipeline](turn-pipeline.md)
-- [Phase 1 Configuration](../configuration/phase-1-config.md)
-- [Phase 2 Configuration](../configuration/phase-2-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

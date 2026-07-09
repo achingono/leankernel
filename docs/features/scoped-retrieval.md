@@ -147,4 +147,4 @@ That is what makes Phase 2 retrieval inspectable instead of implicit.
 - [Knowledge Retrieval](knowledge-retrieval.md)
 - [Context Gating](context-gating.md)
 - [Context Diagnostics API](context-diagnostics-api.md)
-- [Phase 2 Configuration](../configuration/phase-2-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

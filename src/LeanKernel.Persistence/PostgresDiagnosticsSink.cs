@@ -12,7 +12,7 @@ namespace LeanKernel.Persistence;
 /// </summary>
 public sealed class PostgresDiagnosticsSink(
     IDbContextFactory<LeanKernelDbContext> dbFactory,
-    ILogger<PostgresDiagnosticsSink> logger) : IDiagnosticsSink
+    ILogger<PostgresDiagnosticsSink> logger) : IDiagnosticsQuerySink
 {
     private readonly IDbContextFactory<LeanKernelDbContext> _dbFactory = dbFactory ?? throw new ArgumentNullException(nameof(dbFactory));
     private readonly ILogger<PostgresDiagnosticsSink> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -55,17 +55,47 @@ public sealed class PostgresDiagnosticsSink(
     /// <param name="ct">The cancellation token.</param>
     /// <returns>The ordered diagnostic entries for the session.</returns>
     public async Task<IReadOnlyList<DiagnosticEntry>> GetEntriesAsync(string sessionId, CancellationToken ct = default)
+        => await GetEntriesAsync(sessionId, category: null, turnId: null, limit: null, ct).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DiagnosticEntry>> GetEntriesAsync(
+        string sessionId,
+        string? category,
+        string? turnId,
+        int? limit,
+        CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
         await using var db = await _dbFactory.CreateDbContextAsync(ct).ConfigureAwait(false);
 
-        var entries = await db.DiagnosticEntries
+        var query = db.DiagnosticEntries
             .AsNoTracking()
-            .Where(e => e.SessionId == sessionId)
-            .OrderBy(e => e.Timestamp)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
+            .Where(e => e.SessionId == sessionId);
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            query = query.Where(e => e.Category == category);
+        }
+
+        if (!string.IsNullOrWhiteSpace(turnId))
+        {
+            query = query.Where(e => e.TurnId == turnId);
+        }
+
+        if (limit is > 0)
+        {
+            query = query
+                .OrderByDescending(e => e.Timestamp)
+                .Take(limit.Value)
+                .OrderBy(e => e.Timestamp);
+        }
+        else
+        {
+            query = query.OrderBy(e => e.Timestamp);
+        }
+
+        var entries = await query.ToListAsync(ct).ConfigureAwait(false);
 
         return entries
             .Select(e => new DiagnosticEntry

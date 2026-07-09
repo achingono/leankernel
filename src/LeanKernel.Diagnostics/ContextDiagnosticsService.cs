@@ -140,7 +140,21 @@ public sealed class ContextDiagnosticsService(
             return null;
         }
 
-        var entries = await _sink.GetEntriesAsync(sessionId, ct).ConfigureAwait(false);
+        IReadOnlyList<DiagnosticEntry> entries;
+        if (_sink is IDiagnosticsQuerySink querySink)
+        {
+            entries = await querySink.GetEntriesAsync(
+                sessionId,
+                DiagnosticCategory.ContextSnapshot.ToString(),
+                turnId,
+                _diagnosticsConfig.MaxDiagnosticsPerSession > 0 ? _diagnosticsConfig.MaxDiagnosticsPerSession : null,
+                ct).ConfigureAwait(false);
+        }
+        else
+        {
+            entries = await _sink.GetEntriesAsync(sessionId, ct).ConfigureAwait(false);
+        }
+
         if (entries.Count == 0)
         {
             return null;

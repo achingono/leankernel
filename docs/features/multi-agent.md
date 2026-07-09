@@ -116,4 +116,4 @@ Multi-agent orchestration is not a separate product surface. It is a strategy sw
 - [Model Routing](model-routing.md)
 - [Tool Governance](tool-governance.md)
 - [Turn Pipeline](turn-pipeline.md)
-- [Phase 3 Configuration](../configuration/phase-3-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

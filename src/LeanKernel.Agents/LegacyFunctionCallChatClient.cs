@@ -99,6 +99,14 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
         LegacyFunctionCall legacyCall,
         CancellationToken cancellationToken)
     {
+        if (!IsToolVisible(options, legacyCall.Name))
+        {
+            _logger.LogWarning(
+                "Rejected legacy function-call replay for tool {ToolName} because it was not offered in ChatOptions.Tools",
+                legacyCall.Name);
+            return originalResponse;
+        }
+
         var execution = await _toolExecutor.ExecuteAsync(legacyCall.Name, legacyCall.Parameters, cancellationToken).ConfigureAwait(false);
         if (!execution.Success)
         {
@@ -277,6 +285,25 @@ internal sealed class LegacyFunctionCallChatClient : IChatClient
             < int.MinValue => int.MinValue,
             _ => (int)value
         };
+
+    private static bool IsToolVisible(ChatOptions? options, string toolName)
+    {
+        if (options?.Tools is null || options.Tools.Count == 0)
+        {
+            return true;
+        }
+
+        return options.Tools
+            .Select(ResolveToolName)
+            .Any(name => !string.IsNullOrWhiteSpace(name)
+                && string.Equals(name, toolName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? ResolveToolName(AITool tool)
+    {
+        var property = tool.GetType().GetProperty("Name");
+        return property?.GetValue(tool) as string;
+    }
 
     private sealed record LegacyFunctionCall(string Name, IDictionary<string, object?> Parameters);
 }

@@ -130,6 +130,35 @@ public class RuntimeSkillRegistryTests
         registry.Quarantined.Should().BeEmpty();
     }
 
+    [Fact]
+    public void LoadAll_quarantines_skills_with_missing_required_bins()
+    {
+        using var dir = new TempDirectory();
+        Directory.CreateDirectory(dir.Path);
+        File.WriteAllText(Path.Combine(dir.Path, "SKILL.md"),
+            """
+            ---
+            name: bin_guarded
+            description: Bin constrained skill
+            runtime:
+              type: cli
+              command: dotnet
+              requires:
+                bins:
+                  - name: missing-binary-for-test
+            operations:
+              - id: do_stuff
+                summary: Does stuff
+            ---
+            """);
+
+        var registry = CreateRegistry([dir.Path]);
+        registry.LoadAll();
+
+        registry.Skills.Should().BeEmpty();
+        registry.Quarantined.Should().ContainSingle();
+    }
+
     private static RuntimeSkillRegistry CreateRegistry(string[] basePaths)
     {
         return new RuntimeSkillRegistry(

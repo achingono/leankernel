@@ -6,17 +6,21 @@ These instructions are for contributors and coding agents working in this reposi
 
 - LeanKernel is a modular monolith on **.NET 10** (`src/LeanKernel.sln`).
 - Domain ownership:
-  - `LeanKernel.Core`: shared contracts/models/config
-  - `LeanKernel.Commander`: channels + durable outbound queue
-  - `LeanKernel.Thinker`: turn orchestration, routing, agent strategies
-  - `LeanKernel.Archivist`: sessions, wiki, context gating, retrieval
-  - `LeanKernel.Plugins`: built-in tools and dynamic runtime skills
-  - `LeanKernel.Host`: API, Blazor UI, auth, onboarding, composition
+  - `LeanKernel.Abstractions`: shared contracts/models/config
+  - `LeanKernel.Agents`: turn orchestration, routing, and runtime strategies
+  - `LeanKernel.Context`: context assembly, history shaping, and retrieval scoping
+  - `LeanKernel.Knowledge`: wiki/retrieval integration
+  - `LeanKernel.Persistence`: session/diagnostics persistence
+  - `LeanKernel.Tools` + `LeanKernel.Plugins`: built-in tools and dynamic runtime skills
+  - `LeanKernel.Channels`: channel ingress/routing and adapters
+  - `LeanKernel.Diagnostics`: metrics and diagnostics services
+  - `LeanKernel.Scheduler`: scheduled execution
+  - `LeanKernel.Gateway`: API, Blazor UI, auth, onboarding, and composition
 
 ## Coding Expectations
 
-- Keep changes **feature-local**; do not move domain behavior into `LeanKernel.Host` unless it is composition/UI/API-only.
-- Reuse existing contracts in `LeanKernel.Core.Interfaces` before introducing new abstractions.
+- Keep changes **feature-local**; do not move domain behavior into `LeanKernel.Gateway` unless it is composition/UI/API-only.
+- Reuse existing contracts in `LeanKernel.Abstractions.Interfaces` before introducing new abstractions.
 - Prefer small collaborators over growing orchestration classes.
 - Preserve existing naming patterns and configuration binding style (`LeanKernel:*`).
 - Avoid broad exception swallowing; log and surface actionable errors.
@@ -52,7 +56,7 @@ scripts/quality/sonarqube-scan.sh
 
 ## Configuration and Runtime Notes
 
-- Main app config is bound from `src/LeanKernel.Host/appsettings.json` + runtime overlay in data directory.
+- Main app config is bound from `src/LeanKernel.Gateway/appsettings.json` + runtime overlay in data directory.
 - Docker compose stack includes: `engine`, `database`, `litellm`, `gbrain`, `signal`.
 - LiteLLM config is authored in `config/litellm/config.yaml` and compiled at startup by `config/litellm/render_litellm_config.py`.
 

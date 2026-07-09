@@ -48,7 +48,7 @@ Each channel can define sender rules under `LeanKernel:Channels:ChannelAuth`:
 
 ## Related documentation
 
-- [Phase 2 Configuration](../configuration/phase-2-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)
 - [Long-Running Tasks, Progress Updates, and Continuation](long-running-tasks.md)
 - [Solution Structure](../architecture/solution-structure.md)
 - [Phase 2 Channel Expansion PRD](../plans/phase-2-channel-expansion-prd.md)

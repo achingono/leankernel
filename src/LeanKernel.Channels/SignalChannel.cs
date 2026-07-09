@@ -207,7 +207,9 @@ public sealed class SignalChannel : IChannel
         {
             _logger.LogError(
                 "Signal send rate-limited (429) for {RecipientId} from {SourceNumber}: {Body}",
-                recipientId, sourceNumber, body);
+                RedactPhoneNumber(recipientId),
+                RedactPhoneNumber(sourceNumber),
+                TruncateDaemonBody(body));
             _logger.LogError(
                 "Resolve via POST /v1/accounts/{{number}}/rate-limit-challenge with a captcha");
         }
@@ -215,7 +217,10 @@ public sealed class SignalChannel : IChannel
         {
             _logger.LogError(
                 "Signal send failed ({StatusCode}) for {RecipientId} from {SourceNumber}: {Body}",
-                statusCode, recipientId, sourceNumber, body);
+                statusCode,
+                RedactPhoneNumber(recipientId),
+                RedactPhoneNumber(sourceNumber),
+                TruncateDaemonBody(body));
         }
 
         response.EnsureSuccessStatusCode();
@@ -294,7 +299,10 @@ public sealed class SignalChannel : IChannel
             }
             catch (Exception ex)
             {
-                if (!TryHandleReconnect(ex, phoneNumber, connectTime, ref wasEverConnected, ref reconnectAttempts))
+                var reconnectResult = await TryHandleReconnectAsync(ex, phoneNumber, connectTime, ct, wasEverConnected, reconnectAttempts).ConfigureAwait(false);
+                wasEverConnected = reconnectResult.WasEverConnected;
+                reconnectAttempts = reconnectResult.ReconnectAttempts;
+                if (!reconnectResult.ShouldContinue)
                 {
                     break;
                 }
@@ -365,7 +373,7 @@ public sealed class SignalChannel : IChannel
             elapsed);
     }
 
-    private bool TryHandleReconnect(Exception ex, string phoneNumber, DateTimeOffset connectTime, ref bool wasEverConnected, ref int reconnectAttempts)
+    private async Task<ReconnectResult> TryHandleReconnectAsync(Exception ex, string phoneNumber, DateTimeOffset connectTime, CancellationToken ct, bool wasEverConnected, int reconnectAttempts)
     {
         reconnectAttempts++;
 
@@ -397,7 +405,7 @@ public sealed class SignalChannel : IChannel
             _logger.LogError(
                 "Signal channel reached the maximum reconnect attempts for {PhoneNumber} and will stop",
                 phoneNumber);
-            return false;
+            return new ReconnectResult(false, wasEverConnected, reconnectAttempts);
         }
 
         var reconnectDelay = GetReconnectDelay(reconnectAttempts);
@@ -410,11 +418,13 @@ public sealed class SignalChannel : IChannel
 
         if (reconnectDelay > TimeSpan.Zero)
         {
-            Task.Delay(reconnectDelay, CancellationToken.None).Wait();
+            await Task.Delay(reconnectDelay, ct).ConfigureAwait(false);
         }
 
-        return true;
+        return new ReconnectResult(true, wasEverConnected, reconnectAttempts);
     }
+
+    private sealed record ReconnectResult(bool ShouldContinue, bool WasEverConnected, int ReconnectAttempts);
 
     private async Task DispatchMessageAsync(ChannelMessage message, CancellationToken ct)
     {
@@ -437,7 +447,7 @@ public sealed class SignalChannel : IChannel
                 _logger.LogError(
                     ex,
                     "Signal channel subscriber failed while handling a message from {SenderId}",
-                    message.SenderId);
+                    RedactPhoneNumber(message.SenderId));
             }
         }
     }
@@ -639,6 +649,35 @@ public sealed class SignalChannel : IChannel
         }
 
         return chunks;
+    }
+
+    private static string RedactPhoneNumber(string? number)
+    {
+        if (string.IsNullOrWhiteSpace(number))
+        {
+            return "(unknown)";
+        }
+
+        var digits = new string(number.Where(char.IsDigit).ToArray());
+        if (digits.Length <= 4)
+        {
+            return "****";
+        }
+
+        return $"***{digits[^4..]}";
+    }
+
+    private static string TruncateDaemonBody(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return string.Empty;
+        }
+
+        const int maxChars = 256;
+        return body.Length <= maxChars
+            ? body
+            : body[..maxChars] + "...";
     }
 }
 

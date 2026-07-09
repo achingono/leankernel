@@ -62,4 +62,4 @@ Compose environment variables:
 
 - [Tool Governance](tool-governance.md)
 - [Production Operations](production-ops.md)
-- [Phase 3 Configuration](../configuration/phase-3-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

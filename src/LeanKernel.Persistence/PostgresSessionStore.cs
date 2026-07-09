@@ -15,6 +15,7 @@ public sealed class PostgresSessionStore(
     ILogger<PostgresSessionStore> logger) : ISessionStore
 {
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+    private const int MaxConcurrencyRetries = 3;
 
     private readonly IDbContextFactory<LeanKernelDbContext> _dbFactory = dbFactory ?? throw new ArgumentNullException(nameof(dbFactory));
     private readonly ILogger<PostgresSessionStore> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -41,8 +42,7 @@ public sealed class PostgresSessionStore(
 
         if (session is not null)
         {
-            session.UpdatedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            await TouchSessionWithRetryAsync(db, session, ct).ConfigureAwait(false);
             return session.Id;
         }
 
@@ -84,8 +84,7 @@ public sealed class PostgresSessionStore(
             .ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Failed to create or retrieve a session for channel '{channelId}' and user '{userId}'.");
 
-        racedSession.UpdatedAt = DateTimeOffset.UtcNow;
-        await retryDb.SaveChangesAsync(ct).ConfigureAwait(false);
+        await TouchSessionWithRetryAsync(retryDb, racedSession, ct).ConfigureAwait(false);
         return racedSession.Id;
     }
 
@@ -108,7 +107,7 @@ public sealed class PostgresSessionStore(
             .ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Session '{sessionId}' was not found.");
 
-        session.UpdatedAt = DateTimeOffset.UtcNow;
+        session.UpdatedAt = MaxTimestamp(session.UpdatedAt, DateTimeOffset.UtcNow);
 
         var entity = new TurnEntity
         {
@@ -125,7 +124,7 @@ public sealed class PostgresSessionStore(
         };
 
         db.Turns.Add(entity);
-        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await SaveChangesWithConcurrencyRetryAsync(db, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -215,4 +214,44 @@ public sealed class PostgresSessionStore(
     {
         return new JsonSerializerOptions(JsonSerializerDefaults.Web);
     }
+
+    private async Task TouchSessionWithRetryAsync(LeanKernelDbContext db, SessionEntity session, CancellationToken ct)
+    {
+        session.UpdatedAt = MaxTimestamp(session.UpdatedAt, DateTimeOffset.UtcNow);
+        await SaveChangesWithConcurrencyRetryAsync(db, ct).ConfigureAwait(false);
+    }
+
+    private async Task SaveChangesWithConcurrencyRetryAsync(LeanKernelDbContext db, CancellationToken ct)
+    {
+        for (var attempt = 1; attempt <= MaxConcurrencyRetries; attempt++)
+        {
+            try
+            {
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                return;
+            }
+            catch (DbUpdateConcurrencyException ex) when (attempt < MaxConcurrencyRetries)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Session write encountered a concurrency conflict (attempt {Attempt}/{MaxAttempts}); retrying",
+                    attempt,
+                    MaxConcurrencyRetries);
+
+                foreach (var entry in ex.Entries)
+                {
+                    await entry.ReloadAsync(ct).ConfigureAwait(false);
+                    if (entry.Entity is SessionEntity sessionEntity)
+                    {
+                        sessionEntity.UpdatedAt = MaxTimestamp(sessionEntity.UpdatedAt, DateTimeOffset.UtcNow);
+                    }
+                }
+            }
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    private static DateTimeOffset MaxTimestamp(DateTimeOffset left, DateTimeOffset right)
+        => left >= right ? left : right;
 }

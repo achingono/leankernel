@@ -42,6 +42,11 @@ public sealed class LeanKernelConfig
     public DocumentIngestionConfig? DocumentIngestion { get; set; }
 
     /// <summary>
+    /// Gets or sets gateway API authentication configuration.
+    /// </summary>
+    public GatewayConfig Gateway { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets dynamic skill configuration.
     /// </summary>
     public SkillsConfig Skills { get; set; } = new();

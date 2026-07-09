@@ -138,4 +138,4 @@ That makes the conversation slice explainable in the same way context gating mak
 - [Context Gating](context-gating.md)
 - [Turn Pipeline](turn-pipeline.md)
 - [Context Diagnostics API](context-diagnostics-api.md)
-- [Phase 2 Configuration](../configuration/phase-2-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

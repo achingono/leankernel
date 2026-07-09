@@ -105,4 +105,4 @@ Shadow routing is a calibration tool. It helps operators learn whether the curre
 - [Model Routing](model-routing.md)
 - [Quality Gates](quality-gates.md)
 - [Diagnostics](diagnostics.md)
-- [Phase 3 Configuration](../configuration/phase-3-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)

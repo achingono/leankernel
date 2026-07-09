@@ -10,10 +10,14 @@ namespace LeanKernel.Knowledge;
 /// <summary>
 /// Provides LeanKernel knowledge operations by calling the garrytan/gbrain MCP tools.
 /// </summary>
-public sealed class GBrainKnowledgeService(GBrainMcpClient client, ILogger<GBrainKnowledgeService> logger) : IKnowledgeService
+public sealed class GBrainKnowledgeService(
+    GBrainMcpClient client,
+    ILogger<GBrainKnowledgeService> logger,
+    ITokenEstimator? tokenEstimator = null) : IKnowledgeService
 {
     private readonly GBrainMcpClient _client = client ?? throw new ArgumentNullException(nameof(client));
     private readonly ILogger<GBrainKnowledgeService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ITokenEstimator _tokenEstimator = tokenEstimator ?? new DefaultTokenEstimator();
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<RetrievalCandidate>> SearchAsync(
@@ -42,7 +46,7 @@ public sealed class GBrainKnowledgeService(GBrainMcpClient client, ILogger<GBrai
                 Content = r.Content,
                 Source = "gbrain",
                 Score = r.Score,
-                TokenCount = EstimateTokens(r.Content),
+                TokenCount = _tokenEstimator.EstimateTokens(r.Content),
                 Metadata = CreateMetadata(r)
             })
             .ToList();
@@ -133,7 +137,14 @@ public sealed class GBrainKnowledgeService(GBrainMcpClient client, ILogger<GBrai
         return metadata;
     }
 
-    private static int EstimateTokens(string text) => text.Length / 4;
+
+    private sealed class DefaultTokenEstimator : ITokenEstimator
+    {
+        public int EstimateTokens(string text)
+            => string.IsNullOrEmpty(text)
+                ? 0
+                : (int)Math.Ceiling(text.Length / 4d);
+    }
 }
 
 internal sealed class GBrainSearchResult

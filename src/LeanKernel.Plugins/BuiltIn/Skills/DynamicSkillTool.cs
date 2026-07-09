@@ -1,5 +1,7 @@
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using LeanKernel.Abstractions.Models;
@@ -10,6 +12,7 @@ namespace LeanKernel.Plugins.BuiltIn.Skills;
 public static class DynamicSkillTool
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private const int MaxRedirects = 5;
 
 /// <summary>
     /// Creates a <see cref="ToolDefinition"/> for a given skill operation.
@@ -83,6 +86,16 @@ public static class DynamicSkillTool
             return Failed(operation.Id, "HTTP skill has no baseUrl configured");
         }
 
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri))
+        {
+            return Failed(operation.Id, "HTTP skill baseUrl is invalid");
+        }
+
+        if (!TryValidateEgressTarget(baseUri, skill.Runtime.Egress.AllowHosts, out var egressError))
+        {
+            return Failed(operation.Id, egressError);
+        }
+
         var httpPath = operation.Invoke.HttpPath ?? string.Empty;
         var httpMethod = operation.Invoke.HttpMethod ?? "GET";
         var method = httpMethod.ToUpperInvariant();
@@ -95,8 +108,18 @@ public static class DynamicSkillTool
         if (queryParams.Count > 0)
             url += "?" + string.Join("&", queryParams);
 
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var requestUri))
+        {
+            return Failed(operation.Id, "HTTP skill request URL is invalid");
+        }
+
+        if (!TryValidateEgressTarget(requestUri, skill.Runtime.Egress.AllowHosts, out egressError))
+        {
+            return Failed(operation.Id, egressError);
+        }
+
         var client = httpClientFactory.CreateClient("SkillHttp");
-        using var request = new HttpRequestMessage(new HttpMethod(httpMethod), url);
+        using var request = new HttpRequestMessage(new HttpMethod(httpMethod), requestUri);
 
         var authError = ApplyHttpAuth(request, skill.Runtime.Auth);
         if (!string.IsNullOrWhiteSpace(authError))
@@ -109,7 +132,7 @@ public static class DynamicSkillTool
             request.Content = JsonContent.Create(body ?? new { }, options: JsonOptions);
         }
 
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ct);
+        using var response = await SendWithRedirectPolicyAsync(client, request, requestUri, skill.Runtime.Egress.AllowHosts, ct).ConfigureAwait(false);
         var responseBody = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -183,7 +206,7 @@ public static class DynamicSkillTool
         return url;
     }
 
-    private static Task<ToolResult> ExecuteCliAsync(
+    private static async Task<ToolResult> ExecuteCliAsync(
         SkillDefinition skill,
         SkillOperation operation,
         IDictionary<string, object?> args,
@@ -192,7 +215,7 @@ public static class DynamicSkillTool
         var command = skill.Runtime.Command;
         if (string.IsNullOrWhiteSpace(command))
         {
-            return Task.FromResult(Failed(operation.Id, "CLI skill has no command configured"));
+            return Failed(operation.Id, "CLI skill has no command configured");
         }
 
         var psi = new System.Diagnostics.ProcessStartInfo(command)
@@ -210,7 +233,7 @@ public static class DynamicSkillTool
 
         AddFlagArguments(psi, args, operation.Invoke.Flags);
 
-        var process = new System.Diagnostics.Process { StartInfo = psi };
+        using var process = new System.Diagnostics.Process { StartInfo = psi };
         process.Start();
 
         var stdout = new StringBuilder();
@@ -220,36 +243,53 @@ public static class DynamicSkillTool
             ReadStreamAsync(process.StandardOutput, stdout, ct),
             ReadStreamAsync(process.StandardError, stderr, ct));
 
-        var completed = process.WaitForExit(skill.Runtime.TimeoutSeconds * 1000);
-        readTask.Wait(ct);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, skill.Runtime.TimeoutSeconds)));
 
-        if (!completed)
+        try
         {
-            try { process.Kill(); } catch { }
-            return Task.FromResult(new ToolResult
+            await Task.WhenAll(
+                process.WaitForExitAsync(timeoutCts.Token),
+                readTask).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+            }
+
+            return new ToolResult
             {
                 ToolName = operation.Id,
                 Success = false,
                 Error = $"CLI skill timed out after {skill.Runtime.TimeoutSeconds}s"
-            });
+            };
         }
 
         if (process.ExitCode != 0)
         {
-            return Task.FromResult(new ToolResult
+            return new ToolResult
             {
                 ToolName = operation.Id,
                 Success = false,
                 Error = $"Exit code {process.ExitCode}: {Truncate(stderr.ToString())}"
-            });
+            };
         }
 
-        return Task.FromResult(new ToolResult
+        return new ToolResult
         {
             ToolName = operation.Id,
             Success = true,
             Output = Truncate(stdout.ToString())
-        });
+        };
     }
 
     private static async Task ReadStreamAsync(StreamReader reader, StringBuilder sb, CancellationToken ct)
@@ -257,7 +297,7 @@ public static class DynamicSkillTool
         var buffer = new char[4096];
         while (!ct.IsCancellationRequested)
         {
-            var read = await reader.ReadAsync(buffer, 0, buffer.Length);
+            var read = await reader.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false);
             if (read == 0) break;
             sb.Append(buffer, 0, read);
         }
@@ -451,7 +491,20 @@ public static class DynamicSkillTool
 
     private static string? ResolveSecret(string secretRef)
     {
-        var secretPath = Path.Combine("/run/secrets", secretRef);
+        if (!TryNormalizeSecretRef(secretRef, out var normalizedSecretRef))
+        {
+            return null;
+        }
+
+        var secretRoot = Path.GetFullPath("/run/secrets");
+        var secretPath = Path.GetFullPath(Path.Combine(secretRoot, normalizedSecretRef));
+        var isUnderSecretRoot = secretPath.StartsWith(secretRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            || string.Equals(secretPath, secretRoot, StringComparison.Ordinal);
+        if (!isUnderSecretRoot)
+        {
+            return null;
+        }
+
         if (File.Exists(secretPath))
         {
             var value = File.ReadAllText(secretPath).Trim();
@@ -461,13 +514,13 @@ public static class DynamicSkillTool
             }
         }
 
-        var directValue = Environment.GetEnvironmentVariable(secretRef);
+        var directValue = Environment.GetEnvironmentVariable($"SKILL__{NormalizeSecretEnvKey(normalizedSecretRef)}");
         if (!string.IsNullOrWhiteSpace(directValue))
         {
             return directValue.Trim();
         }
 
-        var normalizedKey = NormalizeSecretEnvKey(secretRef);
+        var normalizedKey = NormalizeSecretEnvKey(normalizedSecretRef);
         if (string.IsNullOrWhiteSpace(normalizedKey))
         {
             return null;
@@ -475,6 +528,31 @@ public static class DynamicSkillTool
 
         var normalizedValue = Environment.GetEnvironmentVariable(normalizedKey);
         return string.IsNullOrWhiteSpace(normalizedValue) ? null : normalizedValue.Trim();
+    }
+
+    private static bool TryNormalizeSecretRef(string secretRef, out string normalized)
+    {
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(secretRef))
+        {
+            return false;
+        }
+
+        var trimmed = secretRef.Trim().Replace('\\', '/');
+        if (!trimmed.StartsWith("skill/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (trimmed.Contains("..", StringComparison.Ordinal)
+            || trimmed.StartsWith("/", StringComparison.Ordinal)
+            || Path.IsPathRooted(trimmed))
+        {
+            return false;
+        }
+
+        normalized = trimmed;
+        return true;
     }
 
     private static string NormalizeSecretEnvKey(string secretRef)
@@ -525,6 +603,140 @@ public static class DynamicSkillTool
     };
 
     private const int MaxOutputChars = 12_000;
+
+    private static async Task<HttpResponseMessage> SendWithRedirectPolicyAsync(
+        HttpClient client,
+        HttpRequestMessage originalRequest,
+        Uri originalUri,
+        IReadOnlyList<string> allowHosts,
+        CancellationToken ct)
+    {
+        var currentRequest = originalRequest;
+        var currentUri = originalUri;
+
+        for (var redirectCount = 0; redirectCount <= MaxRedirects; redirectCount++)
+        {
+            var response = await client.SendAsync(currentRequest, HttpCompletionOption.ResponseContentRead, ct).ConfigureAwait(false);
+            if (!IsRedirectStatusCode(response.StatusCode))
+            {
+                return response;
+            }
+
+            if (redirectCount == MaxRedirects)
+            {
+                response.Dispose();
+                throw new InvalidOperationException($"HTTP skill exceeded maximum redirect count ({MaxRedirects}).");
+            }
+
+            var location = response.Headers.Location;
+            if (location is null)
+            {
+                response.Dispose();
+                throw new InvalidOperationException("HTTP skill received a redirect response without a location header.");
+            }
+
+            var redirectUri = location.IsAbsoluteUri ? location : new Uri(currentUri, location);
+            if (!TryValidateEgressTarget(redirectUri, allowHosts, out var egressError))
+            {
+                response.Dispose();
+                throw new InvalidOperationException(egressError);
+            }
+
+            response.Dispose();
+
+            currentUri = redirectUri;
+            var followUp = new HttpRequestMessage(originalRequest.Method, currentUri);
+            CopyHeaders(originalRequest, followUp);
+            currentRequest = followUp;
+        }
+
+        throw new InvalidOperationException("HTTP skill redirect handling failed.");
+    }
+
+    private static bool TryValidateEgressTarget(Uri uri, IReadOnlyList<string> allowHosts, out string error)
+    {
+        if (!uri.IsAbsoluteUri)
+        {
+            error = "HTTP skill target URI must be absolute.";
+            return false;
+        }
+
+        if (!uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
+            && !uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase))
+        {
+            error = $"HTTP skill target uses unsupported scheme '{uri.Scheme}'.";
+            return false;
+        }
+
+        if (!allowHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
+        {
+            error = $"HTTP skill target host '{uri.Host}' is not in runtime.egress.allowHosts.";
+            return false;
+        }
+
+        if (IsPrivateOrLoopbackHost(uri.Host)
+            && !allowHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
+        {
+            error = $"HTTP skill target host '{uri.Host}' resolves to a private or loopback address and is not explicitly allowlisted.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private static bool IsPrivateOrLoopbackHost(string host)
+    {
+        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!IPAddress.TryParse(host, out var ipAddress))
+        {
+            return false;
+        }
+
+        if (IPAddress.IsLoopback(ipAddress))
+        {
+            return true;
+        }
+
+        if (ipAddress.AddressFamily == AddressFamily.InterNetwork)
+        {
+            var bytes = ipAddress.GetAddressBytes();
+            return bytes[0] == 10
+                || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+                || (bytes[0] == 192 && bytes[1] == 168)
+                || (bytes[0] == 169 && bytes[1] == 254)
+                || bytes[0] == 127;
+        }
+
+        if (ipAddress.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            return ipAddress.IsIPv6LinkLocal
+                || ipAddress.IsIPv6SiteLocal
+                || ipAddress.IsIPv6Multicast
+                || ipAddress.Equals(IPAddress.IPv6Loopback)
+                || ipAddress.Equals(IPAddress.IPv6Any)
+                || ipAddress.Equals(IPAddress.IPv6None)
+                || ipAddress.IsIPv6UniqueLocal;
+        }
+
+        return false;
+    }
+
+    private static bool IsRedirectStatusCode(HttpStatusCode statusCode)
+        => statusCode is HttpStatusCode.Moved or HttpStatusCode.Found or HttpStatusCode.RedirectMethod
+            or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect;
+
+    private static void CopyHeaders(HttpRequestMessage source, HttpRequestMessage destination)
+    {
+        foreach (var header in source.Headers)
+        {
+            destination.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+    }
 
     private static string Truncate(string value)
         => value.Length <= MaxOutputChars ? value : value[..MaxOutputChars];

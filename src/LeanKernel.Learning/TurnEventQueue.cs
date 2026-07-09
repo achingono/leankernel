@@ -54,6 +54,7 @@ public sealed class TurnEventQueue(
     public Task PublishAsync(TurnEvent turnEvent, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(turnEvent);
+        ct.ThrowIfCancellationRequested();
 
         lock (_sync)
         {
@@ -76,6 +77,8 @@ public sealed class TurnEventQueue(
                 return Task.CompletedTask;
             }
 
+            _bufferedCount = Math.Min(_capacity, _bufferedCount + 1);
+
             if (queueWasFull)
             {
                 _logger.LogWarning(
@@ -83,10 +86,6 @@ public sealed class TurnEventQueue(
                     _capacity,
                     turnEvent.SessionId,
                     turnEvent.TurnId);
-            }
-            else
-            {
-                _bufferedCount++;
             }
         }
 

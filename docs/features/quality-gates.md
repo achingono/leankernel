@@ -123,4 +123,4 @@ Quality gates are a deterministic policy layer, not a second model. They exist s
 - [Model Routing](model-routing.md)
 - [Shadow Routing](shadow-routing.md)
 - [Turn Pipeline](turn-pipeline.md)
-- [Phase 3 Configuration](../configuration/phase-3-config.md)
+- [Configuration reference](../configuration/configuration-reference.md)
