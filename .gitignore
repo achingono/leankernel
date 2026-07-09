@@ -49,11 +49,9 @@ Thumbs.db
 # Docker volumes / runtime data
 data/wiki/**/*.json
 data/sessions/
-data/qdrant/
 data/logs/
 !data/wiki/.gitkeep
 !data/sessions/.gitkeep
-!data/qdrant/.gitkeep
 !data/logs/.gitkeep
 
 # Environment
