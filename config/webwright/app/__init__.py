@@ -1,1 +1,0 @@
-"""LeanKernel webwright sidecar."""
