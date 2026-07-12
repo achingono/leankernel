@@ -3,17 +3,17 @@ namespace LeanKernel.Entities;
 /// <summary>
 /// Represents a persisted conversation turn within a session.
 /// </summary>
-public sealed class TurnEntity
+public sealed class TurnEntity: IEntity
 {
     /// <summary>
     /// Gets or sets the unique turn identifier.
     /// </summary>
-    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>
     /// Gets or sets the parent session identifier.
     /// </summary>
-    public required string SessionId { get; set; }
+    public required Guid SessionId { get; set; }
 
     /// <summary>
     /// Gets or sets the speaker role for the turn.

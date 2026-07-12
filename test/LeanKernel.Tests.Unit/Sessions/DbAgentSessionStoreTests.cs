@@ -1,4 +1,5 @@
 using FluentAssertions;
+using LeanKernel;
 using LeanKernel.Data;
 using LeanKernel.Gateway.Sessions;
 using Microsoft.Agents.AI;
@@ -11,13 +12,22 @@ namespace LeanKernel.Tests.Unit.Sessions;
 
 public class DbAgentSessionStoreTests
 {
-    private static (DbAgentSessionStore store, EntityContext context) CreateSut()
+    private static (DbAgentSessionStore store, EntityContext context) CreateSut(
+        Guid? tenantId = null,
+        Guid? userId = null,
+        Guid? channelId = null)
     {
         var options = new DbContextOptionsBuilder<EntityContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         var entityContext = new EntityContext(options);
-        return (new DbAgentSessionStore(entityContext), entityContext);
+
+        var permit = new Mock<IPermit>();
+        permit.Setup(p => p.TenantId).Returns(tenantId ?? Guid.NewGuid());
+        permit.Setup(p => p.UserId).Returns(userId ?? Guid.NewGuid());
+        permit.Setup(p => p.ChannelId).Returns(channelId ?? Guid.NewGuid());
+
+        return (new DbAgentSessionStore(entityContext, permit.Object), entityContext);
     }
 
     private static ChatClientAgent CreateStubAgent()
@@ -90,5 +100,26 @@ public class DbAgentSessionStoreTests
         restored1.Should().NotBeNull();
         restored2.Should().NotBeNull();
         restored1.Should().NotBeSameAs(restored2);
+    }
+
+    [Fact]
+    public async Task SaveSessionAsync_PopulatesOwnershipMetadata()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+        var (store, context) = CreateSut(tenantId, userId, channelId);
+        var agent = CreateStubAgent();
+        var conversationId = $"test-conv-{Guid.NewGuid():N}";
+        var session = await agent.CreateSessionAsync();
+
+        await store.SaveSessionAsync(agent, conversationId, session);
+
+        var entity = await context.AgentSessions.FindAsync(conversationId);
+        entity.Should().NotBeNull();
+        entity!.TenantId.Should().Be(tenantId);
+        entity.UserId.Should().Be(userId);
+        entity.ChannelId.Should().Be(channelId);
+        entity.CreatedOn.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
     }
 }

@@ -8,10 +8,13 @@ using Microsoft.EntityFrameworkCore;
 namespace LeanKernel.Gateway.Sessions;
 
 /// <summary>
-/// Durable agent session store backed by EF Core, storing serialized session state per scoped conversation.
-/// Uses <see cref="JsonSerializer"/> to persist <see cref="ChatClientAgentSession"/> state.
+/// Durable agent session store backed by EF Core.
+/// Uses <see cref="JsonSerializer"/> to persist session state.
+/// Populates ownership metadata (TenantId, UserId, ChannelId) on <see cref="AgentSessionEntity"/>.
 /// </summary>
-public class DbAgentSessionStore(EntityContext entityContext) : AgentSessionStore
+public class DbAgentSessionStore(
+    EntityContext entityContext,
+    IPermit permit) : AgentSessionStore
 {
     private static readonly JsonSerializerOptions s_jsonOptions = new()
     {
@@ -76,6 +79,9 @@ public class DbAgentSessionStore(EntityContext entityContext) : AgentSessionStor
             entityContext.AgentSessions.Add(new AgentSessionEntity
             {
                 ScopedConversationId = conversationId,
+                TenantId = permit.TenantId,
+                UserId = permit.UserId,
+                ChannelId = permit.ChannelId,
                 StateJson = stateJson,
                 CreatedOn = DateTimeOffset.UtcNow,
                 UpdatedOn = DateTimeOffset.UtcNow

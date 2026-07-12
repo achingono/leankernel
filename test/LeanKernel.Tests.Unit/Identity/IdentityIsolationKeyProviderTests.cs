@@ -41,7 +41,7 @@ public class IdentityIsolationKeyProviderTests
     }
 
     [Fact]
-    public async Task GetSessionIsolationKey_Anonymous_ReturnsTenantChannelSession()
+    public async Task GetSessionIsolationKey_Anonymous_ReturnsTenantChannelUserSession()
     {
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -52,7 +52,7 @@ public class IdentityIsolationKeyProviderTests
 
         var key = await provider.GetSessionIsolationKeyAsync();
 
-        key.Should().Be($"{tenantId}|{channelId}|{sessionId}");
+        key.Should().Be($"{tenantId}|{channelId}|{userId}|{sessionId}");
     }
 
     [Fact]

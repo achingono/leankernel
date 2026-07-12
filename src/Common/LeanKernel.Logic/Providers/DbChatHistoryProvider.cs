@@ -8,13 +8,14 @@ namespace LeanKernel.Logic.Providers;
 
 /// <summary>
 /// Provides chat history storage backed by EF Core, filtered by tenant/user/channel identity.
+/// Ownership is verified through <see cref="SessionEntity"/> to enforce partitioning.
 /// </summary>
 public class DbChatHistoryProvider(
     IDbContextFactory<EntityContext> dbContextFactory,
     IPermit permit) : ChatHistoryProvider
 {
-    private const string ChatSessionIdKey = "chatSessionId";
-    private const string ConversationIdKey = "conversationId";
+    internal const string ChatSessionIdKey = "chatSessionId";
+    internal const string ConversationIdKey = "conversationId";
 
     protected override async ValueTask<IEnumerable<ChatMessage>> ProvideChatHistoryAsync(
         InvokingContext context,
@@ -26,9 +27,25 @@ public class DbChatHistoryProvider(
             || string.IsNullOrEmpty(chatSessionId))
             return [];
 
+        if (!Guid.TryParse(chatSessionId, out var chatSessionGuid))
+            return [];
+
         using var scope = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        // Verify ownership: the session must belong to the current tenant/user/channel
+        var ownsSession = await scope.Sessions
+            .AnyAsync(s =>
+                s.Id == chatSessionGuid &&
+                s.TenantId == permit.TenantId &&
+                s.UserId == permit.UserId &&
+                s.ChannelId == permit.ChannelId,
+                cancellationToken);
+
+        if (!ownsSession)
+            return [];
+
         var turns = await scope.Turns
-            .Where(t => t.SessionId == chatSessionId)
+            .Where(t => t.SessionId == chatSessionGuid)
             .OrderBy(t => t.Timestamp)
             .ToListAsync(cancellationToken);
 
@@ -57,8 +74,8 @@ public class DbChatHistoryProvider(
 
         using var scope = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // Ensure the session entity exists
-        if (string.IsNullOrEmpty(chatSessionId))
+        // Ensure the session entity exists with correct ownership
+        if (string.IsNullOrEmpty(chatSessionId) || !Guid.TryParse(chatSessionId, out var sessionGuid))
         {
             var sessionEntity = new SessionEntity
             {
@@ -72,8 +89,25 @@ public class DbChatHistoryProvider(
             };
             scope.Sessions.Add(sessionEntity);
             await scope.SaveChangesAsync(cancellationToken);
+            sessionGuid = sessionEntity.Id;
             chatSessionId = sessionEntity.Id.ToString();
             session.StateBag.SetValue(ChatSessionIdKey, chatSessionId);
+        }
+        else
+        {
+            // Verify ownership of existing session
+            var ownsSession = await scope.Sessions
+                .AnyAsync(s =>
+                    s.Id == sessionGuid &&
+                    s.TenantId == permit.TenantId &&
+                    s.UserId == permit.UserId &&
+                    s.ChannelId == permit.ChannelId,
+                    cancellationToken);
+
+            if (!ownsSession)
+                throw new InvalidOperationException(
+                    $"Session {sessionGuid} does not belong to the current identity " +
+                    $"(TenantId={permit.TenantId}, UserId={permit.UserId}, ChannelId={permit.ChannelId}).");
         }
 
         // Store input request messages (user/tool)
@@ -88,7 +122,7 @@ public class DbChatHistoryProvider(
 
                 var turn = new TurnEntity
                 {
-                    SessionId = chatSessionId,
+                    SessionId = sessionGuid,
                     Role = msg.Role.Value.ToString().ToLowerInvariant(),
                     AuthorName = msg.AuthorName,
                     Content = msg.Text,
@@ -108,7 +142,7 @@ public class DbChatHistoryProvider(
 
                 var turn = new TurnEntity
                 {
-                    SessionId = chatSessionId,
+                    SessionId = sessionGuid,
                     Role = "assistant",
                     AuthorName = msg.AuthorName,
                     Content = msg.Text,

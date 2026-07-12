@@ -42,7 +42,9 @@ public static class IServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers a named <see cref="AIAgent"/> as a singleton using MAF hosting primitives.
+    /// Registers a named <see cref="AIAgent"/> as scoped using MAF hosting primitives.
+    /// Scoped lifetime ensures providers (ChatHistoryProvider, AIContextProvider) are resolved
+    /// from the request scope rather than captured at singleton creation time.
     /// </summary>
     public static IServiceCollection AddLeanKernelAgent(
         this IServiceCollection services,
@@ -69,7 +71,7 @@ public static class IServiceCollectionExtensions
                 },
                 sp.GetRequiredService<ILoggerFactory>(),
                 sp);
-        }, ServiceLifetime.Singleton);
+        }, ServiceLifetime.Scoped);
 
         return services;
     }

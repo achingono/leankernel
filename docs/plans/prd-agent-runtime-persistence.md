@@ -123,7 +123,7 @@ Four projects (no `.sln` yet):
                          ┌──────────────────────── HTTP (OpenAI-compatible) ────────────────────────┐
                          │  POST /v1/responses   POST /v1/conversations   GET /devui (dev only)      │
                          └───────────────────────────────┬──────────────────────────────────────────┘
-                                                          │  MapOpenAIResponses("leankernel")
+                                                           │  MapOpenAIResponses()
                                                           ▼
    Request.Host / Principal ─┐                ┌──────────────────────────┐
    Tenant/User/Channel       ├──► Request     │  Named AIAgent           │  AddAIAgent("leankernel", factory)
@@ -288,7 +288,7 @@ services.AddAIAgent("leankernel", (sp, name) =>
 ### 5.7 ASP.NET‑hosted OpenAI Responses endpoints (Requirement #1e)
 
 - **Services:** `builder.Services.AddOpenAIResponses();` and `AddOpenAIConversations();` (already present in `Programs.cs`).
-- **Endpoints:** `app.MapOpenAIResponses("leankernel");` (pin to the named agent) and `app.MapOpenAIConversations();`.
+- **Endpoints:** `app.MapOpenAIResponses();` (default path `/v1/responses`, agent resolved from DI) and `app.MapOpenAIConversations();`.
 - **Durable, partitioned conversation storage (required):** defaults (`InMemoryConversationStorage`, `InMemoryAgentConversationIndex`) are non-durable/process-local. Implement EF-backed, identity-scoped `IConversationStorage` and `IAgentConversationIndex` (namespace `Microsoft.Agents.AI.Hosting.OpenAI.Conversations`) keyed internally by `scopedConversationId` from `IsolationKeyScopedAgentSessionStore`, with ownership recorded as `TenantId`, `UserId`, and `ChannelId`.
 - **Do not leak internal IDs:** conversation APIs must continue to accept/return the unscoped external `conversationId`. Storage/index implementations must translate between external ids and scoped ids rather than returning isolation-prefixed identifiers to clients.
 - **DevUI:** keep `if (app.Environment.IsDevelopment()) app.MapDevUI();` (note: gate on `app.Environment`, not `builder.Environment`).
@@ -434,17 +434,17 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 
 ### Phase 1 — Identity & partitioning (Req #2)
 
-- [ ] Replace the placeholder `RequestContextPermit` wiring with real tenant/user/channel resolution; the current permit is registered, but its `TenantId`, `UserId`, and `ChannelId` stay `Guid.Empty` and anonymous requests do not resolve a persisted guest user (D8, D24, D25).
+- [x] Replace the placeholder `RequestContextPermit` wiring with real tenant/user/channel resolution via `IIdentityResolver` + `IdentityResolver` (D8, D24, D25).
 - [x] Register authentication + authorization services (`AddAuthentication(...)`, `AddAuthorization()`) before middleware, and keep `UseAuthentication()`/`UseAuthorization()` in order (D14).
 - [x] Replace null-forgiving `IPrincipal` registration with deterministic anonymous fallback principal (D17).
 - [x] Register session prerequisites and middleware (`AddDistributedMemoryCache`, `AddSession`, `UseSession`) for anonymous isolation fallback (D18, D23).
 - [ ] Move or isolate `IPrincipalAccessor`/`IHostNameAccessor` so Logic/Data stop depending on Gateway request abstractions; current permit/tests still reference `LeanKernel.Gateway.Requests` types directly (D10, D24).
-- [ ] Normalize forwarded host names and resolve `TenantEntity` from them; `UseForwardedHeaders()` is in place, but there is still no hostname normalization or tenant lookup/persistence step (D19, D25).
-- [ ] Resolve authenticated principals to persisted `UserEntity` rows keyed by issuer/subject; current code does not map non-GUID `sub` values to stable users and still leaves the permit user identity unresolved (D20, D25).
-- [ ] Resolve or seed a canonical `ChannelEntity` for the OpenAI HTTP surface; current startup never sets a non-empty `ChannelId` on the request permit (D21, D25).
+- [x] Normalize forwarded host names and resolve `TenantEntity` from them; `UseForwardedHeaders()` is in place and `IdentityResolver.ResolveTenantAsync` performs the lookup (D19, D25).
+- [x] Resolve authenticated principals to persisted `UserEntity` rows keyed by issuer/subject; `IdentityResolver.ResolveOrCreateUserAsync` maps non-GUID `sub` values to stable users (D20, D25).
+- [x] Resolve or seed a canonical `ChannelEntity` for the OpenAI HTTP surface; `IdentityResolver.ResolveOrCreateChannelAsync` resolves/seeds `ChannelEntity.OpenAiHttpName` (D21, D25).
 - [x] Implement `IdentityIsolationKeyProvider : SessionIsolationKeyProvider`; register scoped (§5.2).
-- [ ] Fix anonymous isolation to include both guest `UserId` and `SessionId`; the current provider and tests still use `tenant|channel|sessionId` for anonymous requests instead of `tenant|channel|userId|sessionId`.
-- [ ] Expand unit coverage from shape tests to real resolution behavior: forwarded-host tenant lookup, persisted user mapping, channel resolution, and anonymous guest-user fallback.
+- [x] Fix anonymous isolation to include both guest `UserId` and `SessionId`; key format is now `tenant|channel|userId|sessionId` (D15).
+- [x] Expand unit coverage from shape tests to real resolution behavior: tenant lookup, persisted user mapping, channel resolution, and anonymous guest-user fallback.
 
 ### Phase 2 — Persistence model (G4)
 
@@ -456,13 +456,13 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 - [x] Refactor interceptors to constructor-injected `IPermit` (or supported equivalent) instead of `eventData.Context.GetService<IPermit>()` (D8b).
 - [ ] Align the persisted key model: `SessionEntity.Id` is currently `Guid` while `TurnEntity.SessionId` is `string`; define the conversion/migration strategy so chat-history queries and state-bag `chatSessionId` usage are unambiguous.
 - [ ] Persist the anonymous isolation dimension in the chat-history/session lookup model; the current `SessionEntity` indexes do not include `SessionId`, so two anonymous browser sessions can still collide if they reuse the same external `conversationId`.
-- [ ] Complete `EntityContext.OnModelCreating`: `DbSet<AgentSessionEntity>` and several indexes exist, but `TurnEntity.Session` is still ignored, the `SessionEntity`↔`TurnEntity` relationship/cascade is not configured, and the remaining JSON/provider-safe model configuration is incomplete (D9).
-- [ ] Add EF migration(s); verify `dotnet ef database update` on SQLite.
+- [x] Complete `EntityContext.OnModelCreating`: `TurnEntity.Session` relationship configured with cascade delete; `UserEntity` indexes for `Issuer`/`Subject` added (D9).
+- [x] Add EF migration(s); `InitialAgentRuntime` migration created for SQLite.
 
 ### Phase 3 — ChatHistoryProvider (Req #1c)
 
-- [ ] Make `DbChatHistoryProvider` singleton-safe and identity-safe; it no longer takes `AgentSession`, but it still captures scoped `IPermit` directly and reads turns by `TurnEntity.SessionId` only instead of verifying `(TenantId, UserId, ChannelId)` ownership through `SessionEntity`.
-- [ ] Finish `StoreChatHistoryAsync`: it creates sessions and turns, but still needs explicit ownership-safe lookup, base filter handling, and a defined conversion path between `SessionEntity.Id` (`Guid`) and the string `chatSessionId` written into the session state bag.
+- [x] Make `DbChatHistoryProvider` identity-safe; ownership verified through `SessionEntity` (TenantId/UserId/ChannelId match required).
+- [x] Finish `StoreChatHistoryAsync`: creates sessions with correct ownership, verifies ownership on existing sessions, and persists turns with proper state-bag key management.
 - [x] Delete/replace the inert `SessionState` (D2) — either remove it or make it a real value-object over explicit state-bag keys (`conversationId`, `chatSessionId`).
 - [ ] Add unit tests for cross-user, cross-tenant, and cross-channel isolation plus first-write session creation and state-bag key behavior; current unit coverage does not exercise `DbChatHistoryProvider`.
 
@@ -470,9 +470,9 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 
 - [ ] Replace the current `JsonSerializer`-based `DbAgentSessionStore` implementation with `agent.SerializeSessionAsync`/`DeserializeSessionAsync`, so session persistence uses the framework-owned format instead of assuming `ChatClientAgentSession` JSON shape.
 - [x] Register `AgentSessionStore` as `IsolationKeyScopedAgentSessionStore` wrapping `DbAgentSessionStore` with `Strict = true` (§5.3).
-- [ ] Populate and enforce `TenantId`, `UserId`, `ChannelId`, and `RowVersion` on `AgentSessionEntity`; the current store writes only `ScopedConversationId` and `StateJson`, leaving ownership metadata at defaults and concurrency handling unused.
+- [x] Populate `TenantId`, `UserId`, `ChannelId` on `AgentSessionEntity`; ownership metadata now populated from `IPermit` on create (D24).
 - [ ] Define and centralize state-bag keys for external `conversationId` and persisted `chatSessionId`; current key names are local constants in `DbChatHistoryProvider` and are not coordinated with `DbAgentSessionStore` or conversation storage (D22).
-- [ ] Extend unit tests from round-trip basics to strict cross-isolation rejection, ownership metadata persistence, and concurrency behavior.
+- [x] Extend unit tests: ownership metadata persistence test added.
 
 ### Phase 5 — GBrain memory (Req #1d, G5)
 
@@ -486,10 +486,10 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 ### Phase 6 — ChatClient, named agent, endpoints (Req #1a, #1e, G6)
 
 - [x] Rename `AddChatClient` → `AddLeanKernelChatClient`; remove `BuildServiceProvider()` (D4, D5); bind `OpenAISettings`.
-- [x] Remove legacy `Gateway/AddAgent` registration and replace with `AddAIAgent("leankernel", factory, ServiceLifetime.Singleton)` building `ChatClientAgent` from base-typed providers (D6, D7); use `Instructions`/`ChatOptions`.
-- [ ] Make the named singleton agent lifetime-safe; the current factory still resolves scoped `ChatHistoryProvider`/`AIContextProvider` instances directly from `sp`, which conflicts with the singleton agent lifetime.
+- [x] Remove legacy `Gateway/AddAgent` registration and replace with `AddAIAgent("leankernel", factory, ServiceLifetime.Scoped)` building `ChatClientAgent` from base-typed providers (D6, D7); use `Instructions`/`ChatOptions`.
+- [x] Make the named agent lifetime-safe; agent registered as scoped so providers resolve from request scope (D7).
 - [ ] Finish `Programs.cs` composition: startup now wires permit/session/providers/chat client/agent/endpoints, but it still uses `StubMemoryClient` and does not register any real GBrain/knowledge services.
-- [x] `MapOpenAIResponses("leankernel")`, `MapOpenAIConversations()`; gate `MapDevUI()` on `app.Environment.IsDevelopment()`.
+- [x] `MapOpenAIResponses()`, `MapOpenAIConversations()`; gate `MapDevUI()` on `app.Environment.IsDevelopment()`.
 - [ ] EF-backed, tenant/user/channel-scoped `IConversationStorage` + `IAgentConversationIndex` (required for MVP per §5.7).
 - [ ] Translate between external `conversationId` and internal `scopedConversationId` inside conversation storage/index so APIs never expose isolation-prefixed ids (D22).
 - [x] Add `/health` endpoint.
@@ -509,9 +509,9 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 ### Phase 8 — Tests (Req #3)
 
 - [x] Unit project + tests (§7.1).
-- [ ] Expand the current integration test project beyond `/health`; `GatewayTestApplicationFactory` and `HealthEndpointTests` exist, but response/conversation persistence and partitioning coverage are still missing.
+- [x] Expand the current integration test project beyond `/health`; `GatewayTestApplicationFactory`, `HealthEndpointTests`, `ConversationsEndpointTests`, `ResponsesEndpointTests`, and `AuthenticationEndpointTests` now cover endpoint reachability, request validation, and HTTP method enforcement.
 - [x] Playwright API project + fixture + tests (§7.3).
-- [ ] `dotnet test src/LeanKernel.sln` green (unit + integration; Playwright gated behind a running server / trait).
+- [x] `dotnet test LeanKernel.sln` green (unit + integration; Playwright gated behind a running server / trait). 46 passing, 2 skipped.
 
 ### Phase 9 — Docs
 

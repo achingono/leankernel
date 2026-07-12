@@ -45,6 +45,7 @@ builder.Services.TryAddScoped<IPrincipal>(provider =>
 builder.Services.TryAddSingleton<IHostNameAccessor, HostNameAccessor>();
 
 // Identity/permit resolution (request-scoped)
+builder.Services.AddScoped<IIdentityResolver, IdentityResolver>();
 builder.Services.AddScoped<IPermit, RequestContextPermit>();
 
 // Session prerequisites for anonymous isolation fallback
@@ -146,6 +147,42 @@ builder.Services.AddOpenAIConversations();
 
 var app = builder.Build();
 
+// Apply pending migrations and seed required entities
+if (app.Environment.EnvironmentName != "Testing")
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<LeanKernel.Data.EntityContext>();
+    await dbContext.Database.MigrateAsync();
+
+    // Seed default tenant for the configured host
+    var hostName = app.Configuration["WebHost:HostName"] ?? "localhost";
+    if (!await dbContext.Tenants.AnyAsync(t => t.HostName == hostName))
+    {
+        dbContext.Tenants.Add(new LeanKernel.Entities.TenantEntity
+        {
+            Id = Guid.NewGuid(),
+            Name = "Default Tenant",
+            Description = "Default tenant created at startup",
+            HostName = hostName,
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new LeanKernel.Entities.Badge { Id = Guid.Empty, FullName = "System", Email = "system@leankernel.local" }
+        });
+        await dbContext.SaveChangesAsync();
+    }
+
+    // Seed OpenAI HTTP channel
+    if (!await dbContext.Channels.AnyAsync(c => c.Name == LeanKernel.Entities.ChannelEntity.OpenAiHttpName))
+    {
+        dbContext.Channels.Add(new LeanKernel.Entities.ChannelEntity
+        {
+            Id = Guid.NewGuid(),
+            Name = LeanKernel.Entities.ChannelEntity.OpenAiHttpName
+        });
+        await dbContext.SaveChangesAsync();
+    }
+}
+
 // Apply forwarded headers before anything reads Request.Host
 app.UseForwardedHeaders();
 
@@ -159,7 +196,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Map endpoints
-app.MapOpenAIResponses("leankernel");
+app.MapOpenAIResponses();
 app.MapOpenAIConversations();
 
 if (app.Environment.IsDevelopment())

@@ -74,7 +74,10 @@ public class EntityContext : DbContext
             entity.Property(e => e.SessionId).HasMaxLength(50);
             entity.Property(e => e.Role).HasMaxLength(50);
             entity.Property(e => e.AuthorName).HasMaxLength(200);
-            entity.Ignore(e => e.Session);
+            entity.HasOne(e => e.Session)
+                .WithMany(s => s.Turns)
+                .HasForeignKey(e => e.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.SessionId, e.Timestamp });
         });
 
@@ -110,7 +113,10 @@ public class EntityContext : DbContext
             entity.Property(e => e.FirstName).HasMaxLength(100);
             entity.Property(e => e.LastName).HasMaxLength(100);
             entity.Property(e => e.FullName).HasMaxLength(200);
+            entity.Property(e => e.Issuer).HasMaxLength(500);
+            entity.Property(e => e.Subject).HasMaxLength(500);
             entity.HasIndex(e => e.Email);
+            entity.HasIndex(e => new { e.Issuer, e.Subject }).IsUnique();
             entity.HasQueryFilter(e => !e.IsDeleted);
             entity.OwnsOne(e => e.CreatedBy);
             entity.OwnsOne(e => e.UpdatedBy);
