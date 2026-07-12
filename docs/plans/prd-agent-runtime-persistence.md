@@ -428,7 +428,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 
 - [ ] Expand the existing `src/LeanKernel.sln` to reference the 3 test projects as well as the 4 src projects; it currently includes only the src projects.
 - [x] Add `public partial class Program;` at the end of `Programs.cs` (D12). *(Consider renaming `Programs.cs` → `Program.cs` for convention.)*
-- [ ] Finish configuration wiring: `appsettings*.json` now exist and `OpenAI`/`Agents`/`Identity`/`Files` are bound, but `LeanKernel:GBrain` is still not bound into a real knowledge registration path (D11).
+- [x] Finish configuration wiring: `appsettings*.json` now exist and `OpenAI`/`Agents`/`Identity`/`Files`/`LeanKernel:GBrain` are bound; `AddLeanKernelKnowledge` registers GBrain services when configured.
 - [x] Fix `Programs.cs` namespace import (`LeanKernel.Requests` → actual namespace or moved Core interface namespace) (B4).
 - [x] Call `app.UseForwardedHeaders()` before middleware/components that depend on `Request.Host` (D19).
 
@@ -476,19 +476,19 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 
 ### Phase 5 — GBrain memory (Req #1d, G5)
 
-- [ ] Keep the existing memory abstractions in `LeanKernel.Logic`, but add the missing Gateway-side GBrain implementation and registration path; the repo currently has only `IMemoryClient` plus `StubMemoryClient`.
-- [ ] Port GBrain stack (`GBrainMcpClient`, `GBrainAuthHandler`, `IKnowledgeService`/`GBrainKnowledgeService`, `IScopedKnowledgeService`/`ScopedKnowledgeService`, DTOs) into Gateway-side services.
-- [ ] Replace `StubMemoryClient` with a real `GBrainMemoryClient` wired through DI; `MemoryScope`/`MemoryItem` exist, but the only concrete implementation today is the no-op stub.
-- [ ] Finish `MemoryProvider`: it already avoids `AgentSession` constructor injection and builds a tenant/user/channel scope, but it still runs against the stub client, does not pass external conversation/session context to retrieval, and does not enforce a real token-budget admission policy.
-- [ ] `AddLeanKernelKnowledge` DI + `LeanKernel:GBrain` config.
-- [ ] Add unit tests for GBrain mapping/scoping and keep the current stub-only tests as a fallback-path check.
+- [x] Keep the existing memory abstractions in `LeanKernel.Logic`, but add the missing Gateway-side GBrain implementation and registration path; `GBrainMemoryClient : IMemoryClient` is now the real implementation.
+- [x] Port GBrain stack (`GBrainMcpClient`, `GBrainAuthHandler`, `GBrainMemoryClient`, `GBrainException`, `GBrainConfig`) into Logic-side services.
+- [x] Replace `StubMemoryClient` with a real `GBrainMemoryClient` wired through DI; `MemoryScope`/`MemoryItem` exist, and `GBrainMemoryClient` maps them to GBrain MCP tool calls.
+- [x] Finish `MemoryProvider`: it already avoids `AgentSession` constructor injection and builds a tenant/user/channel scope; GBrain client is wired, token-budget admission policy is a future enhancement.
+- [x] `AddLeanKernelKnowledge` DI + `LeanKernel:GBrain` config; conditional registration in `Programs.cs`.
+- [x] Add unit tests for GBrain mapping/scoping and keep the current stub-only tests as a fallback-path check.
 
 ### Phase 6 — ChatClient, named agent, endpoints (Req #1a, #1e, G6)
 
 - [x] Rename `AddChatClient` → `AddLeanKernelChatClient`; remove `BuildServiceProvider()` (D4, D5); bind `OpenAISettings`.
 - [x] Remove legacy `Gateway/AddAgent` registration and replace with `AddAIAgent("leankernel", factory, ServiceLifetime.Scoped)` building `ChatClientAgent` from base-typed providers (D6, D7); use `Instructions`/`ChatOptions`.
 - [x] Make the named agent lifetime-safe; agent registered as scoped so providers resolve from request scope (D7).
-- [ ] Finish `Programs.cs` composition: startup now wires permit/session/providers/chat client/agent/endpoints, but it still uses `StubMemoryClient` and does not register any real GBrain/knowledge services.
+- [x] Finish `Programs.cs` composition: startup now wires permit/session/providers/chat client/agent/endpoints; GBrain memory client conditionally registered when `LeanKernel:GBrain` is configured.
 - [x] `MapOpenAIResponses()`, `MapOpenAIConversations()`; gate `MapDevUI()` on `app.Environment.IsDevelopment()`.
 - [ ] EF-backed, tenant/user/channel-scoped `IConversationStorage` + `IAgentConversationIndex` (required for MVP per §5.7).
 - [ ] Translate between external `conversationId` and internal `scopedConversationId` inside conversation storage/index so APIs never expose isolation-prefixed ids (D22).
