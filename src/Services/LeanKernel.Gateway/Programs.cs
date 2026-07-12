@@ -1,5 +1,6 @@
 ﻿using System.Security.Principal;
 using LeanKernel;
+using LeanKernel.Gateway;
 using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.Identity;
 using LeanKernel.Gateway.Requests;
@@ -11,7 +12,6 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.DevUI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -59,8 +59,6 @@ builder.Services.AddSession();
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
-        var identitySettings = builder.Configuration
-            .GetSection("Identity").Get<IdentitySettings>() ?? new IdentitySettings();
         options.RequireHttpsMetadata = false;
         options.TokenValidationParameters.ValidateIssuer = false;
         options.TokenValidationParameters.ValidateAudience = false;
@@ -84,39 +82,7 @@ builder.Services.AddCors(options =>
 // EF Core EntityContext with interceptors resolved from real DI
 builder.Services.AddEntityContext(options =>
 {
-    var connectionStringNames = new[] { "SqlServer", "Sqlite", "Postgres" };
-    string? connectionString = null;
-    string? connectionStringName = null;
-    foreach (var name in connectionStringNames)
-    {
-        connectionString = builder.Configuration.GetConnectionString(name);
-        if (!string.IsNullOrWhiteSpace(connectionString))
-        {
-            connectionStringName = name;
-            break;
-        }
-    }
-
-    if (string.IsNullOrWhiteSpace(connectionString) && builder.Environment.EnvironmentName != "Testing")
-        throw new InvalidOperationException(
-            $"Connection string is missing. Specify any of '{string.Join(",", connectionStringNames)}'.");
-
-    switch (connectionStringName)
-    {
-        case "SqlServer":
-            options.UseSqlServer(connectionString, opts => opts.EnableRetryOnFailure());
-            break;
-        case "Sqlite":
-            options.UseSqlite(connectionString);
-            break;
-        case "Postgres":
-            options.UseNpgsql(connectionString);
-            break;
-    }
-
-    if (builder.Environment.IsDevelopment())
-        options.EnableDetailedErrors(true)
-               .EnableSensitiveDataLogging(true);
+    ProgramSetup.ConfigureEntityContext(builder, options);
 });
 
 // LeanKernel providers (registered against base types)
@@ -124,14 +90,7 @@ builder.Services.AddContextProviders();
 
 // Memory client: use GBrain-backed implementation when configured, otherwise stub
 var gbrainConfig = builder.Configuration.GetSection("LeanKernel:GBrain").Get<GBrainConfig>();
-if (gbrainConfig is { BaseUrl: not null } && !string.IsNullOrWhiteSpace(gbrainConfig.BaseUrl))
-{
-    builder.Services.AddLeanKernelKnowledge(gbrainConfig);
-}
-else
-{
-    builder.Services.AddScoped<IMemoryClient, StubMemoryClient>();
-}
+ProgramSetup.ConfigureMemoryClient(builder.Services, gbrainConfig);
 
 // Chat client (OpenAI-compatible)
 builder.Services.AddLeanKernelChatClient();
@@ -159,40 +118,7 @@ builder.Services.AddOpenAIConversations();
 var app = builder.Build();
 
 // Apply pending migrations and seed required entities
-if (app.Environment.EnvironmentName != "Testing")
-{
-    using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<LeanKernel.Data.EntityContext>();
-    await dbContext.Database.MigrateAsync();
-
-    // Seed default tenant for the configured host
-    var hostName = app.Configuration["WebHost:HostName"] ?? "localhost";
-    if (!await dbContext.Tenants.AnyAsync(t => t.HostName == hostName))
-    {
-        dbContext.Tenants.Add(new LeanKernel.Entities.TenantEntity
-        {
-            Id = Guid.NewGuid(),
-            Name = "Default Tenant",
-            Description = "Default tenant created at startup",
-            HostName = hostName,
-            IsActive = true,
-            CreatedOn = DateTime.UtcNow,
-            CreatedBy = new LeanKernel.Entities.Badge { Id = Guid.Empty, FullName = "System", Email = "system@leankernel.local" }
-        });
-        await dbContext.SaveChangesAsync();
-    }
-
-    // Seed OpenAI HTTP channel
-    if (!await dbContext.Channels.AnyAsync(c => c.Name == LeanKernel.Entities.ChannelEntity.OpenAiHttpName))
-    {
-        dbContext.Channels.Add(new LeanKernel.Entities.ChannelEntity
-        {
-            Id = Guid.NewGuid(),
-            Name = LeanKernel.Entities.ChannelEntity.OpenAiHttpName
-        });
-        await dbContext.SaveChangesAsync();
-    }
-}
+await ProgramSetup.ApplyMigrationsAndSeedAsync(app);
 
 // Apply forwarded headers before anything reads Request.Host
 app.UseForwardedHeaders();

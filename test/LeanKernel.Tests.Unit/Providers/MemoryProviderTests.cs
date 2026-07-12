@@ -52,7 +52,9 @@ public class MemoryProviderTests
             ChannelId = Guid.NewGuid()
         };
 
-        await client.SaveMemoryAsync(scope, "key", "content");
+        var act = async () => await client.SaveMemoryAsync(scope, "key", "content");
+
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]
@@ -176,7 +178,5 @@ file sealed class FakeChatClient : IChatClient
         return null;
     }
 
-    public void Dispose()
-    {
-    }
+    public void Dispose() => GC.SuppressFinalize(this);
 }

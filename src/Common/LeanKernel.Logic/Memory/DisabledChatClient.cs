@@ -25,7 +25,5 @@ public sealed class DisabledChatClient : IChatClient
         return null;
     }
 
-    public void Dispose()
-    {
-    }
+    public void Dispose() => GC.SuppressFinalize(this);
 }

@@ -184,16 +184,11 @@ public sealed class MemoryPageParser
             var trimmed = line.TrimEnd();
             if (!started)
             {
-                if (trimmed.StartsWith("# Learned Fact", StringComparison.OrdinalIgnoreCase)
-                    || trimmed.StartsWith("# Retired Fact", StringComparison.OrdinalIgnoreCase))
-                {
-                    started = true;
-                }
-
+                started = IsFactHeading(trimmed);
                 continue;
             }
 
-            if (trimmed.StartsWith("## ", StringComparison.Ordinal) || trimmed.StartsWith("- ", StringComparison.Ordinal))
+            if (IsFactSectionBoundary(trimmed))
             {
                 if (factLines.Count > 0)
                 {
@@ -203,13 +198,27 @@ public sealed class MemoryPageParser
                 continue;
             }
 
-            if (!string.IsNullOrWhiteSpace(trimmed) || factLines.Count > 0)
+            if (string.IsNullOrWhiteSpace(trimmed) && factLines.Count == 0)
             {
-                factLines.Add(trimmed);
+                continue;
             }
+
+            factLines.Add(trimmed);
         }
 
         return string.Join("\n", factLines).Trim();
+    }
+
+    private static bool IsFactHeading(string value)
+    {
+        return value.StartsWith("# Learned Fact", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("# Retired Fact", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFactSectionBoundary(string value)
+    {
+        return value.StartsWith("## ", StringComparison.Ordinal)
+            || value.StartsWith("- ", StringComparison.Ordinal);
     }
 
     private static string NormalizeFactText(string factText)

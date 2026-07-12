@@ -11,8 +11,9 @@ namespace LeanKernel.Gateway.Identity;
 /// </summary>
 public sealed class IdentityIsolationKeyProvider(IPermit permit) : SessionIsolationKeyProvider
 {
-    public override ValueTask<string?> GetSessionIsolationKeyAsync(CancellationToken ct = default)
+    public override ValueTask<string?> GetSessionIsolationKeyAsync(CancellationToken cancellationToken = default)
     {
+        _ = cancellationToken;
         var subjectKey = permit.UserId.ToString();
 
         // Anonymous users add SessionId as an additional isolation dimension

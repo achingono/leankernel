@@ -74,84 +74,113 @@ public class DbChatHistoryProvider(
 
         using var scope = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // Ensure the session entity exists with correct ownership
-        if (string.IsNullOrEmpty(chatSessionId) || !Guid.TryParse(chatSessionId, out var sessionGuid))
-        {
-            var sessionEntity = new SessionEntity
-            {
-                Id = Guid.NewGuid(),
-                TenantId = permit.TenantId,
-                UserId = permit.UserId,
-                ChannelId = permit.ChannelId,
-                ConversationId = conversationId,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            scope.Sessions.Add(sessionEntity);
-            await scope.SaveChangesAsync(cancellationToken);
-            sessionGuid = sessionEntity.Id;
-            chatSessionId = sessionEntity.Id.ToString();
-            session.StateBag.SetValue(ChatSessionIdKey, chatSessionId);
-        }
-        else
-        {
-            // Verify ownership of existing session
-            var ownsSession = await scope.Sessions
-                .AnyAsync(s =>
-                    s.Id == sessionGuid &&
-                    s.TenantId == permit.TenantId &&
-                    s.UserId == permit.UserId &&
-                    s.ChannelId == permit.ChannelId,
-                    cancellationToken);
+        var sessionGuid = await EnsureOwnedSessionAsync(
+            scope,
+            session,
+            chatSessionId,
+            conversationId,
+            cancellationToken);
 
-            if (!ownsSession)
-                throw new InvalidOperationException(
-                    $"Session {sessionGuid} does not belong to the current identity " +
-                    $"(TenantId={permit.TenantId}, UserId={permit.UserId}, ChannelId={permit.ChannelId}).");
-        }
-
-        // Store input request messages (user/tool)
-        if (context.RequestMessages is not null)
-        {
-            foreach (var msg in context.RequestMessages)
-            {
-                if (msg.Role != ChatRole.User && msg.Role != ChatRole.Tool)
-                    continue;
-                if (string.IsNullOrEmpty(msg.Text))
-                    continue;
-
-                var turn = new TurnEntity
-                {
-                    SessionId = sessionGuid,
-                    Role = msg.Role.Value.ToString().ToLowerInvariant(),
-                    AuthorName = msg.AuthorName,
-                    Content = msg.Text,
-                    Timestamp = msg.CreatedAt ?? DateTimeOffset.UtcNow
-                };
-                scope.Turns.Add(turn);
-            }
-        }
-
-        // Store response messages (assistant)
-        if (context.ResponseMessages is not null)
-        {
-            foreach (var msg in context.ResponseMessages)
-            {
-                if (msg.Role != ChatRole.Assistant || string.IsNullOrEmpty(msg.Text))
-                    continue;
-
-                var turn = new TurnEntity
-                {
-                    SessionId = sessionGuid,
-                    Role = "assistant",
-                    AuthorName = msg.AuthorName,
-                    Content = msg.Text,
-                    Timestamp = msg.CreatedAt ?? DateTimeOffset.UtcNow
-                };
-                scope.Turns.Add(turn);
-            }
-        }
+        AddRequestTurns(scope, context.RequestMessages, sessionGuid);
+        AddResponseTurns(scope, context.ResponseMessages, sessionGuid);
 
         await scope.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<Guid> EnsureOwnedSessionAsync(
+        EntityContext dbContext,
+        AgentSession session,
+        string? chatSessionId,
+        string? conversationId,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(chatSessionId)
+            && Guid.TryParse(chatSessionId, out var existingSessionId))
+        {
+            await EnsureOwnershipAsync(dbContext, existingSessionId, cancellationToken);
+            return existingSessionId;
+        }
+
+        var sessionEntity = new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = permit.TenantId,
+            UserId = permit.UserId,
+            ChannelId = permit.ChannelId,
+            ConversationId = conversationId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        dbContext.Sessions.Add(sessionEntity);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        session.StateBag.SetValue(ChatSessionIdKey, sessionEntity.Id.ToString());
+        return sessionEntity.Id;
+    }
+
+    private async Task EnsureOwnershipAsync(EntityContext dbContext, Guid sessionGuid, CancellationToken cancellationToken)
+    {
+        var ownsSession = await dbContext.Sessions
+            .AnyAsync(s =>
+                s.Id == sessionGuid &&
+                s.TenantId == permit.TenantId &&
+                s.UserId == permit.UserId &&
+                s.ChannelId == permit.ChannelId,
+                cancellationToken);
+
+        if (!ownsSession)
+        {
+            throw new InvalidOperationException(
+                $"Session {sessionGuid} does not belong to the current identity " +
+                $"(TenantId={permit.TenantId}, UserId={permit.UserId}, ChannelId={permit.ChannelId}).");
+        }
+    }
+
+    private static void AddRequestTurns(EntityContext dbContext, IEnumerable<ChatMessage>? requestMessages, Guid sessionGuid)
+    {
+        if (requestMessages is null)
+        {
+            return;
+        }
+
+        foreach (var message in requestMessages.Where(ShouldPersistRequestMessage))
+        {
+            dbContext.Turns.Add(ToTurnEntity(message, sessionGuid, message.Role!.Value.ToString().ToLowerInvariant()));
+        }
+    }
+
+    private static void AddResponseTurns(EntityContext dbContext, IEnumerable<ChatMessage>? responseMessages, Guid sessionGuid)
+    {
+        if (responseMessages is null)
+        {
+            return;
+        }
+
+        foreach (var message in responseMessages.Where(ShouldPersistResponseMessage))
+        {
+            dbContext.Turns.Add(ToTurnEntity(message, sessionGuid, "assistant"));
+        }
+    }
+
+    private static bool ShouldPersistRequestMessage(ChatMessage message)
+    {
+        return (message.Role == ChatRole.User || message.Role == ChatRole.Tool)
+            && !string.IsNullOrEmpty(message.Text);
+    }
+
+    private static bool ShouldPersistResponseMessage(ChatMessage message)
+    {
+        return message.Role == ChatRole.Assistant && !string.IsNullOrEmpty(message.Text);
+    }
+
+    private static TurnEntity ToTurnEntity(ChatMessage message, Guid sessionGuid, string role)
+    {
+        return new TurnEntity
+        {
+            SessionId = sessionGuid,
+            Role = role,
+            AuthorName = message.AuthorName,
+            Content = message.Text!,
+            Timestamp = message.CreatedAt ?? DateTimeOffset.UtcNow
+        };
     }
 }
