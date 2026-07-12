@@ -32,6 +32,7 @@ builder.Services.Configure<OpenAISettings>(builder.Configuration.GetSection("Ope
 builder.Services.Configure<AgentSettings>(builder.Configuration.GetSection("Agents"));
 builder.Services.Configure<IdentitySettings>(builder.Configuration.GetSection("Identity"));
 builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("Files"));
+builder.Services.Configure<GBrainConfig>(builder.Configuration.GetSection("LeanKernel:GBrain"));
 
 // Request-scoped identity accessors
 builder.Services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
@@ -119,8 +120,16 @@ builder.Services.AddEntityContext(options =>
 // LeanKernel providers (registered against base types)
 builder.Services.AddContextProviders();
 
-// Stub memory client (replace with GBrain-backed implementation when available)
-builder.Services.AddScoped<IMemoryClient, StubMemoryClient>();
+// Memory client: use GBrain-backed implementation when configured, otherwise stub
+var gbrainConfig = builder.Configuration.GetSection("LeanKernel:GBrain").Get<GBrainConfig>();
+if (gbrainConfig is { BaseUrl: not null } && !string.IsNullOrWhiteSpace(gbrainConfig.BaseUrl))
+{
+    builder.Services.AddLeanKernelKnowledge(gbrainConfig);
+}
+else
+{
+    builder.Services.AddScoped<IMemoryClient, StubMemoryClient>();
+}
 
 // Chat client (OpenAI-compatible)
 builder.Services.AddLeanKernelChatClient();
