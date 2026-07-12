@@ -426,7 +426,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 
 ### Phase 0 — Solution & build scaffolding
 
-- [ ] Expand the existing `src/LeanKernel.sln` to reference the 3 test projects as well as the 4 src projects; it currently includes only the src projects.
+- [x] Expand the existing `src/LeanKernel.sln` to reference the 3 test projects as well as the 4 src projects; root `LeanKernel.sln` contains all 7 projects.
 - [x] Add `public partial class Program;` at the end of `Programs.cs` (D12). *(Consider renaming `Programs.cs` → `Program.cs` for convention.)*
 - [x] Finish configuration wiring: `appsettings*.json` now exist and `OpenAI`/`Agents`/`Identity`/`Files`/`LeanKernel:GBrain` are bound; `AddLeanKernelKnowledge` registers GBrain services when configured.
 - [x] Fix `Programs.cs` namespace import (`LeanKernel.Requests` → actual namespace or moved Core interface namespace) (B4).
@@ -502,7 +502,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 
 ### Phase 7 — Verification
 
-- [ ] `dotnet build src/LeanKernel.sln` green with warnings‑as‑errors (G1).
+- [x] `dotnet build LeanKernel.sln` green with warnings‑as‑errors (G1). 0 warnings, 0 errors.
 - [ ] `dotnet run` Gateway; `curl POST /v1/responses` returns a response; second call on same conversation grows history; DevUI loads.
 - [ ] Manual two‑identity partition check.
 
