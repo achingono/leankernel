@@ -1,8 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LeanKernel.Logic.Providers;
 using Microsoft.Extensions.Logging;
 
-namespace LeanKernel.Logic.Providers;
+namespace LeanKernel.Gateway.Providers;
 
 /// <summary>
 /// Implements <see cref="IMemoryClient"/> backed by the GBrain MCP service.

@@ -3,7 +3,7 @@ using LeanKernel.Logic.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace LeanKernel.Logic.Providers;
+namespace LeanKernel.Gateway.Providers;
 
 /// <summary>
 /// DelegatingHandler that resolves the GBrain bearer token from config or

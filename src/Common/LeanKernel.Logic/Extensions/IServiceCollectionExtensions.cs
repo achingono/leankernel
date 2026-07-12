@@ -1,5 +1,6 @@
 using System.ClientModel;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
@@ -20,6 +21,31 @@ public static class IServiceCollectionExtensions
     {
         services.AddScoped<ChatHistoryProvider, DbChatHistoryProvider>();
         services.AddScoped<AIContextProvider, MemoryProvider>();
+        services.AddMemoryPageServices();
+        return services;
+    }
+
+    public static IServiceCollection AddMemoryPageServices(this IServiceCollection services)
+    {
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<MemoryPageParser>();
+        services.AddScoped<MemoryPageRenderer>();
+        services.AddScoped<MemoryPageNormalizer>();
+        services.AddScoped<MemoryDimensionClassifier>();
+        services.AddScoped<MemoryPageLinker>();
+        services.AddScoped<MemoryGraphReasoner>();
+        services.AddScoped<MemoryFieldRepairService>();
+        services.AddScoped<MemoryPageKeyBuilder>();
+        services.AddScoped<FactExtractionService>();
+
+        services.AddScoped<IReasoningModel>(sp =>
+        {
+            var cfg = sp.GetRequiredService<IOptions<SmallModelSettings>>().Value;
+            var logger = sp.GetRequiredService<ILogger<ReasoningModel>>();
+            var chatClient = sp.GetRequiredKeyedService<IChatClient>("small-model");
+            return new ReasoningModel(chatClient, cfg, logger);
+        });
+
         return services;
     }
 
@@ -38,6 +64,32 @@ public static class IServiceCollectionExtensions
         })
         .UseFunctionInvocation()
         .UseLogging();
+
+        services.AddKeyedScoped<IChatClient>("small-model", (sp, _) =>
+        {
+            var cfg = sp.GetRequiredService<IOptions<SmallModelSettings>>().Value;
+            if (!cfg.Enabled)
+            {
+                return new DisabledChatClient();
+            }
+
+            var openAi = sp.GetRequiredService<IOptions<OpenAISettings>>().Value;
+            var client = new OpenAIClient(
+                new ApiKeyCredential(openAi.ApiKey),
+                new OpenAIClientOptions { Endpoint = new Uri(openAi.BaseUrl) });
+            return client.GetChatClient(cfg.ModelId).AsIChatClient();
+        });
+
+        services.AddKeyedScoped<IChatClient>("fact-extraction", (sp, _) =>
+        {
+            var cfg = sp.GetRequiredService<IOptions<FactExtractionSettings>>().Value;
+            var openAi = sp.GetRequiredService<IOptions<OpenAISettings>>().Value;
+            var client = new OpenAIClient(
+                new ApiKeyCredential(openAi.ApiKey),
+                new OpenAIClientOptions { Endpoint = new Uri(openAi.BaseUrl) });
+            return client.GetChatClient(cfg.ModelId).AsIChatClient();
+        });
+
         return services;
     }
 
@@ -76,36 +128,4 @@ public static class IServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>
-    /// Registers the GBrain MCP client, auth handler, and memory client backed by GBrain.
-    /// Replaces the <see cref="StubMemoryClient"/> with a real implementation.
-    /// </summary>
-    public static IServiceCollection AddLeanKernelKnowledge(
-        this IServiceCollection services,
-        GBrainConfig config)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(config);
-
-        services.Configure<GBrainConfig>(opts =>
-        {
-            opts.BaseUrl = config.BaseUrl;
-            opts.AuthToken = config.AuthToken;
-            opts.TimeoutSeconds = config.TimeoutSeconds;
-        });
-
-        services.AddTransient<GBrainAuthHandler>();
-        services.AddHttpClient<GBrainMcpClient>(client =>
-        {
-            var baseUrl = config.BaseUrl.TrimEnd('/');
-            client.BaseAddress = new Uri($"{baseUrl}/mcp");
-            client.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
-        })
-        .AddHttpMessageHandler<GBrainAuthHandler>();
-        services.AddScoped<IGBrainMcpClient>(sp => sp.GetRequiredService<GBrainMcpClient>());
-
-        services.AddScoped<IMemoryClient, GBrainMemoryClient>();
-
-        return services;
-    }
 }

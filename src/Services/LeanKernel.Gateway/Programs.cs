@@ -30,6 +30,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.Configure<OpenAISettings>(builder.Configuration.GetSection("OpenAI"));
 builder.Services.Configure<AgentSettings>(builder.Configuration.GetSection("Agents"));
+builder.Services.Configure<SmallModelSettings>(builder.Configuration.GetSection(SmallModelSettings.SectionName));
+builder.Services.Configure<FactExtractionSettings>(builder.Configuration.GetSection(FactExtractionSettings.SectionName));
 builder.Services.Configure<IdentitySettings>(builder.Configuration.GetSection("Identity"));
 builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("Files"));
 builder.Services.Configure<GBrainConfig>(builder.Configuration.GetSection("LeanKernel:GBrain"));
