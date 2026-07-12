@@ -1,5 +1,10 @@
 using FluentAssertions;
+using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -93,8 +98,29 @@ public class MemoryProviderTests
     {
         var memoryClient = new Mock<IMemoryClient>();
         var permit = CreatePermit();
+        var parser = new MemoryPageParser();
+        var renderer = new MemoryPageRenderer();
+        var reasoningModel = new FakeReasoningModel(enabled: false);
+        var classifier = new MemoryDimensionClassifier(reasoningModel);
+        var linker = new MemoryPageLinker();
+        var graph = new MemoryGraphReasoner(reasoningModel, NullLogger<MemoryGraphReasoner>.Instance);
+        var repair = new MemoryFieldRepairService(reasoningModel);
+        var keyBuilder = new MemoryPageKeyBuilder();
+        var normalizer = new MemoryPageNormalizer(classifier, linker, graph, repair, renderer, keyBuilder);
+        var factExtraction = new FactExtractionService(
+            new FakeChatClient(),
+            Options.Create(new FactExtractionSettings()),
+            renderer);
 
-        var act = () => new MemoryProvider(memoryClient.Object, permit);
+        var act = () => new MemoryProvider(
+            memoryClient.Object,
+            permit,
+            parser,
+            renderer,
+            normalizer,
+            factExtraction,
+            TimeProvider.System,
+            NullLogger<MemoryProvider>.Instance);
 
         act.Should().NotThrow();
     }
@@ -117,5 +143,40 @@ public class MemoryProviderTests
         var results = await Task.WhenAll(tasks);
 
         results.Should().AllBeEquivalentTo(Array.Empty<MemoryItem>());
+    }
+}
+
+file sealed class FakeReasoningModel(bool enabled) : IReasoningModel
+{
+    public bool Enabled => enabled;
+
+    public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, int maxOutputTokens, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<string?>(null);
+    }
+}
+
+file sealed class FakeChatClient : IChatClient
+{
+    public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var response = new ChatResponse([
+            new ChatMessage(ChatRole.Assistant, "[]")
+        ]);
+        return Task.FromResult(response);
+    }
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        return AsyncEnumerable.Empty<ChatResponseUpdate>();
+    }
+
+    public object? GetService(Type serviceType, object? serviceKey = null)
+    {
+        return null;
+    }
+
+    public void Dispose()
+    {
     }
 }

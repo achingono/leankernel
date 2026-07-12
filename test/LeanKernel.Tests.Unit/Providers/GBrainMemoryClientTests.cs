@@ -1,4 +1,5 @@
 using FluentAssertions;
+using LeanKernel.Gateway.Providers;
 using LeanKernel.Logic.Providers;
 using Microsoft.Extensions.Logging;
 using Moq;
