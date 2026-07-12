@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft — ready for implementation |
+| **Status** | In progress — core runtime and test scaffolding implemented; remaining gaps tracked below |
 | **Owner** | @achingono |
 | **Target framework** | .NET 10 (`net10.0`) |
 | **Primary dependency** | [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) `Microsoft.Agents.AI` **1.13.0** (+ Hosting `1.13.0-preview.260703.1`, Hosting.OpenAI `1.13.0-alpha.260703.1`, DevUI `1.13.0-preview.260703.1`) |
@@ -477,7 +477,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 ### Phase 5 — GBrain memory (Req #1d, G5)
 
 - [x] Keep the existing memory abstractions in `LeanKernel.Logic`, but add the missing Gateway-side GBrain implementation and registration path; `GBrainMemoryClient : IMemoryClient` is now the real implementation.
-- [x] Port GBrain stack (`GBrainMcpClient`, `GBrainAuthHandler`, `GBrainMemoryClient`, `GBrainException`, `GBrainConfig`) into Logic-side services.
+- [x] Host the GBrain stack (`GBrainMcpClient`, `GBrainAuthHandler`, `GBrainMemoryClient`, `GBrainException`) in `LeanKernel.Gateway` so `LeanKernel.Logic` remains reusable and provider-agnostic.
 - [x] Replace `StubMemoryClient` with a real `GBrainMemoryClient` wired through DI; `MemoryScope`/`MemoryItem` exist, and `GBrainMemoryClient` maps them to GBrain MCP tool calls.
 - [x] Finish `MemoryProvider`: it already avoids `AgentSession` constructor injection and builds a tenant/user/channel scope; GBrain client is wired, token-budget admission policy is a future enhancement.
 - [x] `AddLeanKernelKnowledge` DI + `LeanKernel:GBrain` config; conditional registration in `Programs.cs`.
@@ -490,7 +490,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 - [x] Make the named agent lifetime-safe; agent registered as scoped so providers resolve from request scope (D7).
 - [x] Finish `Programs.cs` composition: startup now wires permit/session/providers/chat client/agent/endpoints; GBrain memory client conditionally registered when `LeanKernel:GBrain` is configured.
 - [x] `MapOpenAIResponses()`, `MapOpenAIConversations()`; gate `MapDevUI()` on `app.Environment.IsDevelopment()`.
-- [ ] EF-backed, tenant/user/channel-scoped `IConversationStorage` + `IAgentConversationIndex` (required for MVP per §5.7).
+- [ ] EF-backed, tenant/user/channel-scoped `IConversationStorage` + `IAgentConversationIndex` (required for MVP per §5.7). **BLOCKED:** `IConversationStorage`, `IAgentConversationIndex`, `Conversation`, `ItemResource`, and `SortOrder` are `internal` in MAF 1.13.0-alpha.260703.1 despite XML docs claiming public. In-memory implementations are the only option with current package. **Note:** This only affects the `/v1/conversations` API surface. The agent's actual chat history is durable and identity-scoped via `DbChatHistoryProvider` (`SessionEntity` + `TurnEntity`).
 - [ ] Translate between external `conversationId` and internal `scopedConversationId` inside conversation storage/index so APIs never expose isolation-prefixed ids (D22).
 - [x] Add `/health` endpoint.
 - [ ] Structured‑output smoke path via `AIAgent.RunAsync<T>`.
@@ -511,7 +511,8 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 - [x] Unit project + tests (§7.1).
 - [x] Expand the current integration test project beyond `/health`; `GatewayTestApplicationFactory`, `HealthEndpointTests`, `ConversationsEndpointTests`, `ResponsesEndpointTests`, and `AuthenticationEndpointTests` now cover endpoint reachability, request validation, and HTTP method enforcement.
 - [x] Playwright API project + fixture + tests (§7.3).
-- [x] `dotnet test LeanKernel.sln` green (unit + integration; Playwright gated behind a running server / trait). 46 passing, 2 skipped.
+- [x] `dotnet test LeanKernel.sln` green (unit + integration; Playwright gated behind a running server / trait). Current run: 104 passing, 2 skipped.
+- [x] Coverage-improvement tests added across Gateway/Identity/Logic memory paths; with `coverlet.runsettings` (excluding EF migrations + generated `obj` files) Unit+Integration merged coverage is currently 81.31%.
 
 ### Phase 9 — Docs
 
@@ -526,7 +527,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 |---|---|---|
 | R1 | **Lifetime mismatch** — singleton named agent vs scoped `EntityContext`/`IPermit`. | Use `IDbContextFactory<EntityContext>` or per-call scopes; fully materialize query results before disposing scope; never capture scoped services in ctor. |
 | R2 | Preview/alpha hosting packages (`Hosting`, `Hosting.OpenAI`) may shift APIs. | Pin exact versions in `.csproj`; wrap MAF extension points behind our own thin registration methods; cover with integration tests. |
-| R3 | OpenAI conversation storage defaults are in-memory (non-durable, non-partitioned). | Treat EF-backed `IConversationStorage` + `IAgentConversationIndex` as required MVP deliverables. |
+| R3 | OpenAI conversation storage defaults are in-memory (non-durable, non-partitioned). | **Partially resolved:** Agent chat history is durable via `DbChatHistoryProvider` (EF-backed, identity-scoped). `/v1/conversations` API surface uses in-memory MAF defaults — `IConversationStorage`/`IAgentConversationIndex` are internal in MAF 1.13.0-alpha; EF-backed replacement blocked until MAF exposes public types. |
 | R4 | Reading `sessionId`/user from `AgentSession.StateBag` requires a set‑on‑create convention. | Define a single well‑known state key; set it in the session‑create path; centralize in one helper. |
 | R5 | GBrain endpoint unavailable in CI. | `MemoryProvider` degrades gracefully (empty `AIContext`) on GBrain failure; stub `IMemoryClient` in tests. |
 | R6 | Anonymous users still need an `AgentSession`. | Resolve a persisted guest user plus ASP.NET session id within the tenant/channel boundary; wire `AddSession`/`UseSession` and deterministic anonymous principal fallback. |
@@ -549,7 +550,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 - **AC3 (#1b, #2):** `AgentSession` state persists across restarts and is scoped by `(TenantId, UserId, ChannelId)` for authenticated users and `(TenantId, UserId, SessionId, ChannelId)` for anonymous guest users; cross-identity resume is rejected under `Strict`.
 - **AC4 (#1c, #2):** Chat history persists in EF Core and every read/write is filtered by the current canonical identity; cross-user, cross-tenant, and cross-channel isolation tests pass.
 - **AC5 (#1d, #2):** `MemoryProvider` injects GBrain‑retrieved, identity‑scoped memory into the prompt; degrades gracefully when GBrain is down.
-- **AC6 (#1e):** `/v1/responses` and `/v1/conversations` are mapped and backed by durable EF conversation storage; DevUI available in Development.
+- **AC6 (#1e):** `/v1/responses` and `/v1/conversations` are mapped; DevUI available in Development. Agent chat history is durable and identity-scoped via `DbChatHistoryProvider`. `/v1/conversations` CRUD is in-memory only (MAF internal types).
 - **AC7 (#3):** Unit + integration + Playwright API test projects exist and pass locally (Playwright gated on a running server); partitioning is explicitly tested at each layer.
 - **AC8:** No secrets committed; README structure updated.
 - **AC9:** Authentication/authorization services plus tenant/user/channel-aware permit wiring are registered in startup (`AddAuthentication`, `AddAuthorization`, and the resolved permit/context pipeline) and verified by integration tests.
@@ -567,7 +568,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 1. **Anonymous user strategy** — unauthenticated requests also resolve to a persisted guest `UserEntity` under the tenant policy so `SessionEntity.UserId` and other ownership fields stay non-null; `SessionId` remains the extra anonymous isolation dimension.
 1. **Channel strategy** — the OpenAI HTTP surface resolves to a canonical `ChannelEntity`; `ChannelEntity.Id` is the canonical channel partition key.
 1. **Authentication model** — principals are expected from configured auth; startup must explicitly wire `AddAuthentication(...)` and `AddAuthorization()` before middleware.
-1. **Conversation durability** — EF-backed `IConversationStorage` and `IAgentConversationIndex` are required for MVP (not deferred).
+1. **Conversation durability** — Agent chat history is durable via `DbChatHistoryProvider` (EF-backed, identity-scoped `SessionEntity` + `TurnEntity`). The `/v1/conversations` API surface uses in-memory MAF defaults because `IConversationStorage`/`IAgentConversationIndex` are internal in MAF 1.13.0-alpha.
 1. **Memory layering** — memory abstractions stay in `src/Common/LeanKernel.Logic`; GBrain implementation stays in `src/Services/LeanKernel.Gateway`.
 1. **DB strategy** — SQLite for local dev/tests and Postgres for production.
 1. **Entity ID strategy for this PRD** — keep existing string IDs on `SessionEntity`/`TurnEntity`; use persisted GUID foreign keys (`TenantId`, `UserId`, `ChannelId`) for ownership, and defer any `Guid`-based `IEntity` unification to a separate migration PRD.
@@ -610,7 +611,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 
 - Services: `AddOpenAIResponses()`, `AddOpenAIConversations()`, `AddOpenAIChatCompletions()`.
 - Endpoints: `MapOpenAIResponses()` / `MapOpenAIResponses(string agentName)` / `MapOpenAIResponses(AIAgent)`; `MapOpenAIConversations()`; `MapOpenAIChatCompletions(...)`.
-- Durable extension points: `IConversationStorage`, `IAgentConversationIndex` (defaults `InMemoryConversationStorage`, `InMemoryAgentConversationIndex`).
+- Durable extension points: `IConversationStorage`, `IAgentConversationIndex` (defaults `InMemoryConversationStorage`, `InMemoryAgentConversationIndex`). **Note:** These types are `internal` in the compiled assembly despite XML docs claiming public; cannot implement externally. The agent's actual chat history durability comes from `ChatHistoryProvider` → `DbChatHistoryProvider` (EF-backed).
 
 **DevUI**: `MapDevUI()` / `MapDevUI(string path)`.
 
