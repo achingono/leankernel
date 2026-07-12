@@ -15,21 +15,17 @@ public static class IServiceCollectionExtensions
     /// Registers the <see cref="EntityContext"/> and its related interceptors in the specified <see cref="IServiceCollection"/>.
     /// </summary>
     /// <param name="services">The <see cref="IServiceCollection"/> to add services to.</param>
-    /// <param name="optionsAction">An action to configure the <see cref="DbContextOptions"/> for the <see cref="DbContext"/>.</param>
+    /// <param name="optionsAction">An action to configure the <see cref="DbContextOptionsBuilder"/> for the <see cref="EntityContext"/>.</param>
     public static IServiceCollection AddEntityContext(this IServiceCollection services, Action<DbContextOptionsBuilder> optionsAction)
     {
-        //services.TryAddTransient<IDbContextValidator, EntityContextValidator>();
-        services.AddScoped<ISaveChangesInterceptor, AuditableInterceptor>();
-        services.AddScoped<ISaveChangesInterceptor, RecyclableInterceptor>();
+        services.TryAddScoped<ISaveChangesInterceptor, AuditableInterceptor>();
+        services.TryAddScoped<ISaveChangesInterceptor, RecyclableInterceptor>();
 
-        using var serviceProvider = services.BuildServiceProvider();
-        using var scope = serviceProvider.CreateScope();
-        var interceptors = scope.ServiceProvider.GetServices<ISaveChangesInterceptor>();
-        return services.AddDbContext<EntityContext>(option =>
+        return services.AddDbContext<EntityContext>((sp, option) =>
         {
+            var interceptors = sp.GetServices<ISaveChangesInterceptor>();
             option.AddInterceptors(interceptors);
             optionsAction?.Invoke(option);
         });
     }
 }
-

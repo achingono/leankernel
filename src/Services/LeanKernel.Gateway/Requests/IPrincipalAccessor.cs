@@ -1,6 +1,6 @@
 using System.Security.Principal;
 
-namespace LeanKernel.Requests;
+namespace LeanKernel.Gateway.Requests;
 
 public interface IPrincipalAccessor
 {

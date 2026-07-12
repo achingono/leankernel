@@ -1,27 +1,51 @@
 namespace LeanKernel;
 
-using System;
-using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
 using LeanKernel.Entities;
 
+/// <summary>
+/// Resolved request-scoped identity context providing tenant, user, and channel partitioning keys.
+/// </summary>
 public interface IPermit
 {
     /// <summary>
-    /// Gets the current user's ID.
+    /// Gets the canonical user identifier (persisted <c>UserEntity.Id</c>).
     /// </summary>
-    Guid Id { get; }
+    Guid UserId { get; }
 
     /// <summary>
-    /// Defines a badge for a user.
+    /// Gets the canonical tenant identifier resolved from the request host.
+    /// </summary>
+    Guid TenantId { get; }
+
+    /// <summary>
+    /// Gets the canonical channel identifier for the current HTTP surface.
+    /// </summary>
+    Guid ChannelId { get; }
+
+    /// <summary>
+    /// Gets the normalized request host name.
+    /// </summary>
+    string HostName { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the current request is from an authenticated principal.
+    /// </summary>
+    bool IsAuthenticated { get; }
+
+    /// <summary>
+    /// Gets the ASP.NET session identifier for anonymous isolation fallback, or <c>null</c> for authenticated users.
+    /// </summary>
+    string? SessionId { get; }
+
+    /// <summary>
+    /// Gets the audit badge describing the current identity.
     /// </summary>
     Badge Badge { get; }
 
     /// <summary>
-    /// Gets the domain of the request.
+    /// Legacy identifier — returns <see cref="UserId"/>.
     /// </summary>
-    string HostName { get; }
+    Guid Id => UserId;
 }
 
 /// <summary>

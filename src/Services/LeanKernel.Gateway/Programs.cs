@@ -1,5 +1,13 @@
 ﻿using System.Security.Principal;
-using LeanKernel.Requests;
+using LeanKernel;
+using LeanKernel.Gateway.Configuration;
+using LeanKernel.Gateway.Identity;
+using LeanKernel.Gateway.Requests;
+using LeanKernel.Gateway.Sessions;
+using LeanKernel.Logic;
+using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Providers;
+using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.DevUI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -9,7 +17,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure forwarded headers to trust proxy headers
+// Bind configuration
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
@@ -20,10 +28,56 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardLimit = 2;
 });
 
+builder.Services.Configure<OpenAISettings>(builder.Configuration.GetSection("OpenAI"));
+builder.Services.Configure<AgentSettings>(builder.Configuration.GetSection("Agents"));
+builder.Services.Configure<IdentitySettings>(builder.Configuration.GetSection("Identity"));
+builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("Files"));
+
+// Request-scoped identity accessors
 builder.Services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 builder.Services.TryAddSingleton<IPrincipalAccessor, PrincipalAccessor>();
-builder.Services.TryAddScoped<IPrincipal>(provider => provider.GetRequiredService<IPrincipalAccessor>().Principal!);
+builder.Services.TryAddScoped<IPrincipal>(provider =>
+{
+    var accessor = provider.GetRequiredService<IPrincipalAccessor>();
+    return accessor.Principal ?? new System.Security.Principal.GenericPrincipal(
+        new System.Security.Principal.GenericIdentity(string.Empty), []);
+});
 builder.Services.TryAddSingleton<IHostNameAccessor, HostNameAccessor>();
+
+// Identity/permit resolution (request-scoped)
+builder.Services.AddScoped<IPermit, RequestContextPermit>();
+
+// Session prerequisites for anonymous isolation fallback
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession();
+
+// Authentication & authorization
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        var identitySettings = builder.Configuration
+            .GetSection("Identity").Get<IdentitySettings>() ?? new IdentitySettings();
+        options.RequireHttpsMetadata = false;
+        options.TokenValidationParameters.ValidateIssuer = false;
+        options.TokenValidationParameters.ValidateAudience = false;
+        options.TokenValidationParameters.ValidateLifetime = false;
+        options.TokenValidationParameters.ValidateIssuerSigningKey = false;
+        options.SaveToken = true;
+    });
+builder.Services.AddAuthorization();
+
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowLocal", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+// EF Core EntityContext with interceptors resolved from real DI
 builder.Services.AddEntityContext(options =>
 {
     var connectionStringNames = new[] { "SqlServer", "Sqlite", "Postgres" };
@@ -40,53 +94,81 @@ builder.Services.AddEntityContext(options =>
     }
 
     if (string.IsNullOrWhiteSpace(connectionString) && builder.Environment.EnvironmentName != "Testing")
-        throw new InvalidOperationException($"Connection string is missing. Specify any of '{string.Join(",", connectionStringNames)}'.");
-    else
-        switch (connectionStringName)
-        {
-            case "SqlServer":
-                options.UseSqlServer(connectionString,
-                    options =>
-                    {
-                        options.EnableRetryOnFailure();
-                    });
-                break;
-            case "Sqlite":
-                options.UseSqlite(connectionString);
-                break;
-            case "Postgres":
-                options.UseNpgsql(connectionString);
-                break;
-        }
+        throw new InvalidOperationException(
+            $"Connection string is missing. Specify any of '{string.Join(",", connectionStringNames)}'.");
 
-    if (builder!.Environment.IsDevelopment())
+    switch (connectionStringName)
+    {
+        case "SqlServer":
+            options.UseSqlServer(connectionString, opts => opts.EnableRetryOnFailure());
+            break;
+        case "Sqlite":
+            options.UseSqlite(connectionString);
+            break;
+        case "Postgres":
+            options.UseNpgsql(connectionString);
+            break;
+    }
+
+    if (builder.Environment.IsDevelopment())
         options.EnableDetailedErrors(true)
-                .EnableSensitiveDataLogging(true);
+               .EnableSensitiveDataLogging(true);
 });
+
+// LeanKernel providers (registered against base types)
 builder.Services.AddContextProviders();
-builder.Services.AddChatHistoryProviders();
 
-// Add chat client and OpenAI chat completions
-builder.Services.AddChatClient();
+// Stub memory client (replace with GBrain-backed implementation when available)
+builder.Services.AddScoped<IMemoryClient, StubMemoryClient>();
 
-// Register services for OpenAI responses and conversations (also required for DevUI)
+// Chat client (OpenAI-compatible)
+builder.Services.AddLeanKernelChatClient();
+
+// Agent session store (durable, isolation-scoped)
+builder.Services.AddScoped<DbAgentSessionStore>();
+builder.Services.AddScoped<SessionIsolationKeyProvider, IdentityIsolationKeyProvider>();
+builder.Services.AddScoped<AgentSessionStore>(sp =>
+{
+    var innerStore = sp.GetRequiredService<DbAgentSessionStore>();
+    var keyProvider = sp.GetRequiredService<SessionIsolationKeyProvider>();
+    return new IsolationKeyScopedAgentSessionStore(
+        innerStore,
+        keyProvider,
+        new IsolationKeyScopedAgentSessionStoreOptions { Strict = true });
+});
+
+// Named AI agent
+builder.Services.AddLeanKernelAgent("leankernel", builder.Configuration);
+
+// OpenAI Responses & Conversations endpoints
 builder.Services.AddOpenAIResponses();
 builder.Services.AddOpenAIConversations();
 
-// Register the main AI agent
-builder.Services.AddAgent();
-
 var app = builder.Build();
-app.UseHttpsRedirection();
 
-// Map endpoints for OpenAI responses and conversations (also required for DevUI)
-app.MapOpenAIResponses();
+// Apply forwarded headers before anything reads Request.Host
+app.UseForwardedHeaders();
+
+app.UseHttpsRedirection();
+app.UseCors("AllowLocal");
+
+// Session middleware (needed for anonymous isolation)
+app.UseSession();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Map endpoints
+app.MapOpenAIResponses("leankernel");
 app.MapOpenAIConversations();
 
-if (builder.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
 {
-    // Map DevUI endpoint to /devui
     app.MapDevUI();
 }
 
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+
 app.Run();
+
+public partial class Program;

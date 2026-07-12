@@ -1,0 +1,11 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: src/Services/LeanKernel.Gateway/Dockerfile
+      # Dockerfile stages are: source, watch, build, final.
+      # Default to `final` so `docker compose up` works without extra env vars.
+      target: ${LEANKERNEL_ENGINE_TARGET:-final}
+    container_name: leankernel-engine
+    ports:
+      - "8080:8080"
