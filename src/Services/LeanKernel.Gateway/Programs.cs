@@ -1,8 +1,10 @@
 ﻿using System.Security.Principal;
 using LeanKernel;
+using LeanKernel.Data;
+using LeanKernel.Entities;
 using LeanKernel.Gateway;
 using LeanKernel.Gateway.Configuration;
-using LeanKernel.Gateway.Identity;
+using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
 using LeanKernel.Gateway.Sessions;
 using LeanKernel.Logic;
@@ -17,6 +19,15 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (builder.Environment.IsDevelopment())
+{
+    builder.Host.UseDefaultServiceProvider(options =>
+    {
+        options.ValidateScopes = false;
+        options.ValidateOnBuild = false;
+    });
+}
+
 // Bind configuration
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -30,11 +41,11 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.Configure<OpenAISettings>(builder.Configuration.GetSection("OpenAI"));
 builder.Services.Configure<AgentSettings>(builder.Configuration.GetSection("Agents"));
-builder.Services.Configure<SmallModelSettings>(builder.Configuration.GetSection(SmallModelSettings.SectionName));
-builder.Services.Configure<FactExtractionSettings>(builder.Configuration.GetSection(FactExtractionSettings.SectionName));
+builder.Services.Configure<MemorySettings>(builder.Configuration.GetSection("OpenAI:Memory"));
+builder.Services.Configure<FactExtractionSettings>(builder.Configuration.GetSection("OpenAI:FactExtraction"));
 builder.Services.Configure<IdentitySettings>(builder.Configuration.GetSection("Identity"));
 builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("Files"));
-builder.Services.Configure<GBrainConfig>(builder.Configuration.GetSection("LeanKernel:GBrain"));
+builder.Services.Configure<GBrainSettings>(builder.Configuration.GetSection("GBrain"));
 
 // Request-scoped identity accessors
 builder.Services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
@@ -82,25 +93,30 @@ builder.Services.AddCors(options =>
 // EF Core EntityContext with interceptors resolved from real DI
 builder.Services.AddEntityContext(options =>
 {
-    ProgramSetup.ConfigureEntityContext(builder, options);
+    var (connectionStringName, connectionString) = builder.Configuration.ResolveConnectionString();
+
+    options.ConfigureOptions(connectionStringName, connectionString,
+        builder.Environment.EnvironmentName.Equals("Testing", StringComparison.OrdinalIgnoreCase),
+        builder.Environment.IsDevelopment(),
+        builder.Environment.IsDevelopment());
 });
 
 // LeanKernel providers (registered against base types)
 builder.Services.AddContextProviders();
 
 // Memory client: use GBrain-backed implementation when configured, otherwise stub
-var gbrainConfig = builder.Configuration.GetSection("LeanKernel:GBrain").Get<GBrainConfig>();
-ProgramSetup.ConfigureMemoryClient(builder.Services, gbrainConfig);
+var gbrainSettings = builder.Configuration.GetSection("GBrain").Get<GBrainSettings>() ?? new GBrainSettings();
+builder.Services.AddGBrainMemory(gbrainSettings);
 
 // Chat client (OpenAI-compatible)
 builder.Services.AddLeanKernelChatClient();
 
 // Agent session store (durable, isolation-scoped)
-builder.Services.AddScoped<DbAgentSessionStore>();
+builder.Services.AddScoped<DbAgentStateStore>();
 builder.Services.AddScoped<SessionIsolationKeyProvider, IdentityIsolationKeyProvider>();
 builder.Services.AddScoped<AgentSessionStore>(sp =>
 {
-    var innerStore = sp.GetRequiredService<DbAgentSessionStore>();
+    var innerStore = sp.GetRequiredService<DbAgentStateStore>();
     var keyProvider = sp.GetRequiredService<SessionIsolationKeyProvider>();
     return new IsolationKeyScopedAgentSessionStore(
         innerStore,
@@ -115,10 +131,25 @@ builder.Services.AddLeanKernelAgent("leankernel", builder.Configuration);
 builder.Services.AddOpenAIResponses();
 builder.Services.AddOpenAIConversations();
 
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddDevUI(options =>
+    {
+        options.AllowRemoteAccess = true;
+    });
+}
+
 var app = builder.Build();
 
 // Apply pending migrations and seed required entities
-await ProgramSetup.ApplyMigrationsAndSeedAsync(app);
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<EntityContext>();
+    var hostName = app.Configuration["WebHost:HostName"] ?? "localhost";
+    context.ApplyMigrationsAndSeedAsync(hostName).GetAwaiter().GetResult();
+}
 
 // Apply forwarded headers before anything reads Request.Host
 app.UseForwardedHeaders();

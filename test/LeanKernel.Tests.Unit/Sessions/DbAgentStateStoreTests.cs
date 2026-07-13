@@ -10,9 +10,9 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Sessions;
 
-public class DbAgentSessionStoreTests
+public class DbAgentStateStoreTests
 {
-    private static (DbAgentSessionStore store, EntityContext context) CreateSut(
+    private static (DbAgentStateStore store, EntityContext context) CreateSut(
         Guid? tenantId = null,
         Guid? userId = null,
         Guid? channelId = null)
@@ -27,7 +27,7 @@ public class DbAgentSessionStoreTests
         permit.Setup(p => p.UserId).Returns(userId ?? Guid.NewGuid());
         permit.Setup(p => p.ChannelId).Returns(channelId ?? Guid.NewGuid());
 
-        return (new DbAgentSessionStore(entityContext, permit.Object), entityContext);
+        return (new DbAgentStateStore(entityContext, permit.Object), entityContext);
     }
 
     private static ChatClientAgent CreateStubAgent()
@@ -76,7 +76,7 @@ public class DbAgentSessionStoreTests
 
         await store.SaveSessionAsync(agent, conversationId, session);
 
-        var entity = await context.AgentSessions.FindAsync(conversationId);
+        var entity = await context.AgentStates.FindAsync(conversationId);
         entity.Should().NotBeNull();
         entity!.StateJson.Should().NotBeNullOrEmpty();
     }
@@ -115,7 +115,7 @@ public class DbAgentSessionStoreTests
 
         await store.SaveSessionAsync(agent, conversationId, session);
 
-        var entity = await context.AgentSessions.FindAsync(conversationId);
+        var entity = await context.AgentStates.FindAsync(conversationId);
         entity.Should().NotBeNull();
         entity!.TenantId.Should().Be(tenantId);
         entity.UserId.Should().Be(userId);

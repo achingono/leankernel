@@ -1,7 +1,7 @@
 using LeanKernel;
 using Microsoft.Agents.AI.Hosting;
 
-namespace LeanKernel.Gateway.Identity;
+namespace LeanKernel.Gateway.Providers;
 
 /// <summary>
 /// Resolves the session isolation key from the current request's <see cref="IPermit"/>.

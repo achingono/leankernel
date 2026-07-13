@@ -1,5 +1,5 @@
 using System.Net.Http.Headers;
-using LeanKernel.Logic.Configuration;
+using LeanKernel.Gateway.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,14 +13,14 @@ public sealed class GBrainAuthHandler : DelegatingHandler
 {
     private static readonly string[] TokenFileCandidates = [TokenFilePath, "/run/secrets/gbrain_auth_token"];
 
-    private readonly GBrainConfig _config;
+    private readonly GBrainSettings _config;
     private readonly ILogger<GBrainAuthHandler> _logger;
     private string? _cachedToken;
 
     internal const string TokenFilePath = "/app/data/gbrain/.engine-token";
 
     public GBrainAuthHandler(
-        IOptions<GBrainConfig> config,
+        IOptions<GBrainSettings> config,
         ILogger<GBrainAuthHandler> logger)
     {
         _config = (config ?? throw new ArgumentNullException(nameof(config))).Value;

@@ -23,9 +23,9 @@ ENV DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
 
 USER leankernel
 
-ENV LEANKERNEL_ENGINE_PORT=8080
-ENV ASPNETCORE_URLS=http://+:${LEANKERNEL_ENGINE_PORT}
-EXPOSE ${LEANKERNEL_ENGINE_PORT}
+ENV LEANKERNEL_GATEWAY_PORT=8080
+ENV ASPNETCORE_URLS=http://+:${LEANKERNEL_GATEWAY_PORT}
+EXPOSE ${LEANKERNEL_GATEWAY_PORT}
 
 ENTRYPOINT dotnet watch --project Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj run --configuration Debug
 
@@ -35,23 +35,27 @@ WORKDIR /src
 
 COPY src/ ./
 
-RUN dotnet restore src/LeanKernel.sln
-RUN dotnet publish src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj -c Release -o /app/publish --no-restore
+RUN dotnet restore LeanKernel.sln
+RUN dotnet publish Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj -c Release -o /app/publish --no-restore
 
 # ── final: runtime image ─────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN useradd -m -s /bin/bash leankernel \
     && chown -R leankernel:leankernel /app
 
 USER leankernel
 
-ENV LEANKERNEL_ENGINE_PORT=8080
-ENV ASPNETCORE_URLS=http://+:${LEANKERNEL_ENGINE_PORT}
-EXPOSE ${LEANKERNEL_ENGINE_PORT}
+ENV LEANKERNEL_GATEWAY_PORT=8080
+ENV ASPNETCORE_URLS=http://+:${LEANKERNEL_GATEWAY_PORT}
+EXPOSE ${LEANKERNEL_GATEWAY_PORT}
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD curl -f http://localhost:${LEANKERNEL_ENGINE_PORT}/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD curl -f http://localhost:${LEANKERNEL_GATEWAY_PORT}/health || exit 1
 
 ENTRYPOINT ["dotnet", "LeanKernel.Gateway.dll"]

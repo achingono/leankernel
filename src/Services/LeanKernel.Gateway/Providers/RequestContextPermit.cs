@@ -3,9 +3,10 @@ using LeanKernel;
 using LeanKernel.Entities;
 using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.Requests;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace LeanKernel.Gateway.Identity;
+namespace LeanKernel.Gateway.Providers;
 
 /// <summary>
 /// Resolves <see cref="IPermit"/> from the current HTTP request's host, principal, and session,
@@ -15,7 +16,7 @@ public sealed class RequestContextPermit(
     IPrincipalAccessor principalAccessor,
     IHostNameAccessor hostNameAccessor,
     IHttpContextAccessor httpContextAccessor,
-    IIdentityResolver identityResolver,
+    IServiceProvider serviceProvider,
     IOptions<IdentitySettings> identitySettings) : IPermit
 {
     private readonly Lazy<ClaimsPrincipal?> _claimsPrincipal = new(() =>
@@ -87,6 +88,21 @@ public sealed class RequestContextPermit(
         _resolving = true;
         try
         {
+            if (httpContextAccessor.HttpContext is null)
+            {
+                _resolvedTenantId = Guid.Empty;
+                _resolvedUserId = Guid.Empty;
+                _resolvedChannelId = Guid.Empty;
+                _resolvedBadge = new Badge
+                {
+                    Id = Guid.Empty,
+                    FullName = "System",
+                    Email = "system@leankernel.local"
+                };
+                return;
+            }
+
+            var identityResolver = serviceProvider.GetRequiredService<IIdentityResolver>();
             var ct = CancellationToken.None;
             var hostName = HostName;
 
@@ -107,6 +123,7 @@ public sealed class RequestContextPermit(
                 var guestUser = identityResolver.ResolveGuestUserAsync(
                     _resolvedTenantId.Value,
                     identitySettings.Value.AnonymousUserName,
+                    SessionId ?? Guid.NewGuid().ToString("N"),
                     ct).GetAwaiter().GetResult();
                 _resolvedUserId = guestUser.Id;
                 _resolvedBadge = new Badge

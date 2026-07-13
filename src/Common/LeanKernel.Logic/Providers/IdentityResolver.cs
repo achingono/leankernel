@@ -4,7 +4,7 @@ using LeanKernel.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace LeanKernel.Gateway.Identity;
+namespace LeanKernel.Logic.Providers;
 
 /// <summary>
 /// Resolves persisted tenant, user, and channel entities from request inputs using EF Core.
@@ -70,19 +70,38 @@ public sealed class IdentityResolver(
         };
 
         context.Users.Add(user);
-        await context.SaveChangesAsync(ct);
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            context.ChangeTracker.Clear();
+            var conflicting = await context.Users
+                .FirstOrDefaultAsync(u => u.Issuer == issuer && u.Subject == subject && !u.IsDeleted, ct);
+            if (conflicting is not null)
+            {
+                conflicting.LastActivity = DateTime.UtcNow;
+                await context.SaveChangesAsync(ct);
+                logger.LogInformation("Created new user {UserId} for issuer={Issuer}, subject={Subject}",
+                    conflicting.Id, issuer, subject);
+                return conflicting;
+            }
+            throw;
+        }
 
         logger.LogInformation("Created new user {UserId} for issuer={Issuer}, subject={Subject}",
             user.Id, issuer, subject);
         return user;
     }
 
-    public async Task<UserEntity> ResolveGuestUserAsync(Guid tenantId, string anonymousUserName, CancellationToken ct = default)
+    public async Task<UserEntity> ResolveGuestUserAsync(Guid tenantId, string anonymousUserName, string sessionId, CancellationToken ct = default)
     {
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
 
         var guest = await context.Users
-            .FirstOrDefaultAsync(u => u.IsGuest && u.UserName == anonymousUserName && !u.IsDeleted, ct);
+            .FirstOrDefaultAsync(u => u.Issuer == "anonymous" && u.Subject == sessionId && !u.IsDeleted, ct);
 
         if (guest is not null)
             return guest;
@@ -90,6 +109,8 @@ public sealed class IdentityResolver(
         guest = new UserEntity
         {
             Id = Guid.NewGuid(),
+            Issuer = "anonymous",
+            Subject = sessionId,
             UserName = anonymousUserName,
             FullName = anonymousUserName,
             IsActive = true,
@@ -98,9 +119,21 @@ public sealed class IdentityResolver(
         };
 
         context.Users.Add(guest);
-        await context.SaveChangesAsync(ct);
 
-        logger.LogInformation("Created guest user {UserId} (name={Name})", guest.Id, anonymousUserName);
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            context.ChangeTracker.Clear();
+            guest = await context.Users
+                .FirstOrDefaultAsync(u => u.Issuer == "anonymous" && u.Subject == sessionId && !u.IsDeleted, ct);
+            if (guest is null)
+                throw;
+        }
+
+        logger.LogInformation("Created guest user {UserId} (name={Name}, session={SessionId})", guest!.Id, anonymousUserName, sessionId);
         return guest;
     }
 
@@ -121,7 +154,23 @@ public sealed class IdentityResolver(
         };
 
         context.Channels.Add(channel);
-        await context.SaveChangesAsync(ct);
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            context.ChangeTracker.Clear();
+            var existing = await context.Channels
+                .FirstOrDefaultAsync(c => c.Name == channelName, ct);
+            if (existing is not null)
+            {
+                logger.LogInformation("Created channel {ChannelId} (name={Name})", existing.Id, channelName);
+                return existing;
+            }
+            throw;
+        }
 
         logger.LogInformation("Created channel {ChannelId} (name={Name})", channel.Id, channelName);
         return channel;
