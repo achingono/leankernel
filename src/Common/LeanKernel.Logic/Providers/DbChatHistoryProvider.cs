@@ -47,10 +47,9 @@ public class DbChatHistoryProvider(
 
         var turns = await scope.Turns
             .Where(t => t.SessionId == chatSessionGuid)
-            .OrderBy(t => t.Timestamp)
             .ToListAsync(cancellationToken);
 
-        return turns.Select(t => new ChatMessage
+        return turns.OrderBy(t => t.Timestamp).Select(t => new ChatMessage
         {
             AuthorName = t.AuthorName,
             CreatedAt = t.Timestamp,
@@ -112,9 +111,19 @@ public class DbChatHistoryProvider(
             TenantId = permit.TenantId,
             UserId = permit.UserId,
             ChannelId = permit.ChannelId,
+            Tenant = null!,
+            User = null!,
+            Channel = null!,
             ConversationId = conversationId,
             CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge
+            {
+                Id = permit.UserId,
+                FullName = "System",
+                Email = string.Empty
+            }
         };
         dbContext.Sessions.Add(sessionEntity);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -203,7 +212,14 @@ public class DbChatHistoryProvider(
             Role = role,
             AuthorName = message.AuthorName,
             Content = message.Text!,
-            Timestamp = message.CreatedAt ?? DateTimeOffset.UtcNow
+            Timestamp = message.CreatedAt ?? DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge
+            {
+                Id = Guid.Empty,
+                FullName = "System",
+                Email = string.Empty
+            }
         };
     }
 }
