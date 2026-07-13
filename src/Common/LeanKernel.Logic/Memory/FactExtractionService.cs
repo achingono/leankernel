@@ -143,6 +143,7 @@ public sealed class FactExtractionService
         }
         catch (JsonException)
         {
+            // Fall through to line-based parsing below.
         }
 
         return trimmed

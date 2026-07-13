@@ -509,7 +509,6 @@ def build_router_settings(
     router: dict[str, Any],
     route_names: set[str],
     alias_names: set[str],
-    alias_map: dict[str, str],
 ) -> dict[str, Any]:
     fallback_targets = route_names | alias_names
 
@@ -586,7 +585,6 @@ def build_output(spec: dict[str, Any]) -> dict[str, Any]:
             router,
             set(route_deployments.keys()),
             set(alias_map.keys()),
-            alias_map,
         ),
         "general_settings": build_general_settings(router, general_settings_spec),
         "litellm_settings": build_litellm_settings(litellm_settings_spec),

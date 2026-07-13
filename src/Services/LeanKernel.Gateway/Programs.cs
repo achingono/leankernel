@@ -179,4 +179,6 @@ app.Run();
 /// <summary>
 /// Application entry point for the LeanKernel gateway service.
 /// </summary>
+#pragma warning disable S1118 // Required for WebApplicationFactory in integration tests
 public partial class Program;
+#pragma warning restore S1118

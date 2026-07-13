@@ -6,7 +6,7 @@ namespace LeanKernel.Entities;
 /// <summary>
 /// Represents a persisted user identity resolved from an external principal or anonymous session.
 /// </summary>
-public class UserEntity : IEntity, IAuditable, IRecyclable
+public class UserEntity : IAuditable, IRecyclable
 {
     public Guid Id { get; set; }
     public string Email { get; set; } = string.Empty;

@@ -18,7 +18,7 @@ public class MemoryPageRoundTripTests
         var renderer = new MemoryPageRenderer();
         var parser = new MemoryPageParser();
 
-        var markdown = renderer.RenderLearnedPage(
+        var markdown = renderer.RenderLearnedPage(new LearnedPageParameters(
             new Dictionary<string, string?>
             {
                 ["Who"] = "Jane Doe",
@@ -36,7 +36,7 @@ public class MemoryPageRoundTripTests
             [],
             "s1",
             "t1",
-            DateTimeOffset.Parse("2026-07-10T12:00:00Z"));
+            DateTimeOffset.Parse("2026-07-10T12:00:00Z")));
 
         var snapshot = parser.Parse("facts/what/q4-budget/a1", markdown);
 

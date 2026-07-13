@@ -4,6 +4,21 @@ using System.Text;
 namespace LeanKernel.Logic.Memory;
 
 /// <summary>
+/// Parameters for rendering a learned memory page.
+/// </summary>
+public sealed record LearnedPageParameters(
+    IReadOnlyDictionary<string, string?> Fields,
+    string PrimaryDimension,
+    IReadOnlyList<string> SecondaryDimensions,
+    IReadOnlyList<MemoryPageLink> Links,
+    string NormalizationStatus,
+    string NormalizationMethod,
+    IReadOnlyList<string> MissingFields,
+    string? Session,
+    string? Turn,
+    DateTimeOffset? RecordedAt);
+
+/// <summary>
 /// Renders learned and seed memory pages using the markdown format stored by the memory provider.
 /// </summary>
 public sealed class MemoryPageRenderer
@@ -11,28 +26,9 @@ public sealed class MemoryPageRenderer
     /// <summary>
     /// Renders a normalized learned memory page.
     /// </summary>
-    /// <param name="fields">The normalized 5W1H fields.</param>
-    /// <param name="primaryDimension">The primary dimension assigned to the page.</param>
-    /// <param name="secondaryDimensions">The secondary dimensions assigned to the page.</param>
-    /// <param name="links">The related page links to include.</param>
-    /// <param name="normalizationStatus">The normalization completeness status.</param>
-    /// <param name="normalizationMethod">The method used to normalize the page.</param>
-    /// <param name="missingFields">The missing 5W1H fields.</param>
-    /// <param name="session">The optional session identifier.</param>
-    /// <param name="turn">The optional turn identifier.</param>
-    /// <param name="recordedAt">The optional recorded-at timestamp.</param>
+    /// <param name="parameters">The learned page parameters.</param>
     /// <returns>The rendered memory page content.</returns>
-    public string RenderLearnedPage(
-        IReadOnlyDictionary<string, string?> fields,
-        string primaryDimension,
-        IReadOnlyList<string> secondaryDimensions,
-        IReadOnlyList<MemoryPageLink> links,
-        string normalizationStatus,
-        string normalizationMethod,
-        IReadOnlyList<string> missingFields,
-        string? session,
-        string? turn,
-        DateTimeOffset? recordedAt)
+    public string RenderLearnedPage(LearnedPageParameters parameters)
     {
         var builder = new StringBuilder();
         builder.AppendLine("# Learned Fact");
@@ -41,20 +37,20 @@ public sealed class MemoryPageRenderer
         builder.AppendLine();
         foreach (var field in MemoryPageFields.FiveWOneH)
         {
-            fields.TryGetValue(field, out var value);
+            parameters.Fields.TryGetValue(field, out var value);
             builder.AppendLine($"- {field}: {value ?? string.Empty}");
         }
 
         builder.AppendLine();
         builder.AppendLine("## Dimensions");
         builder.AppendLine();
-        builder.AppendLine($"- PrimaryDimension: {MemoryPageFields.NormalizeDimension(primaryDimension)}");
-        builder.AppendLine($"- SecondaryDimensions: {string.Join(", ", secondaryDimensions)}");
+        builder.AppendLine($"- PrimaryDimension: {MemoryPageFields.NormalizeDimension(parameters.PrimaryDimension)}");
+        builder.AppendLine($"- SecondaryDimensions: {string.Join(", ", parameters.SecondaryDimensions)}");
 
         builder.AppendLine();
         builder.AppendLine("## Links");
         builder.AppendLine();
-        foreach (var link in links)
+        foreach (var link in parameters.Links)
         {
             builder.AppendLine($"- Related: {link.TargetKey} | {string.Join(", ", link.Reasons)}");
         }
@@ -62,14 +58,14 @@ public sealed class MemoryPageRenderer
         builder.AppendLine();
         builder.AppendLine("## Normalization");
         builder.AppendLine();
-        builder.AppendLine($"- NormalizationStatus: {normalizationStatus}");
-        builder.AppendLine($"- NormalizationMethod: {normalizationMethod}");
-        builder.AppendLine($"- Missing5W1H: {(missingFields.Count == 0 ? string.Empty : string.Join(", ", missingFields))}");
-        AppendIfNotEmpty(builder, "Session", session);
-        AppendIfNotEmpty(builder, "Turn", turn);
-        if (recordedAt.HasValue)
+        builder.AppendLine($"- NormalizationStatus: {parameters.NormalizationStatus}");
+        builder.AppendLine($"- NormalizationMethod: {parameters.NormalizationMethod}");
+        builder.AppendLine($"- Missing5W1H: {(parameters.MissingFields.Count == 0 ? string.Empty : string.Join(", ", parameters.MissingFields))}");
+        AppendIfNotEmpty(builder, "Session", parameters.Session);
+        AppendIfNotEmpty(builder, "Turn", parameters.Turn);
+        if (parameters.RecordedAt.HasValue)
         {
-            builder.AppendLine($"- RecordedAt: {recordedAt.Value.ToString("O", CultureInfo.InvariantCulture)}");
+            builder.AppendLine($"- RecordedAt: {parameters.RecordedAt.Value.ToString("O", CultureInfo.InvariantCulture)}");
         }
 
         return builder.ToString().TrimEnd();

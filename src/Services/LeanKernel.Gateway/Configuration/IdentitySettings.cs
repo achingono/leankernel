@@ -31,26 +31,6 @@ public class IdentitySettings
     public TokenSettings Token { get; set; } = new TokenSettings();
 
     /// <summary>
-    /// The settings required for Facebook authentication.
-    /// </summary>
-    //public FacebookSettings Facebook { get; set; } = new FacebookSettings();
-
-    /// <summary>
-    /// The settings required for Google authentication.
-    /// </summary>
-    //public GoogleSettings Google { get; set; } = new GoogleSettings();
-
-    /// <summary>
-    /// The settings required for Microsoft authentication.
-    /// </summary>
-    //public MicrosoftSettings Microsoft { get; set; } = new MicrosoftSettings();
-
-    /// <summary>
-    /// The settings required for Apple authentication.
-    /// </summary>
-    //public AppleSettings Apple { get; set; } = new AppleSettings();
-
-    /// <summary>
     /// The settings required for OpenID Connect authentication.
     /// </summary>
     public OpenIdSettings OpenId { get; set; } = new OpenIdSettings();

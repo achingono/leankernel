@@ -71,12 +71,9 @@ public sealed class MemoryPageNormalizer
         {
             var repaired = await _repairService.TryRepairMissingFieldsAsync(snapshot, fields, missing, relatedPages, cancellationToken)
                 .ConfigureAwait(false);
-            foreach (var entry in repaired)
+            foreach (var entry in repaired.Where(e => string.IsNullOrWhiteSpace(fields[e.Key])))
             {
-                if (string.IsNullOrWhiteSpace(fields[entry.Key]))
-                {
-                    fields[entry.Key] = entry.Value;
-                }
+                fields[entry.Key] = entry.Value;
             }
 
             missing = MissingFields(fields);
@@ -95,7 +92,7 @@ public sealed class MemoryPageNormalizer
             : snapshot.FactText;
         var key = _keyBuilder.BuildScopeRelativeKey(dimensions.PrimaryDimension, subjectValue, snapshot.FactText, snapshot.EffectiveTimestamp);
 
-        var content = _renderer.RenderLearnedPage(
+        var content = _renderer.RenderLearnedPage(new LearnedPageParameters(
             fields,
             dimensions.PrimaryDimension,
             dimensions.SecondaryDimensions,
@@ -105,7 +102,7 @@ public sealed class MemoryPageNormalizer
             missing,
             snapshot.SessionId,
             snapshot.TurnId,
-            snapshot.EffectiveTimestamp);
+            snapshot.EffectiveTimestamp));
 
         NormalizedCounter.Add(1);
         if (missing.Count > 0)

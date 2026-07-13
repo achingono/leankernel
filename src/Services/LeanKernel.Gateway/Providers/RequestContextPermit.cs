@@ -19,8 +19,7 @@ public sealed class RequestContextPermit(
     IServiceProvider serviceProvider,
     IOptions<IdentitySettings> identitySettings) : IPermit
 {
-    private readonly Lazy<ClaimsPrincipal?> _claimsPrincipal = new(() =>
-        principalAccessor.Principal as ClaimsPrincipal);
+    private readonly Lazy<ClaimsPrincipal?> _claimsPrincipal = new(() => principalAccessor.Principal as ClaimsPrincipal);
 
     private Guid? _resolvedTenantId;
     private Guid? _resolvedUserId;

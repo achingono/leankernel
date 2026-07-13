@@ -5,7 +5,7 @@ namespace LeanKernel.Entities;
 /// <summary>
 /// Represents a persisted chat session for a channel and user pair.
 /// </summary>
-public class SessionEntity: IEntity, IAuditable, IRecyclable
+public class SessionEntity: IAuditable, IRecyclable
 {
     /// <summary>
     /// Gets or sets the unique session identifier.

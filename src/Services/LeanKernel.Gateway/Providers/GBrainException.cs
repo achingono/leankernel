@@ -3,7 +3,9 @@ namespace LeanKernel.Gateway.Providers;
 /// <summary>
 /// Represents an error returned by the GBrain MCP service.
 /// </summary>
+#pragma warning disable S3925 // Not used for binary serialization
 public sealed class GBrainException : Exception
+#pragma warning restore S3925
 {
     /// <summary>
     /// Gets the error code from the GBrain MCP response.

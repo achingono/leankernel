@@ -5,7 +5,7 @@ namespace LeanKernel.Entities;
 /// <summary>
 /// Represents a persisted conversation turn within a session.
 /// </summary>
-public sealed class TurnEntity: IEntity, IAuditable, IRecyclable
+public sealed class TurnEntity: IAuditable, IRecyclable
 {
     /// <summary>
     /// Gets or sets the unique turn identifier.
