@@ -1,4 +1,112 @@
 services:
+    # ── Postgres Database (Source of Truth) ────────────────────────
+  database:
+    image: pgvector/pgvector:pg16
+    container_name: leankernel-database
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-leankernel}
+      - POSTGRES_USER=${POSTGRES_USER:-leankernel}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - database-data:/var/lib/postgresql/data
+      - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-leankernel} -d ${POSTGRES_DB:-leankernel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── LiteLLM (Model Proxy) ─────────────────────────────────────
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: leankernel-litellm
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
+      - POSTGRES_HOST=database
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-leankernel}
+      - POSTGRES_USER=${POSTGRES_USER:-leankernel}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - LITELLM_DB_SCHEMA=${LITELLM_DB_SCHEMA:-litellm}
+      - PYTHONPATH=/app/config
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_API_KEY_2=${GROQ_API_KEY_2:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_API_KEY_2=${GEMINI_API_KEY_2:-}
+      - GEMINI_API_KEY_3=${GEMINI_API_KEY_3:-}
+      - AZURE_AI_API_KEY=${AZURE_AI_API_KEY:-}
+      - AZURE_AI_API_BASE=${AZURE_AI_API_BASE:-}
+      - AZURE_AI_API_KEY_2=${AZURE_AI_API_KEY_2:-}
+      - AZURE_AI_API_BASE_2=${AZURE_AI_API_BASE_2:-}
+      - GITHUB_COPILOT_OAUTH_TOKEN=${GITHUB_COPILOT_OAUTH_TOKEN:-}
+      - GITHUB_COPILOT_API_BASE=${GITHUB_COPILOT_API_BASE:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - NVIDIA_API_BASE=${NVIDIA_API_BASE:-}
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - ./config/litellm:/app/config:ro
+      - ./config/litellm/leankernel_litellm_callbacks.py:/app/litellm_callbacks.py:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    entrypoint: ["sh", "-c"]
+    command: ["set -eu; ENCODED_POSTGRES_PASSWORD=$$(python3 -c \"import os, urllib.parse; print(urllib.parse.quote(os.environ['POSTGRES_PASSWORD']))\"); export DATABASE_URL=postgresql://$${POSTGRES_USER}:$${ENCODED_POSTGRES_PASSWORD}@$${POSTGRES_HOST}:$${POSTGRES_PORT}/$${POSTGRES_DB}?schema=$${LITELLM_DB_SCHEMA}; python3 /app/config/render_litellm_config.py /app/config/config.yaml /app/litellm_config.generated.yaml && exec litellm --config /app/litellm_config.generated.yaml --port 4000"]
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=5).getcode() == 200 else 1)"]
+      interval: 15s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+  # ── GBrain (Wiki/Memory MCP Server) ───────────────────────────
+  gbrain:
+    build:
+      context: .
+      dockerfile: config/gbrain/Dockerfile
+    container_name: leankernel-gbrain
+    working_dir: /app/data/wiki
+    environment:
+      - POSTGRES_HOST=database
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-leankernel}
+      - POSTGRES_USER=${POSTGRES_USER:-leankernel}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - GBRAIN_DB_URL=${GBRAIN_DB_URL:-}
+      - GBRAIN_EMBEDDING_MODEL=${GBRAIN_EMBEDDING_MODEL:-openai:embedding}
+      - GBRAIN_EMBEDDING_DIMENSIONS=${GBRAIN_EMBEDDING_DIMENSIONS:-3072}
+      - LITELLM_BASE_URL=${LITELLM_BASE_URL:-http://litellm:4000}
+      - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - ./data/wiki:/app/data/wiki
+      - gbrain-data:/app/data/gbrain
+    ports:
+      - "${GBRAIN_PORT:-8789}:8789"
+    depends_on:
+      database:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8789/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   gateway:
     build:
       context: .
@@ -6,6 +114,37 @@ services:
       # Dockerfile stages are: source, watch, build, final.
       # Default to `final` so `docker compose up` works without extra env vars.
       target: ${LEANKERNEL_ENGINE_TARGET:-final}
-    container_name: leankernel-engine
+    container_name: leankernel-gateway
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=${LEANKERNEL_GATEWAY_PORT:-8080}
+      - CONNECTIONSTRINGS__POSTGRES=Host=database;Port=5432;Database=${POSTGRES_DB:-leankernel};Username=${POSTGRES_USER:-leankernel};Password=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - OPENAI__BASEURL=${LITELLM_BASE_URL:-http://litellm:4000}/v1
+      - OPENAI__APIKEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
+      - OPENAI__DEFAULTMODEL=${LEANKERNEL_DEFAULT_MODEL:-medium}
+      - OPENAI__MEMORY__MODELID=${LEANKERNEL_MEMORY_MODEL:-small}
+      - OPENAI__FACTEXTRACTION__MODELID=${LEANKERNEL_FACT_EXTRACTION_MODEL:-small}
+      - GBRAIN__BASEURL=http://gbrain:8789
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - gbrain-data:/app/data/gbrain:ro
     ports:
-      - "8080:8080"
+      - "${LEANKERNEL_GATEWAY_PORT:-8080}:${LEANKERNEL_GATEWAY_PORT:-8080}"
+    depends_on:
+      database:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+      gbrain:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${LEANKERNEL_GATEWAY_PORT:-8080}/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  database-data:
+  gbrain-data:
