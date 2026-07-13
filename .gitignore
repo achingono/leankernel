@@ -3,3 +3,6 @@ obj/
 .env
 config/litellm/config.yaml
 config/litellm/litellm_config.generated.yaml
+.sonarqube/
+coverage-results/
+.playwright-mcp/

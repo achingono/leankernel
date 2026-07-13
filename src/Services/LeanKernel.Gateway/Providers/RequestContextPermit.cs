@@ -19,7 +19,7 @@ public sealed class RequestContextPermit(
     IServiceProvider serviceProvider,
     IOptions<IdentitySettings> identitySettings) : IPermit
 {
-    private readonly Lazy<ClaimsPrincipal?> _claimsPrincipal = new(() => principalAccessor.Principal as ClaimsPrincipal);
+    private readonly Lazy<ClaimsPrincipal?> _claimsPrincipal = new(() => principalAccessor.Principal as ClaimsPrincipal); // S3604: Lazy initializer is required; no constructor assigns this member
 
     private Guid? _resolvedTenantId;
     private Guid? _resolvedUserId;
