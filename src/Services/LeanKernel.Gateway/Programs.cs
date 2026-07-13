@@ -1,9 +1,11 @@
 ﻿using System.Security.Principal;
+using System.Text.Json;
 using LeanKernel;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Gateway;
 using LeanKernel.Gateway.Configuration;
+using LeanKernel.Gateway.HealthChecks;
 using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
 using LeanKernel.Gateway.Sessions;
@@ -13,6 +15,7 @@ using LeanKernel.Logic.Providers;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.DevUI;
 using Microsoft.Agents.AI.Hosting;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -111,6 +114,9 @@ builder.Services.AddGBrainMemory(gbrainSettings);
 // Chat client (OpenAI-compatible)
 builder.Services.AddLeanKernelChatClient();
 
+// Health checks for dependent services
+builder.Services.AddGatewayHealthChecks();
+
 // Agent session store (durable, isolation-scoped)
 builder.Services.AddScoped<DbAgentStateStore>();
 builder.Services.AddScoped<SessionIsolationKeyProvider, IdentityIsolationKeyProvider>();
@@ -172,7 +178,10 @@ if (app.Environment.IsDevelopment())
     app.MapDevUI();
 }
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync
+});
 
 app.Run();
 

@@ -40,6 +40,6 @@ public class HealthEndpointTests : IClassFixture<GatewayTestApplicationFactory>
         var response = await _client.GetAsync("/health");
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("healthy");
+        content.Should().ContainEquivalentOf("healthy");
     }
 }

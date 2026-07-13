@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LeanKernel.Tests.Integration;
 
@@ -54,6 +55,18 @@ public class GatewayTestApplicationFactory : WebApplicationFactory<Program>
 
             services.AddDbContext<LeanKernel.Data.EntityContext>(options =>
                 options.UseInMemoryDatabase($"IntegrationTests_{Guid.NewGuid():N}"));
+
+            // Remove external health checks that depend on services unavailable in tests
+            services.Configure<HealthCheckServiceOptions>(opts =>
+            {
+                var external = opts.Registrations
+                    .Where(r => r.Name is "litellm" or "gbrain")
+                    .ToList();
+                foreach (var r in external)
+                {
+                    opts.Registrations.Remove(r);
+                }
+            });
         });
     }
 }

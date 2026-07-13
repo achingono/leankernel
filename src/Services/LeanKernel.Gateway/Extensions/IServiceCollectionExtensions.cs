@@ -1,7 +1,10 @@
+using LeanKernel.Data;
 using LeanKernel.Gateway.Configuration;
+using LeanKernel.Gateway.HealthChecks;
 using LeanKernel.Gateway.Providers;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Providers;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -41,5 +44,29 @@ public static class IServiceCollectionExtensions
         services.AddScoped<IGBrainMcpClient>(sp => sp.GetRequiredService<GBrainMcpClient>());
         services.AddScoped<IMemoryClient, GBrainMemoryClient>();
         return services;
+    }
+
+    /// <summary>
+    /// Registers health checks for the gateway's dependent services:
+    /// the EF Core database, LiteLLM proxy, and GBrain MCP service.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The <see cref="IHealthChecksBuilder"/> for further configuration.</returns>
+    public static IHealthChecksBuilder AddGatewayHealthChecks(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        var probeTimeout = TimeSpan.FromSeconds(5);
+
+        services.AddHttpClient(LiteLlmHealthCheck.HttpClientName)
+            .ConfigureHttpClient(c => c.Timeout = probeTimeout);
+
+        services.AddHttpClient(GBrainHealthCheck.HttpClientName)
+            .ConfigureHttpClient(c => c.Timeout = probeTimeout);
+
+        return services.AddHealthChecks()
+            .AddDbContextCheck<EntityContext>("database", tags: ["database"])
+            .AddCheck<LiteLlmHealthCheck>("litellm", tags: ["litellm"])
+            .AddCheck<GBrainHealthCheck>("gbrain", tags: ["gbrain"]);
     }
 }
