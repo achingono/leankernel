@@ -23,7 +23,7 @@ This starts:
 - GBrain
 - LeanKernel Gateway
 
-Reference: [`../docker-compose.yml`](../docker-compose.yml)
+Reference: [`../../docker-compose.yml`](../../docker-compose.yml)
 
 ## Verify Gateway Health
 

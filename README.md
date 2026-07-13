@@ -1,122 +1,152 @@
 # LeanKernel
 
-LeanKernel is a `.NET 10` modular-monolith agent platform built on [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) with a Blazor + API gateway, durable persistence, and configurable model/runtime orchestration.
+LeanKernel is the current `.NET 10` LeanKernel rebuild: a small modular monolith centered on Microsoft Agent Framework (MAF), an ASP.NET gateway, EF-backed persistence, and a GBrain-backed memory pipeline.
 
-## Why Try LeanKernel
+This repository currently implements the rebuild that lives in this worktree. Older LeanKernel layouts and module maps should be treated as reference material, not as the current workspace structure.
 
-LeanKernel is built for teams that want to ship practical AI agents without stitching together fragile demos. It gives you one opinionated runtime for chat turns, context assembly, tool execution, diagnostics, and UI/API delivery.
+## Why Consider LeanKernel
 
-## Pain Points It Solves
+LeanKernel is aimed at teams that want an agent runtime they can actually inspect, test, and evolve, instead of a loose collection of demos and glue code.
 
-- Agent prototypes that work in notebooks but break in production.
-- Opaque prompt/context behavior that is hard to debug.
-- Tool-heavy agent flows with weak governance and poor observability.
-- Scattered architecture across many services before the product earns that complexity.
+### What It Gives You
 
-## Value Proposition
+- A MAF-based runtime with a real ASP.NET gateway instead of an isolated prototype loop.
+- Durable transcript and agent-state persistence backed by EF Core.
+- A memory pipeline that stays provider-agnostic in logic while integrating with GBrain at the gateway boundary.
+- A local stack that can be run either directly from the gateway project or through Docker Compose with PostgreSQL, LiteLLM, and GBrain.
 
-- Deterministic, inspectable turn pipeline with persisted diagnostics.
-- Built-in tooling, retrieval, scheduling, and hardening controls.
-- Dual surface out of the box: API endpoints plus a Blazor operator UI.
-- Modular project boundaries without forcing microservice overhead.
+### Why It May Be A Good Fit
 
-## Who It Is For
+- You want a practical starting point for agent-backed product work on .NET.
+- You care about identity partitioning, persistence boundaries, and testable runtime behavior.
+- You want one codebase that covers API hosting, runtime composition, persistence, and memory plumbing without immediately splitting into many services.
+- You prefer a rebuild that is explicit about what exists today instead of promising an unimplemented platform surface.
 
-- Product engineers building agent-backed features.
-- Platform teams standardizing runtime behavior and safety controls.
-- Applied AI teams that need reproducible local-to-CI workflows.
-- Developers who want to move fast but keep architecture maintainable.
+## Current Workspace
 
-## Start Here
-
+- Full contributor-facing solution: [`LeanKernel.sln`](LeanKernel.sln)
+- App-only solution: [`src/LeanKernel.sln`](src/LeanKernel.sln)
 - Documentation home: [`docs/index.md`](docs/index.md)
 
+### Implemented Projects
 
-## Repository Structure
+| Project | Purpose |
+| --- | --- |
+| `src/Common/LeanKernel.Core` | Shared interfaces, entities, and low-level contracts |
+| `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, and design-time data access support |
+| `src/Common/LeanKernel.Logic` | Chat history, memory pipeline, identity resolution, and MAF-facing logic services |
+| `src/Services/LeanKernel.Gateway` | ASP.NET host, endpoint mapping, auth/session middleware, GBrain integration, and agent state wiring |
+| `test/LeanKernel.Tests.Unit` | Unit coverage for core, data, logic, and gateway components |
+| `test/LeanKernel.Tests.Integration` | ASP.NET integration tests against the gateway |
+| `test/LeanKernel.Tests.Playwright` | Playwright-based API endpoint checks for a running server |
 
-Primary solution: `src/LeanKernel.sln`
+Current architecture details: [`docs/architecture/solution-structure.md`](docs/architecture/solution-structure.md)
 
-Current solution projects and responsibilities:
+## Documentation Map
 
-- `src/Common/LeanKernel.Core`: shared code contracts, interfaces, and cross-project models
-- `src/Common/LeanKernel.Data`: EF Core/Postgres persistence, session store, diagnostics/doc-ingestion repositories. Shared data contracts and persistence.
-- `src/Common/LeanKernel.Logic`: turn pipeline, runtime execution, routing/orchestration strategy, response quality/enhancement
-- `src/Common/LeanKernel.Logic`: context gating, retrieval scoping, history shaping, and identity grounding helpers
-- `src/Services/LeanKernel.Knowledge`: GBrain-backed knowledge client/service integration
-- `src/Services/LeanKernel.Tools`: built-in tool registry/execution (file, web, browser, wiki, data) and document ingestion plumbing
-- `src/LeanKernel.Plugins`: dynamic runtime skills loading (`SKILL.md` parsing/registration)
-- `src/Services/LeanKernel.Diagnostics`: diagnostics services and runtime metrics primitives
-- `src/Services/LeanKernel.Channels`: channel router/auth and  Signal channel host integration
-- `src/Services/LeanKernel.Learning`: background learning pipeline (fact/intent extraction, capability and engagement signals)
-- `src/Services/LeanKernel.Scheduler`: cron-based background job scheduling/execution
-- `src/Services/LeanKernel.Gateway`: composition root, minimal APIs, middleware, auth, health endpoints
-- `src/Terminals/LeanKernel.Portal`: management portal
-- `src/Terminals/LeanKernel.Client`: AG-UI client powered by `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore`
+- Getting started: [`docs/getting-started/index.md`](docs/getting-started/index.md)
+- Architecture: [`docs/architecture/index.md`](docs/architecture/index.md)
+- Features: [`docs/features/index.md`](docs/features/index.md)
+- API surface: [`docs/api/index.md`](docs/api/index.md)
+- Configuration: [`docs/configuration/index.md`](docs/configuration/index.md)
+- Development workflows: [`docs/development/index.md`](docs/development/index.md)
+- Operations: [`docs/operations/index.md`](docs/operations/index.md)
+- Decisions: [`docs/decisions/index.md`](docs/decisions/index.md)
+- Plans: [`docs/plans/`](docs/plans/)
 
-Key pairings in runtime composition:
+## Running Locally
 
-- `LeanKernel.Gateway` composes all runtime modules and hosts HTTP + UI surfaces
-- `LeanKernel.Tools` + `LeanKernel.Plugins` provide built-in tools and dynamic skill tools
-- `LeanKernel.Context` + `LeanKernel.Knowledge` + `LeanKernel.Persistence` provide context assembly and durable memory inputs
-- `LeanKernel.Agents` + `LeanKernel.Learning` provide turn execution plus background learning updates
-
-
-## CI-Aligned Local Commands
-
-The CI workflow is in [`.github/workflows/build-and-test.yml`](.github/workflows/build-and-test.yml).
-
-### Build and non-Playwright tests
+### Full Docker Compose Stack
 
 ```bash
-dotnet restore src/LeanKernel.sln
-dotnet build src/LeanKernel.sln --no-restore -v minimal
-dotnet test test --no-build -v minimal --filter 'FullyQualifiedName!~Playwright' --logger "trx;LogFileName=results.trx" --collect:"XPlat Code Coverage"
+docker compose up -d --build
 ```
 
-### Coverage gate
+This starts PostgreSQL with `pgvector`, LiteLLM, GBrain, and the LeanKernel gateway.
 
-```bash
-scripts/quality/test-coverage.sh
-```
+Reference: [`docs/getting-started/quick-start.md`](docs/getting-started/quick-start.md)
 
-### Playwright tests
-
-Install Playwright browser dependencies once:
-
-```bash
-npx playwright install --with-deps chromium
-```
-
-Start the app:
+### Run The Gateway Directly
 
 ```bash
 dotnet run --project src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj --urls "http://127.0.0.1:5080"
 ```
 
-In another shell, run UI tests:
+Direct local runs use the gateway appsettings defaults, which point at SQLite unless you override connection strings.
+
+Reference: [`docs/getting-started/local-development.md`](docs/getting-started/local-development.md)
+
+### Useful Local URLs
+
+- Direct gateway run: `http://127.0.0.1:5080`
+- Compose gateway: `http://127.0.0.1:8080`
+- Gateway health: `http://127.0.0.1:8080/health`
+- LiteLLM: `http://127.0.0.1:4000`
+- GBrain: `http://127.0.0.1:8789`
+
+## Build, Test, And Quality Checks
+
+### Build
 
 ```bash
-LEANKERNEL_BASE_URL="http://127.0.0.1:5080" dotnet test test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj
+dotnet build LeanKernel.sln
 ```
 
-## Local Runtime Notes
+### Focused App Build
 
-- Gateway default URL in local docs/tests: `http://127.0.0.1:5080`
-- Running outside Docker is supported for UI/test flows, but service probes to external dependencies may log warnings if backing services are unavailable.
-- For roadmap and implementation planning artifacts, see [`docs/plans/index.md`](docs/plans/index.md).
+```bash
+dotnet build src/LeanKernel.sln
+```
 
-## Dependency Credits
+### Unit Tests
 
-LeanKernel builds on several great open-source projects:
+```bash
+dotnet test test/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj
+```
 
-- Microsoft Agent Framework (MAF): <https://github.com/microsoft/agent-framework>
-- .NET (SDK/Runtime images): <https://github.com/dotnet/dotnet-docker>
-- PostgreSQL: <https://github.com/postgres/postgres>
-- pgvector: <https://github.com/pgvector/pgvector>
-- GBrain: <https://github.com/garrytan/gbrain>
-- LiteLLM: <https://github.com/BerriAI/litellm>
-- Playwright: <https://github.com/microsoft/playwright>
-- PaddleOCR: <https://github.com/PaddlePaddle/PaddleOCR>
-- PaddlePaddle: <https://github.com/PaddlePaddle/Paddle>
-- pdf2image: <https://github.com/Belval/pdf2image>
-- signal-cli REST API: <https://github.com/bbernhard/signal-cli-rest-api>
+### Integration Tests
+
+```bash
+dotnet test test/LeanKernel.Tests.Integration/LeanKernel.Tests.Integration.csproj
+```
+
+### Coverage Gate
+
+```bash
+scripts/quality/test-coverage.sh
+```
+
+### Documentation Link Check
+
+```bash
+python3 scripts/quality/check-doc-links.py
+```
+
+### Playwright Checks
+
+The Playwright project targets a running server and uses `LEANKERNEL_BASE_URL` when set.
+
+```bash
+dotnet test test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj
+```
+
+Current build/test guidance: [`docs/development/build-and-test.md`](docs/development/build-and-test.md)
+
+## Contributing
+
+Use the current worktree as the source of truth. Before making non-trivial changes:
+
+1. Copy the relevant blank templates from [`docs/templates/`](docs/templates/) into a new folder under [`docs/plans/`](docs/plans/).
+2. Draft the implementation plan in that folder.
+3. Have the plan reviewed before implementation.
+4. Make the change.
+5. Run verification appropriate to the scope.
+
+Contributor and coding-agent guidance lives in [`AGENTS.md`](AGENTS.md).
+
+## Current Scope Notes
+
+- The implemented runtime is the gateway plus the common libraries described above.
+- `src/Services` currently contains only `LeanKernel.Gateway`.
+- `src/Terminals` currently exists as a placeholder directory and does not contain active projects.
+- If older docs or logs mention a much larger service map, treat that as historical or aspirational unless the matching project exists in this worktree.

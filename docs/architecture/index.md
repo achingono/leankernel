@@ -5,7 +5,7 @@ System design and ownership boundaries for the current runtime.
 ## Canonical Pages
 
 | Document | Description |
-|----------|-------------|
+| ---------- | ------------- |
 | [system-overview.md](system-overview.md) | Runtime topology and major boundaries. |
 | [solution-structure.md](solution-structure.md) | Project ownership and dependency rules. |
 | [runtime-flows.md](runtime-flows.md) | Request, session, and memory flow summary. |
