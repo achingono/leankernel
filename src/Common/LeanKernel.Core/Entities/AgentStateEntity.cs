@@ -1,9 +1,9 @@
 namespace LeanKernel.Entities;
 
 /// <summary>
-/// Represents a persisted agent session blob for durable state storage.
+/// Represents a persisted agent runtime state checkpoint for durable storage.
 /// </summary>
-public sealed class AgentSessionEntity
+public sealed class AgentStateEntity
 {
     /// <summary>
     /// Gets or sets the isolation-scoped conversation identifier (primary key).

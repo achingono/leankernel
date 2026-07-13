@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using LeanKernel.Entities;
 
 namespace LeanKernel.Entities;
@@ -14,10 +15,31 @@ public class UserEntity : IEntity, IAuditable, IRecyclable
     public bool IsActive { get; set; }
     public bool IsLockedOut { get; set; }
     public DateTime? LastActivity { get; set; }
-    public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
-    public Badge CreatedBy { get; set; } = new();
+    /// <summary>
+    /// Date and time when the tenant was created.
+    /// </summary>
+    [Required]
+    public DateTime CreatedOn { get; set; }
+
+    /// <summary>
+    /// Badge of the user who created the tenant.
+    /// </summary>
+    [Required]
+    public Badge CreatedBy { get; set; } = default!;
+
+    /// <summary>
+    /// Date and time when the tenant was last updated.
+    /// </summary>
     public DateTime? UpdatedOn { get; set; }
+
+    /// <summary>
+    /// Badge of the user who last updated the tenant.
+    /// </summary>
     public Badge? UpdatedBy { get; set; }
+
+    /// <summary>
+    /// Indicates whether the tenant is deleted.
+    /// </summary>
     public bool IsDeleted { get; set; }
 
     /// <summary>
@@ -37,5 +59,5 @@ public class UserEntity : IEntity, IAuditable, IRecyclable
     /// </summary>
     public bool IsGuest { get; set; }
 
-    public ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();
+    public virtual ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();
 }

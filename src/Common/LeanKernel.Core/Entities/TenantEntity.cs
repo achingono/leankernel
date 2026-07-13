@@ -70,4 +70,6 @@ public class TenantEntity : IEntity, IAuditable, IRecyclable
     /// Indicates whether the tenant is deleted.
     /// </summary>
     public bool IsDeleted { get; set; }
+
+    public virtual ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();
 }

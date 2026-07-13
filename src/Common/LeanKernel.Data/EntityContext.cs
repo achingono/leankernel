@@ -37,7 +37,7 @@ public class EntityContext : DbContext
     /// <summary>
     /// Gets the persisted agent session state blobs.
     /// </summary>
-    public DbSet<AgentSessionEntity> AgentSessions => Set<AgentSessionEntity>();
+    public DbSet<AgentStateEntity> AgentStates => Set<AgentStateEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,9 +48,10 @@ public class EntityContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.ConversationId).HasMaxLength(500);
+            entity.HasQueryFilter(e => !e.IsDeleted);
             entity.HasIndex(e => new { e.TenantId, e.UserId, e.ChannelId, e.ConversationId })
                 .IsUnique()
-                .HasFilter("[ConversationId] IS NOT NULL");
+                .HasFilter("\"ConversationId\" IS NOT NULL");
             entity.HasIndex(e => new { e.TenantId, e.UserId, e.ChannelId });
             entity.HasOne(e => e.User)
                 .WithMany(u => u.Sessions)
@@ -79,10 +80,11 @@ public class EntityContext : DbContext
                 .HasForeignKey(e => e.SessionId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.SessionId, e.Timestamp });
+            entity.HasQueryFilter(e => !e.IsDeleted && !e.Session.IsDeleted);
         });
 
-        // AgentSessionEntity
-        modelBuilder.Entity<AgentSessionEntity>(entity =>
+        // AgentStateEntity
+        modelBuilder.Entity<AgentStateEntity>(entity =>
         {
             entity.HasKey(e => e.ScopedConversationId);
             entity.Property(e => e.ScopedConversationId).HasMaxLength(500);
@@ -129,5 +131,69 @@ public class EntityContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(100);
             entity.HasIndex(e => e.Name).IsUnique();
         });
+    }
+
+    public async Task ApplyMigrationsAndSeedAsync(string hostName)
+    {
+        await Database.MigrateAsync();
+
+        await EnsureDefaultTenantAsync(hostName);
+        await EnsureOpenAiChannelAsync();
+    }
+
+    private async Task EnsureDefaultTenantAsync(string hostName)
+    {
+        if (await Tenants.AnyAsync(tenant => tenant.HostName == hostName))
+        {
+            return;
+        }
+
+        Tenants.Add(new TenantEntity
+        {
+            Id = Guid.NewGuid(),
+            Name = "Default Tenant",
+            Description = "Default tenant created at startup",
+            HostName = hostName,
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge
+            {
+                Id = Guid.Empty,
+                FullName = "System",
+                Email = "system@leankernel.local"
+            }
+        });
+
+        try
+        {
+            await SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            ChangeTracker.Clear();
+        }
+    }
+
+    private async Task EnsureOpenAiChannelAsync()
+    {
+        if (await Channels.AnyAsync(channel => channel.Name == ChannelEntity.OpenAiHttpName))
+        {
+            return;
+        }
+
+        Channels.Add(new ChannelEntity
+        {
+            Id = Guid.NewGuid(),
+            Name = ChannelEntity.OpenAiHttpName
+        });
+
+        try
+        {
+            await SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            ChangeTracker.Clear();
+        }
     }
 }

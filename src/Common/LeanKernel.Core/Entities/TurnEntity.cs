@@ -1,9 +1,11 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace LeanKernel.Entities;
 
 /// <summary>
 /// Represents a persisted conversation turn within a session.
 /// </summary>
-public sealed class TurnEntity: IEntity
+public sealed class TurnEntity: IEntity, IAuditable, IRecyclable
 {
     /// <summary>
     /// Gets or sets the unique turn identifier.
@@ -49,6 +51,33 @@ public sealed class TurnEntity: IEntity
     /// Gets or sets optional turn metadata persisted as JSON.
     /// </summary>
     public string? Metadata { get; set; }
+    
+    /// <summary>
+    /// Date and time when the tenant was created.
+    /// </summary>
+    [Required]
+    public DateTime CreatedOn { get; set; }
+
+    /// <summary>
+    /// Badge of the user who created the tenant.
+    /// </summary>
+    [Required]
+    public Badge CreatedBy { get; set; } = default!;
+
+    /// <summary>
+    /// Date and time when the tenant was last updated.
+    /// </summary>
+    public DateTime? UpdatedOn { get; set; }
+
+    /// <summary>
+    /// Badge of the user who last updated the tenant.
+    /// </summary>
+    public Badge? UpdatedBy { get; set; }
+
+    /// <summary>
+    /// Indicates whether the tenant is deleted.
+    /// </summary>
+    public bool IsDeleted { get; set; }
 
     /// <summary>
     /// Gets or sets the parent session navigation property.

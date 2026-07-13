@@ -21,11 +21,23 @@ public static class IServiceCollectionExtensions
         services.TryAddScoped<ISaveChangesInterceptor, AuditableInterceptor>();
         services.TryAddScoped<ISaveChangesInterceptor, RecyclableInterceptor>();
 
-        return services.AddDbContext<EntityContext>((sp, option) =>
+        static void ConfigureFactoryOptions(DbContextOptionsBuilder option, Action<DbContextOptionsBuilder> configure)
+        {
+            configure(option);
+        }
+
+        static void ConfigureContextOptions(IServiceProvider sp, DbContextOptionsBuilder option, Action<DbContextOptionsBuilder> configure)
         {
             var interceptors = sp.GetServices<ISaveChangesInterceptor>();
             option.AddInterceptors(interceptors);
-            optionsAction?.Invoke(option);
-        });
+            configure(option);
+        }
+
+        services.AddDbContextFactory<EntityContext>(
+            (_, option) => ConfigureFactoryOptions(option, optionsAction),
+            ServiceLifetime.Scoped);
+
+        return services.AddDbContext<EntityContext>((sp, option) =>
+            ConfigureContextOptions(sp, option, optionsAction));
     }
 }

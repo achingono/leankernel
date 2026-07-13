@@ -1,9 +1,11 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace LeanKernel.Entities;
 
 /// <summary>
 /// Represents a persisted chat session for a channel and user pair.
 /// </summary>
-public sealed class SessionEntity: IEntity
+public class SessionEntity: IEntity, IAuditable, IRecyclable
 {
     /// <summary>
     /// Gets or sets the unique session identifier.
@@ -44,6 +46,33 @@ public sealed class SessionEntity: IEntity
     /// Gets or sets optional JSON metadata for the session.
     /// </summary>
     public string? Metadata { get; set; }
+    
+    /// <summary>
+    /// Date and time when the tenant was created.
+    /// </summary>
+    [Required]
+    public DateTime CreatedOn { get; set; }
+
+    /// <summary>
+    /// Badge of the user who created the tenant.
+    /// </summary>
+    [Required]
+    public Badge CreatedBy { get; set; } = default!;
+
+    /// <summary>
+    /// Date and time when the tenant was last updated.
+    /// </summary>
+    public DateTime? UpdatedOn { get; set; }
+
+    /// <summary>
+    /// Badge of the user who last updated the tenant.
+    /// </summary>
+    public Badge? UpdatedBy { get; set; }
+
+    /// <summary>
+    /// Indicates whether the tenant is deleted.
+    /// </summary>
+    public bool IsDeleted { get; set; }
 
     public UserEntity User { get; set; } = new();
 
@@ -54,5 +83,5 @@ public sealed class SessionEntity: IEntity
     /// <summary>
     /// Gets or sets the conversation turns associated with the session.
     /// </summary>
-    public ICollection<TurnEntity> Turns { get; set; } = new List<TurnEntity>();
+    public virtual ICollection<TurnEntity> Turns { get; set; } = new List<TurnEntity>();
 }

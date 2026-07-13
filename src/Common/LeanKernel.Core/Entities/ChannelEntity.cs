@@ -18,7 +18,7 @@ public class ChannelEntity : IEntity
     /// <summary>
     /// Gets or sets the sessions associated with this channel.
     /// </summary>
-    public ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();
+    public virtual ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();
 
     /// <summary>
     /// Well-known channel name for the OpenAI-compatible HTTP surface.

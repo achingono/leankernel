@@ -17,10 +17,10 @@ public class EntityContextTests
     }
 
     [Fact]
-    public async Task AgentSessions_CanAddAndQuery()
+    public async Task AgentStates_CanAddAndQuery()
     {
         using var ctx = CreateContext();
-        var entity = new AgentSessionEntity
+        var entity = new AgentStateEntity
         {
             ScopedConversationId = "test-scoped-id-1",
             TenantId = Guid.NewGuid(),
@@ -31,10 +31,10 @@ public class EntityContextTests
             UpdatedOn = DateTimeOffset.UtcNow
         };
 
-        ctx.AgentSessions.Add(entity);
+        ctx.AgentStates.Add(entity);
         await ctx.SaveChangesAsync();
 
-        var result = await ctx.AgentSessions
+        var result = await ctx.AgentStates
             .AsNoTracking()
             .FirstOrDefaultAsync(e => e.ScopedConversationId == "test-scoped-id-1");
 
@@ -45,18 +45,18 @@ public class EntityContextTests
     }
 
     [Fact]
-    public void AgentSessions_DuplicateKey_Throws()
+    public void AgentStates_DuplicateKey_Throws()
     {
         using var ctx = CreateContext();
         var id = $"dup-test-{Guid.NewGuid():N}";
 
-        ctx.AgentSessions.Add(new AgentSessionEntity
+        ctx.AgentStates.Add(new AgentStateEntity
         {
             ScopedConversationId = id,
             StateJson = "{}"
         });
 
-        var act = () => ctx.AgentSessions.Add(new AgentSessionEntity
+        var act = () => ctx.AgentStates.Add(new AgentStateEntity
         {
             ScopedConversationId = id,
             StateJson = "{}"
