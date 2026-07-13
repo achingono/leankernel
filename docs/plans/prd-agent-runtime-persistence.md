@@ -97,7 +97,7 @@ Four projects (no `.sln` yet):
 - **D8b — interceptor permit resolution path is unsafe.** Interceptors currently use `eventData.Context.GetService<IPermit>()`; this resolves from EF internal services, not app DI by default. Interceptors must be DI-resolved from the real container and use constructor injection (or an equivalent supported pattern).
 - **D9 — `EntityContext` has no model config.** No `OnModelCreating`, no indexes, no partition columns, no session↔turn relationship configuration, no soft‑delete query filter.
 - **D10 — Identity abstractions live in the wrong assembly.** `IPrincipalAccessor`/`IHostNameAccessor` are declared in the `LeanKernel.Gateway` project (namespace `LeanKernel.Gateway.Requests`). `LeanKernel.Logic` (providers) and `LeanKernel.Data` (interceptors/permit) should not depend on Gateway types.
-- **D11 — No configuration.** No `appsettings.json` / `appsettings.Development.json`; `OpenAISettings`, `AgentSettings`, `GBrainConfig`, and `ConnectionStrings` are never bound. `AddOpenAIResponses`/conversations use in‑memory stores (non‑durable, non‑partitioned) by default.
+- **D11 — No configuration.** No `appsettings.json` / `appsettings.Development.json`; `OpenAISettings`, `AgentSettings`, `GBrainSettings`, and `ConnectionStrings` are never bound. `AddOpenAIResponses`/conversations use in‑memory stores (non‑durable, non‑partitioned) by default.
 - **D12 — `Program` not test‑visible.** `Programs.cs` uses top‑level statements; `WebApplicationFactory<Program>` requires `public partial class Program;`.
 - **D13 — `EntityContext` constructor mismatch.** `EntityContext` lacks a `DbContextOptions<EntityContext>` constructor, which blocks proper options/interceptor configuration and provider-specific behavior.
 - **D14 — auth/authorization middleware wiring mismatch.** `app.UseAuthentication()` and `app.UseAuthorization()` are called, but `AddAuthentication(...)`/`AddAuthorization()` are not called in startup. This causes runtime pipeline failures and prevents principal-based partitioning from working as designed.
@@ -342,11 +342,11 @@ Align to the decided split: **memory abstractions in `LeanKernel.Logic`, GBrain 
 Reuse from `~/source/repos/leankernel/src/LeanKernel.Knowledge`:
 
 - `GBrainMcpClient(HttpClient, ILogger)` — `CallToolAsync(string toolName, object? args, CancellationToken)`, `ListToolsAsync(CancellationToken)`; MCP JSON‑RPC to `{BaseUrl}/mcp`, JSON + SSE.
-- `GBrainAuthHandler` — bearer token from token file or `GBrainConfig.AuthToken`.
+- `GBrainAuthHandler` — bearer token from token file or `GBrainSettings.AuthToken`.
 - `IKnowledgeService` / `GBrainKnowledgeService` — `SearchAsync`, `GetPageAsync`, `PutPageAsync`, `DeletePageAsync`; maps GBrain `slug/compiled_truth/score/page_id/metadata` → `RetrievalCandidate`.
 - `IScopedKnowledgeService` / `ScopedKnowledgeService` — `RetrieveWithScopeAsync(query, scope, maxResults, sessionId, turnId, ct)`; namespace/scope admission policy.
 - DTOs: `RetrievalCandidate { Key, Content, Source, Score, TokenCount, Metadata }`, `KnowledgePage { Key, Content, LastModified, LinkedPages }`.
-- DI: `AddLeanKernelKnowledge(GBrainConfig)` in Gateway — `AddHttpClient<GBrainMcpClient>(...).AddHttpMessageHandler<GBrainAuthHandler>()` and `services.AddScoped<IMemoryClient, GBrainMemoryClient>()`. Config section **`LeanKernel:GBrain`** (`BaseUrl`, `AuthToken`, `TimeoutSeconds`).
+- DI: `AddLeanKernelKnowledge(GBrainSettings)` in Gateway — `AddHttpClient<GBrainMcpClient>(...).AddHttpMessageHandler<GBrainAuthHandler>()` and `services.AddScoped<IMemoryClient, GBrainMemoryClient>()`. Config section **`LeanKernel:GBrain`** (`BaseUrl`, `AuthToken`, `TimeoutSeconds`).
 - Packages: `Microsoft.Extensions.Http`, `Microsoft.Extensions.Logging.Abstractions`, `Microsoft.Extensions.Options` (10.0.x).
 
 Identity scoping: pass the `MemoryScope` (derived from `IPermit` -> `TenantId`/`UserId`/`ChannelId` -> namespace) into `RetrieveWithScopeAsync`, mirroring the original where `UserId` scopes identity/context and `namespace` scopes retrieval admission, now under an explicit tenant boundary. For anonymous requests, `UserId` is the resolved guest user and `SessionId` remains the extra isolation dimension outside the memory namespace.
@@ -622,4 +622,4 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 - `IScopedKnowledgeService`: `Task<ScopedRetrievalResult> RetrieveWithScopeAsync(string query, string scope, int maxResults=10, string? sessionId=null, string? turnId=null, ct)`.
 - `RetrievalCandidate { string Key; string Content; string Source; double Score; int TokenCount; IReadOnlyDictionary<string,string>? Metadata; }`.
 - `KnowledgePage { string Key; string Content; DateTimeOffset LastModified; IReadOnlyList<string> LinkedPages; }`.
-- GBrain wire mapping: `slug→Key`, `compiled_truth→Content`, `score→Score`, `page_id→Metadata`. DI: `AddLeanKernelKnowledge(GBrainConfig)`; config `LeanKernel:GBrain:{BaseUrl,AuthToken,TimeoutSeconds}`.
+- GBrain wire mapping: `slug→Key`, `compiled_truth→Content`, `score→Score`, `page_id→Metadata`. DI: `AddLeanKernelKnowledge(GBrainSettings)`; config `LeanKernel:GBrain:{BaseUrl,AuthToken,TimeoutSeconds}`.

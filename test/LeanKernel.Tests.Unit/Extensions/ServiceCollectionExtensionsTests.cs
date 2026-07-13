@@ -35,7 +35,7 @@ public class ServiceCollectionExtensionsTests
             o.BaseUrl = "https://api.openai.com/v1";
             o.DefaultModel = "gpt-4o-mini";
         });
-        services.Configure<SmallModelSettings>(o =>
+        services.Configure<MemorySettings>(o =>
         {
             o.Enabled = false;
             o.ModelId = "gpt-4o-mini";
@@ -61,7 +61,7 @@ public class ServiceCollectionExtensionsTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddOptions();
-        services.Configure<SmallModelSettings>(o => o.Enabled = false);
+        services.Configure<MemorySettings>(o => o.Enabled = false);
         services.AddKeyedScoped<Microsoft.Extensions.AI.IChatClient>("small-model", (_, _) => new DisabledChatClient());
 
         services.AddMemoryPageServices();

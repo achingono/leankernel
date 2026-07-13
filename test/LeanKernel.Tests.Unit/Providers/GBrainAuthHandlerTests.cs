@@ -16,7 +16,7 @@ public class GBrainAuthHandlerTests
     {
         var inner = new CaptureHandler();
         var handler = new GBrainAuthHandler(
-            Options.Create(new GBrainConfig { AuthToken = "abc123" }),
+            Options.Create(new GBrainSettings { AuthToken = "abc123" }),
             NullLogger<GBrainAuthHandler>.Instance)
         {
             InnerHandler = inner
@@ -36,7 +36,7 @@ public class GBrainAuthHandlerTests
     {
         var inner = new CaptureHandler();
         var handler = new GBrainAuthHandler(
-            Options.Create(new GBrainConfig { AuthToken = string.Empty }),
+            Options.Create(new GBrainSettings { AuthToken = string.Empty }),
             NullLogger<GBrainAuthHandler>.Instance)
         {
             InnerHandler = inner

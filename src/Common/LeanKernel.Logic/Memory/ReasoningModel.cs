@@ -7,13 +7,13 @@ namespace LeanKernel.Logic.Memory;
 public sealed class ReasoningModel : IReasoningModel
 {
     private readonly IChatClient _chatClient;
-    private readonly SmallModelSettings _settings;
+    private readonly MemorySettings _settings;
     private readonly ILogger<ReasoningModel> _logger;
     private readonly SemaphoreSlim _concurrencyGate;
 
     public ReasoningModel(
         IChatClient chatClient,
-        SmallModelSettings settings,
+        MemorySettings settings,
         ILogger<ReasoningModel> logger)
     {
         _chatClient = chatClient;

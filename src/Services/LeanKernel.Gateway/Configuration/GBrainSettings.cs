@@ -1,9 +1,9 @@
-namespace LeanKernel.Logic.Configuration;
+namespace LeanKernel.Gateway.Configuration;
 
 /// <summary>
 /// Configures the LeanKernel connection to the external GBrain MCP service.
 /// </summary>
-public sealed class GBrainConfig
+public sealed class GBrainSettings
 {
     /// <summary>
     /// Gets or sets the root HTTP endpoint exposed by the GBrain MCP server.

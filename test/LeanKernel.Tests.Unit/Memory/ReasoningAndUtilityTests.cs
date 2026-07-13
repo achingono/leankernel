@@ -14,7 +14,7 @@ public class ReasoningAndUtilityTests
     {
         var model = new ReasoningModel(
             new FakeChatClient(new ChatMessage(ChatRole.Assistant, "ok")),
-            new SmallModelSettings { Enabled = false },
+            new MemorySettings { Enabled = false },
             NullLogger<ReasoningModel>.Instance);
 
         var response = await model.CompleteAsync("sys", "usr", 100, CancellationToken.None);
@@ -26,7 +26,7 @@ public class ReasoningAndUtilityTests
     {
         var model = new ReasoningModel(
             new FakeChatClient(new ChatMessage(ChatRole.Assistant, "{\"ok\":true}")),
-            new SmallModelSettings { Enabled = true, TimeoutSeconds = 5, MaxOutputTokens = 16, MaxConcurrency = 1 },
+            new MemorySettings { Enabled = true, TimeoutSeconds = 5, MaxOutputTokens = 16, MaxConcurrency = 1 },
             NullLogger<ReasoningModel>.Instance);
 
         var response = await model.CompleteAsync("sys", "usr", 100, CancellationToken.None);
@@ -38,11 +38,11 @@ public class ReasoningAndUtilityTests
     {
         var notSupported = new ReasoningModel(
             new ThrowingChatClient(new NotSupportedException("disabled")),
-            new SmallModelSettings { Enabled = true, TimeoutSeconds = 1 },
+            new MemorySettings { Enabled = true, TimeoutSeconds = 1 },
             NullLogger<ReasoningModel>.Instance);
         var timeout = new ReasoningModel(
             new ThrowingChatClient(new OperationCanceledException()),
-            new SmallModelSettings { Enabled = true, TimeoutSeconds = 1 },
+            new MemorySettings { Enabled = true, TimeoutSeconds = 1 },
             NullLogger<ReasoningModel>.Instance);
 
         (await notSupported.CompleteAsync("s", "u", 8, CancellationToken.None)).Should().BeNull();

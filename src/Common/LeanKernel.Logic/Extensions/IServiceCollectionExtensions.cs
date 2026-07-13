@@ -40,7 +40,7 @@ public static class IServiceCollectionExtensions
 
         services.AddScoped<IReasoningModel>(sp =>
         {
-            var cfg = sp.GetRequiredService<IOptions<SmallModelSettings>>().Value;
+            var cfg = sp.GetRequiredService<IOptions<MemorySettings>>().Value;
             var logger = sp.GetRequiredService<ILogger<ReasoningModel>>();
             var chatClient = sp.GetRequiredKeyedService<IChatClient>("small-model");
             return new ReasoningModel(chatClient, cfg, logger);
@@ -67,7 +67,7 @@ public static class IServiceCollectionExtensions
 
         services.AddKeyedScoped<IChatClient>("small-model", (sp, _) =>
         {
-            var cfg = sp.GetRequiredService<IOptions<SmallModelSettings>>().Value;
+            var cfg = sp.GetRequiredService<IOptions<MemorySettings>>().Value;
             if (!cfg.Enabled)
             {
                 return new DisabledChatClient();
