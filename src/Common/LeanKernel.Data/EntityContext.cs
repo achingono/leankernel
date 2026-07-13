@@ -151,7 +151,14 @@ public class EntityContext : DbContext
     /// <returns>A task that completes when migrations and seed data have been applied.</returns>
     public async Task ApplyMigrationsAndSeedAsync(string hostName)
     {
-        await Database.MigrateAsync();
+        if (Database.IsRelational())
+        {
+            await Database.MigrateAsync();
+        }
+        else
+        {
+            await Database.EnsureCreatedAsync();
+        }
 
         await EnsureDefaultTenantAsync(hostName);
         await EnsureOpenAiChannelAsync();

@@ -3,9 +3,11 @@ using FluentAssertions;
 using LeanKernel;
 using LeanKernel.Entities;
 using LeanKernel.Gateway.Configuration;
-using LeanKernel.Gateway.Identity;
+using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
@@ -35,6 +37,7 @@ public class RequestContextPermitTests
 
         var httpAccessor = new Mock<IHttpContextAccessor>();
         var ctx = new DefaultHttpContext();
+        ctx.Features.Set<ISessionFeature>(new SessionFeature { Session = new TestSession() });
         httpAccessor.Setup(a => a.HttpContext).Returns(ctx);
 
         var identityResolver = new Mock<IIdentityResolver>();
@@ -42,7 +45,7 @@ public class RequestContextPermitTests
             .ReturnsAsync(resolvedTenant);
         identityResolver.Setup(r => r.ResolveOrCreateUserAsync(It.IsAny<ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(resolvedUser ?? new UserEntity { Id = Guid.NewGuid(), UserName = "test-user" });
-        identityResolver.Setup(r => r.ResolveGuestUserAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        identityResolver.Setup(r => r.ResolveGuestUserAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UserEntity { Id = Guid.NewGuid(), UserName = "anonymous", IsGuest = true });
         identityResolver.Setup(r => r.ResolveOrCreateChannelAsync(ChannelEntity.OpenAiHttpName, It.IsAny<CancellationToken>()))
             .ReturnsAsync(resolvedChannel ?? new ChannelEntity { Id = Guid.NewGuid(), Name = ChannelEntity.OpenAiHttpName });
@@ -53,11 +56,15 @@ public class RequestContextPermitTests
             AnonymousFullName = "Anonymous User"
         });
 
+        var serviceProvider = new Mock<IServiceProvider>();
+        serviceProvider.Setup(sp => sp.GetService(typeof(IIdentityResolver)))
+            .Returns(identityResolver.Object);
+
         var permit = new RequestContextPermit(
             principalAccessor.Object,
             hostAccessor.Object,
             httpAccessor.Object,
-            identityResolver.Object,
+            serviceProvider.Object,
             identitySettings);
 
         return (permit, principalAccessor, hostAccessor);
@@ -199,5 +206,33 @@ public class RequestContextPermitTests
 
         IPermit iPermit = permit;
         iPermit.Id.Should().Be(userId);
+    }
+
+    /// <summary>
+    /// Minimal ISession implementation for test contexts.
+    /// </summary>
+    private sealed class TestSession : ISession
+    {
+        public string Id => "test-session";
+        public bool IsAvailable => true;
+        public IEnumerable<string> Keys => [];
+        public void Clear() { }
+        public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public void Remove(string key) { }
+        public void Set(string key, byte[] value) { }
+        public bool TryGetValue(string key, out byte[] value)
+        {
+            value = [];
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Provides session features for test HTTP contexts.
+    /// </summary>
+    private sealed class SessionFeature : ISessionFeature
+    {
+        public required ISession Session { get; set; }
     }
 }

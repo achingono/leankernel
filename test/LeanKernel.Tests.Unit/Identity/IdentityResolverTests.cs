@@ -2,7 +2,7 @@ using System.Security.Claims;
 using FluentAssertions;
 using LeanKernel.Data;
 using LeanKernel.Entities;
-using LeanKernel.Gateway.Identity;
+using LeanKernel.Logic.Providers;
 using LeanKernel.Tests.Unit.TestDoubles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -90,8 +90,9 @@ public class IdentityResolverTests
     {
         var resolver = CreateResolver(out var db);
 
-        var guest1 = await resolver.ResolveGuestUserAsync(Guid.NewGuid(), "anonymous");
-        var guest2 = await resolver.ResolveGuestUserAsync(Guid.NewGuid(), "anonymous");
+        var tenantId = Guid.NewGuid();
+        var guest1 = await resolver.ResolveGuestUserAsync(tenantId, "anonymous", "session-1");
+        var guest2 = await resolver.ResolveGuestUserAsync(tenantId, "anonymous", "session-1");
         guest2.Id.Should().Be(guest1.Id);
 
         var channel1 = await resolver.ResolveOrCreateChannelAsync("openai-http");

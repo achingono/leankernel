@@ -35,9 +35,23 @@ public class GatewayTestApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
-            // Replace EntityContext with InMemory
-            services.RemoveAll<DbContextOptions<LeanKernel.Data.EntityContext>>();
-            services.RemoveAll<LeanKernel.Data.EntityContext>();
+            // Remove ALL EF Core services registered by AddEntityContext for EntityContext,
+            // including factory-related and options-configuration services that carry the
+            // SQLite provider extension and would conflict with the InMemory replacement.
+            var entityType = typeof(LeanKernel.Data.EntityContext);
+            var optionsConfigType = typeof(Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<>).MakeGenericType(entityType);
+            var toRemove = services.Where(d =>
+                d.ServiceType == typeof(DbContextOptions<LeanKernel.Data.EntityContext>) ||
+                d.ServiceType == entityType ||
+                d.ServiceType == typeof(IDbContextFactory<LeanKernel.Data.EntityContext>) ||
+                d.ServiceType == optionsConfigType ||
+                d.ServiceType == typeof(Microsoft.EntityFrameworkCore.Infrastructure.ServiceProviderAccessor)).ToList();
+
+            foreach (var descriptor in toRemove)
+            {
+                services.Remove(descriptor);
+            }
+
             services.AddDbContext<LeanKernel.Data.EntityContext>(options =>
                 options.UseInMemoryDatabase($"IntegrationTests_{Guid.NewGuid():N}"));
         });

@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using FluentAssertions;
 using LeanKernel;
-using LeanKernel.Gateway.Identity;
+using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
 using Moq;
 using Xunit;

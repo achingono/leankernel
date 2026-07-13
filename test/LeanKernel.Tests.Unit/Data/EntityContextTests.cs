@@ -1,6 +1,7 @@
 using FluentAssertions;
 using LeanKernel.Data;
 using LeanKernel.Entities;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -9,17 +10,22 @@ namespace LeanKernel.Tests.Unit.Data;
 /// <summary>
 /// Covers basic entity persistence behavior for <see cref="EntityContext"/>.
 /// </summary>
-public class EntityContextTests
+public class EntityContextTests : IDisposable
 {
-    /// <summary>
-    /// Creates an isolated in-memory entity context.
-    /// </summary>
-    private static EntityContext CreateContext()
+    private readonly SqliteConnection _connection = new("Data Source=:memory:");
+
+    public EntityContextTests() => _connection.Open();
+
+    public void Dispose() => _connection.Dispose();
+
+    private EntityContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<EntityContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .UseSqlite(_connection)
             .Options;
-        return new EntityContext(options);
+        var ctx = new TestEntityContext(options);
+        ctx.Database.EnsureCreated();
+        return ctx;
     }
 
     /// <summary>
@@ -96,7 +102,7 @@ public class EntityContextTests
             FullName = "A",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge()
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
         };
         var channel = new ChannelEntity { Id = channelId, Name = "test-channel" };
         var tenant = new TenantEntity
@@ -106,7 +112,7 @@ public class EntityContextTests
             HostName = "test.local",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge()
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
         };
 
         ctx.Users.Add(user);
@@ -121,7 +127,9 @@ public class EntityContextTests
             ChannelId = channelId,
             User = user,
             Channel = channel,
-            Tenant = tenant
+            Tenant = tenant,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
         };
         ctx.Sessions.Add(session);
         await ctx.SaveChangesAsync();
@@ -135,5 +143,18 @@ public class EntityContextTests
         loaded.Should().NotBeNull();
         loaded!.User.Email.Should().Be("a@b.com");
         loaded.Channel.Name.Should().Be("test-channel");
+    }
+
+    /// <summary>
+    /// Test-specific EntityContext that overrides RowVersion to ValueGeneratedNever
+    /// so SQLite (which lacks native rowversion support) can accept explicit values.
+    /// </summary>
+    private sealed class TestEntityContext(DbContextOptions<EntityContext> options) : EntityContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<AgentStateEntity>().Property(e => e.RowVersion).ValueGeneratedNever();
+        }
     }
 }
