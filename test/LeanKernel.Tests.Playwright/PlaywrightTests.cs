@@ -3,9 +3,15 @@ using Xunit;
 
 namespace LeanKernel.Tests.Playwright;
 
+/// <summary>
+/// Defines the shared Playwright test collection.
+/// </summary>
 [CollectionDefinition("Playwright", DisableParallelization = true)]
 public class PlaywrightCollectionDefinition;
 
+/// <summary>
+/// Manages the shared Playwright instance for browser tests.
+/// </summary>
 public class PlaywrightFixture : IAsyncLifetime
 {
     private IPlaywright? _instance;
@@ -15,11 +21,13 @@ public class PlaywrightFixture : IAsyncLifetime
 
     public IPlaywright Instance => _instance ?? throw new InvalidOperationException("Playwright not initialized.");
 
+    /// <inheritdoc />
     public async Task InitializeAsync()
     {
         _instance = await Microsoft.Playwright.Playwright.CreateAsync();
     }
 
+    /// <inheritdoc />
     public Task DisposeAsync()
     {
         _instance?.Dispose();
@@ -27,16 +35,25 @@ public class PlaywrightFixture : IAsyncLifetime
     }
 }
 
+/// <summary>
+/// Covers the responses endpoint through Playwright's API client.
+/// </summary>
 [Collection("Playwright")]
 public class ResponsesEndpointTests : IClassFixture<PlaywrightFixture>
 {
     private readonly PlaywrightFixture _fixture;
 
+    /// <summary>
+    /// Creates a test instance backed by the shared Playwright fixture.
+    /// </summary>
     public ResponsesEndpointTests(PlaywrightFixture fixture)
     {
         _fixture = fixture;
     }
 
+    /// <summary>
+    /// Verifies the responses endpoint returns an expected status without full auth setup.
+    /// </summary>
     [Fact(Skip = "Requires running server")]
     public async Task PostResponses_ReturnsOkOrUnauthorized()
     {
@@ -59,16 +76,25 @@ public class ResponsesEndpointTests : IClassFixture<PlaywrightFixture>
     }
 }
 
+/// <summary>
+/// Covers the conversations endpoint through Playwright's API client.
+/// </summary>
 [Collection("Playwright")]
 public class ConversationsEndpointTests : IClassFixture<PlaywrightFixture>
 {
     private readonly PlaywrightFixture _fixture;
 
+    /// <summary>
+    /// Creates a test instance backed by the shared Playwright fixture.
+    /// </summary>
     public ConversationsEndpointTests(PlaywrightFixture fixture)
     {
         _fixture = fixture;
     }
 
+    /// <summary>
+    /// Verifies the conversations endpoint returns an expected status without full auth setup.
+    /// </summary>
     [Fact(Skip = "Requires running server")]
     public async Task GetConversations_ReturnsOkOrUnauthorized()
     {

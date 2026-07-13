@@ -9,8 +9,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Providers;
 
+/// <summary>
+/// Covers authentication header behavior for the GBrain auth handler.
+/// </summary>
 public class GBrainAuthHandlerTests
 {
+    /// <summary>
+    /// Verifies configured tokens are added as bearer authorization headers.
+    /// </summary>
     [Fact]
     public async Task SendAsync_AddsAuthAndAcceptHeaders_WhenConfigTokenExists()
     {
@@ -31,6 +37,9 @@ public class GBrainAuthHandlerTests
         inner.LastRequest.Headers.Accept.Select(a => a.MediaType).Should().Contain(["application/json", "text/event-stream"]);
     }
 
+    /// <summary>
+    /// Verifies empty tokens leave the authorization header unset.
+    /// </summary>
     [Fact]
     public async Task SendAsync_LeavesAuthNull_WhenNoTokenFound()
     {
@@ -48,10 +57,14 @@ public class GBrainAuthHandlerTests
         inner.LastRequest!.Headers.Authorization.Should().BeNull();
     }
 
+    /// <summary>
+    /// Captures the outgoing request for assertions.
+    /// </summary>
     private sealed class CaptureHandler : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest { get; private set; }
 
+        /// <inheritdoc />
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastRequest = request;

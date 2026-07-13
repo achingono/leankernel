@@ -12,8 +12,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Identity;
 
+/// <summary>
+/// Covers request-scoped permit behavior.
+/// </summary>
 public class RequestContextPermitTests
 {
+    /// <summary>
+    /// Creates a permit with configurable request and identity state.
+    /// </summary>
     private static (RequestContextPermit permit, Mock<IPrincipalAccessor> principalAccessor, Mock<IHostNameAccessor> hostAccessor) CreateSut(
         ClaimsPrincipal? principal = null,
         string hostName = "localhost",
@@ -57,6 +63,9 @@ public class RequestContextPermitTests
         return (permit, principalAccessor, hostAccessor);
     }
 
+    /// <summary>
+    /// Verifies missing principals are treated as anonymous.
+    /// </summary>
     [Fact]
     public void IsAuthenticated_WhenPrincipalIsNull_ReturnsFalse()
     {
@@ -65,6 +74,9 @@ public class RequestContextPermitTests
         permit.IsAuthenticated.Should().BeFalse();
     }
 
+    /// <summary>
+    /// Verifies authenticated principals are reported as authenticated.
+    /// </summary>
     [Fact]
     public void IsAuthenticated_WhenPrincipalIsAuthenticated_ReturnsTrue()
     {
@@ -77,6 +89,9 @@ public class RequestContextPermitTests
         permit.IsAuthenticated.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Verifies unauthenticated principals are reported as anonymous.
+    /// </summary>
     [Fact]
     public void IsAuthenticated_WhenPrincipalIsNotAuthenticated_ReturnsFalse()
     {
@@ -88,6 +103,9 @@ public class RequestContextPermitTests
         permit.IsAuthenticated.Should().BeFalse();
     }
 
+    /// <summary>
+    /// Verifies the host name is sourced from the accessor.
+    /// </summary>
     [Fact]
     public void HostName_ReturnsFromAccessor()
     {
@@ -96,6 +114,9 @@ public class RequestContextPermitTests
         permit.HostName.Should().Be("example.com");
     }
 
+    /// <summary>
+    /// Verifies anonymous badges use the configured defaults.
+    /// </summary>
     [Fact]
     public void Badge_WhenAnonymous_ReturnsAnonymousDefaults()
     {
@@ -105,6 +126,9 @@ public class RequestContextPermitTests
         permit.Badge.FullName.Should().Be("Anonymous User");
     }
 
+    /// <summary>
+    /// Verifies authenticated users resolve their persisted identifier.
+    /// </summary>
     [Fact]
     public void UserId_WhenAuthenticated_ResolvesFromIdentityResolver()
     {
@@ -119,6 +143,9 @@ public class RequestContextPermitTests
         permit.UserId.Should().Be(userId);
     }
 
+    /// <summary>
+    /// Verifies anonymous requests resolve a guest user identifier.
+    /// </summary>
     [Fact]
     public void UserId_WhenAnonymous_ResolvesGuestUser()
     {
@@ -128,6 +155,9 @@ public class RequestContextPermitTests
         permit.UserId.Should().NotBe(Guid.Empty);
     }
 
+    /// <summary>
+    /// Verifies tenant resolution is based on the request host.
+    /// </summary>
     [Fact]
     public void TenantId_ResolvesFromHost()
     {
@@ -139,6 +169,9 @@ public class RequestContextPermitTests
         permit.TenantId.Should().Be(tenantId);
     }
 
+    /// <summary>
+    /// Verifies the OpenAI HTTP channel is resolved for requests.
+    /// </summary>
     [Fact]
     public void ChannelId_ResolvesOpenAiHttpChannel()
     {
@@ -150,6 +183,9 @@ public class RequestContextPermitTests
         permit.ChannelId.Should().Be(channelId);
     }
 
+    /// <summary>
+    /// Verifies the permit identifier matches the resolved user identifier.
+    /// </summary>
     [Fact]
     public void Id_ReturnsUserId()
     {

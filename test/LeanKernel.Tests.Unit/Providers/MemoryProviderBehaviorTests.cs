@@ -14,8 +14,14 @@ namespace LeanKernel.Tests.Unit.Providers;
 
 #pragma warning disable MAAI001
 
+/// <summary>
+/// Covers end-to-end behavior of the memory provider pipeline.
+/// </summary>
 public class MemoryProviderBehaviorTests
 {
+    /// <summary>
+    /// Verifies no context is added when the request contains no query text.
+    /// </summary>
     [Fact]
     public async Task ProvideContext_ReturnsEmpty_WhenNoQueryText()
     {
@@ -30,6 +36,9 @@ public class MemoryProviderBehaviorTests
         context.Messages.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Verifies compact memory summaries are returned when matches exist.
+    /// </summary>
     [Fact]
     public async Task ProvideContext_ReturnsCompactSummaries_WhenMemoriesExist()
     {
@@ -60,6 +69,9 @@ public class MemoryProviderBehaviorTests
         context.Messages!.First().Text.Should().Contain("dimensions:");
     }
 
+    /// <summary>
+    /// Verifies normalized facts are persisted after invocation.
+    /// </summary>
     [Fact]
     public async Task StoreContext_PersistsNormalizedFacts()
     {
@@ -80,6 +92,9 @@ public class MemoryProviderBehaviorTests
         memory.Saved[0].Content.Should().Contain("## 5W1H");
     }
 
+    /// <summary>
+    /// Verifies raw fact pages are saved when normalization fails.
+    /// </summary>
     [Fact]
     public async Task StoreContext_FallsBackToRawSave_OnPipelineFailure()
     {
@@ -99,6 +114,9 @@ public class MemoryProviderBehaviorTests
         memory.Saved[0].Content.Should().Contain("# Learned Fact");
     }
 
+    /// <summary>
+    /// Creates a provider under test with configurable extraction behavior.
+    /// </summary>
     private static (TestableMemoryProvider Provider, TestAgentSession Session) CreateSut(
         InMemoryMemoryClient memoryClient,
         string? extractionResponse = "[]",
@@ -138,6 +156,17 @@ public class MemoryProviderBehaviorTests
             new TestAgentSession());
     }
 
+    /// <summary>
+    /// Exposes protected memory provider hooks for tests.
+    /// </summary>
+    /// <param name="memoryClient">The memory client to wrap.</param>
+    /// <param name="permit">The permit used to resolve memory scope.</param>
+    /// <param name="parser">The memory page parser to use.</param>
+    /// <param name="renderer">The memory page renderer to use.</param>
+    /// <param name="normalizer">The page normalizer to use.</param>
+    /// <param name="factExtractionService">The fact extraction service to use.</param>
+    /// <param name="timeProvider">The time provider to use.</param>
+    /// <param name="logger">The logger to use.</param>
     private sealed class TestableMemoryProvider(
         IMemoryClient memoryClient,
         IPermit permit,
@@ -149,23 +178,34 @@ public class MemoryProviderBehaviorTests
         Microsoft.Extensions.Logging.ILogger<MemoryProvider> logger)
         : MemoryProvider(memoryClient, permit, parser, renderer, normalizer, factExtractionService, timeProvider, logger)
     {
+        /// <summary>
+        /// Invokes context provisioning for tests.
+        /// </summary>
         public async Task<AIContext> ProvideForTestAsync(AIContextProvider.InvokingContext context)
             => await ProvideAIContextAsync(context);
 
+        /// <summary>
+        /// Invokes context storage for tests.
+        /// </summary>
         public async Task StoreForTestAsync(AIContextProvider.InvokedContext context)
             => await StoreAIContextAsync(context);
     }
 
+    /// <summary>
+    /// Stores memory operations in memory for assertions.
+    /// </summary>
     private sealed class InMemoryMemoryClient : IMemoryClient
     {
         public IReadOnlyList<MemoryItem> SearchResults { get; init; } = [];
         public List<(string Key, string Content)> Saved { get; } = [];
 
+        /// <inheritdoc />
         public Task<IReadOnlyList<MemoryItem>> SearchMemoriesAsync(MemoryScope scope, string query, int maxResults = 10, CancellationToken ct = default)
         {
             return Task.FromResult(SearchResults);
         }
 
+        /// <inheritdoc />
         public Task SaveMemoryAsync(MemoryScope scope, string key, string content, CancellationToken ct = default)
         {
             Saved.Add((key, content));
@@ -173,41 +213,60 @@ public class MemoryProviderBehaviorTests
         }
     }
 
+    /// <summary>
+    /// Provides a reasoning model stub that is always disabled.
+    /// </summary>
     private sealed class StubReasoningModel : IReasoningModel
     {
         public bool Enabled => false;
 
+        /// <inheritdoc />
         public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, int maxOutputTokens, CancellationToken cancellationToken = default)
             => Task.FromResult<string?>(null);
     }
 
+    /// <summary>
+    /// Returns a fixed extraction response from the chat client.
+    /// </summary>
+    /// <param name="text">The response text to return.</param>
     private sealed class StaticChatClient(string text) : IChatClient
     {
+        /// <inheritdoc />
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
             => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text)));
 
+        /// <inheritdoc />
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
             => AsyncEnumerable.Empty<ChatResponseUpdate>();
 
+        /// <inheritdoc />
         public object? GetService(Type serviceType, object? serviceKey = null)
             => null;
 
+        /// <inheritdoc />
         public void Dispose()
         {
         }
     }
 
+    /// <summary>
+    /// Throws from chat completions to simulate extraction failures.
+    /// </summary>
     private sealed class ThrowingChatClient : IChatClient
     {
+        /// <inheritdoc />
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
             => Task.FromException<ChatResponse>(new InvalidOperationException("boom"));
 
+        /// <inheritdoc />
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
             => AsyncEnumerable.Empty<ChatResponseUpdate>();
 
+        /// <inheritdoc />
         public object? GetService(Type serviceType, object? serviceKey = null)
             => null;
 
+        /// <inheritdoc />
         public void Dispose()
         {
         }

@@ -4,8 +4,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Memory;
 
+/// <summary>
+/// Covers basic contract behavior for memory model record types.
+/// </summary>
 public class MemoryModelContractsTests
 {
+    /// <summary>
+    /// Verifies record-based memory models expose their assigned values.
+    /// </summary>
     [Fact]
     public void ModelRecords_ExposeExpectedValues()
     {

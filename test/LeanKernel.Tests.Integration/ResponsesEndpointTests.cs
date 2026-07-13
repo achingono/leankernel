@@ -6,15 +6,24 @@ using Xunit;
 
 namespace LeanKernel.Tests.Integration;
 
+/// <summary>
+/// Covers the responses endpoints exposed by the test host.
+/// </summary>
 public class ResponsesEndpointTests : IClassFixture<GatewayTestApplicationFactory>
 {
     private readonly HttpClient _client;
 
+    /// <summary>
+    /// Creates a test instance backed by the shared gateway factory.
+    /// </summary>
     public ResponsesEndpointTests(GatewayTestApplicationFactory factory)
     {
         _client = factory.CreateClient();
     }
 
+    /// <summary>
+    /// Verifies a valid responses payload reaches the endpoint.
+    /// </summary>
     [Fact]
     public async Task PostResponses_WithValidPayload_ReturnsOkOrError()
     {
@@ -35,6 +44,9 @@ public class ResponsesEndpointTests : IClassFixture<GatewayTestApplicationFactor
             HttpStatusCode.InternalServerError);
     }
 
+    /// <summary>
+    /// Verifies an empty responses payload is rejected or handled.
+    /// </summary>
     [Fact]
     public async Task PostResponses_WithEmptyBody_ReturnsBadRequest()
     {
@@ -51,6 +63,9 @@ public class ResponsesEndpointTests : IClassFixture<GatewayTestApplicationFactor
             HttpStatusCode.InternalServerError);
     }
 
+    /// <summary>
+    /// Verifies GET is not supported on the responses route.
+    /// </summary>
     [Fact]
     public async Task GetResponses_Returns404Or405()
     {

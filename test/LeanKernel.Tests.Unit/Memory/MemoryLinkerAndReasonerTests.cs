@@ -5,8 +5,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Memory;
 
+/// <summary>
+/// Covers memory link building and graph refinement.
+/// </summary>
 public class MemoryLinkerAndReasonerTests
 {
+    /// <summary>
+    /// Verifies the linker ranks explicit and dimension-based links.
+    /// </summary>
     [Fact]
     public void Linker_BuildsRankedLinks_WithExpectedReasons()
     {
@@ -46,6 +52,9 @@ public class MemoryLinkerAndReasonerTests
         links[1].Reasons.Should().Contain("same-dimension");
     }
 
+    /// <summary>
+    /// Verifies graph refinement filters invalid edges and caps model output.
+    /// </summary>
     [Fact]
     public async Task GraphReasoner_FiltersAndCapsModelEdges()
     {
@@ -83,6 +92,9 @@ public class MemoryLinkerAndReasonerTests
         result.Any(link => link.TargetKey == "facts/what/a/1" && link.Source == "llm").Should().BeFalse();
     }
 
+    /// <summary>
+    /// Verifies invalid refinement output falls back to deterministic links.
+    /// </summary>
     [Fact]
     public async Task GraphReasoner_InvalidJson_FallsBackToDeterministic()
     {
@@ -102,6 +114,9 @@ public class MemoryLinkerAndReasonerTests
         result.Should().BeEquivalentTo(deterministic);
     }
 
+    /// <summary>
+    /// Creates a snapshot for link and graph reasoning tests.
+    /// </summary>
     private static MemoryPageSnapshot Snapshot(
         string key,
         string text,
@@ -127,10 +142,15 @@ public class MemoryLinkerAndReasonerTests
             []);
     }
 
+    /// <summary>
+    /// Returns a fixed reasoning response for graph refinement tests.
+    /// </summary>
+    /// <param name="response">The completion text to return.</param>
     private sealed class StaticReasoningModel(string response) : IReasoningModel
     {
         public bool Enabled => true;
 
+        /// <inheritdoc />
         public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, int maxOutputTokens, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<string?>(response);

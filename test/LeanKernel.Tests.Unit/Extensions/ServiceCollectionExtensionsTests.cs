@@ -8,8 +8,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Extensions;
 
+/// <summary>
+/// Covers test registrations added by the service collection extensions.
+/// </summary>
 public class ServiceCollectionExtensionsTests
 {
+    /// <summary>
+    /// Verifies chat and memory context providers are registered.
+    /// </summary>
     [Fact]
     public void AddContextProviders_RegistersChatAndMemoryProviders()
     {
@@ -23,6 +29,9 @@ public class ServiceCollectionExtensionsTests
             && d.ImplementationType == typeof(MemoryProvider));
     }
 
+    /// <summary>
+    /// Verifies the chat client registrations expose the expected keyed services.
+    /// </summary>
     [Fact]
     public void AddLeanKernelChatClient_RegistersKeyedClients()
     {
@@ -55,6 +64,9 @@ public class ServiceCollectionExtensionsTests
         extraction.Should().NotBeNull();
     }
 
+    /// <summary>
+    /// Verifies the memory page pipeline services are registered.
+    /// </summary>
     [Fact]
     public void AddMemoryPageServices_RegistersPipeline()
     {

@@ -4,8 +4,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Memory;
 
+/// <summary>
+/// Covers deterministic and LLM-assisted memory dimension classification.
+/// </summary>
 public class MemoryDimensionClassifierTests
 {
+    /// <summary>
+    /// Verifies action-heavy facts default to the what dimension.
+    /// </summary>
     [Fact]
     public async Task ActionCentricFact_DefaultsToWhatPrimary()
     {
@@ -43,6 +49,9 @@ public class MemoryDimensionClassifierTests
         result.Source.Should().Be("deterministic");
     }
 
+    /// <summary>
+    /// Verifies fact keys remain scope-relative.
+    /// </summary>
     [Fact]
     public void KeyBuilder_EmitsScopeRelativeFactKey()
     {
@@ -53,6 +62,9 @@ public class MemoryDimensionClassifierTests
         key.Should().NotStartWith("memory/");
     }
 
+    /// <summary>
+    /// Verifies valid LLM refinements override ambiguous deterministic output.
+    /// </summary>
     [Fact]
     public async Task AmbiguousPage_UsesLlmRefinement_WhenValidJsonReturned()
     {
@@ -84,6 +96,9 @@ public class MemoryDimensionClassifierTests
         result.DimensionScores.Should().Contain(score => score.Source == "llm-refined");
     }
 
+    /// <summary>
+    /// Verifies invalid LLM output falls back to deterministic classification.
+    /// </summary>
     [Fact]
     public async Task AmbiguousPage_InvalidJson_FallsBackToDeterministic()
     {
@@ -105,6 +120,9 @@ public class MemoryDimensionClassifierTests
         result.PrimaryDimension.Should().Be("what");
     }
 
+    /// <summary>
+    /// Verifies the LLM is skipped when the page is not ambiguous.
+    /// </summary>
     [Fact]
     public async Task NonAmbiguousPage_DoesNotInvokeLlm()
     {
@@ -127,6 +145,9 @@ public class MemoryDimensionClassifierTests
         model.CallCount.Should().Be(0);
     }
 
+    /// <summary>
+    /// Creates a minimal snapshot for classification tests.
+    /// </summary>
     private static MemoryPageSnapshot CreateSnapshot(string factText)
     {
         return new MemoryPageSnapshot(
@@ -147,12 +168,18 @@ public class MemoryDimensionClassifierTests
     }
 }
 
+/// <summary>
+/// Captures reasoning model calls for classifier tests.
+/// </summary>
+/// <param name="enabled">Whether the model reports itself as enabled.</param>
+/// <param name="response">The completion text to return.</param>
 file sealed class StubReasoningModel(bool enabled = false, string? response = null) : IReasoningModel
 {
     public int CallCount { get; private set; }
 
     public bool Enabled => enabled;
 
+    /// <inheritdoc />
     public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, int maxOutputTokens, CancellationToken cancellationToken = default)
     {
         CallCount++;

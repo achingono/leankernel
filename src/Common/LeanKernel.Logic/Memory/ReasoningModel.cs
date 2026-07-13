@@ -4,6 +4,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Logic.Memory;
 
+/// <summary>
+/// Implements <see cref="IReasoningModel"/> using an <see cref="IChatClient"/> with bounded concurrency and timeouts.
+/// </summary>
 public sealed class ReasoningModel : IReasoningModel
 {
     private readonly IChatClient _chatClient;
@@ -11,6 +14,12 @@ public sealed class ReasoningModel : IReasoningModel
     private readonly ILogger<ReasoningModel> _logger;
     private readonly SemaphoreSlim _concurrencyGate;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ReasoningModel"/> class.
+    /// </summary>
+    /// <param name="chatClient">The chat client used to execute reasoning prompts.</param>
+    /// <param name="settings">The memory reasoning settings.</param>
+    /// <param name="logger">The logger used for timeout warnings.</param>
     public ReasoningModel(
         IChatClient chatClient,
         MemorySettings settings,
@@ -22,8 +31,10 @@ public sealed class ReasoningModel : IReasoningModel
         _concurrencyGate = new SemaphoreSlim(Math.Max(1, settings.MaxConcurrency));
     }
 
+    /// <inheritdoc />
     public bool Enabled => _settings.Enabled;
 
+    /// <inheritdoc />
     public async Task<string?> CompleteAsync(
         string systemPrompt,
         string userPrompt,

@@ -6,6 +6,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Logic.Memory;
 
+/// <summary>
+/// Extracts durable facts from conversation turns and renders seed memory pages.
+/// </summary>
 public sealed class FactExtractionService
 {
     private const int MaxTranscriptChars = 12000;
@@ -13,6 +16,12 @@ public sealed class FactExtractionService
     private readonly FactExtractionSettings _settings;
     private readonly MemoryPageRenderer _renderer;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FactExtractionService"/> class.
+    /// </summary>
+    /// <param name="chatClient">The chat client used for fact extraction prompts.</param>
+    /// <param name="settings">The fact extraction settings.</param>
+    /// <param name="renderer">The renderer used to produce seed pages.</param>
     public FactExtractionService(
         [FromKeyedServices("fact-extraction")] IChatClient chatClient,
         IOptions<FactExtractionSettings> settings,
@@ -23,6 +32,14 @@ public sealed class FactExtractionService
         _renderer = renderer;
     }
 
+    /// <summary>
+    /// Extracts distinct factual statements from the latest conversation exchange.
+    /// </summary>
+    /// <param name="userMessage">The latest user message, if any.</param>
+    /// <param name="assistantResponse">The assistant response text.</param>
+    /// <param name="recentHistory">Recent conversation history to use as context.</param>
+    /// <param name="cancellationToken">The token used to cancel the operation.</param>
+    /// <returns>The extracted fact strings.</returns>
     public async Task<IReadOnlyList<string>> ExtractFactsAsync(
         string? userMessage,
         string assistantResponse,
@@ -47,11 +64,26 @@ public sealed class FactExtractionService
         return ParseFacts(text);
     }
 
+    /// <summary>
+    /// Renders a seed memory page for a fact before normalization.
+    /// </summary>
+    /// <param name="fact">The fact text to render.</param>
+    /// <param name="sessionId">The optional session identifier.</param>
+    /// <param name="turnId">The optional turn identifier.</param>
+    /// <param name="recordedAt">The timestamp associated with the fact.</param>
+    /// <returns>The rendered seed page content.</returns>
     public string RenderSeedPage(string fact, string? sessionId, string? turnId, DateTimeOffset recordedAt)
     {
         return _renderer.RenderSeedPage(fact, sessionId, turnId, recordedAt);
     }
 
+    /// <summary>
+    /// Builds a compact transcript from the latest exchange and recent history.
+    /// </summary>
+    /// <param name="userMessage">The latest user message, if any.</param>
+    /// <param name="assistantResponse">The assistant response text.</param>
+    /// <param name="recentHistory">Recent conversation history to include.</param>
+    /// <returns>The transcript text used for fact extraction.</returns>
     public static string BuildConversationTranscript(
         string? userMessage,
         string assistantResponse,
@@ -76,6 +108,11 @@ public sealed class FactExtractionService
             : transcript[..MaxTranscriptChars];
     }
 
+    /// <summary>
+    /// Parses extracted fact output from JSON or line-based text into distinct facts.
+    /// </summary>
+    /// <param name="content">The raw model output to parse.</param>
+    /// <returns>The parsed fact strings.</returns>
     public static IReadOnlyList<string> ParseFacts(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))

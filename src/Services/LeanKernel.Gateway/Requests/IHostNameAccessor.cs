@@ -1,7 +1,8 @@
-using System.Security.Principal;
-
 namespace LeanKernel.Gateway.Requests;
 
+/// <summary>
+/// Provides access to the normalized host name for the current request.
+/// </summary>
 public interface IHostNameAccessor
 {
     /// <summary>

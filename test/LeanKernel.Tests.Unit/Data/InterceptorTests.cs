@@ -9,8 +9,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Data;
 
+/// <summary>
+/// Covers the EF Core save interceptors used by the data layer.
+/// </summary>
 public class InterceptorTests
 {
+    /// <summary>
+    /// Creates a permit with a stable test badge.
+    /// </summary>
     private static IPermit CreateStubPermit()
     {
         var mock = new Mock<IPermit>();
@@ -23,6 +29,9 @@ public class InterceptorTests
         return mock.Object;
     }
 
+    /// <summary>
+    /// Creates an isolated entity context with the supplied interceptors.
+    /// </summary>
     private static EntityContext CreateContext(ISaveChangesInterceptor[] interceptors)
     {
         var options = new DbContextOptionsBuilder<EntityContext>()
@@ -32,6 +41,9 @@ public class InterceptorTests
         return new EntityContext(options);
     }
 
+    /// <summary>
+    /// Verifies the auditable interceptor stamps creation metadata on insert.
+    /// </summary>
     [Fact]
     public async Task AuditableInterceptor_SetsCreatedOnAndCreatedBy_OnAdd()
     {
@@ -55,6 +67,9 @@ public class InterceptorTests
         tenant.CreatedBy.FullName.Should().Be("Test User");
     }
 
+    /// <summary>
+    /// Verifies the auditable interceptor stamps update metadata on modification.
+    /// </summary>
     [Fact]
     public async Task AuditableInterceptor_SetsUpdatedOnAndUpdated_OnModify()
     {
@@ -81,6 +96,9 @@ public class InterceptorTests
         tenant.UpdatedBy!.FullName.Should().Be("Test User");
     }
 
+    /// <summary>
+    /// Verifies the recyclable interceptor soft-deletes tracked entities.
+    /// </summary>
     [Fact]
     public async Task RecyclableInterceptor_SoftDeletes_OnDelete()
     {

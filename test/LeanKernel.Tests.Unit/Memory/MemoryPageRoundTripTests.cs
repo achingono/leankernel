@@ -4,8 +4,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Memory;
 
+/// <summary>
+/// Covers round-trip rendering and parsing of memory pages.
+/// </summary>
 public class MemoryPageRoundTripTests
 {
+    /// <summary>
+    /// Verifies rendered learned pages preserve their core sections when parsed.
+    /// </summary>
     [Fact]
     public void Render_Then_Parse_RoundTripsCoreSections()
     {
@@ -40,6 +46,9 @@ public class MemoryPageRoundTripTests
         snapshot.Links.Should().ContainSingle();
     }
 
+    /// <summary>
+    /// Verifies seed pages parse fact text and metadata correctly.
+    /// </summary>
     [Fact]
     public void Parse_SeedPage_ExtractsFactAndMetadata()
     {

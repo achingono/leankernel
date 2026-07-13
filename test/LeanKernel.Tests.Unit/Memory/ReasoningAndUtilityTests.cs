@@ -7,8 +7,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Memory;
 
+/// <summary>
+/// Covers reasoning model and utility behavior used by the memory pipeline.
+/// </summary>
 public class ReasoningAndUtilityTests
 {
+    /// <summary>
+    /// Verifies disabled reasoning returns no completion.
+    /// </summary>
     [Fact]
     public async Task ReasoningModel_Disabled_ReturnsNull()
     {
@@ -21,6 +27,9 @@ public class ReasoningAndUtilityTests
         response.Should().BeNull();
     }
 
+    /// <summary>
+    /// Verifies chat response text is mapped into the reasoning completion.
+    /// </summary>
     [Fact]
     public async Task ReasoningModel_MapsChatResponseText()
     {
@@ -33,6 +42,9 @@ public class ReasoningAndUtilityTests
         response.Should().Be("{\"ok\":true}");
     }
 
+    /// <summary>
+    /// Verifies unsupported clients and timeouts are treated as no result.
+    /// </summary>
     [Fact]
     public async Task ReasoningModel_NotSupported_AndTimeout_ReturnNull()
     {
@@ -49,6 +61,9 @@ public class ReasoningAndUtilityTests
         (await timeout.CompleteAsync("s", "u", 8, CancellationToken.None)).Should().BeNull();
     }
 
+    /// <summary>
+    /// Verifies the disabled chat client throws when invoked.
+    /// </summary>
     [Fact]
     public void DisabledChatClient_ThrowsOnCalls()
     {
@@ -59,6 +74,9 @@ public class ReasoningAndUtilityTests
         client.GetService(typeof(object)).Should().BeNull();
     }
 
+    /// <summary>
+    /// Verifies dimension normalization falls back to the what dimension.
+    /// </summary>
     [Fact]
     public void MemoryPageFields_NormalizeDimension_DefaultsToWhat()
     {
@@ -67,45 +85,61 @@ public class ReasoningAndUtilityTests
         MemoryPageFields.FiveWOneH.Should().ContainInOrder("Who", "What", "When", "Where", "Why", "How");
     }
 
+    /// <summary>
+    /// Returns a fixed chat response for reasoning model tests.
+    /// </summary>
+    /// <param name="responseMessage">The chat message to return.</param>
     private sealed class FakeChatClient(ChatMessage responseMessage) : IChatClient
     {
+        /// <inheritdoc />
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new ChatResponse(responseMessage));
         }
 
+        /// <inheritdoc />
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             return AsyncEnumerable.Empty<ChatResponseUpdate>();
         }
 
+        /// <inheritdoc />
         public object? GetService(Type serviceType, object? serviceKey = null)
         {
             return null;
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
         }
     }
 
+    /// <summary>
+    /// Throws a configured exception from chat completions.
+    /// </summary>
+    /// <param name="ex">The exception to throw.</param>
     private sealed class ThrowingChatClient(Exception ex) : IChatClient
     {
+        /// <inheritdoc />
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             return Task.FromException<ChatResponse>(ex);
         }
 
+        /// <inheritdoc />
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             return AsyncEnumerable.Empty<ChatResponseUpdate>();
         }
 
+        /// <inheritdoc />
         public object? GetService(Type serviceType, object? serviceKey = null)
         {
             return null;
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
         }

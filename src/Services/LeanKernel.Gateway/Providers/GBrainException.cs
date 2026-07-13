@@ -10,6 +10,11 @@ public sealed class GBrainException : Exception
     /// </summary>
     public int ErrorCode { get; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GBrainException"/> class.
+    /// </summary>
+    /// <param name="message">The error message returned by GBrain.</param>
+    /// <param name="errorCode">The MCP error code, if one was supplied.</param>
     public GBrainException(string message, int errorCode = 0)
         : base(message)
     {

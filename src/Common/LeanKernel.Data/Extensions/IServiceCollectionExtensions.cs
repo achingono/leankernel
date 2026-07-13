@@ -16,6 +16,7 @@ public static class IServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The <see cref="IServiceCollection"/> to add services to.</param>
     /// <param name="optionsAction">An action to configure the <see cref="DbContextOptionsBuilder"/> for the <see cref="EntityContext"/>.</param>
+    /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddEntityContext(this IServiceCollection services, Action<DbContextOptionsBuilder> optionsAction)
     {
         services.TryAddScoped<ISaveChangesInterceptor, AuditableInterceptor>();

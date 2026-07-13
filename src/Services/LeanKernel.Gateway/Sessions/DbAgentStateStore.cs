@@ -22,6 +22,7 @@ public class DbAgentStateStore(
         WriteIndented = false
     };
 
+    /// <inheritdoc />
     public override async ValueTask<AgentSession> GetSessionAsync(
         AIAgent agent,
         string conversationId,
@@ -48,6 +49,7 @@ public class DbAgentStateStore(
         return await agent.CreateSessionAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
     public override async ValueTask SaveSessionAsync(
         AIAgent agent,
         string conversationId,

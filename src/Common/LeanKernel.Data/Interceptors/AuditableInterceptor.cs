@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 /// </summary>
 public class AuditableInterceptor(IPermit permit) : ISaveChangesInterceptor
 {
+    /// <inheritdoc />
     public InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
         InterceptionResult<int> result)
@@ -36,6 +37,7 @@ public class AuditableInterceptor(IPermit permit) : ISaveChangesInterceptor
         return result;
     }
 
+    /// <inheritdoc />
     public ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,

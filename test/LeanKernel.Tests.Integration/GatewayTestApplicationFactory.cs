@@ -8,8 +8,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace LeanKernel.Tests.Integration;
 
+/// <summary>
+/// Configures the gateway host for integration tests.
+/// </summary>
 public class GatewayTestApplicationFactory : WebApplicationFactory<Program>
 {
+    /// <inheritdoc />
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");

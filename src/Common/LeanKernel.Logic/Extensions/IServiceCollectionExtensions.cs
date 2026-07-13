@@ -12,11 +12,16 @@ using OpenAI;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+/// Provides extension methods for registering LeanKernel logic services.
+/// </summary>
 public static class IServiceCollectionExtensions
 {
     /// <summary>
     /// Registers chat history and memory providers scoped by identity, against base types.
     /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddContextProviders(this IServiceCollection services)
     {
         services.AddScoped<ChatHistoryProvider, DbChatHistoryProvider>();
@@ -25,6 +30,11 @@ public static class IServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Registers the memory parsing, normalization, reasoning, and rendering services.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddMemoryPageServices(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
@@ -52,6 +62,8 @@ public static class IServiceCollectionExtensions
     /// <summary>
     /// Registers the OpenAI-compatible chat client from configuration.
     /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddLeanKernelChatClient(this IServiceCollection services)
     {
         services.AddChatClient(sp =>
@@ -98,6 +110,10 @@ public static class IServiceCollectionExtensions
     /// Scoped lifetime ensures providers (ChatHistoryProvider, AIContextProvider) are resolved
     /// from the request scope rather than captured at singleton creation time.
     /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <param name="agentName">The agent name to register.</param>
+    /// <param name="configuration">The configuration used to bind agent settings.</param>
+    /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddLeanKernelAgent(
         this IServiceCollection services,
         string agentName,

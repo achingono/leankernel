@@ -71,5 +71,8 @@ public class TenantEntity : IEntity, IAuditable, IRecyclable
     /// </summary>
     public bool IsDeleted { get; set; }
 
+    /// <summary>
+    /// Gets or sets the sessions associated with this tenant.
+    /// </summary>
     public virtual ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();
 }

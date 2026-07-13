@@ -28,14 +28,18 @@ public sealed class RequestContextPermit(
     private Badge? _resolvedBadge;
     private bool _resolving;
 
+    /// <inheritdoc />
     public string HostName => hostNameAccessor.HostName;
 
+    /// <inheritdoc />
     public bool IsAuthenticated =>
         _claimsPrincipal.Value?.Identity?.IsAuthenticated == true;
 
+    /// <inheritdoc />
     public string? SessionId =>
         httpContextAccessor.HttpContext?.Session?.Id;
 
+    /// <inheritdoc />
     public Guid UserId
     {
         get
@@ -45,6 +49,7 @@ public sealed class RequestContextPermit(
         }
     }
 
+    /// <inheritdoc />
     public Guid TenantId
     {
         get
@@ -54,6 +59,7 @@ public sealed class RequestContextPermit(
         }
     }
 
+    /// <inheritdoc />
     public Guid ChannelId
     {
         get
@@ -63,6 +69,7 @@ public sealed class RequestContextPermit(
         }
     }
 
+    /// <inheritdoc />
     public Badge Badge
     {
         get
@@ -77,6 +84,9 @@ public sealed class RequestContextPermit(
         }
     }
 
+    /// <summary>
+    /// Resolves and caches the request-scoped tenant, user, channel, and badge values.
+    /// </summary>
     private void EnsureResolved()
     {
         if (_resolvedTenantId.HasValue)

@@ -6,8 +6,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Data;
 
+/// <summary>
+/// Covers basic entity persistence behavior for <see cref="EntityContext"/>.
+/// </summary>
 public class EntityContextTests
 {
+    /// <summary>
+    /// Creates an isolated in-memory entity context.
+    /// </summary>
     private static EntityContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<EntityContext>()
@@ -16,6 +22,9 @@ public class EntityContextTests
         return new EntityContext(options);
     }
 
+    /// <summary>
+    /// Verifies agent state entities can be saved and queried.
+    /// </summary>
     [Fact]
     public async Task AgentStates_CanAddAndQuery()
     {
@@ -44,6 +53,9 @@ public class EntityContextTests
         result.ChannelId.Should().Be(entity.ChannelId);
     }
 
+    /// <summary>
+    /// Verifies duplicate tracked agent state keys are rejected.
+    /// </summary>
     [Fact]
     public void AgentStates_DuplicateKey_Throws()
     {
@@ -65,6 +77,9 @@ public class EntityContextTests
         act.Should().Throw<InvalidOperationException>();
     }
 
+    /// <summary>
+    /// Verifies session entities can be saved with related navigation data.
+    /// </summary>
     [Fact]
     public async Task Sessions_CanAddWithNavigationProps()
     {

@@ -10,6 +10,7 @@ namespace LeanKernel.Data.Design;
 /// </summary>
 public class EntityContextDesignFactory : IDesignTimeDbContextFactory<EntityContext>
 {
+    /// <inheritdoc />
     public EntityContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres")

@@ -7,8 +7,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Providers;
 
+/// <summary>
+/// Covers parsing and error handling for the GBrain MCP client.
+/// </summary>
 public class GBrainMcpClientTests
 {
+    /// <summary>
+    /// Verifies JSON RPC success payloads are returned as structured results.
+    /// </summary>
     [Fact]
     public async Task CallToolAsync_ReturnsStructuredResult_ForJsonResponse()
     {
@@ -23,6 +29,9 @@ public class GBrainMcpClientTests
         result!.Value.GetProperty("value").GetInt32().Should().Be(42);
     }
 
+    /// <summary>
+    /// Verifies MCP errors are surfaced as client exceptions.
+    /// </summary>
     [Fact]
     public async Task CallToolAsync_Throws_OnMcpError()
     {
@@ -35,6 +44,9 @@ public class GBrainMcpClientTests
         await act.Should().ThrowAsync<GBrainException>().WithMessage("boom");
     }
 
+    /// <summary>
+    /// Verifies server-sent event payloads are parsed correctly.
+    /// </summary>
     [Fact]
     public async Task CallToolAsync_ParsesSseTransport()
     {
@@ -47,6 +59,9 @@ public class GBrainMcpClientTests
         result!.Value.GetProperty("value").GetInt32().Should().Be(7);
     }
 
+    /// <summary>
+    /// Verifies tool envelopes containing JSON text are unwrapped.
+    /// </summary>
     [Fact]
     public async Task CallToolAsync_UnwrapsToolEnvelopeAndParsesTextJson()
     {
@@ -68,6 +83,9 @@ public class GBrainMcpClientTests
         result!.Value.GetProperty("score").GetDouble().Should().Be(0.9);
     }
 
+    /// <summary>
+    /// Verifies error tool envelopes are surfaced as client exceptions.
+    /// </summary>
     [Fact]
     public async Task CallToolAsync_Throws_WhenToolEnvelopeIsError()
     {
@@ -87,14 +105,24 @@ public class GBrainMcpClientTests
         await act.Should().ThrowAsync<GBrainException>().WithMessage("bad request");
     }
 
+    /// <summary>
+    /// Creates a client backed by the supplied HTTP handler.
+    /// </summary>
     private static GBrainMcpClient CreateClient(HttpMessageHandler handler)
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/mcp") };
         return new GBrainMcpClient(http, NullLogger<GBrainMcpClient>.Instance);
     }
 
+    /// <summary>
+    /// Returns a fixed HTTP response for MCP client tests.
+    /// </summary>
+    /// <param name="code">The status code to return.</param>
+    /// <param name="mediaType">The content media type to return.</param>
+    /// <param name="content">The response content to return.</param>
     private sealed class StubHandler(HttpStatusCode code, string mediaType, string content) : HttpMessageHandler
     {
+        /// <inheritdoc />
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var response = new HttpResponseMessage(code)

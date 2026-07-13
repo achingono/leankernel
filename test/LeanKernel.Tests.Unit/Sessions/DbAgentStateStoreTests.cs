@@ -10,8 +10,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Sessions;
 
+/// <summary>
+/// Covers database-backed agent session state storage.
+/// </summary>
 public class DbAgentStateStoreTests
 {
+    /// <summary>
+    /// Creates a store and backing context with generated ownership identifiers.
+    /// </summary>
     private static (DbAgentStateStore store, EntityContext context) CreateSut(
         Guid? tenantId = null,
         Guid? userId = null,
@@ -30,6 +36,9 @@ public class DbAgentStateStoreTests
         return (new DbAgentStateStore(entityContext, permit.Object), entityContext);
     }
 
+    /// <summary>
+    /// Creates a minimal chat client agent for session tests.
+    /// </summary>
     private static ChatClientAgent CreateStubAgent()
     {
         return new ChatClientAgent(
@@ -39,6 +48,9 @@ public class DbAgentStateStoreTests
             null);
     }
 
+    /// <summary>
+    /// Verifies missing persisted state returns a new agent session.
+    /// </summary>
     [Fact]
     public async Task GetSessionAsync_WhenNoEntity_ReturnsNewSession()
     {
@@ -51,6 +63,9 @@ public class DbAgentStateStoreTests
         session.Should().BeOfType<ChatClientAgentSession>();
     }
 
+    /// <summary>
+    /// Verifies saved sessions can be loaded again.
+    /// </summary>
     [Fact]
     public async Task SaveSessionAsync_ThenGetSessionAsync_RoundTrips()
     {
@@ -66,6 +81,9 @@ public class DbAgentStateStoreTests
         restored.Should().NotBeNull();
     }
 
+    /// <summary>
+    /// Verifies saving a session creates a backing database entity.
+    /// </summary>
     [Fact]
     public async Task SaveSessionAsync_CreatesEntityInDatabase()
     {
@@ -81,6 +99,9 @@ public class DbAgentStateStoreTests
         entity!.StateJson.Should().NotBeNullOrEmpty();
     }
 
+    /// <summary>
+    /// Verifies different conversations persist isolated state.
+    /// </summary>
     [Fact]
     public async Task SaveSessionAsync_DifferentConversations_AreIsolated()
     {
@@ -102,6 +123,9 @@ public class DbAgentStateStoreTests
         restored1.Should().NotBeSameAs(restored2);
     }
 
+    /// <summary>
+    /// Verifies ownership metadata is persisted with the saved session.
+    /// </summary>
     [Fact]
     public async Task SaveSessionAsync_PopulatesOwnershipMetadata()
     {

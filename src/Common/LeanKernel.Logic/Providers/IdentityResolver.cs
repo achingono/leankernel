@@ -13,6 +13,7 @@ public sealed class IdentityResolver(
     IDbContextFactory<EntityContext> dbContextFactory,
     ILogger<IdentityResolver> logger) : IIdentityResolver
 {
+    /// <inheritdoc />
     public async Task<TenantEntity?> ResolveTenantAsync(string hostName, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(hostName))
@@ -24,6 +25,7 @@ public sealed class IdentityResolver(
             .FirstOrDefaultAsync(t => t.HostName == hostName && t.IsActive, ct);
     }
 
+    /// <inheritdoc />
     public async Task<UserEntity> ResolveOrCreateUserAsync(ClaimsPrincipal principal, CancellationToken ct = default)
     {
         var issuer = principal.FindFirst(ClaimTypes.AuthenticationMethod)?.Value
@@ -96,6 +98,7 @@ public sealed class IdentityResolver(
         return user;
     }
 
+    /// <inheritdoc />
     public async Task<UserEntity> ResolveGuestUserAsync(Guid tenantId, string anonymousUserName, string sessionId, CancellationToken ct = default)
     {
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
@@ -137,6 +140,7 @@ public sealed class IdentityResolver(
         return guest;
     }
 
+    /// <inheritdoc />
     public async Task<ChannelEntity> ResolveOrCreateChannelAsync(string channelName, CancellationToken ct = default)
     {
         using var context = await dbContextFactory.CreateDbContextAsync(ct);

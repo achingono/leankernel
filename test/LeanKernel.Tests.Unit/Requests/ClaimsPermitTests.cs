@@ -5,8 +5,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Requests;
 
+/// <summary>
+/// Covers permit behavior derived from claims principals.
+/// </summary>
 public class ClaimsPermitTests
 {
+    /// <summary>
+    /// Verifies the subject claim is parsed as the user identifier.
+    /// </summary>
     [Fact]
     public void UserId_ParsesFromSubClaim()
     {
@@ -18,6 +24,9 @@ public class ClaimsPermitTests
         permit.UserId.Should().Be(userId);
     }
 
+    /// <summary>
+    /// Verifies badge fields are populated from name and email claims.
+    /// </summary>
     [Fact]
     public void Badge_ReadsNameAndEmail()
     {
@@ -31,6 +40,9 @@ public class ClaimsPermitTests
         permit.Badge.Email.Should().Be("jane@test");
     }
 
+    /// <summary>
+    /// Verifies anonymous users cannot perform operations.
+    /// </summary>
     [Fact]
     public void Can_ReturnsFalse_WhenNotAuthenticated()
     {
@@ -38,6 +50,9 @@ public class ClaimsPermitTests
         permit.Can(Operation.Read).Should().BeFalse();
     }
 
+    /// <summary>
+    /// Verifies administrator role or naming conventions grant access.
+    /// </summary>
     [Fact]
     public void Can_ReturnsTrue_ForAdminRole_OrAdminName()
     {
@@ -53,6 +68,9 @@ public class ClaimsPermitTests
         byName.Can(Operation.Delete).Should().BeTrue();
     }
 
+    /// <summary>
+    /// Verifies entity permissions are derived from right claims.
+    /// </summary>
     [Fact]
     public void Can_UsesRightClaimForEntityOperation()
     {
@@ -67,12 +85,19 @@ public class ClaimsPermitTests
         permit.Can(Operation.Create).Should().BeFalse();
     }
 
+    /// <summary>
+    /// Creates a permit with the supplied claims.
+    /// </summary>
     private static ClaimsPermit<object> CreatePermit(IEnumerable<Claim> claims, bool isAuthenticated)
     {
         var identity = new ClaimsIdentity(claims, isAuthenticated ? "Bearer" : string.Empty);
         return new ClaimsPermit<object>(new ClaimsPrincipal(identity), new HostNameAccessorStub("host"));
     }
 
+    /// <summary>
+    /// Provides a fixed host name for claims permit tests.
+    /// </summary>
+    /// <param name="hostName">The host name to return.</param>
     private sealed class HostNameAccessorStub(string hostName) : IHostNameAccessor
     {
         public string HostName => hostName;

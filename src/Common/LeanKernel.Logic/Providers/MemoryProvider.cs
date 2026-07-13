@@ -21,6 +21,7 @@ public class MemoryProvider(
 {
     private const int MaxMemoryResults = 10;
 
+    /// <inheritdoc />
     protected override async ValueTask<AIContext> ProvideAIContextAsync(
         InvokingContext context,
         CancellationToken cancellationToken = default)
@@ -68,6 +69,7 @@ public class MemoryProvider(
         }
     }
 
+    /// <inheritdoc />
     protected override ValueTask StoreAIContextAsync(
         InvokedContext context,
         CancellationToken cancellationToken = default)
@@ -75,6 +77,9 @@ public class MemoryProvider(
         return new ValueTask(StoreCoreAsync(context, cancellationToken));
     }
 
+    /// <summary>
+    /// Extracts, normalizes, and persists new facts from the latest invocation.
+    /// </summary>
     private async Task StoreCoreAsync(InvokedContext context, CancellationToken cancellationToken)
     {
         var scope = new MemoryScope
@@ -147,6 +152,9 @@ public class MemoryProvider(
         }
     }
 
+    /// <summary>
+    /// Builds a compact one-line summary for a stored memory page.
+    /// </summary>
     private string BuildCompactSummary(string key, string content)
     {
         try

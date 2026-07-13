@@ -5,8 +5,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Memory;
 
+/// <summary>
+/// Covers memory field repair and normalization behavior.
+/// </summary>
 public class MemoryRepairAndNormalizerTests
 {
+    /// <summary>
+    /// Verifies repair only fills fields that are currently missing.
+    /// </summary>
     [Fact]
     public async Task RepairService_FillsOnlyMissingFields()
     {
@@ -37,6 +43,9 @@ public class MemoryRepairAndNormalizerTests
         repaired.Should().ContainKey("Why");
     }
 
+    /// <summary>
+    /// Verifies disabled or invalid repair output yields no repaired fields.
+    /// </summary>
     [Fact]
     public async Task RepairService_InvalidOrDisabled_ReturnsEmpty()
     {
@@ -50,6 +59,9 @@ public class MemoryRepairAndNormalizerTests
         two.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Verifies normalization produces canonical content and a scope-relative key.
+    /// </summary>
     [Fact]
     public async Task Normalizer_ProducesCanonicalContentAndScopeRelativeKey()
     {
@@ -88,6 +100,9 @@ public class MemoryRepairAndNormalizerTests
         result.MissingFields.Should().Contain("Why");
     }
 
+    /// <summary>
+    /// Creates a minimal learned fact snapshot for repair tests.
+    /// </summary>
     private static MemoryPageSnapshot SeedSnapshot()
     {
         return new MemoryPageSnapshot(
@@ -107,10 +122,16 @@ public class MemoryRepairAndNormalizerTests
             []);
     }
 
+    /// <summary>
+    /// Returns a configurable reasoning response for repair tests.
+    /// </summary>
+    /// <param name="response">The completion text to return.</param>
+    /// <param name="enabled">Whether the model reports itself as enabled.</param>
     private sealed class TestReasoningModel(string? response, bool enabled) : IReasoningModel
     {
         public bool Enabled => enabled;
 
+        /// <inheritdoc />
         public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, int maxOutputTokens, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(response);

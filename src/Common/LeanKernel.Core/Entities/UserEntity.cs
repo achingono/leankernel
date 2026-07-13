@@ -3,6 +3,9 @@ using LeanKernel.Entities;
 
 namespace LeanKernel.Entities;
 
+/// <summary>
+/// Represents a persisted user identity resolved from an external principal or anonymous session.
+/// </summary>
 public class UserEntity : IEntity, IAuditable, IRecyclable
 {
     public Guid Id { get; set; }
@@ -59,5 +62,8 @@ public class UserEntity : IEntity, IAuditable, IRecyclable
     /// </summary>
     public bool IsGuest { get; set; }
 
+    /// <summary>
+    /// Gets or sets the sessions associated with this user.
+    /// </summary>
     public virtual ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();
 }

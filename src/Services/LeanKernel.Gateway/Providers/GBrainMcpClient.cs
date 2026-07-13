@@ -13,6 +13,10 @@ public interface IGBrainMcpClient
     /// <summary>
     /// Calls a GBrain MCP tool by name with the given arguments.
     /// </summary>
+    /// <param name="toolName">The MCP tool name to invoke.</param>
+    /// <param name="args">The tool arguments to serialize into the MCP request payload.</param>
+    /// <param name="ct">The cancellation token for the operation.</param>
+    /// <returns>The unwrapped tool result payload, if one is returned.</returns>
     Task<JsonElement?> CallToolAsync(string toolName, object? args = null, CancellationToken ct = default);
 }
 
@@ -28,6 +32,11 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
     private readonly ILogger<GBrainMcpClient> _logger;
     private int _requestId;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GBrainMcpClient"/> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client used to communicate with the GBrain MCP endpoint.</param>
+    /// <param name="logger">The logger for transport diagnostics.</param>
     public GBrainMcpClient(HttpClient httpClient, ILogger<GBrainMcpClient> logger)
     {
         _httpClient = httpClient;
@@ -37,6 +46,10 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
     /// <summary>
     /// Calls a GBrain MCP tool by name with the given arguments.
     /// </summary>
+    /// <param name="toolName">The MCP tool name to invoke.</param>
+    /// <param name="args">The tool arguments to serialize into the MCP request payload.</param>
+    /// <param name="ct">The cancellation token for the operation.</param>
+    /// <returns>The unwrapped tool result payload, if one is returned.</returns>
     public async Task<JsonElement?> CallToolAsync(string toolName, object? args = null, CancellationToken ct = default)
     {
         var requestId = Interlocked.Increment(ref _requestId);
@@ -70,6 +83,12 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
         return UnwrapToolResult(result.Result.Value);
     }
 
+    /// <summary>
+    /// Sends a JSON-RPC MCP request and deserializes the response.
+    /// </summary>
+    /// <param name="request">The MCP request payload.</param>
+    /// <param name="ct">The cancellation token for the operation.</param>
+    /// <returns>The deserialized MCP response, if one is returned.</returns>
     private async Task<McpResponse?> SendMcpRequestAsync(McpRequest request, CancellationToken ct)
     {
         using var response = await _httpClient.PostAsJsonAsync(string.Empty, request, SerializerOptions, ct).ConfigureAwait(false);
@@ -85,6 +104,12 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
         return await response.Content.ReadFromJsonAsync<McpResponse>(SerializerOptions, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reads the terminal message from an SSE-formatted MCP response.
+    /// </summary>
+    /// <param name="response">The HTTP response containing the SSE stream.</param>
+    /// <param name="ct">The cancellation token for the operation.</param>
+    /// <returns>The last MCP response emitted in the stream, if any.</returns>
     private static async Task<McpResponse?> ReadSseResponseAsync(HttpResponseMessage response, CancellationToken ct)
     {
         using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
@@ -111,6 +136,11 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
         return lastResponse;
     }
 
+    /// <summary>
+    /// Extracts the useful tool payload from the MCP tool result envelope.
+    /// </summary>
+    /// <param name="result">The raw MCP result element.</param>
+    /// <returns>The structured tool payload, text payload, or <c>null</c> when the result is empty.</returns>
     private static JsonElement? UnwrapToolResult(JsonElement result)
     {
         if (result.ValueKind != JsonValueKind.Object)
@@ -166,6 +196,9 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
     }
 }
 
+/// <summary>
+/// Represents a JSON-RPC MCP request payload.
+/// </summary>
 internal sealed class McpRequest
 {
     [JsonPropertyName("jsonrpc")]
@@ -181,6 +214,9 @@ internal sealed class McpRequest
     public object? Params { get; set; }
 }
 
+/// <summary>
+/// Represents the parameters for an MCP tool call.
+/// </summary>
 internal sealed class McpToolCallParams
 {
     [JsonPropertyName("name")]
@@ -190,6 +226,9 @@ internal sealed class McpToolCallParams
     public object? Arguments { get; set; }
 }
 
+/// <summary>
+/// Represents a JSON-RPC MCP response payload.
+/// </summary>
 internal sealed class McpResponse
 {
     [JsonPropertyName("jsonrpc")]
@@ -205,6 +244,9 @@ internal sealed class McpResponse
     public McpError? Error { get; set; }
 }
 
+/// <summary>
+/// Represents an error returned by the MCP transport.
+/// </summary>
 internal sealed class McpError
 {
     [JsonPropertyName("code")]
@@ -214,6 +256,9 @@ internal sealed class McpError
     public string Message { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Represents the standard MCP tool result envelope.
+/// </summary>
 internal sealed class McpToolResult
 {
     [JsonPropertyName("content")]
@@ -225,6 +270,10 @@ internal sealed class McpToolResult
     [JsonPropertyName("isError")]
     public bool IsError { get; set; }
 
+    /// <summary>
+    /// Resolves a readable error message from the tool result content.
+    /// </summary>
+    /// <returns>The extracted error message, or a default fallback message.</returns>
     public string GetMessage()
     {
         var text = Content.FirstOrDefault(item => item.Type.Equals("text", StringComparison.OrdinalIgnoreCase))?.Text;
@@ -232,6 +281,9 @@ internal sealed class McpToolResult
     }
 }
 
+/// <summary>
+/// Represents a single content item returned in an MCP tool result.
+/// </summary>
 internal sealed class McpContentItem
 {
     [JsonPropertyName("type")]

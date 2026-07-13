@@ -60,6 +60,11 @@ public interface IMemoryClient
     /// <summary>
     /// Searches for memories matching the query within the given scope.
     /// </summary>
+    /// <param name="scope">The scope to search within.</param>
+    /// <param name="query">The query text to search for.</param>
+    /// <param name="maxResults">The maximum number of results to return.</param>
+    /// <param name="ct">The token used to cancel the operation.</param>
+    /// <returns>The matching memory items.</returns>
     Task<IReadOnlyList<MemoryItem>> SearchMemoriesAsync(
         MemoryScope scope,
         string query,
@@ -69,6 +74,10 @@ public interface IMemoryClient
     /// <summary>
     /// Saves a memory item within the given scope.
     /// </summary>
+    /// <param name="scope">The scope to save within.</param>
+    /// <param name="key">The scope-relative memory key.</param>
+    /// <param name="content">The memory content to persist.</param>
+    /// <param name="ct">The token used to cancel the operation.</param>
     Task SaveMemoryAsync(
         MemoryScope scope,
         string key,
@@ -81,6 +90,7 @@ public interface IMemoryClient
 /// </summary>
 public sealed class StubMemoryClient : IMemoryClient
 {
+    /// <inheritdoc />
     public Task<IReadOnlyList<MemoryItem>> SearchMemoriesAsync(
         MemoryScope scope,
         string query,
@@ -90,6 +100,7 @@ public sealed class StubMemoryClient : IMemoryClient
         return Task.FromResult<IReadOnlyList<MemoryItem>>(Array.Empty<MemoryItem>());
     }
 
+    /// <inheritdoc />
     public Task SaveMemoryAsync(
         MemoryScope scope,
         string key,

@@ -11,6 +11,7 @@ namespace LeanKernel.Gateway.Providers;
 /// </summary>
 public sealed class IdentityIsolationKeyProvider(IPermit permit) : SessionIsolationKeyProvider
 {
+    /// <inheritdoc />
     public override ValueTask<string?> GetSessionIsolationKeyAsync(CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;

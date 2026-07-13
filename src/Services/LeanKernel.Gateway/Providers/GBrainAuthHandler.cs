@@ -19,6 +19,11 @@ public sealed class GBrainAuthHandler : DelegatingHandler
 
     internal const string TokenFilePath = "/app/data/gbrain/.engine-token";
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GBrainAuthHandler"/> class.
+    /// </summary>
+    /// <param name="config">Provides the configured GBrain settings.</param>
+    /// <param name="logger">The logger for token resolution diagnostics.</param>
     public GBrainAuthHandler(
         IOptions<GBrainSettings> config,
         ILogger<GBrainAuthHandler> logger)
@@ -27,6 +32,7 @@ public sealed class GBrainAuthHandler : DelegatingHandler
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <inheritdoc />
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var token = ResolveToken();
@@ -42,6 +48,10 @@ public sealed class GBrainAuthHandler : DelegatingHandler
         return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Resolves the bearer token from shared token files or configured settings.
+    /// </summary>
+    /// <returns>The resolved bearer token, or <c>null</c> when no token is available.</returns>
     private string? ResolveToken()
     {
         foreach (var tokenPath in TokenFileCandidates)
@@ -66,6 +76,11 @@ public sealed class GBrainAuthHandler : DelegatingHandler
         return null;
     }
 
+    /// <summary>
+    /// Attempts to read and cache a bearer token from the specified file.
+    /// </summary>
+    /// <param name="path">The token file path to inspect.</param>
+    /// <returns>The token value, or <c>null</c> when the file is missing, empty, or unreadable.</returns>
     private string? TryReadTokenFile(string path)
     {
         if (_cachedToken is not null)

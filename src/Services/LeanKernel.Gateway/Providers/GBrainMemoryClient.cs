@@ -14,6 +14,11 @@ public sealed class GBrainMemoryClient : IMemoryClient
     private readonly IGBrainMcpClient _client;
     private readonly ILogger<GBrainMemoryClient> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GBrainMemoryClient"/> class.
+    /// </summary>
+    /// <param name="client">The low-level MCP client used to call GBrain tools.</param>
+    /// <param name="logger">The logger for memory operation diagnostics.</param>
     public GBrainMemoryClient(IGBrainMcpClient client, ILogger<GBrainMemoryClient> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
@@ -72,11 +77,22 @@ public sealed class GBrainMemoryClient : IMemoryClient
         }, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Builds the GBrain page slug used to persist a scoped memory item.
+    /// </summary>
+    /// <param name="scope">The memory scope being persisted.</param>
+    /// <param name="key">The caller-provided memory key.</param>
+    /// <returns>The scoped GBrain slug.</returns>
     private static string BuildScopedSlug(MemoryScope scope, string key)
     {
         return $"memory/{scope.TenantId}/{scope.UserId}/{scope.ChannelId}/{key}";
     }
 
+    /// <summary>
+    /// Deserializes GBrain search results into LeanKernel memory items.
+    /// </summary>
+    /// <param name="result">The raw JSON payload returned by the search tool.</param>
+    /// <returns>The mapped memory items.</returns>
     private static IReadOnlyList<MemoryItem> DeserializeSearchResults(JsonElement result)
     {
         if (result.ValueKind == JsonValueKind.Array)
@@ -89,6 +105,11 @@ public sealed class GBrainMemoryClient : IMemoryClient
         return searchResult?.Results?.Select(MapToMemoryItem).ToList() ?? [];
     }
 
+    /// <summary>
+    /// Maps a GBrain search item into a LeanKernel <see cref="MemoryItem"/>.
+    /// </summary>
+    /// <param name="item">The GBrain search item to map.</param>
+    /// <returns>The mapped memory item.</returns>
     private static MemoryItem MapToMemoryItem(GBrainMemorySearchItem item) => new()
     {
         Key = item.Key,
@@ -98,12 +119,18 @@ public sealed class GBrainMemoryClient : IMemoryClient
     };
 }
 
+/// <summary>
+/// Represents the top-level payload returned by GBrain memory search responses.
+/// </summary>
 internal sealed class GBrainMemorySearchResult
 {
     [JsonPropertyName("results")]
     public List<GBrainMemorySearchItem>? Results { get; set; }
 }
 
+/// <summary>
+/// Represents a single memory search result item returned by GBrain.
+/// </summary>
 internal sealed class GBrainMemorySearchItem
 {
     [JsonPropertyName("slug")]

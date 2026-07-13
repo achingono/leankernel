@@ -10,8 +10,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Identity;
 
+/// <summary>
+/// Covers tenant, user, and channel resolution behavior.
+/// </summary>
 public class IdentityResolverTests
 {
+    /// <summary>
+    /// Verifies blank host names do not resolve a tenant.
+    /// </summary>
     [Fact]
     public async Task ResolveTenantAsync_BlankHost_ReturnsNull()
     {
@@ -22,6 +28,9 @@ public class IdentityResolverTests
         tenant.Should().BeNull();
     }
 
+    /// <summary>
+    /// Verifies only active tenants are returned for a host.
+    /// </summary>
     [Fact]
     public async Task ResolveTenantAsync_ReturnsOnlyActiveTenant()
     {
@@ -42,6 +51,9 @@ public class IdentityResolverTests
         (await resolver.ResolveTenantAsync("b.test"))!.HostName.Should().Be("b.test");
     }
 
+    /// <summary>
+    /// Verifies users are created once and then reused.
+    /// </summary>
     [Fact]
     public async Task ResolveOrCreateUserAsync_CreatesAndFindsUser()
     {
@@ -57,6 +69,9 @@ public class IdentityResolverTests
         db.Users.Count().Should().Be(1);
     }
 
+    /// <summary>
+    /// Verifies missing subject claims are rejected.
+    /// </summary>
     [Fact]
     public async Task ResolveOrCreateUserAsync_WithoutSubject_Throws()
     {
@@ -67,6 +82,9 @@ public class IdentityResolverTests
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
+    /// <summary>
+    /// Verifies guest users and channels are created once and then reused.
+    /// </summary>
     [Fact]
     public async Task ResolveGuestAndChannel_CreateThenReuse()
     {
@@ -84,6 +102,9 @@ public class IdentityResolverTests
         db.Channels.Count().Should().Be(1);
     }
 
+    /// <summary>
+    /// Creates an identity resolver backed by an isolated in-memory context.
+    /// </summary>
     private static IdentityResolver CreateResolver(out EntityContext db)
     {
         var options = new DbContextOptionsBuilder<EntityContext>()
@@ -93,6 +114,9 @@ public class IdentityResolverTests
         return new IdentityResolver(new TestDbContextFactory(options), NullLogger<IdentityResolver>.Instance);
     }
 
+    /// <summary>
+    /// Creates a principal with the claims used by these tests.
+    /// </summary>
     private static ClaimsPrincipal Principal(string sub, string issuer, string name, string email)
     {
         var claims = new List<Claim>

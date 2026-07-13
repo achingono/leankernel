@@ -2,6 +2,9 @@ using System.Diagnostics.Metrics;
 
 namespace LeanKernel.Logic.Memory;
 
+/// <summary>
+/// Normalizes seed memory pages into structured learned pages with dimensions and related links.
+/// </summary>
 public sealed class MemoryPageNormalizer
 {
     private static readonly Meter Meter = new("LeanKernel.Logic.Memory", "1.0.0");
@@ -15,6 +18,9 @@ public sealed class MemoryPageNormalizer
     private readonly MemoryPageRenderer _renderer;
     private readonly MemoryPageKeyBuilder _keyBuilder;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MemoryPageNormalizer"/> class.
+    /// </summary>
     public MemoryPageNormalizer(
         MemoryDimensionClassifier dimensionClassifier,
         MemoryPageLinker linker,
@@ -31,6 +37,14 @@ public sealed class MemoryPageNormalizer
         _keyBuilder = keyBuilder;
     }
 
+    /// <summary>
+    /// Normalizes a memory page snapshot and enriches it with repaired fields, dimensions, and links.
+    /// </summary>
+    /// <param name="snapshot">The snapshot to normalize.</param>
+    /// <param name="relatedPages">Related pages used for repair and linking.</param>
+    /// <param name="enableRepair">A value indicating whether missing fields should be repaired.</param>
+    /// <param name="cancellationToken">The token used to cancel the operation.</param>
+    /// <returns>The normalization result.</returns>
     public async Task<MemoryPageNormalizationResult> NormalizeAsync(
         MemoryPageSnapshot snapshot,
         IReadOnlyList<MemoryPageSnapshot> relatedPages,
@@ -111,6 +125,11 @@ public sealed class MemoryPageNormalizer
             key);
     }
 
+    /// <summary>
+    /// Computes the list of missing 5W1H fields.
+    /// </summary>
+    /// <param name="fields">The field values to inspect.</param>
+    /// <returns>The missing field names.</returns>
     private static List<string> MissingFields(IReadOnlyDictionary<string, string?> fields)
     {
         return MemoryPageFields.FiveWOneH

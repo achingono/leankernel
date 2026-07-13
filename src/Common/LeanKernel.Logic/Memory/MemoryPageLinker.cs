@@ -3,11 +3,23 @@ using System.Text;
 
 namespace LeanKernel.Logic.Memory;
 
+/// <summary>
+/// Builds deterministic links between related memory pages.
+/// </summary>
 public sealed class MemoryPageLinker
 {
     private static readonly Meter Meter = new("LeanKernel.Logic.Memory", "1.0.0");
     private static readonly Histogram<int> LinkCountHistogram = Meter.CreateHistogram<int>("memory.links.count");
 
+    /// <summary>
+    /// Builds related links for a target page from a candidate set.
+    /// </summary>
+    /// <param name="target">The target page to link from.</param>
+    /// <param name="candidates">The candidate pages to score.</param>
+    /// <param name="fields">The target page fields.</param>
+    /// <param name="primaryDimension">The target page primary dimension.</param>
+    /// <param name="secondaryDimensions">The target page secondary dimensions.</param>
+    /// <returns>The highest scoring related links.</returns>
     public IReadOnlyList<MemoryPageLink> BuildLinks(
         MemoryPageSnapshot target,
         IReadOnlyList<MemoryPageSnapshot> candidates,
@@ -43,6 +55,14 @@ public sealed class MemoryPageLinker
         return links;
     }
 
+    /// <summary>
+    /// Scores a single candidate page for potential linkage.
+    /// </summary>
+    /// <param name="target">The target page.</param>
+    /// <param name="candidate">The candidate page.</param>
+    /// <param name="primaryDimension">The target primary dimension.</param>
+    /// <param name="secondaryDimensions">The target secondary dimensions.</param>
+    /// <returns>The candidate score and reasons, or <c>null</c> when the candidate should be excluded.</returns>
     private static (int Score, HashSet<string> Reasons)? ScoreCandidate(
         MemoryPageSnapshot target,
         MemoryPageSnapshot candidate,
@@ -65,6 +85,9 @@ public sealed class MemoryPageLinker
         return score > 0 ? (score, reasons) : null;
     }
 
+    /// <summary>
+    /// Scores explicit cross-page relationships.
+    /// </summary>
     private static int ScoreExplicitRelationship(MemoryPageSnapshot target, MemoryPageSnapshot candidate, ISet<string> reasons)
     {
         if (!target.ExplicitLinks.Contains(candidate.Key, StringComparer.Ordinal)
@@ -79,6 +102,9 @@ public sealed class MemoryPageLinker
         return 100;
     }
 
+    /// <summary>
+    /// Scores whether two pages belong to the same session or turn.
+    /// </summary>
     private static int ScoreSessionRelationship(MemoryPageSnapshot target, MemoryPageSnapshot candidate, ISet<string> reasons)
     {
         if (string.IsNullOrWhiteSpace(target.SessionId)
@@ -100,6 +126,9 @@ public sealed class MemoryPageLinker
         return score;
     }
 
+    /// <summary>
+    /// Scores the lexical similarity between two normalized fact strings.
+    /// </summary>
     private static int ScoreSimilarity(string left, string right, ISet<string> reasons)
     {
         var similarity = Similarity(left, right);
@@ -112,6 +141,9 @@ public sealed class MemoryPageLinker
         return (int)Math.Round(similarity * 30, MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>
+    /// Scores whether the candidate dimensions align with the target dimensions.
+    /// </summary>
     private static int ScoreDimensionRelationship(
         string candidatePrimary,
         string primaryDimension,
@@ -135,6 +167,9 @@ public sealed class MemoryPageLinker
         return score;
     }
 
+    /// <summary>
+    /// Computes a Jaccard-style similarity score over tokenized fact text.
+    /// </summary>
     private static double Similarity(string left, string right)
     {
         if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
@@ -154,6 +189,9 @@ public sealed class MemoryPageLinker
         return unionCount == 0 ? 0 : (double)intersectionCount / unionCount;
     }
 
+    /// <summary>
+    /// Tokenizes a string into lowercase alphanumeric terms.
+    /// </summary>
     private static HashSet<string> Tokens(string value)
     {
         var tokens = new HashSet<string>(StringComparer.Ordinal);

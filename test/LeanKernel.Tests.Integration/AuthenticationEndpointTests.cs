@@ -13,11 +13,17 @@ public class AuthenticationEndpointTests : IClassFixture<GatewayTestApplicationF
 {
     private readonly HttpClient _client;
 
+    /// <summary>
+    /// Creates a test instance backed by the shared gateway factory.
+    /// </summary>
     public AuthenticationEndpointTests(GatewayTestApplicationFactory factory)
     {
         _client = factory.CreateClient();
     }
 
+    /// <summary>
+    /// Verifies the health endpoint is publicly reachable.
+    /// </summary>
     [Fact]
     public async Task HealthEndpoint_IsPublicAndReturnsOk()
     {
@@ -26,6 +32,9 @@ public class AuthenticationEndpointTests : IClassFixture<GatewayTestApplicationF
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    /// <summary>
+    /// Verifies the conversations route is available.
+    /// </summary>
     [Fact]
     public async Task ConversationsEndpoint_IsReachable()
     {
@@ -35,6 +44,9 @@ public class AuthenticationEndpointTests : IClassFixture<GatewayTestApplicationF
         response.StatusCode.Should().NotBe(HttpStatusCode.InternalServerError);
     }
 
+    /// <summary>
+    /// Verifies the responses route is available.
+    /// </summary>
     [Fact]
     public async Task ResponsesEndpoint_IsReachable()
     {
@@ -49,6 +61,9 @@ public class AuthenticationEndpointTests : IClassFixture<GatewayTestApplicationF
         response.StatusCode.Should().NotBe(HttpStatusCode.InternalServerError);
     }
 
+    /// <summary>
+    /// Verifies unsupported conversation verbs are rejected.
+    /// </summary>
     [Theory]
     [InlineData("/v1/conversations", "DELETE")]
     [InlineData("/v1/conversations", "PUT")]

@@ -5,15 +5,24 @@ using Xunit;
 
 namespace LeanKernel.Tests.Integration;
 
+/// <summary>
+/// Covers the conversations endpoints exposed by the test host.
+/// </summary>
 public class ConversationsEndpointTests : IClassFixture<GatewayTestApplicationFactory>
 {
     private readonly HttpClient _client;
 
+    /// <summary>
+    /// Creates a test instance backed by the shared gateway factory.
+    /// </summary>
     public ConversationsEndpointTests(GatewayTestApplicationFactory factory)
     {
         _client = factory.CreateClient();
     }
 
+    /// <summary>
+    /// Verifies listing conversations requires an agent identifier.
+    /// </summary>
     [Fact]
     public async Task GetConversations_WithoutAgentId_ReturnsBadRequest()
     {
@@ -22,6 +31,9 @@ public class ConversationsEndpointTests : IClassFixture<GatewayTestApplicationFa
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    /// <summary>
+    /// Verifies listing conversations reaches the endpoint for a valid query.
+    /// </summary>
     [Fact]
     public async Task GetConversations_WithAgentId_ReturnsOkOrNotFound()
     {
@@ -30,6 +42,9 @@ public class ConversationsEndpointTests : IClassFixture<GatewayTestApplicationFa
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
     }
 
+    /// <summary>
+    /// Verifies fetching an unknown conversation returns an error status.
+    /// </summary>
     [Fact]
     public async Task GetConversation_ByNonexistentId_ReturnsNotFound()
     {

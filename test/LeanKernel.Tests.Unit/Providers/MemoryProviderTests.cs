@@ -10,8 +10,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Providers;
 
+/// <summary>
+/// Covers basic contracts and construction for memory provider types.
+/// </summary>
 public class MemoryProviderTests
 {
+    /// <summary>
+    /// Creates a permit stub with generated identifiers unless provided.
+    /// </summary>
     private static IPermit CreatePermit(
         Guid? tenantId = null,
         Guid? userId = null,
@@ -25,6 +31,9 @@ public class MemoryProviderTests
         return mock.Object;
     }
 
+    /// <summary>
+    /// Verifies the stub memory client returns no search results.
+    /// </summary>
     [Fact]
     public async Task StubMemoryClient_SearchMemories_ReturnsEmptyResults()
     {
@@ -41,6 +50,9 @@ public class MemoryProviderTests
         results.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Verifies the stub memory client accepts save requests.
+    /// </summary>
     [Fact]
     public async Task StubMemoryClient_SaveMemory_Completes()
     {
@@ -57,6 +69,9 @@ public class MemoryProviderTests
         await act.Should().NotThrowAsync();
     }
 
+    /// <summary>
+    /// Verifies memory scope properties retain assigned values.
+    /// </summary>
     [Fact]
     public void MemoryScope_Properties_SetCorrectly()
     {
@@ -78,6 +93,9 @@ public class MemoryProviderTests
         scope.Namespace.Should().Be("test-ns");
     }
 
+    /// <summary>
+    /// Verifies memory item properties retain assigned values.
+    /// </summary>
     [Fact]
     public void MemoryItem_Properties_SetCorrectly()
     {
@@ -95,6 +113,9 @@ public class MemoryProviderTests
         item.Source.Should().Be("gbrain");
     }
 
+    /// <summary>
+    /// Verifies the memory provider can be constructed with valid dependencies.
+    /// </summary>
     [Fact]
     public void MemoryProvider_CanBeConstructed()
     {
@@ -127,6 +148,9 @@ public class MemoryProviderTests
         act.Should().NotThrow();
     }
 
+    /// <summary>
+    /// Verifies the stub memory client supports concurrent searches.
+    /// </summary>
     [Fact]
     public async Task StubMemoryClient_Concurrent_SearchMemories_IsThreadSafe()
     {
@@ -148,18 +172,27 @@ public class MemoryProviderTests
     }
 }
 
+/// <summary>
+/// Provides a disabled reasoning model for memory provider tests.
+/// </summary>
+/// <param name="enabled">Whether the model reports itself as enabled.</param>
 file sealed class FakeReasoningModel(bool enabled) : IReasoningModel
 {
     public bool Enabled => enabled;
 
+    /// <inheritdoc />
     public Task<string?> CompleteAsync(string systemPrompt, string userPrompt, int maxOutputTokens, CancellationToken cancellationToken = default)
     {
         return Task.FromResult<string?>(null);
     }
 }
 
+/// <summary>
+/// Returns an empty fact array for extraction-related tests.
+/// </summary>
 file sealed class FakeChatClient : IChatClient
 {
+    /// <inheritdoc />
     public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         var response = new ChatResponse([
@@ -168,15 +201,18 @@ file sealed class FakeChatClient : IChatClient
         return Task.FromResult(response);
     }
 
+    /// <inheritdoc />
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         return AsyncEnumerable.Empty<ChatResponseUpdate>();
     }
 
+    /// <inheritdoc />
     public object? GetService(Type serviceType, object? serviceKey = null)
     {
         return null;
     }
 
+    /// <inheritdoc />
     public void Dispose() => GC.SuppressFinalize(this);
 }

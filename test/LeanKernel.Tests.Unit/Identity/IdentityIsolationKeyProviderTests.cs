@@ -8,8 +8,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Identity;
 
+/// <summary>
+/// Covers isolation key generation for identity-scoped sessions.
+/// </summary>
 public class IdentityIsolationKeyProviderTests
 {
+    /// <summary>
+    /// Creates a permit stub with the supplied identity values.
+    /// </summary>
     private static IPermit CreatePermit(
         Guid tenantId,
         Guid userId,
@@ -26,6 +32,9 @@ public class IdentityIsolationKeyProviderTests
         return mock.Object;
     }
 
+    /// <summary>
+    /// Verifies authenticated users receive tenant, channel, and user scoping.
+    /// </summary>
     [Fact]
     public async Task GetSessionIsolationKey_Authenticated_ReturnsTenantChannelUser()
     {
@@ -40,6 +49,9 @@ public class IdentityIsolationKeyProviderTests
         key.Should().Be($"{tenantId}|{channelId}|{userId}");
     }
 
+    /// <summary>
+    /// Verifies anonymous users include the session identifier in the isolation key.
+    /// </summary>
     [Fact]
     public async Task GetSessionIsolationKey_Anonymous_ReturnsTenantChannelUserSession()
     {
@@ -55,6 +67,9 @@ public class IdentityIsolationKeyProviderTests
         key.Should().Be($"{tenantId}|{channelId}|{userId}|{sessionId}");
     }
 
+    /// <summary>
+    /// Verifies anonymous users without a session cannot produce a key.
+    /// </summary>
     [Fact]
     public async Task GetSessionIsolationKey_Anonymous_NoSession_Throws()
     {
@@ -66,6 +81,9 @@ public class IdentityIsolationKeyProviderTests
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
+    /// <summary>
+    /// Verifies tenant changes produce different isolation keys.
+    /// </summary>
     [Fact]
     public async Task GetSessionIsolationKey_DifferentTenants_ProduceDifferentKeys()
     {
@@ -80,6 +98,9 @@ public class IdentityIsolationKeyProviderTests
         keyA.Should().NotBe(keyB);
     }
 
+    /// <summary>
+    /// Verifies channel changes produce different isolation keys.
+    /// </summary>
     [Fact]
     public async Task GetSessionIsolationKey_DifferentChannels_ProduceDifferentKeys()
     {

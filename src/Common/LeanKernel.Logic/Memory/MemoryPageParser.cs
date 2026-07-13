@@ -2,8 +2,17 @@ using System.Globalization;
 
 namespace LeanKernel.Logic.Memory;
 
+/// <summary>
+/// Parses stored memory page markdown into structured memory models.
+/// </summary>
 public sealed class MemoryPageParser
 {
+    /// <summary>
+    /// Parses a memory page key and content payload into a structured snapshot.
+    /// </summary>
+    /// <param name="key">The memory item key.</param>
+    /// <param name="content">The stored memory page content.</param>
+    /// <returns>The parsed memory page snapshot.</returns>
     public MemoryPageSnapshot Parse(string key, string content)
     {
         var normalized = content.Replace("\r\n", "\n", StringComparison.Ordinal);
@@ -40,6 +49,11 @@ public sealed class MemoryPageParser
             isRetired);
     }
 
+    /// <summary>
+    /// Extracts metadata entries from list item lines in the page.
+    /// </summary>
+    /// <param name="lines">The page lines to inspect.</param>
+    /// <returns>The extracted metadata dictionary.</returns>
     private static Dictionary<string, string> ExtractMetadata(IEnumerable<string> lines)
     {
         var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -67,6 +81,12 @@ public sealed class MemoryPageParser
         return metadata;
     }
 
+    /// <summary>
+    /// Parses the 5W1H field values from the page body and metadata.
+    /// </summary>
+    /// <param name="lines">The page lines to inspect.</param>
+    /// <param name="metadata">The previously extracted metadata dictionary.</param>
+    /// <returns>The parsed field dictionary.</returns>
     private static IReadOnlyDictionary<string, string?> ParseFields(IReadOnlyList<string> lines, IReadOnlyDictionary<string, string> metadata)
     {
         var result = new Dictionary<string, string?>(StringComparer.Ordinal);
@@ -103,6 +123,13 @@ public sealed class MemoryPageParser
         return result;
     }
 
+    /// <summary>
+    /// Parses the primary and secondary dimensions assigned to the page.
+    /// </summary>
+    /// <param name="lines">The page lines to inspect.</param>
+    /// <param name="metadata">The metadata dictionary for fallback values.</param>
+    /// <param name="fields">The parsed 5W1H field values.</param>
+    /// <returns>The parsed primary and secondary dimensions.</returns>
     private static (string Primary, IReadOnlyList<string> Secondary) ParseDimensions(
         IReadOnlyList<string> lines,
         IReadOnlyDictionary<string, string> metadata,
@@ -149,6 +176,11 @@ public sealed class MemoryPageParser
         return (primary, secondary);
     }
 
+    /// <summary>
+    /// Parses explicit related links from the page content.
+    /// </summary>
+    /// <param name="lines">The page lines to inspect.</param>
+    /// <returns>The parsed page links.</returns>
     private static IReadOnlyList<MemoryPageLink> ParseLinks(IReadOnlyList<string> lines)
     {
         var links = new List<MemoryPageLink>();
@@ -174,6 +206,11 @@ public sealed class MemoryPageParser
         return links;
     }
 
+    /// <summary>
+    /// Extracts the fact text section from the page content.
+    /// </summary>
+    /// <param name="lines">The page lines to inspect.</param>
+    /// <returns>The extracted fact text.</returns>
     private static string ExtractFactText(IReadOnlyList<string> lines)
     {
         var factLines = new List<string>();
@@ -209,18 +246,33 @@ public sealed class MemoryPageParser
         return string.Join("\n", factLines).Trim();
     }
 
+    /// <summary>
+    /// Determines whether the supplied line begins the fact section.
+    /// </summary>
+    /// <param name="value">The line value to inspect.</param>
+    /// <returns><c>true</c> when the line is a fact heading; otherwise, <c>false</c>.</returns>
     private static bool IsFactHeading(string value)
     {
         return value.StartsWith("# Learned Fact", StringComparison.OrdinalIgnoreCase)
             || value.StartsWith("# Retired Fact", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Determines whether the supplied line ends the fact section.
+    /// </summary>
+    /// <param name="value">The line value to inspect.</param>
+    /// <returns><c>true</c> when the line is a section boundary; otherwise, <c>false</c>.</returns>
     private static bool IsFactSectionBoundary(string value)
     {
         return value.StartsWith("## ", StringComparison.Ordinal)
             || value.StartsWith("- ", StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Normalizes fact text for similarity comparisons.
+    /// </summary>
+    /// <param name="factText">The fact text to normalize.</param>
+    /// <returns>The normalized fact text.</returns>
     private static string NormalizeFactText(string factText)
     {
         if (string.IsNullOrWhiteSpace(factText))
@@ -232,6 +284,12 @@ public sealed class MemoryPageParser
             .ToLowerInvariant();
     }
 
+    /// <summary>
+    /// Retrieves a non-empty metadata value when present.
+    /// </summary>
+    /// <param name="metadata">The metadata dictionary to inspect.</param>
+    /// <param name="key">The metadata key to read.</param>
+    /// <returns>The metadata value, or <c>null</c> when not present.</returns>
     private static string? GetMetadata(IReadOnlyDictionary<string, string> metadata, string key)
     {
         return metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
@@ -239,6 +297,12 @@ public sealed class MemoryPageParser
             : null;
     }
 
+    /// <summary>
+    /// Tries to parse a metadata timestamp using invariant UTC semantics.
+    /// </summary>
+    /// <param name="metadata">The metadata dictionary to inspect.</param>
+    /// <param name="key">The metadata key to parse.</param>
+    /// <returns>The parsed timestamp, or <c>null</c> when parsing fails.</returns>
     private static DateTimeOffset? TryGetTimestamp(IReadOnlyDictionary<string, string> metadata, string key)
     {
         var raw = GetMetadata(metadata, key);
@@ -252,6 +316,11 @@ public sealed class MemoryPageParser
             : null;
     }
 
+    /// <summary>
+    /// Parses a comma-separated list into distinct trimmed values.
+    /// </summary>
+    /// <param name="value">The comma-separated value to parse.</param>
+    /// <returns>The parsed values.</returns>
     private static List<string> ParseCsv(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))

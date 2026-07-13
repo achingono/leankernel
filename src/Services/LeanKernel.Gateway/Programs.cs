@@ -176,4 +176,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = Dat
 
 app.Run();
 
+/// <summary>
+/// Application entry point for the LeanKernel gateway service.
+/// </summary>
 public partial class Program;

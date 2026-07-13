@@ -7,8 +7,14 @@ using Xunit;
 
 namespace LeanKernel.Tests.Unit.Providers;
 
+/// <summary>
+/// Covers the GBrain-backed memory client.
+/// </summary>
 public class GBrainMemoryClientTests
 {
+    /// <summary>
+    /// Creates a scope with generated identifiers unless provided.
+    /// </summary>
     private static MemoryScope CreateScope(
         Guid? tenantId = null,
         Guid? userId = null,
@@ -22,6 +28,9 @@ public class GBrainMemoryClientTests
         };
     }
 
+    /// <summary>
+    /// Verifies the constructor rejects a missing MCP client.
+    /// </summary>
     [Fact]
     public void Constructor_NullClient_Throws()
     {
@@ -30,6 +39,9 @@ public class GBrainMemoryClientTests
         act.Should().Throw<ArgumentNullException>();
     }
 
+    /// <summary>
+    /// Verifies the constructor rejects a missing logger.
+    /// </summary>
     [Fact]
     public void Constructor_NullLogger_Throws()
     {
@@ -40,6 +52,9 @@ public class GBrainMemoryClientTests
         act.Should().Throw<ArgumentNullException>();
     }
 
+    /// <summary>
+    /// Verifies search failures are handled by returning no memories.
+    /// </summary>
     [Fact]
     public async Task SearchMemoriesAsync_WhenClientThrows_ReturnsEmpty()
     {
@@ -56,6 +71,9 @@ public class GBrainMemoryClientTests
         results.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Verifies null search results are treated as empty.
+    /// </summary>
     [Fact]
     public async Task SearchMemoriesAsync_NullResult_ReturnsEmpty()
     {
@@ -72,6 +90,9 @@ public class GBrainMemoryClientTests
         results.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Verifies save failures are propagated to callers.
+    /// </summary>
     [Fact]
     public async Task SaveMemoryAsync_WhenClientThrows_PropagatesException()
     {
@@ -88,6 +109,9 @@ public class GBrainMemoryClientTests
         await act.Should().ThrowAsync<GBrainException>();
     }
 
+    /// <summary>
+    /// Verifies successful saves invoke the put page tool.
+    /// </summary>
     [Fact]
     public async Task SaveMemoryAsync_Success_CallsPutPage()
     {
@@ -108,6 +132,9 @@ public class GBrainMemoryClientTests
             Times.Once);
     }
 
+    /// <summary>
+    /// Verifies successful searches invoke the search tool.
+    /// </summary>
     [Fact]
     public async Task SearchMemoriesAsync_Success_CallsSearch()
     {
@@ -128,6 +155,9 @@ public class GBrainMemoryClientTests
             Times.Once);
     }
 
+    /// <summary>
+    /// Verifies saved memory keys include the expected scoped slug.
+    /// </summary>
     [Fact]
     public async Task SaveMemoryAsync_CallsPutPageWithCorrectSlug()
     {

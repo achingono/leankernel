@@ -74,10 +74,19 @@ public class SessionEntity: IEntity, IAuditable, IRecyclable
     /// </summary>
     public bool IsDeleted { get; set; }
 
+    /// <summary>
+    /// Gets or sets the user associated with the session.
+    /// </summary>
     public UserEntity User { get; set; } = new();
 
+    /// <summary>
+    /// Gets or sets the channel associated with the session.
+    /// </summary>
     public ChannelEntity Channel { get; set; } = new();
 
+    /// <summary>
+    /// Gets or sets the tenant associated with the session.
+    /// </summary>
     public TenantEntity Tenant { get; set; } = new();
 
     /// <summary>

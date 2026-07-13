@@ -17,6 +17,7 @@ public class DbChatHistoryProvider(
     internal const string ChatSessionIdKey = "chatSessionId";
     internal const string ConversationIdKey = "conversationId";
 
+    /// <inheritdoc />
     protected override async ValueTask<IEnumerable<ChatMessage>> ProvideChatHistoryAsync(
         InvokingContext context,
         CancellationToken cancellationToken = default)
@@ -64,6 +65,7 @@ public class DbChatHistoryProvider(
         }).ToList();
     }
 
+    /// <inheritdoc />
     protected override async ValueTask StoreChatHistoryAsync(
         InvokedContext context,
         CancellationToken cancellationToken = default)
@@ -87,6 +89,9 @@ public class DbChatHistoryProvider(
         await scope.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Ensures the current request owns the chat session, creating it when needed.
+    /// </summary>
     private async Task<Guid> EnsureOwnedSessionAsync(
         EntityContext dbContext,
         AgentSession session,
@@ -117,6 +122,9 @@ public class DbChatHistoryProvider(
         return sessionEntity.Id;
     }
 
+    /// <summary>
+    /// Verifies that a session belongs to the current tenant, user, and channel partition.
+    /// </summary>
     private async Task EnsureOwnershipAsync(EntityContext dbContext, Guid sessionGuid, CancellationToken cancellationToken)
     {
         var ownsSession = await dbContext.Sessions
@@ -135,6 +143,9 @@ public class DbChatHistoryProvider(
         }
     }
 
+    /// <summary>
+    /// Persists eligible request-side messages as turns.
+    /// </summary>
     private static void AddRequestTurns(EntityContext dbContext, IEnumerable<ChatMessage>? requestMessages, Guid sessionGuid)
     {
         if (requestMessages is null)
@@ -148,6 +159,9 @@ public class DbChatHistoryProvider(
         }
     }
 
+    /// <summary>
+    /// Persists eligible response-side messages as turns.
+    /// </summary>
     private static void AddResponseTurns(EntityContext dbContext, IEnumerable<ChatMessage>? responseMessages, Guid sessionGuid)
     {
         if (responseMessages is null)
@@ -161,17 +175,26 @@ public class DbChatHistoryProvider(
         }
     }
 
+    /// <summary>
+    /// Determines whether a request message should be stored as a turn.
+    /// </summary>
     private static bool ShouldPersistRequestMessage(ChatMessage message)
     {
         return (message.Role == ChatRole.User || message.Role == ChatRole.Tool)
             && !string.IsNullOrEmpty(message.Text);
     }
 
+    /// <summary>
+    /// Determines whether a response message should be stored as a turn.
+    /// </summary>
     private static bool ShouldPersistResponseMessage(ChatMessage message)
     {
         return message.Role == ChatRole.Assistant && !string.IsNullOrEmpty(message.Text);
     }
 
+    /// <summary>
+    /// Converts a chat message into a persisted turn entity.
+    /// </summary>
     private static TurnEntity ToTurnEntity(ChatMessage message, Guid sessionGuid, string role)
     {
         return new TurnEntity

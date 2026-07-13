@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 /// </summary>
 public class RecyclableInterceptor(IPermit permit) : ISaveChangesInterceptor
 {
+    /// <inheritdoc />
     public InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
         InterceptionResult<int> result)
@@ -40,6 +41,7 @@ public class RecyclableInterceptor(IPermit permit) : ISaveChangesInterceptor
         return result;
     }
 
+    /// <inheritdoc />
     public ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,

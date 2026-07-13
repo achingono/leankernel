@@ -3,8 +3,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LeanKernel.Data;
 
+/// <summary>
+/// EF Core database context for persisted tenants, users, channels, sessions, turns, and agent state.
+/// </summary>
 public class EntityContext : DbContext
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EntityContext"/> class.
+    /// </summary>
+    /// <param name="options">The configured EF Core options for this context.</param>
     public EntityContext(DbContextOptions<EntityContext> options) : base(options)
     {
     }
@@ -39,6 +46,10 @@ public class EntityContext : DbContext
     /// </summary>
     public DbSet<AgentStateEntity> AgentStates => Set<AgentStateEntity>();
 
+    /// <summary>
+    /// Configures the entity mappings, indexes, relationships, and query filters.
+    /// </summary>
+    /// <param name="modelBuilder">The model builder used to configure the EF Core model.</param>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -133,6 +144,11 @@ public class EntityContext : DbContext
         });
     }
 
+    /// <summary>
+    /// Applies pending migrations and ensures the default tenant and OpenAI channel records exist.
+    /// </summary>
+    /// <param name="hostName">The host name to seed for the default tenant if needed.</param>
+    /// <returns>A task that completes when migrations and seed data have been applied.</returns>
     public async Task ApplyMigrationsAndSeedAsync(string hostName)
     {
         await Database.MigrateAsync();
@@ -141,6 +157,11 @@ public class EntityContext : DbContext
         await EnsureOpenAiChannelAsync();
     }
 
+    /// <summary>
+    /// Ensures a default tenant exists for the supplied host name.
+    /// </summary>
+    /// <param name="hostName">The host name to associate with the default tenant.</param>
+    /// <returns>A task that completes when the tenant check finishes.</returns>
     private async Task EnsureDefaultTenantAsync(string hostName)
     {
         if (await Tenants.AnyAsync(tenant => tenant.HostName == hostName))
@@ -174,6 +195,10 @@ public class EntityContext : DbContext
         }
     }
 
+    /// <summary>
+    /// Ensures the well-known OpenAI HTTP channel exists.
+    /// </summary>
+    /// <returns>A task that completes when the channel check finishes.</returns>
     private async Task EnsureOpenAiChannelAsync()
     {
         if (await Channels.AnyAsync(channel => channel.Name == ChannelEntity.OpenAiHttpName))
