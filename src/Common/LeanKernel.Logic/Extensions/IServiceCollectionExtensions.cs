@@ -2,6 +2,7 @@ using System.ClientModel;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Logic.Tools;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.AI;
@@ -61,6 +62,7 @@ public static class IServiceCollectionExtensions
 
     /// <summary>
     /// Registers the OpenAI-compatible chat client from configuration.
+    /// Uses the ToolModel alias for the primary chat client when configured.
     /// </summary>
     /// <param name="services">The service collection to update.</param>
     /// <returns>The updated service collection.</returns>
@@ -69,10 +71,17 @@ public static class IServiceCollectionExtensions
         services.AddChatClient(sp =>
         {
             var cfg = sp.GetRequiredService<IOptions<OpenAISettings>>().Value;
+            var agentSettings = sp.GetRequiredService<IOptions<AgentSettings>>().Value;
+
+            // Use ToolModel alias for tool-capable turns when configured and tools are enabled
+            var modelId = agentSettings.Tools.Enabled && !string.IsNullOrWhiteSpace(cfg.ToolModel)
+                ? cfg.ToolModel
+                : cfg.DefaultModel;
+
             var client = new OpenAIClient(
                 new ApiKeyCredential(cfg.ApiKey),
                 new OpenAIClientOptions { Endpoint = new Uri(cfg.BaseUrl) });
-            return client.GetChatClient(cfg.DefaultModel).AsIChatClient();
+            return client.GetChatClient(modelId).AsIChatClient();
         })
         .UseFunctionInvocation()
         .UseLogging();
@@ -109,6 +118,7 @@ public static class IServiceCollectionExtensions
     /// Registers a named <see cref="AIAgent"/> as scoped using MAF hosting primitives.
     /// Scoped lifetime ensures providers (ChatHistoryProvider, AIContextProvider) are resolved
     /// from the request scope rather than captured at singleton creation time.
+    /// When the tool runtime is enabled, registered tools are attached through ChatOptions.Tools.
     /// </summary>
     /// <param name="services">The service collection to update.</param>
     /// <param name="agentName">The agent name to register.</param>
@@ -124,6 +134,21 @@ public static class IServiceCollectionExtensions
         services.AddAIAgent(agentName, (sp, name) =>
         {
             var settings = sp.GetRequiredService<IOptions<AgentSettings>>().Value;
+
+            // Resolve tools from the registry when the tool runtime is enabled
+            List<AITool> aiTools = [];
+            if (settings.Tools.Enabled)
+            {
+                var registry = sp.GetService<IToolRegistry>();
+                if (registry is not null)
+                {
+                    var policy = new ToolGovernancePolicy(settings.Tools);
+                    aiTools = policy.Filter(registry.Tools)
+                        .Select(ToolDefinitionAIToolAdapter.ToAITool)
+                        .ToList();
+                }
+            }
+
             return new ChatClientAgent(
                 sp.GetRequiredService<IChatClient>(),
                 new ChatClientAgentOptions
@@ -133,6 +158,7 @@ public static class IServiceCollectionExtensions
                     ChatOptions = new ChatOptions
                     {
                         Instructions = settings.DefaultInstructions,
+                        Tools = aiTools.Count > 0 ? aiTools : null,
                     },
                     ChatHistoryProvider = sp.GetRequiredService<ChatHistoryProvider>(),
                     AIContextProviders = sp.GetServices<AIContextProvider>().ToList(),

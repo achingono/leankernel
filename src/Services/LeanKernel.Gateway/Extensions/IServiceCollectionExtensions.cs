@@ -4,6 +4,7 @@ using LeanKernel.Gateway.HealthChecks;
 using LeanKernel.Gateway.Providers;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,28 @@ public static class IServiceCollectionExtensions
         .AddHttpMessageHandler<GBrainAuthHandler>();
         services.AddScoped<IGBrainMcpClient>(sp => sp.GetRequiredService<GBrainMcpClient>());
         services.AddScoped<IMemoryClient, GBrainMemoryClient>();
+
+        // GBrain knowledge service for callable wiki tools
+        services.AddScoped<IKnowledgeService, GBrainKnowledgeService>();
+
+        // Capability pre-check (transient — used once at startup)
+        services.AddTransient<GBrainCapabilityCheck>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the shared tool registry as a singleton.
+    /// </summary>
+    public static IServiceCollection AddToolRegistry(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton<IToolRegistry, ToolRegistry>();
+
+        // Named HTTP clients for tool egress
+        services.AddHttpClient("web-search");
+        services.AddHttpClient("dynamic-skill");
+
         return services;
     }
 

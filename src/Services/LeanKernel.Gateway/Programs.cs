@@ -9,6 +9,7 @@ using LeanKernel.Gateway.HealthChecks;
 using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
 using LeanKernel.Gateway.Sessions;
+using LeanKernel.Gateway.Tools;
 using LeanKernel.Logic;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Providers;
@@ -111,6 +112,9 @@ builder.Services.AddContextProviders();
 var gbrainSettings = builder.Configuration.GetSection("GBrain").Get<GBrainSettings>() ?? new GBrainSettings();
 builder.Services.AddGBrainMemory(gbrainSettings);
 
+// Shared tool registry
+builder.Services.AddToolRegistry();
+
 // Chat client (OpenAI-compatible)
 builder.Services.AddLeanKernelChatClient();
 
@@ -155,6 +159,13 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
     var context = services.GetRequiredService<EntityContext>();
     var hostName = app.Configuration["WebHost:HostName"] ?? "localhost";
     context.ApplyMigrationsAndSeedAsync(hostName).GetAwaiter().GetResult();
+}
+
+// Register tools into the shared registry at startup
+var agentToolSettings = app.Configuration.GetSection("Agents:Tools").Get<ToolSettings>() ?? new ToolSettings();
+if (agentToolSettings.Enabled)
+{
+    ToolRuntimeStartup.RegisterToolsAsync(app.Services).GetAwaiter().GetResult();
 }
 
 // Apply forwarded headers before anything reads Request.Host

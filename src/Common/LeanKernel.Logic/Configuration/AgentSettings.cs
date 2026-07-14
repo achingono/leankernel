@@ -24,4 +24,9 @@ public class AgentSettings
     /// Gets or sets the default agent description.
     /// </summary>
     public string DefaultDescription { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the tool runtime configuration nested under <c>Agents:Tools</c>.
+    /// </summary>
+    public ToolSettings Tools { get; set; } = new ToolSettings();
 }

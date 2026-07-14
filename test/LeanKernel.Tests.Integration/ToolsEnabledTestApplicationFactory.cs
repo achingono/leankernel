@@ -1,3 +1,4 @@
+using LeanKernel.Gateway.Tools;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -10,9 +11,10 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 namespace LeanKernel.Tests.Integration;
 
 /// <summary>
-/// Configures the gateway host for integration tests.
+/// Test application factory with tools enabled and GBrain disabled.
+/// Used to validate the tool registry and execution paths in integration tests.
 /// </summary>
-public class GatewayTestApplicationFactory : WebApplicationFactory<Program>
+public class ToolsEnabledTestApplicationFactory : WebApplicationFactory<Program>
 {
     /// <inheritdoc />
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -24,22 +26,30 @@ public class GatewayTestApplicationFactory : WebApplicationFactory<Program>
             config.Sources.Clear();
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Sqlite"] = $"Data Source=:memory:",
+                ["ConnectionStrings:Sqlite"] = "Data Source=:memory:",
                 ["OpenAI:ApiKey"] = "test-key",
                 ["OpenAI:BaseUrl"] = "http://localhost:1",
                 ["OpenAI:DefaultModel"] = "test-model",
                 ["Agents:DefaultName"] = "leankernel",
                 ["Agents:DefaultDescription"] = "Test agent",
                 ["Agents:DefaultInstructions"] = "You are a test assistant.",
-                ["Agents:Tools:Enabled"] = "false"
+                // Tool runtime enabled
+                ["Agents:Tools:Enabled"] = "true",
+                ["Agents:Tools:BuiltIns:Calculation:Enabled"] = "true",
+                ["Agents:Tools:BuiltIns:Calculation:MaxInputItems"] = "100",
+                // No skill base paths — avoid scanning non-existent dirs
+                ["Agents:Tools:SkillBasePaths:0"] = "/tmp/lk-test-skills-nonexistent",
+                // Files root for file_search
+                ["Files:RootPath"] = Path.GetTempPath(),
+                // GBrain disabled (no valid baseurl → wiki tools skipped)
+                ["GBrain:BaseUrl"] = "http://localhost:1",
+                ["GBrain:TimeoutSeconds"] = "1"
             });
         });
 
         builder.ConfigureTestServices(services =>
         {
-            // Remove ALL EF Core services registered by AddEntityContext for EntityContext,
-            // including factory-related and options-configuration services that carry the
-            // SQLite provider extension and would conflict with the InMemory replacement.
+            // Replace EF Core for tests
             var entityType = typeof(LeanKernel.Data.EntityContext);
             var optionsConfigType = typeof(Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<>).MakeGenericType(entityType);
             var toRemove = services.Where(d =>
@@ -55,9 +65,9 @@ public class GatewayTestApplicationFactory : WebApplicationFactory<Program>
             }
 
             services.AddDbContext<LeanKernel.Data.EntityContext>(options =>
-                options.UseInMemoryDatabase($"IntegrationTests_{Guid.NewGuid():N}"));
+                options.UseInMemoryDatabase($"ToolTests_{Guid.NewGuid():N}"));
 
-            // Remove external health checks that depend on services unavailable in tests
+            // Remove external health checks
             services.Configure<HealthCheckServiceOptions>(opts =>
             {
                 var external = opts.Registrations

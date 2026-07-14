@@ -1,0 +1,78 @@
+using LeanKernel.Gateway.Providers;
+using LeanKernel.Logic.Tools;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace LeanKernel.Gateway.Tools.Wiki;
+
+/// <summary>
+/// Provides the LeanKernel-owned <c>wiki_write</c> tool backed by GBrain.
+/// </summary>
+public static class WikiWriteTool
+{
+    private const string ToolName = "wiki_write";
+
+    /// <summary>
+    /// Creates the wiki_write tool definition.
+    /// </summary>
+    public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
+    {
+        ArgumentNullException.ThrowIfNull(scopeFactory);
+
+        return new ToolDefinition
+        {
+            Name = ToolName,
+            Description = "Create or update a knowledge page in GBrain",
+            Category = "knowledge",
+            Parameters =
+            [
+                new ToolParameter
+                {
+                    Name = "key",
+                    Type = "string",
+                    Description = "The page key (slug) to create or update",
+                    Required = true
+                },
+                new ToolParameter
+                {
+                    Name = "content",
+                    Type = "string",
+                    Description = "The Markdown content to store in the page",
+                    Required = true
+                }
+            ],
+            Handler = async (args, ct) =>
+            {
+                var key = ToolArgumentReader.GetString(args, "key");
+                var content = ToolArgumentReader.GetString(args, "content");
+
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    return new ToolResult { ToolName = ToolName, Success = false, Error = "key is required" };
+                }
+
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    return new ToolResult { ToolName = ToolName, Success = false, Error = "content is required" };
+                }
+
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var knowledge = scope.ServiceProvider.GetRequiredService<IKnowledgeService>();
+
+                    await knowledge.PutPageAsync(key, content, ct).ConfigureAwait(false);
+                    return new ToolResult
+                    {
+                        ToolName = ToolName,
+                        Success = true,
+                        Output = $"Page '{key}' saved successfully."
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new ToolResult { ToolName = ToolName, Success = false, Error = ex.Message };
+                }
+            }
+        };
+    }
+}

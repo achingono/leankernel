@@ -1,0 +1,22 @@
+# Phase 01 Risk Register
+
+## Risks
+
+| ID | Risk | Impact | Mitigation | Status |
+| --- | --- | --- | --- | --- |
+| R1 | The current runtime has no shared tool registry, so built-in and dynamic tools may be implemented inconsistently or duplicated across features. | Tool behavior drifts and becomes hard to govern or test. | Introduce one shared tool contract and registry before adding multiple tool families. | Open |
+| R2 | LeanKernel-owned built-in tools could be conflated again with provider-hosted MAF/OpenAI tools. | The implementation becomes provider-specific and breaks the LiteLLM portability goal. | Document the distinction explicitly and keep built-ins on the local `AIFunction` execution path. | Open |
+| R3 | Dynamic user-defined tools can create network or secret-handling risk. | Unsafe tool definitions could expose the host or sensitive data. | Limit Phase 01 dynamic tools to HTTP runtime only, add egress allowlists, explicit auth handling, and fail-fast validation before registration. | Open |
+| R4 | The wrong LiteLLM alias may be used for tool-capable turns. | Tools appear unreliable or underperform because the agent still runs on the plain `medium` route. | Introduce explicit `OpenAI:ToolModel` routing and test it directly against the LiteLLM `tool` alias. | Open |
+| R5 | GBrain remains reachable for background memory search but unavailable as a callable knowledge tool surface. | Users continue to get “no connected wiki tool” behavior despite working GBrain transport. | Add a dedicated callable knowledge abstraction and register GBrain-backed `wiki_*` tools in the shared runtime. | Open |
+| R6 | Tool visibility and execution policy may stay too open by default. | The agent could see or invoke more tools than intended. | Add a minimal governance layer with allowlisted names/categories and clear startup logging. | Open |
+| R7 | The `SKILL.md` manifest format is undefined, blocking dynamic-tool loading and validation. | Implementation stalls or diverges; egress/secret rules become inconsistent. | Define the canonical Phase 01 schema up front (Appendix A) grounded in the older `SkillParser`/`DynamicSkillTool` behavior, HTTP-only. | Mitigated |
+| R8 | `web_search` has no defined backend, credentials, or egress, yet is a hard exit requirement. | The tool cannot execute or leaks to unbounded egress. | Pin the Brave→DuckDuckGo backend, `ApiKeyEnv`, and web-search egress allowlist in configuration (Appendix B). | Mitigated |
+| R9 | Startup-registered tools may lose request identity/partitioning at execution time. | Wiki/memory scope bleeds across tenants/users, violating the identity-partitioning invariant. | Execute built-in and `wiki_*` tools under a per-invocation DI scope (Appendix C); pass scope-relative keys to the transport. | Mitigated |
+| R10 | Attaching tools to the existing working chat agent could regress all turns. | A bad registry or the all-turns `tool`-alias switch breaks normal chat. | Gate the runtime behind `Agents:Tools:Enabled` as an explicit rollback lever and fail fast on invalid tool prerequisites. | Mitigated |
+| R11 | Deployed GBrain may lack callable `get_page`/`put_page` parity despite reachable memory search. | `wiki_read`/`wiki_write` exit criteria become unachievable, or tools fail silently. | Run a startup capability pre-check (Appendix D); register only the supported subset and treat missing ops as a documented contingency. | Mitigated |
+| R12 | Configuration ownership between `OpenAI:*` and `Agents:*` may drift, mixing model-provider and agent-runtime concerns. | Settings become harder to reason about, document, and review; future changes may duplicate knobs or place them inconsistently. | Reserve `OpenAI:*` for provider/model behavior and `Agents:*` for agentic behavior, including all tool-runtime settings. | Mitigated |
+| R13 | Downstream services may lack native count/group/aggregation endpoints, leaving the agent unable to answer quantitative questions even when raw data is retrievable. | Users get unnecessary “cannot compute” failures for simple deterministic operations. | Add bounded local `calculate` / aggregation helpers that operate only on explicit arguments or structured tool results and require no new external egress. | Mitigated |
+
+## Open Decisions
+- None currently blocking. Configuration ownership is fixed: `OpenAI:*` for model-provider behavior, `Agents:*` for agentic behavior including tools.

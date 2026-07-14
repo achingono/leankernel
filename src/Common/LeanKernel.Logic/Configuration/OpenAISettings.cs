@@ -21,6 +21,11 @@ public class OpenAISettings
     public string DefaultModel { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the LiteLLM alias used for all Phase 01 leankernel tool-capable turns.
+    /// </summary>
+    public string ToolModel { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the fact extraction model settings.
     /// </summary>
     public FactExtractionSettings FactExtraction { get; set; } = new FactExtractionSettings();
