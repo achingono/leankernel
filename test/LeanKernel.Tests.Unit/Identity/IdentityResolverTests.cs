@@ -104,6 +104,29 @@ public class IdentityResolverTests
     }
 
     /// <summary>
+    /// M5: Two tenants sharing the same anonymous session ID must resolve to different guest users.
+    /// </summary>
+    [Fact]
+    public async Task ResolveGuestUserAsync_DifferentTenants_SameSession_CreatesDifferentUsers()
+    {
+        var resolver = CreateResolver(out var db);
+
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        const string sessionId = "shared-anon-session";
+
+        var guestA = await resolver.ResolveGuestUserAsync(tenantA, "anonymous", sessionId);
+        var guestB = await resolver.ResolveGuestUserAsync(tenantB, "anonymous", sessionId);
+
+        guestA.Id.Should().NotBe(guestB.Id,
+            because: "guest identity must be tenant-scoped to prevent cross-tenant isolation break");
+        guestA.Subject.Should().Contain(tenantA.ToString("N"),
+            because: "subject must embed tenantId so the same session ID is unique across tenants");
+        guestB.Subject.Should().Contain(tenantB.ToString("N"));
+        db.Users.Count().Should().Be(2);
+    }
+
+    /// <summary>
     /// Creates an identity resolver backed by an isolated in-memory context.
     /// </summary>
     private static IdentityResolver CreateResolver(out EntityContext db)

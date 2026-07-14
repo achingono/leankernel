@@ -226,4 +226,85 @@ public class GBrainMemoryClientTests
         results[0].Key.Should().Be("a");
         results[0].Source.Should().Be("gbrain");
     }
+
+    /// <summary>
+    /// C3: Search must use a namespace derived from TenantId/UserId/ChannelId, not scope.Namespace.
+    /// Ensures search and save use the same identity-scoped namespace for correct recall.
+    /// </summary>
+    [Fact]
+    public async Task SearchMemoriesAsync_UsesNamespaceDerivedFromScopeIdentity()
+    {
+        string? capturedNamespace = null;
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("search", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, object?, CancellationToken>((_, args, _) =>
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(args);
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                doc.RootElement.TryGetProperty("namespace_name", out var ns);
+                capturedNamespace = ns.GetString();
+            })
+            .ReturnsAsync((System.Text.Json.JsonElement?)null);
+
+        var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var userId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var channelId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        var scope = CreateScope(tenantId, userId, channelId);
+
+        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        await client.SearchMemoriesAsync(scope, "test query");
+
+        capturedNamespace.Should().Be(
+            $"memory/{tenantId}/{userId}/{channelId}",
+            because: "C3: search must use the same namespace as save to prevent cross-tenant recall");
+    }
+
+    /// <summary>
+    /// C3: Memory saved under scope A must use a different namespace than memory searched under scope B.
+    /// </summary>
+    [Fact]
+    public async Task SearchMemoriesAsync_DifferentScopes_UseDifferentNamespaces()
+    {
+        var saveSlug = null as string;
+        var searchNamespace = null as string;
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("put_page", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, object?, CancellationToken>((_, args, _) =>
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(args);
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                doc.RootElement.TryGetProperty("slug", out var s);
+                saveSlug = s.GetString();
+            })
+            .ReturnsAsync((System.Text.Json.JsonElement?)null);
+
+        mockClient
+            .Setup(c => c.CallToolAsync("search", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, object?, CancellationToken>((_, args, _) =>
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(args);
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                doc.RootElement.TryGetProperty("namespace_name", out var ns);
+                searchNamespace = ns.GetString();
+            })
+            .ReturnsAsync((System.Text.Json.JsonElement?)null);
+
+        var scopeA = CreateScope();
+        var scopeB = CreateScope(); // Different random GUIDs
+
+        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        await client.SaveMemoryAsync(scopeA, "key", "content");
+        await client.SearchMemoriesAsync(scopeB, "query");
+
+        saveSlug.Should().StartWith($"memory/{scopeA.TenantId}",
+            because: "save must namespace under scope A's tenant");
+        searchNamespace.Should().StartWith($"memory/{scopeB.TenantId}",
+            because: "search must namespace under scope B's tenant");
+        searchNamespace.Should().NotBe(saveSlug![..searchNamespace!.Length],
+            because: "cross-scope recall must be impossible");
+    }
 }

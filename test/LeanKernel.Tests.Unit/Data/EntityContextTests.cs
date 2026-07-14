@@ -146,6 +146,27 @@ public class EntityContextTests : IDisposable
     }
 
     /// <summary>
+    /// M2: The EF model must not generate a TenantEntityId shadow FK on SessionEntity.
+    /// </summary>
+    [Fact]
+    public void SessionEntity_HasNoShadowTenantEntityIdProperty()
+    {
+        var options = new DbContextOptionsBuilder<EntityContext>()
+            .UseSqlite(_connection)
+            .Options;
+        using var ctx = new EntityContext(options);
+
+        var sessionEntityType = ctx.Model.FindEntityType(typeof(SessionEntity))!;
+        var shadowProps = sessionEntityType.GetProperties()
+            .Where(p => p.IsShadowProperty())
+            .Select(p => p.Name)
+            .ToList();
+
+        shadowProps.Should().NotContain("TenantEntityId",
+            because: "the duplicate shadow FK must have been removed to eliminate the redundant TenantEntityId column");
+    }
+
+    /// <summary>
     /// Test-specific EntityContext that overrides RowVersion to ValueGeneratedNever
     /// so SQLite (which lacks native rowversion support) can accept explicit values.
     /// </summary>

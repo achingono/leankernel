@@ -134,46 +134,142 @@ public class DbChatHistoryProviderTests : IDisposable
         messages.Should().HaveCount(3);
     }
 
+    /// <summary>
+    /// C5: A "tool" turn must rehydrate as <see cref="ChatRole.Tool"/>, not be promoted to User.
+    /// </summary>
     [Fact]
-    public async Task ProvideChatHistoryAsync_OtherRoleDefaultsToUser()
+    public async Task ProvideChatHistoryAsync_ToolRole_RehydratesAsChatRoleTool()
     {
         var (provider, context) = CreateSut();
         var sessionId = Guid.NewGuid();
 
         var permit = provider.GetPermit();
-        var sessionEntity = new SessionEntity
+        context.Sessions.Add(new SessionEntity
         {
             Id = sessionId,
-            TenantId = permit.TenantId,
-            UserId = permit.UserId,
-            ChannelId = permit.ChannelId,
-            Tenant = null!,
-            User = null!,
-            Channel = null!,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
-        };
-        context.Sessions.Add(sessionEntity);
+            TenantId = permit.TenantId, UserId = permit.UserId, ChannelId = permit.ChannelId,
+            Tenant = null!, User = null!, Channel = null!,
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+        });
         context.Turns.Add(new TurnEntity
         {
-            SessionId = sessionId,
-            Role = "tool",
-            Content = "Tool output",
-            Timestamp = DateTimeOffset.UtcNow,
-            AuthorName = "tool",
-            CreatedOn = DateTime.UtcNow,
+            SessionId = sessionId, Role = "tool", Content = "Tool output", AuthorName = "calculator",
+            Timestamp = DateTimeOffset.UtcNow, CreatedOn = DateTime.UtcNow,
             CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
         });
         await context.SaveChangesAsync();
 
         var session = CreateSession(new Dictionary<string, string?> { ["chatSessionId"] = sessionId.ToString() });
-        var invokingCtx = CreateInvokingContext(session: session);
+        var result = (await provider.InvokeProvideChatHistoryAsync(CreateInvokingContext(session: session), CancellationToken.None)).ToList();
 
-        var result = await provider.InvokeProvideChatHistoryAsync(invokingCtx, CancellationToken.None);
+        result.Should().ContainSingle();
+        result[0].Role.Should().Be(ChatRole.Tool, because: "tool turns must round-trip as ChatRole.Tool, not ChatRole.User");
+    }
 
-        result.Should().HaveCount(1);
+    /// <summary>
+    /// C5: Unknown roles are skipped (not promoted to User) to preserve message provenance.
+    /// </summary>
+    [Fact]
+    public async Task ProvideChatHistoryAsync_UnknownRole_IsSkippedNotPromotedToUser()
+    {
+        var (provider, context) = CreateSut();
+        var sessionId = Guid.NewGuid();
+
+        var permit = provider.GetPermit();
+        context.Sessions.Add(new SessionEntity
+        {
+            Id = sessionId,
+            TenantId = permit.TenantId, UserId = permit.UserId, ChannelId = permit.ChannelId,
+            Tenant = null!, User = null!, Channel = null!,
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+        });
+        context.Turns.Add(new TurnEntity
+        {
+            SessionId = sessionId, Role = "UNKNOWN_FUTURE_ROLE", Content = "some content",
+            Timestamp = DateTimeOffset.UtcNow, CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+        });
+        await context.SaveChangesAsync();
+
+        var session = CreateSession(new Dictionary<string, string?> { ["chatSessionId"] = sessionId.ToString() });
+        var result = await provider.InvokeProvideChatHistoryAsync(CreateInvokingContext(session: session), CancellationToken.None);
+
+        result.Should().BeEmpty(because: "unknown roles must be skipped to avoid corrupting message provenance");
+    }
+
+    /// <summary>
+    /// M3: A session with more turns than the window limit returns only the most recent turns.
+    /// </summary>
+    [Fact]
+    public async Task ProvideChatHistoryAsync_ExceedsTurnWindow_ReturnsBoundedCount()
+    {
+        var (provider, context) = CreateSut();
+        var sessionId = Guid.NewGuid();
+
+        var permit = provider.GetPermit();
+        context.Sessions.Add(new SessionEntity
+        {
+            Id = sessionId,
+            TenantId = permit.TenantId, UserId = permit.UserId, ChannelId = permit.ChannelId,
+            Tenant = null!, User = null!, Channel = null!,
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+        });
+        const int turnWindow = 200; // matches DbChatHistoryProvider.RecentTurnWindow
+        var overLimit = turnWindow + 20;
+        for (var i = 0; i < overLimit; i++)
+        {
+            context.Turns.Add(new TurnEntity
+            {
+                SessionId = sessionId, Role = "user", Content = $"msg {i}",
+                Timestamp = DateTimeOffset.UtcNow.AddSeconds(i),
+                CreatedOn = DateTime.UtcNow,
+                CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            });
+        }
+        await context.SaveChangesAsync();
+
+        var session = CreateSession(new Dictionary<string, string?> { ["chatSessionId"] = sessionId.ToString() });
+        var result = (await provider.InvokeProvideChatHistoryAsync(CreateInvokingContext(session: session), CancellationToken.None)).ToList();
+
+        result.Count.Should().BeLessThanOrEqualTo(turnWindow,
+            because: "unbounded history causes linear prompt-size growth");
+    }
+
+    /// <summary>
+    /// Integration: user, assistant, and tool turns all round-trip with correct roles.
+    /// </summary>
+    [Fact]
+    public async Task ProvideChatHistoryAsync_ToolCallScenario_AllRolesRoundTrip()
+    {
+        var (provider, context) = CreateSut();
+        var sessionId = Guid.NewGuid();
+
+        var permit = provider.GetPermit();
+        context.Sessions.Add(new SessionEntity
+        {
+            Id = sessionId,
+            TenantId = permit.TenantId, UserId = permit.UserId, ChannelId = permit.ChannelId,
+            Tenant = null!, User = null!, Channel = null!,
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+        });
+        var ts = DateTimeOffset.UtcNow;
+        context.Turns.AddRange(
+            new TurnEntity { SessionId = sessionId, Role = "user", Content = "What is 2+2?", Timestamp = ts, CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" } },
+            new TurnEntity { SessionId = sessionId, Role = "assistant", Content = "Calculating.", Timestamp = ts.AddSeconds(1), CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" } },
+            new TurnEntity { SessionId = sessionId, Role = "tool", Content = "4", AuthorName = "calc", Timestamp = ts.AddSeconds(2), CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" } },
+            new TurnEntity { SessionId = sessionId, Role = "assistant", Content = "The answer is 4.", Timestamp = ts.AddSeconds(3), CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" } }
+        );
+        await context.SaveChangesAsync();
+
+        var session = CreateSession(new Dictionary<string, string?> { ["chatSessionId"] = sessionId.ToString() });
+        var result = (await provider.InvokeProvideChatHistoryAsync(CreateInvokingContext(session: session), CancellationToken.None)).ToList();
+
+        result.Should().HaveCount(4);
+        result.Select(m => m.Role.Value).Should().Equal("user", "assistant", "tool", "assistant");
     }
 
     [Fact]
