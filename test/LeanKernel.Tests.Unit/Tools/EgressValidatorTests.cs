@@ -38,6 +38,24 @@ public class EgressValidatorTests
         EgressValidator.IsPrivateOrLoopbackHost(host).Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("fe80::1")]    // IPv6 link-local
+    [InlineData("fc00::1")]    // IPv6 unique-local
+    [InlineData("fd12::1")]    // IPv6 unique-local (fd prefix)
+    [InlineData("[fe80::1]")]  // IPv6 link-local bracketed
+    public void IsPrivateOrLoopbackHost_IPv6PrivateAddresses_ReturnsTrue(string host)
+    {
+        EgressValidator.IsPrivateOrLoopbackHost(host).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("2001:db8::1")] // IPv6 documentation range - public
+    [InlineData("2600::1")]     // IPv6 public
+    public void IsPrivateOrLoopbackHost_IPv6PublicAddresses_ReturnsFalse(string host)
+    {
+        EgressValidator.IsPrivateOrLoopbackHost(host).Should().BeFalse();
+    }
+
     [Fact]
     public void IsPrivateOrLoopbackHost_EmptyHost_ReturnsTrue()
     {

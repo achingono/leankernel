@@ -216,4 +216,39 @@ public class CalculationToolTests
         tools.Should().HaveCount(6); // calculate, count, sum, average, min_max, group_by
         tools.Select(t => t.Name).Should().Contain("calculate", "count", "sum", "average", "min_max", "group_by");
     }
+
+    [Fact]
+    public async Task GroupBy_NonObjectItems_SkipsNonObjects()
+    {
+        // Array with mixed types - strings are not objects and should be skipped
+        var items = """["active","active","inactive"]""";
+        var (success, output, _) = await InvokeAsync("group_by",
+            new Dictionary<string, object?> { ["items"] = items, ["key"] = "status" });
+
+        success.Should().BeTrue();
+        output.Should().Be("{}"); // all items are non-objects, skipped
+    }
+
+    [Fact]
+    public async Task GroupBy_ObjectsMissingKey_SkipsThoseObjects()
+    {
+        var items = """[{"name":"a"},{"name":"b"},{"status":"active"}]""";
+        var (success, output, _) = await InvokeAsync("group_by",
+            new Dictionary<string, object?> { ["items"] = items, ["key"] = "status" });
+
+        success.Should().BeTrue();
+        output.Should().Contain("active");
+        output.Should().NotContain("name");
+    }
+
+    [Fact]
+    public async Task GroupBy_NumberKey_GroupsByNumericValue()
+    {
+        var items = """[{"score":1},{"score":2},{"score":1}]""";
+        var (success, output, _) = await InvokeAsync("group_by",
+            new Dictionary<string, object?> { ["items"] = items, ["key"] = "score" });
+
+        success.Should().BeTrue();
+        output.Should().Contain("\"1\":2");
+    }
 }
