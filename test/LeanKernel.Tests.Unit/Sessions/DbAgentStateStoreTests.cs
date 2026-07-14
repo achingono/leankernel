@@ -5,6 +5,7 @@ using LeanKernel.Gateway.Sessions;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
@@ -33,7 +34,7 @@ public class DbAgentStateStoreTests
         permit.Setup(p => p.UserId).Returns(userId ?? Guid.NewGuid());
         permit.Setup(p => p.ChannelId).Returns(channelId ?? Guid.NewGuid());
 
-        return (new DbAgentStateStore(entityContext, permit.Object), entityContext);
+        return (new DbAgentStateStore(entityContext, permit.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<DbAgentStateStore>.Instance), entityContext);
     }
 
     /// <summary>

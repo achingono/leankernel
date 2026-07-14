@@ -2,13 +2,10 @@ using System.Security.Claims;
 using FluentAssertions;
 using LeanKernel;
 using LeanKernel.Entities;
-using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -25,9 +22,10 @@ public class RequestContextPermitTests
     private static (RequestContextPermit permit, Mock<IPrincipalAccessor> principalAccessor, Mock<IHostNameAccessor> hostAccessor) CreateSut(
         ClaimsPrincipal? principal = null,
         string hostName = "localhost",
-        UserEntity? resolvedUser = null,
-        TenantEntity? resolvedTenant = null,
-        ChannelEntity? resolvedChannel = null)
+        Guid? resolvedUserId = null,
+        Guid? resolvedTenantId = null,
+        Guid? resolvedChannelId = null,
+        Badge? resolvedBadge = null)
     {
         var principalAccessor = new Mock<IPrincipalAccessor>();
         principalAccessor.Setup(a => a.Principal).Returns(principal);
@@ -38,34 +36,19 @@ public class RequestContextPermitTests
         var httpAccessor = new Mock<IHttpContextAccessor>();
         var ctx = new DefaultHttpContext();
         ctx.Features.Set<ISessionFeature>(new SessionFeature { Session = new TestSession() });
+
+        // Pre-populate HttpContext.Items as the middleware would (new architecture).
+        if (resolvedTenantId.HasValue) ctx.Items[TenantResolutionMiddleware.TenantKey] = resolvedTenantId.Value;
+        if (resolvedUserId.HasValue) ctx.Items[TenantResolutionMiddleware.UserIdKey] = resolvedUserId.Value;
+        if (resolvedChannelId.HasValue) ctx.Items[TenantResolutionMiddleware.ChannelIdKey] = resolvedChannelId.Value;
+        if (resolvedBadge is not null) ctx.Items[TenantResolutionMiddleware.BadgeKey] = resolvedBadge;
+
         httpAccessor.Setup(a => a.HttpContext).Returns(ctx);
-
-        var identityResolver = new Mock<IIdentityResolver>();
-        identityResolver.Setup(r => r.ResolveTenantAsync(hostName, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(resolvedTenant);
-        identityResolver.Setup(r => r.ResolveOrCreateUserAsync(It.IsAny<ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(resolvedUser ?? new UserEntity { Id = Guid.NewGuid(), UserName = "test-user" });
-        identityResolver.Setup(r => r.ResolveGuestUserAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserEntity { Id = Guid.NewGuid(), UserName = "anonymous", IsGuest = true });
-        identityResolver.Setup(r => r.ResolveOrCreateChannelAsync(ChannelEntity.OpenAiHttpName, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(resolvedChannel ?? new ChannelEntity { Id = Guid.NewGuid(), Name = ChannelEntity.OpenAiHttpName });
-
-        var identitySettings = Options.Create(new IdentitySettings
-        {
-            AnonymousUserName = "anonymous",
-            AnonymousFullName = "Anonymous User"
-        });
-
-        var serviceProvider = new Mock<IServiceProvider>();
-        serviceProvider.Setup(sp => sp.GetService(typeof(IIdentityResolver)))
-            .Returns(identityResolver.Object);
 
         var permit = new RequestContextPermit(
             principalAccessor.Object,
             hostAccessor.Object,
-            httpAccessor.Object,
-            serviceProvider.Object,
-            identitySettings);
+            httpAccessor.Object);
 
         return (permit, principalAccessor, hostAccessor);
     }
@@ -127,7 +110,8 @@ public class RequestContextPermitTests
     [Fact]
     public void Badge_WhenAnonymous_ReturnsAnonymousDefaults()
     {
-        var (permit, _, _) = CreateSut(principal: null);
+        var badge = new Badge { Id = Guid.NewGuid(), FullName = "Anonymous User", Email = "" };
+        var (permit, _, _) = CreateSut(principal: null, resolvedBadge: badge);
 
         permit.Badge.Should().NotBeNull();
         permit.Badge.FullName.Should().Be("Anonymous User");
@@ -140,12 +124,11 @@ public class RequestContextPermitTests
     public void UserId_WhenAuthenticated_ResolvesFromIdentityResolver()
     {
         var userId = Guid.NewGuid();
-        var user = new UserEntity { Id = userId, UserName = "test-user" };
         var identity = new ClaimsIdentity("Bearer");
         identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, "user-1"));
         var principal = new ClaimsPrincipal(identity);
 
-        var (permit, _, _) = CreateSut(principal: principal, resolvedUser: user);
+        var (permit, _, _) = CreateSut(principal: principal, resolvedUserId: userId);
 
         permit.UserId.Should().Be(userId);
     }
@@ -156,7 +139,8 @@ public class RequestContextPermitTests
     [Fact]
     public void UserId_WhenAnonymous_ResolvesGuestUser()
     {
-        var (permit, _, _) = CreateSut(principal: null);
+        var guestId = Guid.NewGuid();
+        var (permit, _, _) = CreateSut(principal: null, resolvedUserId: guestId);
 
         // Should not be Guid.Empty since a guest user is resolved
         permit.UserId.Should().NotBe(Guid.Empty);
@@ -169,9 +153,7 @@ public class RequestContextPermitTests
     public void TenantId_ResolvesFromHost()
     {
         var tenantId = Guid.NewGuid();
-        var tenant = new TenantEntity { Id = tenantId, HostName = "example.com", Name = "Test Tenant" };
-
-        var (permit, _, _) = CreateSut(hostName: "example.com", resolvedTenant: tenant);
+        var (permit, _, _) = CreateSut(hostName: "example.com", resolvedTenantId: tenantId);
 
         permit.TenantId.Should().Be(tenantId);
     }
@@ -183,9 +165,7 @@ public class RequestContextPermitTests
     public void ChannelId_ResolvesOpenAiHttpChannel()
     {
         var channelId = Guid.NewGuid();
-        var channel = new ChannelEntity { Id = channelId, Name = ChannelEntity.OpenAiHttpName };
-
-        var (permit, _, _) = CreateSut(resolvedChannel: channel);
+        var (permit, _, _) = CreateSut(resolvedChannelId: channelId);
 
         permit.ChannelId.Should().Be(channelId);
     }
@@ -197,12 +177,11 @@ public class RequestContextPermitTests
     public void Id_ReturnsUserId()
     {
         var userId = Guid.NewGuid();
-        var user = new UserEntity { Id = userId, UserName = "test-user" };
         var identity = new ClaimsIdentity("Bearer");
         identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, "user-1"));
         var principal = new ClaimsPrincipal(identity);
 
-        var (permit, _, _) = CreateSut(principal: principal, resolvedUser: user);
+        var (permit, _, _) = CreateSut(principal: principal, resolvedUserId: userId);
 
         IPermit iPermit = permit;
         iPermit.Id.Should().Be(userId);

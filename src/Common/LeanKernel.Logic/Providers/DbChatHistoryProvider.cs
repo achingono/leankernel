@@ -3,6 +3,7 @@ using LeanKernel.Entities;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Logic.Providers;
 
@@ -12,10 +13,16 @@ namespace LeanKernel.Logic.Providers;
 /// </summary>
 public class DbChatHistoryProvider(
     IDbContextFactory<EntityContext> dbContextFactory,
-    IPermit permit) : ChatHistoryProvider
+    IPermit permit,
+    ILogger<DbChatHistoryProvider>? logger = null) : ChatHistoryProvider
 {
     internal const string ChatSessionIdKey = "chatSessionId";
     internal const string ConversationIdKey = "conversationId";
+
+    /// <summary>
+    /// Maximum number of recent turns retrieved per session to bound context growth.
+    /// </summary>
+    internal const int RecentTurnWindow = 200;
 
     /// <inheritdoc />
     protected override async ValueTask<IEnumerable<ChatMessage>> ProvideChatHistoryAsync(
@@ -49,19 +56,20 @@ public class DbChatHistoryProvider(
             .Where(t => t.SessionId == chatSessionGuid)
             .ToListAsync(cancellationToken);
 
-        return turns.OrderBy(t => t.Timestamp).Select(t => new ChatMessage
-        {
-            AuthorName = t.AuthorName,
-            CreatedAt = t.Timestamp,
-            Role = t.Role switch
-            {
-                "user" => ChatRole.User,
-                "system" => ChatRole.System,
-                "assistant" => ChatRole.Assistant,
-                _ => ChatRole.User
-            },
-            Contents = [new TextContent(t.Content)]
-        }).ToList();
+        // Order and bound in memory — DB-side DateTimeOffset ordering is provider-dependent.
+        var recentTurns = turns
+            .OrderByDescending(t => t.Timestamp)
+            .Take(RecentTurnWindow)
+            .ToList();
+
+        if (recentTurns.Count == RecentTurnWindow)
+            logger?.LogDebug("Chat history truncated to {Window} turns for session {SessionId}", RecentTurnWindow, chatSessionGuid);
+
+        return recentTurns.OrderBy(t => t.Timestamp)
+            .Select(MapTurnToMessage)
+            .Where(m => m is not null)
+            .Cast<ChatMessage>()
+            .ToList();
     }
 
     /// <inheritdoc />
@@ -220,6 +228,33 @@ public class DbChatHistoryProvider(
                 FullName = "System",
                 Email = string.Empty
             }
+        };
+    }
+
+    /// <summary>
+    /// Converts a persisted turn entity to a chat message, preserving role semantics.
+    /// Returns null for unrecognized roles so they are skipped rather than corrupting message provenance.
+    /// </summary>
+    private static ChatMessage? MapTurnToMessage(TurnEntity t)
+    {
+        ChatRole? role = t.Role switch
+        {
+            "user" => ChatRole.User,
+            "system" => ChatRole.System,
+            "assistant" => ChatRole.Assistant,
+            "tool" => ChatRole.Tool,
+            _ => null
+        };
+
+        if (role is null)
+            return null;
+
+        return new ChatMessage
+        {
+            AuthorName = t.AuthorName,
+            CreatedAt = t.Timestamp,
+            Role = role.Value,
+            Contents = [new TextContent(t.Content)]
         };
     }
 }

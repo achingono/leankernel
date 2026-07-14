@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,14 +34,36 @@ if (builder.Environment.IsDevelopment())
 }
 
 // Bind configuration
+var identityConfig = builder.Configuration.GetSection("Identity").Get<IdentitySettings>() ?? new IdentitySettings();
+
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
-                               ForwardedHeaders.XForwardedProto |
-                               ForwardedHeaders.XForwardedHost;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
-    options.ForwardLimit = 2;
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // Only trust X-Forwarded-Host when a named proxy set is configured (C1).
+    var trustedProxyIPs = builder.Configuration
+        .GetSection("Identity:TrustedProxies")
+        .Get<string[]>() ?? [];
+
+    if (trustedProxyIPs.Length > 0)
+    {
+        options.ForwardedHeaders |= ForwardedHeaders.XForwardedHost;
+        options.KnownProxies.Clear();
+        options.KnownIPNetworks.Clear();
+        foreach (var proxyIp in trustedProxyIPs)
+        {
+            if (System.Net.IPAddress.TryParse(proxyIp, out var ip))
+                options.KnownProxies.Add(ip);
+            else if (System.Net.IPNetwork.TryParse(proxyIp, out var net))
+                options.KnownIPNetworks.Add(net);
+        }
+    }
+    else
+    {
+        // No trusted proxies configured — do not accept X-Forwarded-Host from arbitrary clients.
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    }
 });
 
 builder.Services.Configure<OpenAISettings>(builder.Configuration.GetSection("OpenAI"));
@@ -74,12 +97,43 @@ builder.Services.AddSession();
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
-        options.RequireHttpsMetadata = false;
-        options.TokenValidationParameters.ValidateIssuer = false;
-        options.TokenValidationParameters.ValidateAudience = false;
-        options.TokenValidationParameters.ValidateLifetime = false;
-        options.TokenValidationParameters.ValidateIssuerSigningKey = false;
+        options.RequireHttpsMetadata = identityConfig.OpenId.RequireHttpsMetadata;
         options.SaveToken = true;
+
+        // Enable real JWT validation when signing key is configured (C4).
+        // Keep validation disabled only when no key is provided (dev / test stubs).
+        var tokenSettings = identityConfig.Token;
+        var hasSigningKey = !string.IsNullOrWhiteSpace(tokenSettings.SecretKey);
+        var hasIssuer = !string.IsNullOrWhiteSpace(tokenSettings.Issuer);
+        var hasAudience = !string.IsNullOrWhiteSpace(tokenSettings.Audience);
+
+        if (hasSigningKey)
+        {
+            var key = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+                System.Text.Encoding.UTF8.GetBytes(tokenSettings.SecretKey));
+            options.TokenValidationParameters.IssuerSigningKey = key;
+        }
+
+        options.TokenValidationParameters.ValidateIssuerSigningKey = hasSigningKey;
+        options.TokenValidationParameters.ValidateIssuer = hasIssuer;
+        options.TokenValidationParameters.ValidateAudience = hasAudience;
+        options.TokenValidationParameters.ValidateLifetime = hasSigningKey;
+
+        if (hasIssuer)
+            options.TokenValidationParameters.ValidIssuer = tokenSettings.Issuer;
+
+        if (hasAudience)
+            options.TokenValidationParameters.ValidAudience = tokenSettings.Audience;
+
+        // Authority-based OIDC discovery takes priority when configured.
+        if (!string.IsNullOrWhiteSpace(identityConfig.OpenId.Authority))
+        {
+            options.Authority = identityConfig.OpenId.Authority;
+            options.TokenValidationParameters.ValidateIssuer = true;
+            options.TokenValidationParameters.ValidateAudience = !string.IsNullOrWhiteSpace(identityConfig.OpenId.ClientId);
+            options.TokenValidationParameters.ValidAudience = identityConfig.OpenId.ClientId;
+            options.TokenValidationParameters.ValidateIssuerSigningKey = true;
+        }
     });
 builder.Services.AddAuthorization();
 
@@ -178,6 +232,10 @@ app.UseCors("AllowLocal");
 app.UseSession();
 
 app.UseAuthentication();
+
+// Resolve tenant/user/channel identity eagerly before request handlers run (C2, M7).
+app.UseMiddleware<TenantResolutionMiddleware>();
+
 app.UseAuthorization();
 
 // Map endpoints

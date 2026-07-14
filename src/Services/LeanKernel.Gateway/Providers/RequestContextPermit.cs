@@ -1,31 +1,24 @@
 using System.Security.Claims;
 using LeanKernel;
 using LeanKernel.Entities;
-using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.Requests;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Gateway.Providers;
 
 /// <summary>
-/// Resolves <see cref="IPermit"/> from the current HTTP request's host, principal, and session,
-/// backed by persisted tenant, user, and channel entities.
+/// Resolves <see cref="IPermit"/> from values pre-populated in <see cref="HttpContext.Items"/>
+/// by <see cref="TenantResolutionMiddleware"/>. All identity resolution is performed
+/// asynchronously in the middleware; this class only reads already-resolved values,
+/// eliminating sync-over-async blocking on the hot request path (M7 / S1).
 /// </summary>
 public sealed class RequestContextPermit(
     IPrincipalAccessor principalAccessor,
     IHostNameAccessor hostNameAccessor,
-    IHttpContextAccessor httpContextAccessor,
-    IServiceProvider serviceProvider,
-    IOptions<IdentitySettings> identitySettings) : IPermit
+    IHttpContextAccessor httpContextAccessor) : IPermit
 {
-    private readonly Lazy<ClaimsPrincipal?> _claimsPrincipal = new(() => principalAccessor.Principal as ClaimsPrincipal); // S3604: Lazy initializer is required; no constructor assigns this member
+    private readonly Lazy<ClaimsPrincipal?> _claimsPrincipal = new(() => principalAccessor.Principal as ClaimsPrincipal);
 
-    private Guid? _resolvedTenantId;
-    private Guid? _resolvedUserId;
-    private Guid? _resolvedChannelId;
-    private Badge? _resolvedBadge;
-    private bool _resolving;
+    private HttpContext? Ctx => httpContextAccessor.HttpContext;
 
     /// <inheritdoc />
     public string HostName => hostNameAccessor.HostName;
@@ -35,122 +28,28 @@ public sealed class RequestContextPermit(
         _claimsPrincipal.Value?.Identity?.IsAuthenticated == true;
 
     /// <inheritdoc />
-    public string? SessionId =>
-        httpContextAccessor.HttpContext?.Session?.Id;
+    public string? SessionId => Ctx?.Session?.Id;
 
     /// <inheritdoc />
-    public Guid UserId
-    {
-        get
-        {
-            EnsureResolved();
-            return _resolvedUserId ?? Guid.Empty;
-        }
-    }
+    public Guid UserId =>
+        Ctx?.Items[TenantResolutionMiddleware.UserIdKey] is Guid uid ? uid : Guid.Empty;
 
     /// <inheritdoc />
-    public Guid TenantId
-    {
-        get
-        {
-            EnsureResolved();
-            return _resolvedTenantId ?? Guid.Empty;
-        }
-    }
+    public Guid TenantId =>
+        Ctx?.Items[TenantResolutionMiddleware.TenantKey] is Guid tid ? tid : Guid.Empty;
 
     /// <inheritdoc />
-    public Guid ChannelId
-    {
-        get
-        {
-            EnsureResolved();
-            return _resolvedChannelId ?? Guid.Empty;
-        }
-    }
+    public Guid ChannelId =>
+        Ctx?.Items[TenantResolutionMiddleware.ChannelIdKey] is Guid cid ? cid : Guid.Empty;
 
     /// <inheritdoc />
-    public Badge Badge
-    {
-        get
-        {
-            EnsureResolved();
-            return _resolvedBadge ?? new Badge
+    public Badge Badge =>
+        Ctx?.Items[TenantResolutionMiddleware.BadgeKey] is Badge badge
+            ? badge
+            : new Badge
             {
-                Id = UserId,
-                FullName = "Anonymous",
-                Email = string.Empty
+                Id = Guid.Empty,
+                FullName = "System",
+                Email = "system@leankernel.local"
             };
-        }
-    }
-
-    /// <summary>
-    /// Resolves and caches the request-scoped tenant, user, channel, and badge values.
-    /// </summary>
-    private void EnsureResolved()
-    {
-        if (_resolvedTenantId.HasValue)
-            return;
-
-        if (_resolving)
-            return;
-
-        _resolving = true;
-        try
-        {
-            if (httpContextAccessor.HttpContext is null)
-            {
-                _resolvedTenantId = Guid.Empty;
-                _resolvedUserId = Guid.Empty;
-                _resolvedChannelId = Guid.Empty;
-                _resolvedBadge = new Badge
-                {
-                    Id = Guid.Empty,
-                    FullName = "System",
-                    Email = "system@leankernel.local"
-                };
-                return;
-            }
-
-            var identityResolver = serviceProvider.GetRequiredService<IIdentityResolver>();
-            var ct = CancellationToken.None;
-            var hostName = HostName;
-
-            // Resolve tenant from host
-            var tenant = identityResolver.ResolveTenantAsync(hostName, ct).GetAwaiter().GetResult();
-            _resolvedTenantId = tenant?.Id ?? Guid.Empty;
-
-            // Resolve user from principal or create guest
-            if (IsAuthenticated && _claimsPrincipal.Value is { } cp)
-            {
-                var user = identityResolver.ResolveOrCreateUserAsync(cp, ct).GetAwaiter().GetResult();
-                _resolvedUserId = user.Id;
-                _resolvedBadge = cp.ToBadge();
-                _resolvedBadge.Id = user.Id;
-            }
-            else
-            {
-                var guestUser = identityResolver.ResolveGuestUserAsync(
-                    _resolvedTenantId.Value,
-                    identitySettings.Value.AnonymousUserName,
-                    SessionId ?? Guid.NewGuid().ToString("N"),
-                    ct).GetAwaiter().GetResult();
-                _resolvedUserId = guestUser.Id;
-                _resolvedBadge = new Badge
-                {
-                    Id = guestUser.Id,
-                    FullName = identitySettings.Value.AnonymousFullName,
-                    Email = string.Empty
-                };
-            }
-
-            // Resolve channel for OpenAI HTTP surface
-            var channel = identityResolver.ResolveOrCreateChannelAsync(
-                ChannelEntity.OpenAiHttpName, ct).GetAwaiter().GetResult();
-            _resolvedChannelId = channel.Id;
-        }
-        finally
-        {
-            _resolving = false;
-        }
-    }
 }

@@ -4,6 +4,7 @@ using LeanKernel.Entities;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Gateway.Sessions;
 
@@ -14,7 +15,8 @@ namespace LeanKernel.Gateway.Sessions;
 /// </summary>
 public class DbAgentStateStore(
     EntityContext entityContext,
-    IPermit permit) : AgentSessionStore
+    IPermit permit,
+    ILogger<DbAgentStateStore> logger) : AgentSessionStore
 {
     private static readonly JsonSerializerOptions s_jsonOptions = new()
     {
@@ -40,8 +42,9 @@ public class DbAgentStateStore(
                 return JsonSerializer.Deserialize<ChatClientAgentSession>(doc, s_jsonOptions)
                     ?? await agent.CreateSessionAsync(cancellationToken);
             }
-            catch
+            catch (Exception ex)
             {
+                logger.LogWarning(ex, "Failed to deserialize agent session state for conversation {ConversationId}; starting a new session.", conversationId);
                 // Fall through to create new session if deserialization fails
             }
         }
@@ -68,8 +71,7 @@ public class DbAgentStateStore(
             stateJson = "{}";
         }
 
-        entityContext.ChangeTracker.Clear();
-
+        // Use a tracked query so EF manages the RowVersion concurrency token.
         var existing = await entityContext.AgentStates
             .FirstOrDefaultAsync(e => e.ScopedConversationId == conversationId, cancellationToken);
 
@@ -96,8 +98,23 @@ public class DbAgentStateStore(
         {
             await entityContext.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // Reload the winning state from the store and retry once.
+            foreach (var entry in ex.Entries)
+                await entry.ReloadAsync(cancellationToken);
+
+            var conflicted = ex.Entries.FirstOrDefault()?.Entity as AgentStateEntity;
+            if (conflicted is not null)
+            {
+                conflicted.StateJson = stateJson;
+                conflicted.UpdatedOn = DateTimeOffset.UtcNow;
+                await entityContext.SaveChangesAsync(cancellationToken);
+            }
+        }
         catch (DbUpdateException)
         {
+            // Duplicate key on concurrent insert: reload and update.
             entityContext.ChangeTracker.Clear();
             var conflicted = await entityContext.AgentStates
                 .FirstOrDefaultAsync(e => e.ScopedConversationId == conversationId, cancellationToken);

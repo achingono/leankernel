@@ -103,8 +103,11 @@ public sealed class IdentityResolver(
     {
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
 
+        // Embed tenantId in the subject so guests are partitioned by tenant (M5).
+        var tenantScopedSubject = $"{tenantId:N}:{sessionId}";
+
         var guest = await context.Users
-            .FirstOrDefaultAsync(u => u.Issuer == "anonymous" && u.Subject == sessionId && !u.IsDeleted, ct);
+            .FirstOrDefaultAsync(u => u.Issuer == "anonymous" && u.Subject == tenantScopedSubject && !u.IsDeleted, ct);
 
         if (guest is not null)
             return guest;
@@ -113,7 +116,7 @@ public sealed class IdentityResolver(
         {
             Id = Guid.NewGuid(),
             Issuer = "anonymous",
-            Subject = sessionId,
+            Subject = tenantScopedSubject,
             UserName = anonymousUserName,
             FullName = anonymousUserName,
             IsActive = true,
@@ -131,12 +134,12 @@ public sealed class IdentityResolver(
         {
             context.ChangeTracker.Clear();
             guest = await context.Users
-                .FirstOrDefaultAsync(u => u.Issuer == "anonymous" && u.Subject == sessionId && !u.IsDeleted, ct);
+                .FirstOrDefaultAsync(u => u.Issuer == "anonymous" && u.Subject == tenantScopedSubject && !u.IsDeleted, ct);
             if (guest is null)
                 throw;
         }
 
-        logger.LogInformation("Created guest user {UserId} (name={Name}, session={SessionId})", guest!.Id, anonymousUserName, sessionId);
+        logger.LogInformation("Created guest user {UserId} (name={Name}, session={SessionId}, tenant={TenantId})", guest!.Id, anonymousUserName, sessionId, tenantId);
         return guest;
     }
 

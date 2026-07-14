@@ -41,7 +41,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
             {
                 query,
                 limit = maxResults,
-                namespace_name = scope.Namespace
+                namespace_name = BuildScopedNamespace(scope)
             }, ct).ConfigureAwait(false);
 
             if (result is null)
@@ -75,6 +75,17 @@ public sealed class GBrainMemoryClient : IMemoryClient
             slug,
             content
         }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Builds the GBrain namespace used to scope memory search results.
+    /// Derived from the same tenant/user/channel identifiers used by <see cref="BuildScopedSlug"/>.
+    /// </summary>
+    /// <param name="scope">The memory scope to derive the namespace from.</param>
+    /// <returns>The scoped namespace string.</returns>
+    private static string BuildScopedNamespace(MemoryScope scope)
+    {
+        return $"memory/{scope.TenantId}/{scope.UserId}/{scope.ChannelId}";
     }
 
     /// <summary>

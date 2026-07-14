@@ -115,6 +115,9 @@ public class EntityContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
             entity.OwnsOne(e => e.CreatedBy);
             entity.OwnsOne(e => e.UpdatedBy);
+            // Ignore the Sessions collection navigation to prevent EF from inferring a duplicate
+            // shadow FK alongside the explicitly mapped TenantId FK on SessionEntity (M2).
+            entity.Ignore(e => e.Sessions);
         });
 
         // UserEntity

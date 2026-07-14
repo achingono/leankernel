@@ -186,15 +186,10 @@ public class NewCodeCoverageTests
         var principalAccessor = new Mock<IPrincipalAccessor>();
         var hostAccessor = new Mock<IHostNameAccessor>();
         hostAccessor.Setup(h => h.HostName).Returns("test-host");
-        var sp = new Mock<IServiceProvider>();
-        var settings = Options.Create(new IdentitySettings());
-
         var permit = new RequestContextPermit(
             principalAccessor.Object,
             hostAccessor.Object,
-            httpAccessor.Object,
-            sp.Object,
-            settings);
+            httpAccessor.Object);
 
         permit.HostName.Should().Be("test-host");
     }
@@ -207,15 +202,10 @@ public class NewCodeCoverageTests
         var principalAccessor = new Mock<IPrincipalAccessor>();
         var hostAccessor = new Mock<IHostNameAccessor>();
         hostAccessor.Setup(h => h.HostName).Returns("localhost");
-        var sp = new Mock<IServiceProvider>();
-        var settings = Options.Create(new IdentitySettings());
-
         var permit = new RequestContextPermit(
             principalAccessor.Object,
             hostAccessor.Object,
-            httpAccessor.Object,
-            sp.Object,
-            settings);
+            httpAccessor.Object);
 
         permit.IsAuthenticated.Should().BeFalse();
     }
@@ -232,15 +222,10 @@ public class NewCodeCoverageTests
         var principalAccessor = new Mock<IPrincipalAccessor>();
         var hostAccessor = new Mock<IHostNameAccessor>();
         hostAccessor.Setup(h => h.HostName).Returns("localhost");
-        var sp = new Mock<IServiceProvider>();
-        var settings = Options.Create(new IdentitySettings());
-
         var permit = new RequestContextPermit(
             principalAccessor.Object,
             hostAccessor.Object,
-            httpAccessor.Object,
-            sp.Object,
-            settings);
+            httpAccessor.Object);
 
         permit.SessionId.Should().NotBeNull();
     }
@@ -253,15 +238,10 @@ public class NewCodeCoverageTests
         var principalAccessor = new Mock<IPrincipalAccessor>();
         var hostAccessor = new Mock<IHostNameAccessor>();
         hostAccessor.Setup(h => h.HostName).Returns("localhost");
-        var sp = new Mock<IServiceProvider>();
-        var settings = Options.Create(new IdentitySettings());
-
         var permit = new RequestContextPermit(
             principalAccessor.Object,
             hostAccessor.Object,
-            httpAccessor.Object,
-            sp.Object,
-            settings);
+            httpAccessor.Object);
 
         permit.UserId.Should().Be(Guid.Empty);
         permit.TenantId.Should().Be(Guid.Empty);
@@ -276,15 +256,10 @@ public class NewCodeCoverageTests
         var principalAccessor = new Mock<IPrincipalAccessor>();
         var hostAccessor = new Mock<IHostNameAccessor>();
         hostAccessor.Setup(h => h.HostName).Returns("localhost");
-        var sp = new Mock<IServiceProvider>();
-        var settings = Options.Create(new IdentitySettings());
-
         var permit = new RequestContextPermit(
             principalAccessor.Object,
             hostAccessor.Object,
-            httpAccessor.Object,
-            sp.Object,
-            settings);
+            httpAccessor.Object);
 
         var badge = permit.Badge;
         badge.Should().NotBeNull();
@@ -299,15 +274,10 @@ public class NewCodeCoverageTests
         var principalAccessor = new Mock<IPrincipalAccessor>();
         var hostAccessor = new Mock<IHostNameAccessor>();
         hostAccessor.Setup(h => h.HostName).Returns("localhost");
-        var sp = new Mock<IServiceProvider>();
-        var settings = Options.Create(new IdentitySettings());
-
         var permit = new RequestContextPermit(
             principalAccessor.Object,
             hostAccessor.Object,
-            httpAccessor.Object,
-            sp.Object,
-            settings);
+            httpAccessor.Object);
 
         var first = permit.UserId;
         var second = permit.UserId;
@@ -326,7 +296,7 @@ public class NewCodeCoverageTests
         permit.Setup(p => p.UserId).Returns(Guid.NewGuid());
         permit.Setup(p => p.ChannelId).Returns(Guid.NewGuid());
 
-        var store = new DbAgentStateStore(context, permit.Object);
+        var store = new DbAgentStateStore(context, permit.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<DbAgentStateStore>.Instance);
         var agent = CreateStubAgent();
         var convId = $"test-conv-{Guid.NewGuid():N}";
         var session1 = await agent.CreateSessionAsync();
@@ -366,7 +336,7 @@ public class NewCodeCoverageTests
         });
         await context.SaveChangesAsync();
 
-        var store = new DbAgentStateStore(context, permit.Object);
+        var store = new DbAgentStateStore(context, permit.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<DbAgentStateStore>.Instance);
         var agent = CreateStubAgent();
 
         var session = await store.GetSessionAsync(agent, convId);
@@ -398,7 +368,7 @@ public class NewCodeCoverageTests
         });
         await context.SaveChangesAsync();
 
-        var store = new DbAgentStateStore(context, permit.Object);
+        var store = new DbAgentStateStore(context, permit.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<DbAgentStateStore>.Instance);
         var agent = CreateStubAgent();
 
         var session = await store.GetSessionAsync(agent, convId);

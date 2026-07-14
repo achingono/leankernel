@@ -62,9 +62,11 @@ public class MemoryProvider(
                 ]
             };
         }
-        catch
+        catch (Exception ex)
         {
             // Degrade gracefully when memory service is unavailable
+            logger.LogWarning(ex, "Memory search failed for scope (tenant={TenantId}, user={UserId}, channel={ChannelId}); continuing without memory context.",
+                scope.TenantId, scope.UserId, scope.ChannelId);
             return new AIContext { Messages = [] };
         }
     }
