@@ -9,6 +9,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
+SEQUENCE_POINT_XPATH = ".//SequencePoint"
+
+
 def merge_reports(results_dir: Path) -> None:
     reports = sorted(results_dir.glob("**/coverage.opencover.xml"))
     if not reports:
@@ -32,7 +35,7 @@ def merge_reports(results_dir: Path) -> None:
         root = tree.getroot()
         if base_tree is None:
             base_tree = tree
-        for sp in root.findall(".//SequencePoint"):
+        for sp in root.findall(SEQUENCE_POINT_XPATH):
             file_ref = sp.attrib.get("fileid", "")
             start_line = sp.attrib.get("sl", "")
             key = (file_ref, start_line)
@@ -44,15 +47,15 @@ def merge_reports(results_dir: Path) -> None:
         sys.exit("No reports parsed")
 
     base_root = base_tree.getroot()
-    for sp in base_root.findall(".//SequencePoint"):
+    for sp in base_root.findall(SEQUENCE_POINT_XPATH):
         file_ref = sp.attrib.get("fileid", "")
         start_line = sp.attrib.get("sl", "")
         key = (file_ref, start_line)
         sp.set("vc", str(visit_counts.get(key, int(sp.attrib.get("vc", "0")))))
 
-    total = len(base_root.findall(".//SequencePoint"))
+    total = len(base_root.findall(SEQUENCE_POINT_XPATH))
     covered = sum(
-        1 for sp in base_root.findall(".//SequencePoint")
+        1 for sp in base_root.findall(SEQUENCE_POINT_XPATH)
         if int(sp.attrib.get("vc", "0")) > 0
     )
     pct = covered / total * 100 if total else 0
