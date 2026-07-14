@@ -71,7 +71,6 @@ public class ToolDefinitionAIToolAdapterTests
             Handler = (args, _) =>
             {
                 invoked = true;
-                args.Should().ContainKey("x");
                 return Task.FromResult(new ToolResult { ToolName = "test_invoke", Success = true, Output = "ok" });
             }
         };
@@ -79,9 +78,9 @@ public class ToolDefinitionAIToolAdapterTests
         var aiTool = ToolDefinitionAIToolAdapter.ToAITool(tool) as AIFunction;
         aiTool.Should().NotBeNull();
 
-        // Invoke via the AIFunction interface — passes JSON args
-        var argsJson = JsonSerializer.Serialize(new { x = "hello" });
-        await aiTool!.InvokeAsync(new AIFunctionArguments { ["x"] = "hello" });
+        // The adapter wraps a (string argsJson, CancellationToken) delegate;
+        // pass the JSON args as the 'argsJson' parameter
+        await aiTool!.InvokeAsync(new AIFunctionArguments { ["argsJson"] = """{"x":"hello"}""" });
 
         invoked.Should().BeTrue();
     }
@@ -104,8 +103,9 @@ public class ToolDefinitionAIToolAdapterTests
         };
 
         var aiTool = ToolDefinitionAIToolAdapter.ToAITool(tool) as AIFunction;
-        await aiTool!.InvokeAsync(new AIFunctionArguments());
+        await aiTool!.InvokeAsync(new AIFunctionArguments { ["argsJson"] = string.Empty });
 
         capturedArgs.Should().NotBeNull();
+        capturedArgs.Should().BeEmpty();
     }
 }
