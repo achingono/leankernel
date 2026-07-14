@@ -57,4 +57,55 @@ public class ToolDefinitionAIToolAdapterTests
         var act = () => ToolDefinitionAIToolAdapter.ToAITools(null!).ToList();
         act.Should().Throw<ArgumentNullException>();
     }
+
+    [Fact]
+    public async Task ToAITool_InvokedWithValidJson_CallsHandler()
+    {
+        var invoked = false;
+        var tool = new ToolDefinition
+        {
+            Name = "test_invoke",
+            Description = "Test",
+            Category = "test",
+            Parameters = [new ToolParameter { Name = "x", Type = "string", Required = true }],
+            Handler = (args, _) =>
+            {
+                invoked = true;
+                args.Should().ContainKey("x");
+                return Task.FromResult(new ToolResult { ToolName = "test_invoke", Success = true, Output = "ok" });
+            }
+        };
+
+        var aiTool = ToolDefinitionAIToolAdapter.ToAITool(tool) as AIFunction;
+        aiTool.Should().NotBeNull();
+
+        // Invoke via the AIFunction interface — passes JSON args
+        var argsJson = JsonSerializer.Serialize(new { x = "hello" });
+        await aiTool!.InvokeAsync(new AIFunctionArguments { ["x"] = "hello" });
+
+        invoked.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ToAITool_InvokedWithEmptyArgs_UsesEmptyDictionary()
+    {
+        var capturedArgs = (IReadOnlyDictionary<string, object?>?)null;
+        var tool = new ToolDefinition
+        {
+            Name = "no_args",
+            Description = "No args",
+            Category = "test",
+            Parameters = [],
+            Handler = (args, _) =>
+            {
+                capturedArgs = args;
+                return Task.FromResult(new ToolResult { ToolName = "no_args", Success = true, Output = "ok" });
+            }
+        };
+
+        var aiTool = ToolDefinitionAIToolAdapter.ToAITool(tool) as AIFunction;
+        await aiTool!.InvokeAsync(new AIFunctionArguments());
+
+        capturedArgs.Should().NotBeNull();
+    }
 }

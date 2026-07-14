@@ -227,4 +227,137 @@ public class DynamicSkillToolTests
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("allowlist");
     }
+
+    [Fact]
+    public async Task Handler_PostMethod_SendsJsonBody()
+    {
+        string? capturedBody = null;
+        var mockHandler = new Mock<HttpMessageHandler>();
+        mockHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Returns<HttpRequestMessage, CancellationToken>(async (req, ct) =>
+            {
+                capturedBody = await req.Content!.ReadAsStringAsync(ct);
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
+            });
+
+        var skill = MakeSkill("svc", "https://api.example.com");
+        var op = new SkillOperation
+        {
+            Id = "create",
+            Summary = "Create item",
+            HttpMethod = "POST",
+            HttpPath = "/items",
+            Parameters = [new SkillOperationParameter { Name = "name", Type = "string", Required = true }]
+        };
+
+        var tool = DynamicSkillTool.Create(skill, op, BuildScopeFactory(mockHandler.Object));
+        var result = await tool.Handler(new Dictionary<string, object?> { ["name"] = "test-item" }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        capturedBody.Should().Contain("test-item");
+    }
+
+    [Fact]
+    public async Task Handler_GetWithRemainingParams_AppendsQueryString()
+    {
+        HttpRequestMessage? captured = null;
+        var mockHandler = new Mock<HttpMessageHandler>();
+        mockHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+
+        var skill = MakeSkill("svc", "https://api.example.com");
+        var op = new SkillOperation
+        {
+            Id = "search",
+            Summary = "Search",
+            HttpMethod = "GET",
+            HttpPath = "/search",
+            Parameters = [new SkillOperationParameter { Name = "q", Type = "string", Required = true }]
+        };
+
+        var tool = DynamicSkillTool.Create(skill, op, BuildScopeFactory(mockHandler.Object));
+        await tool.Handler(new Dictionary<string, object?> { ["q"] = "hello world" }, CancellationToken.None);
+
+        captured!.RequestUri!.Query.Should().Contain("hello%20world");
+    }
+
+    [Fact]
+    public async Task Handler_BearerAuthWithEnvVar_SendsToken()
+    {
+        Environment.SetEnvironmentVariable("SKILL__TEST_SECRET", "env-token-value");
+        HttpRequestMessage? captured = null;
+        var mockHandler = new Mock<HttpMessageHandler>();
+        mockHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+
+        var skill = new SkillDefinition
+        {
+            Name = "svc",
+            Description = "Secure svc",
+            Runtime = new SkillRuntimeConfig
+            {
+                Type = "http",
+                BaseUrl = "https://api.example.com",
+                Auth = new SkillAuthConfig { Type = "bearer", SecretRef = "test-secret" }
+            },
+            AllowedHosts = ["api.example.com"],
+            Operations = []
+        };
+        var op = MakeOperation("get");
+        var tool = DynamicSkillTool.Create(skill, op, BuildScopeFactory(mockHandler.Object));
+
+        await tool.Handler(new Dictionary<string, object?>(), CancellationToken.None);
+
+        captured!.Headers.Authorization!.Scheme.Should().Be("Bearer");
+        captured.Headers.Authorization.Parameter.Should().Be("env-token-value");
+        Environment.SetEnvironmentVariable("SKILL__TEST_SECRET", null);
+    }
+
+    [Fact]
+    public async Task Handler_SecretNotFound_ReturnsError()
+    {
+        var skill = new SkillDefinition
+        {
+            Name = "svc",
+            Description = "Secure svc",
+            Runtime = new SkillRuntimeConfig
+            {
+                Type = "http",
+                BaseUrl = "https://api.example.com",
+                Auth = new SkillAuthConfig { Type = "bearer", SecretRef = "nonexistent-secret-xyz" }
+            },
+            AllowedHosts = ["api.example.com"],
+            Operations = []
+        };
+        var op = MakeOperation("get");
+        var tool = DynamicSkillTool.Create(skill, op, BuildScopeFactory());
+
+        var result = await tool.Handler(new Dictionary<string, object?>(), CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("nonexistent-secret-xyz");
+    }
+
+    [Fact]
+    public async Task Handler_HttpError_ReturnsFailure()
+    {
+        var mockHandler = new Mock<HttpMessageHandler>();
+        mockHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = new StringContent("error") });
+
+        var skill = MakeSkill("svc", "https://api.example.com");
+        var op = MakeOperation("get");
+        var tool = DynamicSkillTool.Create(skill, op, BuildScopeFactory(mockHandler.Object));
+
+        var result = await tool.Handler(new Dictionary<string, object?>(), CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("500");
+    }
 }

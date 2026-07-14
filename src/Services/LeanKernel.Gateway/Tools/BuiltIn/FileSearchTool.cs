@@ -131,6 +131,12 @@ public static class FileSearchTool
         int MaxScanned,
         long MaxFileBytes);
 
+    private sealed record FileEntryContext(
+        string Entry,
+        string RelativePath,
+        string FileName,
+        bool NameMatch);
+
     private static async Task<FileSearchResponse> SearchAsync(FileSearchOptions opts, CancellationToken ct)
     {
         var matches = new List<FileSearchMatch>();
@@ -142,56 +148,57 @@ public static class FileSearchTool
         while (stack.Count > 0 && matches.Count < opts.Limit && !truncated)
         {
             ct.ThrowIfCancellationRequested();
-            var (dir, depth) = stack.Pop();
+            (truncated, scanned) = await ProcessDirectoryAsync(matches, stack, opts, scanned, truncated, ct).ConfigureAwait(false);
+        }
 
-            IEnumerable<string> entries;
-            try
+        return new FileSearchResponse { Matches = matches, Scanned = scanned, Truncated = truncated };
+    }
+
+    private static async Task<(bool truncated, int scanned)> ProcessDirectoryAsync(
+        List<FileSearchMatch> matches,
+        Stack<(string Path, int Depth)> stack,
+        FileSearchOptions opts,
+        int scanned,
+        bool truncated,
+        CancellationToken ct)
+    {
+        var (dir, depth) = stack.Pop();
+        IEnumerable<string> entries;
+        try
+        {
+            entries = Directory.EnumerateFileSystemEntries(dir);
+        }
+        catch
+        {
+            return (truncated, scanned);
+        }
+
+        foreach (var entry in entries)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (scanned >= opts.MaxScanned)
             {
-                entries = Directory.EnumerateFileSystemEntries(dir);
+                return (true, scanned);
             }
-            catch
+
+            scanned++;
+            if (Directory.Exists(entry))
             {
+                if (depth < opts.MaxDepth)
+                {
+                    stack.Push((entry, depth + 1));
+                }
+
                 continue;
             }
 
-            foreach (var entry in entries)
+            if (await TryAddMatchAsync(matches, entry, opts, ct).ConfigureAwait(false) && matches.Count >= opts.Limit)
             {
-                ct.ThrowIfCancellationRequested();
-
-                if (scanned >= opts.MaxScanned)
-                {
-                    truncated = true;
-                    break;
-                }
-
-                scanned++;
-
-                if (Directory.Exists(entry))
-                {
-                    if (depth < opts.MaxDepth)
-                    {
-                        stack.Push((entry, depth + 1));
-                    }
-
-                    continue;
-                }
-
-                if (await TryAddMatchAsync(matches, entry, opts, ct).ConfigureAwait(false))
-                {
-                    if (matches.Count >= opts.Limit)
-                    {
-                        break;
-                    }
-                }
+                break;
             }
         }
 
-        return new FileSearchResponse
-        {
-            Matches = matches,
-            Scanned = scanned,
-            Truncated = truncated
-        };
+        return (truncated, scanned);
     }
 
     private static async Task<bool> TryAddMatchAsync(
@@ -204,48 +211,34 @@ public static class FileSearchTool
         var relativePath = Path.GetRelativePath(opts.RootPath, entry);
         var nameMatch = !string.IsNullOrWhiteSpace(opts.NameTerm) &&
             fileName.Contains(opts.NameTerm, StringComparison.OrdinalIgnoreCase);
+        var ctx = new FileEntryContext(entry, relativePath, fileName, nameMatch);
 
-        if (!string.IsNullOrWhiteSpace(opts.ContentTerm))
+        var info = new FileInfo(entry);
+        if (!string.IsNullOrWhiteSpace(opts.ContentTerm) && info.Length <= opts.MaxFileBytes && IsTextFile(entry) &&
+            await TryAddContentMatchAsync(matches, ctx, info.Length, opts.ContentTerm, ct).ConfigureAwait(false))
         {
-            var info = new FileInfo(entry);
-            if (info.Length <= opts.MaxFileBytes && IsTextFile(entry))
-            {
-                if (await TryAddContentMatchAsync(matches, entry, relativePath, fileName, info.Length, nameMatch, opts.ContentTerm, ct).ConfigureAwait(false))
-                {
-                    return true;
-                }
-            }
-        }
-
-        if (nameMatch)
-        {
-            matches.Add(new FileSearchMatch
-            {
-                Path = relativePath,
-                Name = fileName,
-                MatchType = "name",
-                SizeBytes = new FileInfo(entry).Length
-            });
-
             return true;
         }
 
-        return false;
+        if (!nameMatch)
+        {
+            return false;
+        }
+
+        matches.Add(new FileSearchMatch { Path = relativePath, Name = fileName, MatchType = "name", SizeBytes = new FileInfo(entry).Length });
+        return true;
     }
 
     private static async Task<bool> TryAddContentMatchAsync(
         List<FileSearchMatch> matches,
-        string entry,
-        string relativePath,
-        string fileName,
+        FileEntryContext ctx,
         long sizeBytes,
-        bool nameMatch,
         string contentTerm,
         CancellationToken ct)
     {
         try
         {
-            var text = await File.ReadAllTextAsync(entry, ct).ConfigureAwait(false);
+            var text = await File.ReadAllTextAsync(ctx.Entry, ct).ConfigureAwait(false);
             if (!text.Contains(contentTerm, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
@@ -253,9 +246,9 @@ public static class FileSearchTool
 
             matches.Add(new FileSearchMatch
             {
-                Path = relativePath,
-                Name = fileName,
-                MatchType = nameMatch ? "name+content" : "content",
+                Path = ctx.RelativePath,
+                Name = ctx.FileName,
+                MatchType = ctx.NameMatch ? "name+content" : "content",
                 SizeBytes = sizeBytes
             });
 

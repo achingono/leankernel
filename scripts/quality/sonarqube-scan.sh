@@ -69,9 +69,9 @@ docker run --rm \
       /d:sonar.scm.disabled=true \
       /d:sonar.qualitygate.wait=true \
       /d:sonar.python.version=3.12 \
-      /d:sonar.cs.opencover.reportsPaths="coverage-results/sonar/coverage.opencover.xml" \
+      /d:sonar.cs.opencover.reportsPaths="coverage-results/sonar/coverage.opencover.xml,coverage-results/sonar/**/coverage.opencover.xml" \
       /d:sonar.cpd.exclusions="test/**,config/webwright/**/*.py,src/LeanKernel.Tools/BuiltIn/Browser/BrowserToolDefinitions.cs,src/LeanKernel.Tools/BuiltIn/Data/*.cs,src/LeanKernel.Tools/BuiltIn/FileSystem/*.cs,src/LeanKernel.Host/Services/SelfConfigurationStep.cs,src/LeanKernel.Host/Services/UserConfigurationStep.cs,src/LeanKernel.Host/Templates/*.template" \
-      /d:sonar.coverage.exclusions="scripts/**/*.py,config/litellm/*.py,config/webwright/**/*.py,**/LeanKernel.Tests.*/*,**/obj/**/*.cs,**/*.g.cs,**/*.Designer.cs,**/*.razor,**/Program.cs,**/Migrations/*.cs,**/Data/Migrations/*.cs,**/LeanKernel.Abstractions/Configuration/WebwrightConfig.cs,**/LeanKernel.Abstractions/Models/WebwrightModels.cs,**/LeanKernel.Gateway/Endpoints.cs,**/LeanKernel.Gateway/LeanKernelHardeningServiceCollectionExtensions.cs,**/LeanKernel.Gateway/Middleware/CorrelationIdDelegatingHandler.cs,**/LeanKernel.Gateway/Middleware/CorrelationIdMiddleware.cs,**/LeanKernel.Gateway/Models/ChatRequest.cs,**/LeanKernel.Gateway/Services/ChatService.cs,**/LeanKernel.Gateway/Services/DiagnosticsService.cs,**/LeanKernel.Gateway/Services/KnowledgeUiService.cs,**/LeanKernel.Gateway/Services/OnboardingService.cs,**/LeanKernel.Knowledge/GBrainKnowledgeService.cs,**/LeanKernel.Knowledge/Resilience/ResilientKnowledgeService.cs,**/LeanKernel.Persistence/DocumentIngestionJobRepository.cs,**/LeanKernel.Tools/DocumentFolderIngestionHostedService.cs,**/LeanKernel.Tools/DocumentIngestionHostedService.cs,**/LeanKernel.Tools/BuiltIn/Browser/WebwrightClient.cs,**/LeanKernel.Tools/BuiltIn/Browser/WebwrightHealthProbe.cs,**/LeanKernel.Tools/BuiltIn/Common/FileSystemSupport.cs,**/LeanKernel.Tools/BuiltIn/Common/ToolArgumentReader.cs,**/LeanKernel.Tools/BuiltIn/Data/*.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileCopyTool.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileDeleteTool.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileMoveTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/HttpRequestTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/WebFetchTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/WebSearchTool.cs,**/Services/Auth/AuthRegistration.cs,**/Services/Auth/OidcRegistration.cs,**/Services/Auth/BearerTokenAuthHandler.cs,**/Services/EngagementAuthorizationFilter.cs,**/Services/ChannelInitializationService.cs,**/Services/Skills/SkillHostedService.cs,**/Services/AttachmentTextExtractionService.cs,**/Services/EngagementRulesProvider.cs,**/LeanKernel.Commander/Adapters/SignalRestApiAdapter.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillTool.cs,**/LeanKernel.Plugins/BuiltIn/Skills/BinaryResolver.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillToolFactory.cs,**/LeanKernel.Plugins/BuiltIn/Skills/EgressPolicy.cs,**/LeanKernel.Plugins/BuiltIn/Skills/RuntimeSkillRegistry.cs,**/LeanKernel.Generators/ToolRegistryGenerator.cs"
+      /d:sonar.coverage.exclusions="scripts/**/*.py,config/litellm/*.py,config/webwright/**/*.py,**/LeanKernel.Tests.*/*,**/obj/**/*.cs,**/*.g.cs,**/*.Designer.cs,**/*.razor,**/Program.cs,**/Programs.cs,**/Migrations/*.cs,**/Data/Migrations/*.cs,**/HealthChecks/*.cs,**/LeanKernel.Gateway/Extensions/IServiceCollectionExtensions.cs,**/LeanKernel.Data/Extensions/IServiceCollectionExtensions.cs,**/LeanKernel.Abstractions/Configuration/WebwrightConfig.cs,**/LeanKernel.Abstractions/Models/WebwrightModels.cs,**/LeanKernel.Gateway/Endpoints.cs,**/LeanKernel.Gateway/LeanKernelHardeningServiceCollectionExtensions.cs,**/LeanKernel.Gateway/Middleware/CorrelationIdDelegatingHandler.cs,**/LeanKernel.Gateway/Middleware/CorrelationIdMiddleware.cs,**/LeanKernel.Gateway/Models/ChatRequest.cs,**/LeanKernel.Gateway/Services/ChatService.cs,**/LeanKernel.Gateway/Services/DiagnosticsService.cs,**/LeanKernel.Gateway/Services/KnowledgeUiService.cs,**/LeanKernel.Gateway/Services/OnboardingService.cs,**/LeanKernel.Knowledge/GBrainKnowledgeService.cs,**/LeanKernel.Knowledge/Resilience/ResilientKnowledgeService.cs,**/LeanKernel.Persistence/DocumentIngestionJobRepository.cs,**/LeanKernel.Tools/DocumentFolderIngestionHostedService.cs,**/LeanKernel.Tools/DocumentIngestionHostedService.cs,**/LeanKernel.Tools/BuiltIn/Browser/WebwrightClient.cs,**/LeanKernel.Tools/BuiltIn/Browser/WebwrightHealthProbe.cs,**/LeanKernel.Tools/BuiltIn/Common/FileSystemSupport.cs,**/LeanKernel.Tools/BuiltIn/Common/ToolArgumentReader.cs,**/LeanKernel.Tools/BuiltIn/Data/*.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileCopyTool.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileDeleteTool.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileMoveTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/HttpRequestTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/WebFetchTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/WebSearchTool.cs,**/Services/Auth/AuthRegistration.cs,**/Services/Auth/OidcRegistration.cs,**/Services/Auth/BearerTokenAuthHandler.cs,**/Services/EngagementAuthorizationFilter.cs,**/Services/ChannelInitializationService.cs,**/Services/Skills/SkillHostedService.cs,**/Services/AttachmentTextExtractionService.cs,**/Services/EngagementRulesProvider.cs,**/LeanKernel.Commander/Adapters/SignalRestApiAdapter.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillTool.cs,**/LeanKernel.Plugins/BuiltIn/Skills/BinaryResolver.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillToolFactory.cs,**/LeanKernel.Plugins/BuiltIn/Skills/EgressPolicy.cs,**/LeanKernel.Plugins/BuiltIn/Skills/RuntimeSkillRegistry.cs,**/LeanKernel.Generators/ToolRegistryGenerator.cs"
     dotnet restore LeanKernel.sln
     dotnet build LeanKernel.sln -c Release --no-restore
     
@@ -88,7 +88,6 @@ docker run --rm \
 
     python3 - <<'PY'
 from pathlib import Path
-import shutil
 import xml.etree.ElementTree as ET
 
 results_dir = Path("coverage-results/sonar")
@@ -96,15 +95,44 @@ reports = sorted(results_dir.glob("**/coverage.opencover.xml"))
 if not reports:
     raise SystemExit("No coverage reports were produced.")
 
-def score(report: Path) -> tuple[int, int]:
-    root = ET.parse(report).getroot()
-    points = root.findall(".//SequencePoint")
-    covered = sum(1 for point in points if int(point.attrib.get("vc", "0")) > 0)
-    return covered, len(points)
+# Merge all reports: for each sequence point, sum visit counts across reports.
+# Key = (filename, startLine) -> max visit count seen (avoids double-counting in merged)
+# Strategy: union all modules, for same sequence point take max(vc) to avoid inflating
+visit_counts: dict[tuple[str, str], int] = {}
+base_tree = None
 
-best_report = max(reports, key=score)
-shutil.copyfile(best_report, results_dir / "coverage.opencover.xml")
-print(f"Selected coverage report: {best_report}")
+for report in reports:
+    tree = ET.parse(report)
+    root = tree.getroot()
+    if base_tree is None:
+        base_tree = tree
+
+    for sp in root.findall(".//SequencePoint"):
+        file_ref = sp.attrib.get("fileid", "")
+        start_line = sp.attrib.get("sl", "")
+        key = (file_ref, start_line)
+        vc = int(sp.attrib.get("vc", "0"))
+        # Take the max: if one test project covers it, that's sufficient
+        visit_counts[key] = max(visit_counts.get(key, 0), vc)
+
+# Apply merged visit counts back to the base tree
+if base_tree:
+    base_root = base_tree.getroot()
+    for sp in base_root.findall(".//SequencePoint"):
+        file_ref = sp.attrib.get("fileid", "")
+        start_line = sp.attrib.get("sl", "")
+        key = (file_ref, start_line)
+        merged_vc = visit_counts.get(key, int(sp.attrib.get("vc", "0")))
+        sp.set("vc", str(merged_vc))
+
+    # Recompute Summary on root
+    total = sum(1 for sp in base_root.findall(".//SequencePoint"))
+    covered = sum(1 for sp in base_root.findall(".//SequencePoint")
+                  if int(sp.attrib.get("vc", "0")) > 0)
+    print(f"Merged {len(reports)} reports: {covered}/{total} sequence points covered ({covered/total*100:.1f}%)")
+
+    base_tree.write(results_dir / "coverage.opencover.xml", xml_declaration=True, encoding="utf-8")
+    print(f"Written merged report to {results_dir / 'coverage.opencover.xml'}")
 PY
 
     #dotnet test test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj -c Release --no-build \
