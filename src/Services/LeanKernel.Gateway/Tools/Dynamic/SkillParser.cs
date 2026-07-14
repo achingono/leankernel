@@ -52,7 +52,7 @@ public sealed partial class SkillParser
         try
         {
             var raw = _deserializer.Deserialize<RawSkill>(yaml);
-            return MapToDefinition(raw, sourcePath);
+            return MapToDefinition(raw);
         }
         catch (Exception ex) when (ex is YamlDotNet.Core.YamlException or InvalidOperationException)
         {
@@ -60,7 +60,7 @@ public sealed partial class SkillParser
         }
     }
 
-    private static SkillDefinition? MapToDefinition(RawSkill? raw, string? sourcePath)
+    private static SkillDefinition? MapToDefinition(RawSkill? raw)
     {
         if (raw is null || string.IsNullOrWhiteSpace(raw.Name))
         {

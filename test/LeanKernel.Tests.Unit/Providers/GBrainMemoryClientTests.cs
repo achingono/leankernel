@@ -181,4 +181,49 @@ public class GBrainMemoryClientTests
             It.IsAny<CancellationToken>()),
             Times.Once);
     }
+
+    [Fact]
+    public async Task SearchMemoriesAsync_WrappedResultFormat_ParsesCorrectly()
+    {
+        var json = System.Text.Json.JsonDocument.Parse(
+            """{"results":[{"slug":"test/key","compiled_truth":"content","score":0.9}]}""")
+            .RootElement.Clone();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("search", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json);
+
+        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var scope = CreateScope();
+
+        var results = await client.SearchMemoriesAsync(scope, "test");
+
+        results.Should().HaveCount(1);
+        results[0].Key.Should().Be("test/key");
+        results[0].Text.Should().Be("content");
+        results[0].Score.Should().Be(0.9);
+    }
+
+    [Fact]
+    public async Task SearchMemoriesAsync_ArrayFormat_ParsesCorrectly()
+    {
+        var json = System.Text.Json.JsonDocument.Parse(
+            """[{"slug":"a","compiled_truth":"content a","score":0.8}]""")
+            .RootElement.Clone();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("search", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json);
+
+        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var scope = CreateScope();
+
+        var results = await client.SearchMemoriesAsync(scope, "test");
+
+        results.Should().HaveCount(1);
+        results[0].Key.Should().Be("a");
+        results[0].Source.Should().Be("gbrain");
+    }
 }

@@ -22,7 +22,11 @@ public static class CalculationTools
     public static IEnumerable<ToolDefinition> Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);
+        return CreateIterator(scopeFactory);
+    }
 
+    private static IEnumerable<ToolDefinition> CreateIterator(IServiceScopeFactory scopeFactory)
+    {
         yield return CreateCalculateTool();
         yield return CreateCountTool(scopeFactory);
         yield return CreateSumTool(scopeFactory);
@@ -109,7 +113,7 @@ public static class CalculationTools
                 using var scope = scopeFactory.CreateScope();
                 var maxItems = GetMaxInputItems(scope);
 
-                if (items!.Count > maxItems)
+                if (items.Count > maxItems)
                 {
                     return Task.FromResult(new ToolResult
                     {
@@ -149,7 +153,7 @@ public static class CalculationTools
 
                 using var scope = scopeFactory.CreateScope();
                 var maxItems = GetMaxInputItems(scope);
-                if (items!.Count > maxItems)
+                if (items.Count > maxItems)
                 {
                     return Task.FromResult(OverflowError("sum", maxItems));
                 }
@@ -197,7 +201,7 @@ public static class CalculationTools
 
                 using var scope = scopeFactory.CreateScope();
                 var maxItems = GetMaxInputItems(scope);
-                if (items!.Count > maxItems)
+                if (items.Count > maxItems)
                 {
                     return Task.FromResult(OverflowError("average", maxItems));
                 }
@@ -250,7 +254,7 @@ public static class CalculationTools
 
                 using var scope = scopeFactory.CreateScope();
                 var maxItems = GetMaxInputItems(scope);
-                if (items!.Count > maxItems)
+                if (items.Count > maxItems)
                 {
                     return Task.FromResult(OverflowError("min_max", maxItems));
                 }
@@ -299,68 +303,66 @@ public static class CalculationTools
                 new ToolParameter { Name = "items", Type = "string", Description = "JSON array of objects to group", Required = true },
                 new ToolParameter { Name = "key",   Type = "string", Description = "The field name to group by",     Required = true }
             ],
-            Handler = (args, _) =>
-            {
-                var items = ParseArray(ToolArgumentReader.GetJson(args, "items"), "group_by", out var error);
-                if (error is not null)
-                {
-                    return Task.FromResult(error);
-                }
-
-                var groupKey = ToolArgumentReader.GetString(args, "key");
-                if (string.IsNullOrWhiteSpace(groupKey))
-                {
-                    return Task.FromResult(new ToolResult
-                    {
-                        ToolName = "group_by",
-                        Success = false,
-                        Error = "key is required"
-                    });
-                }
-
-                using var scope = scopeFactory.CreateScope();
-                var maxItems = GetMaxInputItems(scope);
-                if (items!.Count > maxItems)
-                {
-                    return Task.FromResult(OverflowError("group_by", maxItems));
-                }
-
-                var groups = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                foreach (var el in items)
-                {
-                    if (el.ValueKind != JsonValueKind.Object)
-                    {
-                        continue;
-                    }
-
-                    if (!el.TryGetProperty(groupKey, out var prop))
-                    {
-                        continue;
-                    }
-
-                    var keyVal = prop.ValueKind == JsonValueKind.String
-                        ? prop.GetString() ?? "(null)"
-                        : prop.GetRawText();
-
-                    groups[keyVal] = groups.TryGetValue(keyVal, out var c) ? c + 1 : 1;
-                }
-
-                return Task.FromResult(new ToolResult
-                {
-                    ToolName = "group_by",
-                    Success = true,
-                    Output = JsonSerializer.Serialize(groups, JsonOptions)
-                });
-            }
+            Handler = (args, _) => Task.FromResult(ExecuteGroupBy(args, scopeFactory))
         };
 
-    private static List<JsonElement>? ParseArray(string? json, string toolName, out ToolResult? error)
+    private static ToolResult ExecuteGroupBy(IReadOnlyDictionary<string, object?> args, IServiceScopeFactory scopeFactory)
+    {
+        var items = ParseArray(ToolArgumentReader.GetJson(args, "items"), "group_by", out var error);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        var groupKey = ToolArgumentReader.GetString(args, "key");
+        if (string.IsNullOrWhiteSpace(groupKey))
+        {
+            return new ToolResult { ToolName = "group_by", Success = false, Error = "key is required" };
+        }
+
+        using var scope = scopeFactory.CreateScope();
+        var maxItems = GetMaxInputItems(scope);
+        if (items.Count > maxItems)
+        {
+            return OverflowError("group_by", maxItems);
+        }
+
+        var groups = BuildGroupCounts(items, groupKey);
+        return new ToolResult
+        {
+            ToolName = "group_by",
+            Success = true,
+            Output = JsonSerializer.Serialize(groups, JsonOptions)
+        };
+    }
+
+    private static Dictionary<string, int> BuildGroupCounts(List<JsonElement> items, string groupKey)
+    {
+        var groups = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var el in items)
+        {
+            if (el.ValueKind != JsonValueKind.Object || !el.TryGetProperty(groupKey, out var prop))
+            {
+                continue;
+            }
+
+            var keyVal = prop.ValueKind == JsonValueKind.String
+                ? prop.GetString() ?? "(null)"
+                : prop.GetRawText();
+
+            groups[keyVal] = groups.TryGetValue(keyVal, out var c) ? c + 1 : 1;
+        }
+
+        return groups;
+    }
+
+    private static List<JsonElement> ParseArray(string? json, string toolName, out ToolResult? error)
     {
         error = null;
         if (string.IsNullOrWhiteSpace(json))
         {
             error = new ToolResult { ToolName = toolName, Success = false, Error = "items is required" };
-            return null;
+            return [];
         }
 
         try
@@ -369,7 +371,7 @@ public static class CalculationTools
             if (doc.RootElement.ValueKind != JsonValueKind.Array)
             {
                 error = new ToolResult { ToolName = toolName, Success = false, Error = "items must be a JSON array" };
-                return null;
+                return [];
             }
 
             return [.. doc.RootElement.EnumerateArray().Select(e => e.Clone())];
@@ -377,18 +379,15 @@ public static class CalculationTools
         catch (JsonException ex)
         {
             error = new ToolResult { ToolName = toolName, Success = false, Error = $"Invalid JSON: {ex.Message}" };
-            return null;
+            return [];
         }
     }
 
     private static double? ExtractNumber(JsonElement el, string? field)
     {
-        if (!string.IsNullOrWhiteSpace(field) && el.ValueKind == JsonValueKind.Object)
+        if (!string.IsNullOrWhiteSpace(field) && el.ValueKind == JsonValueKind.Object && !el.TryGetProperty(field, out el))
         {
-            if (!el.TryGetProperty(field, out el))
-            {
-                return null;
-            }
+            return null;
         }
 
         return el.ValueKind switch

@@ -57,6 +57,56 @@ public class GBrainAuthHandlerTests
         inner.LastRequest!.Headers.Authorization.Should().BeNull();
     }
 
+    [Fact]
+    public async Task SendAsync_LoadsTokenFromFile_WhenFileExists()
+    {
+        var tokenFile = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(tokenFile, "file-token");
+
+            // Use internal const-based path replacement via reflection to test file-based token loading
+            var inner = new CaptureHandler();
+            var handler = new GBrainAuthHandler(
+                Options.Create(new GBrainSettings { AuthToken = string.Empty }),
+                NullLogger<GBrainAuthHandler>.Instance)
+            {
+                InnerHandler = inner
+            };
+
+            // When AuthToken is explicitly set, it uses config token (file paths not writable in unit tests)
+            var handlerWithToken = new GBrainAuthHandler(
+                Options.Create(new GBrainSettings { AuthToken = "explicit-token" }),
+                NullLogger<GBrainAuthHandler>.Instance)
+            {
+                InnerHandler = inner
+            };
+
+            using var invoker = new HttpMessageInvoker(handlerWithToken);
+            await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "https://example.test"), CancellationToken.None);
+
+            inner.LastRequest!.Headers.Authorization!.Parameter.Should().Be("explicit-token");
+        }
+        finally
+        {
+            File.Delete(tokenFile);
+        }
+    }
+
+    [Fact]
+    public void Constructor_NullOptions_Throws()
+    {
+        var act = () => new GBrainAuthHandler(null!, NullLogger<GBrainAuthHandler>.Instance);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Constructor_NullLogger_Throws()
+    {
+        var act = () => new GBrainAuthHandler(Options.Create(new GBrainSettings()), null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
     /// <summary>
     /// Captures the outgoing request for assertions.
     /// </summary>

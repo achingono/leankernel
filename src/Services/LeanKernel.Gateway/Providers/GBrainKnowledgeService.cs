@@ -80,11 +80,15 @@ public sealed class GBrainKnowledgeService : IKnowledgeService
     }
 
     /// <inheritdoc />
-    public async Task PutPageAsync(string key, string content, CancellationToken ct = default)
+    public Task PutPageAsync(string key, string content, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentNullException.ThrowIfNull(content);
+        return PutPageCoreAsync(key, content, ct);
+    }
 
+    private async Task PutPageCoreAsync(string key, string content, CancellationToken ct)
+    {
         _logger.LogDebug("GBrain knowledge put_page: {Key} ({Length} chars)", key, content.Length);
 
         await _client.CallToolAsync("put_page", new { slug = key, content }, ct)

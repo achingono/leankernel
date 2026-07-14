@@ -84,4 +84,32 @@ public class ServiceCollectionExtensionsTests
         sp.GetRequiredService<MemoryPageNormalizer>().Should().NotBeNull();
         sp.GetRequiredService<IReasoningModel>().Should().NotBeNull();
     }
+
+    [Fact]
+    public void AddLeanKernelChatClient_WithToolsEnabled_UsesToolModel()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddOptions();
+        services.Configure<OpenAISettings>(o =>
+        {
+            o.ApiKey = "test-key";
+            o.BaseUrl = "https://api.openai.com/v1";
+            o.DefaultModel = "gpt-4o-mini";
+            o.ToolModel = "gpt-4o";
+        });
+        services.Configure<AgentSettings>(o =>
+        {
+            o.Tools = new ToolSettings { Enabled = true };
+        });
+        services.Configure<MemorySettings>(o => { o.Enabled = false; o.ModelId = "m"; });
+        services.Configure<FactExtractionSettings>(o => { o.ModelId = "m"; });
+
+        services.AddLeanKernelChatClient();
+
+        using var sp = services.BuildServiceProvider();
+        // Just verify it resolves without throwing (model selection logic exercised via factory)
+        var chatClient = sp.GetRequiredService<Microsoft.Extensions.AI.IChatClient>();
+        chatClient.Should().NotBeNull();
+    }
 }

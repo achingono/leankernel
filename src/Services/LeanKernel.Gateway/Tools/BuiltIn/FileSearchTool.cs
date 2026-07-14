@@ -100,14 +100,15 @@ public static class FileSearchTool
                 }
 
                 var results = await SearchAsync(
-                    startPath,
-                    fileSettings.RootPath,
-                    query ?? name,
-                    content,
-                    limit,
-                    maxDepth,
-                    DefaultMaxScanned,
-                    DefaultMaxFileBytes,
+                    new FileSearchOptions(
+                        startPath,
+                        fileSettings.RootPath,
+                        query ?? name,
+                        content,
+                        limit,
+                        maxDepth,
+                        DefaultMaxScanned,
+                        DefaultMaxFileBytes),
                     ct).ConfigureAwait(false);
 
                 return new ToolResult
@@ -120,24 +121,25 @@ public static class FileSearchTool
         };
     }
 
-    private static async Task<FileSearchResponse> SearchAsync(
-        string startPath,
-        string rootPath,
-        string? nameTerm,
-        string? contentTerm,
-        int limit,
-        int maxDepth,
-        int maxScanned,
-        long maxFileBytes,
-        CancellationToken ct)
+    private sealed record FileSearchOptions(
+        string StartPath,
+        string RootPath,
+        string? NameTerm,
+        string? ContentTerm,
+        int Limit,
+        int MaxDepth,
+        int MaxScanned,
+        long MaxFileBytes);
+
+    private static async Task<FileSearchResponse> SearchAsync(FileSearchOptions opts, CancellationToken ct)
     {
         var matches = new List<FileSearchMatch>();
         var scanned = 0;
         var truncated = false;
         var stack = new Stack<(string Path, int Depth)>();
-        stack.Push((startPath, 0));
+        stack.Push((opts.StartPath, 0));
 
-        while (stack.Count > 0 && matches.Count < limit && !truncated)
+        while (stack.Count > 0 && matches.Count < opts.Limit && !truncated)
         {
             ct.ThrowIfCancellationRequested();
             var (dir, depth) = stack.Pop();
@@ -156,7 +158,7 @@ public static class FileSearchTool
             {
                 ct.ThrowIfCancellationRequested();
 
-                if (scanned >= maxScanned)
+                if (scanned >= opts.MaxScanned)
                 {
                     truncated = true;
                     break;
@@ -166,7 +168,7 @@ public static class FileSearchTool
 
                 if (Directory.Exists(entry))
                 {
-                    if (depth < maxDepth)
+                    if (depth < opts.MaxDepth)
                     {
                         stack.Push((entry, depth + 1));
                     }
@@ -174,54 +176,9 @@ public static class FileSearchTool
                     continue;
                 }
 
-                var fileName = Path.GetFileName(entry);
-                var relativePath = Path.GetRelativePath(rootPath, entry);
-                var nameMatch = !string.IsNullOrWhiteSpace(nameTerm) &&
-                    fileName.Contains(nameTerm, StringComparison.OrdinalIgnoreCase);
-
-                if (!string.IsNullOrWhiteSpace(contentTerm))
+                if (await TryAddMatchAsync(matches, entry, opts, ct).ConfigureAwait(false))
                 {
-                    var info = new FileInfo(entry);
-                    if (info.Length <= maxFileBytes && IsTextFile(entry))
-                    {
-                        try
-                        {
-                            var text = await File.ReadAllTextAsync(entry, ct).ConfigureAwait(false);
-                            if (text.Contains(contentTerm, StringComparison.OrdinalIgnoreCase))
-                            {
-                                matches.Add(new FileSearchMatch
-                                {
-                                    Path = relativePath,
-                                    Name = fileName,
-                                    MatchType = nameMatch ? "name+content" : "content",
-                                    SizeBytes = info.Length
-                                });
-                                if (matches.Count >= limit)
-                                {
-                                    break;
-                                }
-
-                                continue;
-                            }
-                        }
-                        catch
-                        {
-                            // skip unreadable files
-                        }
-                    }
-                }
-
-                if (nameMatch)
-                {
-                    matches.Add(new FileSearchMatch
-                    {
-                        Path = relativePath,
-                        Name = fileName,
-                        MatchType = "name",
-                        SizeBytes = new FileInfo(entry).Length
-                    });
-
-                    if (matches.Count >= limit)
+                    if (matches.Count >= opts.Limit)
                     {
                         break;
                     }
@@ -235,6 +192,79 @@ public static class FileSearchTool
             Scanned = scanned,
             Truncated = truncated
         };
+    }
+
+    private static async Task<bool> TryAddMatchAsync(
+        List<FileSearchMatch> matches,
+        string entry,
+        FileSearchOptions opts,
+        CancellationToken ct)
+    {
+        var fileName = Path.GetFileName(entry);
+        var relativePath = Path.GetRelativePath(opts.RootPath, entry);
+        var nameMatch = !string.IsNullOrWhiteSpace(opts.NameTerm) &&
+            fileName.Contains(opts.NameTerm, StringComparison.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(opts.ContentTerm))
+        {
+            var info = new FileInfo(entry);
+            if (info.Length <= opts.MaxFileBytes && IsTextFile(entry))
+            {
+                if (await TryAddContentMatchAsync(matches, entry, relativePath, fileName, info.Length, nameMatch, opts.ContentTerm, ct).ConfigureAwait(false))
+                {
+                    return true;
+                }
+            }
+        }
+
+        if (nameMatch)
+        {
+            matches.Add(new FileSearchMatch
+            {
+                Path = relativePath,
+                Name = fileName,
+                MatchType = "name",
+                SizeBytes = new FileInfo(entry).Length
+            });
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static async Task<bool> TryAddContentMatchAsync(
+        List<FileSearchMatch> matches,
+        string entry,
+        string relativePath,
+        string fileName,
+        long sizeBytes,
+        bool nameMatch,
+        string contentTerm,
+        CancellationToken ct)
+    {
+        try
+        {
+            var text = await File.ReadAllTextAsync(entry, ct).ConfigureAwait(false);
+            if (!text.Contains(contentTerm, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            matches.Add(new FileSearchMatch
+            {
+                Path = relativePath,
+                Name = fileName,
+                MatchType = nameMatch ? "name+content" : "content",
+                SizeBytes = sizeBytes
+            });
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static bool IsTextFile(string path)

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <ExcludeByFile>
+            **/Migrations/**,
+            **/obj/**,
+            **/*Designer.cs,
+            **/*Snapshot.cs,
+            **/*ModelSnapshot.cs,
+            **/Programs.cs,
+            **/Design/**,
+            **/*.g.cs
+          </ExcludeByFile>
+          <ExcludeByAttribute>
+            ExcludeFromCodeCoverage,
+            GeneratedCode,
+            CompilerGenerated
+          </ExcludeByAttribute>
+          <Include>
+            [LeanKernel.*]*
+          </Include>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

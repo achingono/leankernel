@@ -105,55 +105,18 @@ public static class EgressValidator
     private static bool IsPrivateRange(IPAddress ip)
     {
         var bytes = ip.GetAddressBytes();
-
-        if (bytes.Length == 4)
-        {
-            // 10.0.0.0/8
-            if (bytes[0] == 10)
-            {
-                return true;
-            }
-
-            // 172.16.0.0/12
-            if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
-            {
-                return true;
-            }
-
-            // 192.168.0.0/16
-            if (bytes[0] == 192 && bytes[1] == 168)
-            {
-                return true;
-            }
-
-            // 127.0.0.0/8 (loopback range)
-            if (bytes[0] == 127)
-            {
-                return true;
-            }
-
-            // 169.254.0.0/16 (link-local)
-            if (bytes[0] == 169 && bytes[1] == 254)
-            {
-                return true;
-            }
-        }
-
-        if (bytes.Length == 16)
-        {
-            // IPv6 link-local: fe80::/10
-            if (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80)
-            {
-                return true;
-            }
-
-            // IPv6 unique-local: fc00::/7
-            if ((bytes[0] & 0xfe) == 0xfc)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return bytes.Length == 4 ? IsPrivateIPv4(bytes) : IsPrivateIPv6(bytes);
     }
+
+    private static bool IsPrivateIPv4(byte[] b) =>
+        b[0] == 10                                // 10.0.0.0/8
+        || (b[0] == 172 && b[1] >= 16 && b[1] <= 31) // 172.16.0.0/12
+        || (b[0] == 192 && b[1] == 168)           // 192.168.0.0/16
+        || b[0] == 127                             // 127.0.0.0/8 loopback
+        || (b[0] == 169 && b[1] == 254);           // 169.254.0.0/16 link-local
+
+    private static bool IsPrivateIPv6(byte[] b) =>
+        b.Length == 16 && (
+            (b[0] == 0xfe && (b[1] & 0xc0) == 0x80) // fe80::/10 link-local
+            || (b[0] & 0xfe) == 0xfc);               // fc00::/7 unique-local
 }

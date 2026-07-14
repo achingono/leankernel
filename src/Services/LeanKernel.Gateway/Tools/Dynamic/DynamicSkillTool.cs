@@ -85,7 +85,7 @@ public static class DynamicSkillTool
                     client.Timeout = TimeSpan.FromSeconds(skill.Runtime.TimeoutSeconds);
 
                     var response = await ExecuteRequestAsync(
-                        client, skill, operation, url!, args, bearerToken, ct)
+                        client, operation, url!, args, bearerToken, ct)
                         .ConfigureAwait(false);
 
                     return new ToolResult
@@ -137,7 +137,6 @@ public static class DynamicSkillTool
 
     private static async Task<HttpResponseMessage> ExecuteRequestAsync(
         HttpClient client,
-        SkillDefinition skill,
         SkillOperation operation,
         string url,
         IReadOnlyDictionary<string, object?> args,

@@ -42,7 +42,7 @@ public static class ToolRuntimeStartup
         RegisterBuiltInTools(registry, settings, scopeFactory, logger);
 
         // GBrain wiki tools
-        await RegisterWikiToolsAsync(registry, settings, services, scopeFactory, logger, ct)
+        await RegisterWikiToolsAsync(registry, services, scopeFactory, logger, ct)
             .ConfigureAwait(false);
 
         // Dynamic SKILL.md tools
@@ -77,7 +77,6 @@ public static class ToolRuntimeStartup
 
     private static async Task RegisterWikiToolsAsync(
         IToolRegistry registry,
-        ToolSettings settings,
         IServiceProvider services,
         IServiceScopeFactory scopeFactory,
         ILogger logger,
@@ -157,14 +156,13 @@ public static class ToolRuntimeStartup
 
             foreach (var filePath in files)
             {
-                LoadSkillFile(registry, settings, scopeFactory, parser, filePath, logger);
+                LoadSkillFile(registry, scopeFactory, parser, filePath, logger);
             }
         }
     }
 
     private static void LoadSkillFile(
         IToolRegistry registry,
-        ToolSettings settings,
         IServiceScopeFactory scopeFactory,
         SkillParser parser,
         string filePath,

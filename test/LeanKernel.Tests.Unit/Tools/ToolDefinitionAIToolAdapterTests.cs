@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.AI;

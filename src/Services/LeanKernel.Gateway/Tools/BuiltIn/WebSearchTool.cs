@@ -100,24 +100,31 @@ public static class WebSearchTool
 
         var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         using var doc = JsonDocument.Parse(body);
+        var results = ParseBraveResults(doc);
+        return results.Count == 0 ? "No results found." : string.Join("\n", results);
+    }
 
+    private static List<string> ParseBraveResults(JsonDocument doc)
+    {
         var results = new List<string>();
-        if (doc.RootElement.TryGetProperty("web", out var web) &&
-            web.TryGetProperty("results", out var webResults))
+        if (!doc.RootElement.TryGetProperty("web", out var web) ||
+            !web.TryGetProperty("results", out var webResults))
         {
-            foreach (var item in webResults.EnumerateArray().Take(5))
+            return results;
+        }
+
+        foreach (var item in webResults.EnumerateArray().Take(5))
+        {
+            var title = item.TryGetProperty("title", out var t) ? t.GetString() : null;
+            var description = item.TryGetProperty("description", out var d) ? d.GetString() : null;
+            var url = item.TryGetProperty("url", out var u) ? u.GetString() : null;
+            if (!string.IsNullOrWhiteSpace(title))
             {
-                var title = item.TryGetProperty("title", out var t) ? t.GetString() : null;
-                var description = item.TryGetProperty("description", out var d) ? d.GetString() : null;
-                var url = item.TryGetProperty("url", out var u) ? u.GetString() : null;
-                if (!string.IsNullOrWhiteSpace(title))
-                {
-                    results.Add($"- {title}: {description} ({url})");
-                }
+                results.Add($"- {title}: {description} ({url})");
             }
         }
 
-        return results.Count == 0 ? "No results found." : string.Join("\n", results);
+        return results;
     }
 
     private static async Task<string> SearchWithDuckDuckGoAsync(
