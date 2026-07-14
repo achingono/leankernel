@@ -86,54 +86,7 @@ docker run --rm \
       --settings test/LeanKernel.Tests.Unit/coverage.sonar.runsettings \
       --results-directory coverage-results/sonar
 
-    python3 - <<'PY'
-from pathlib import Path
-import xml.etree.ElementTree as ET
-
-results_dir = Path("coverage-results/sonar")
-reports = sorted(results_dir.glob("**/coverage.opencover.xml"))
-if not reports:
-    raise SystemExit("No coverage reports were produced.")
-
-# Merge all reports: for each sequence point, sum visit counts across reports.
-# Key = (filename, startLine) -> max visit count seen (avoids double-counting in merged)
-# Strategy: union all modules, for same sequence point take max(vc) to avoid inflating
-visit_counts: dict[tuple[str, str], int] = {}
-base_tree = None
-
-for report in reports:
-    tree = ET.parse(report)
-    root = tree.getroot()
-    if base_tree is None:
-        base_tree = tree
-
-    for sp in root.findall(".//SequencePoint"):
-        file_ref = sp.attrib.get("fileid", "")
-        start_line = sp.attrib.get("sl", "")
-        key = (file_ref, start_line)
-        vc = int(sp.attrib.get("vc", "0"))
-        # Take the max: if one test project covers it, that's sufficient
-        visit_counts[key] = max(visit_counts.get(key, 0), vc)
-
-# Apply merged visit counts back to the base tree
-if base_tree:
-    base_root = base_tree.getroot()
-    for sp in base_root.findall(".//SequencePoint"):
-        file_ref = sp.attrib.get("fileid", "")
-        start_line = sp.attrib.get("sl", "")
-        key = (file_ref, start_line)
-        merged_vc = visit_counts.get(key, int(sp.attrib.get("vc", "0")))
-        sp.set("vc", str(merged_vc))
-
-    # Recompute Summary on root
-    total = sum(1 for sp in base_root.findall(".//SequencePoint"))
-    covered = sum(1 for sp in base_root.findall(".//SequencePoint")
-                  if int(sp.attrib.get("vc", "0")) > 0)
-    print(f"Merged {len(reports)} reports: {covered}/{total} sequence points covered ({covered/total*100:.1f}%)")
-
-    base_tree.write(results_dir / "coverage.opencover.xml", xml_declaration=True, encoding="utf-8")
-    print(f"Written merged report to {results_dir / 'coverage.opencover.xml'}")
-PY
+    python3 /workspace/scripts/quality/merge_coverage.py
 
     #dotnet test test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj -c Release --no-build \
     #  --collect:"XPlat Code Coverage" \
