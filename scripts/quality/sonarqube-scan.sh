@@ -43,7 +43,9 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   echo "sonar_token=$token" >> "$GITHUB_OUTPUT"
 fi
 
-rm -rf "$ROOT_DIR/coverage-results/sonar"
+if [[ -d "$ROOT_DIR/coverage-results/sonar" ]]; then
+  mv "$ROOT_DIR/coverage-results/sonar" "$ROOT_DIR/coverage-results/sonar.preexisting.$(date +%s)"
+fi
 mkdir -p "$ROOT_DIR/coverage-results/sonar"
 
 docker run --rm \
@@ -67,6 +69,8 @@ docker run --rm \
       /d:sonar.host.url="$SONAR_HOST_URL" \
       /d:sonar.token="$SONAR_TOKEN" \
       /d:sonar.scm.disabled=true \
+      /d:sonar.sourceEncoding="UTF-8" \
+      /d:sonar.exclusions="**/bin/**,**/obj/**,**/.playwright/**,test/test/**,coverage-results/**,sonar-reports/**" \
       /d:sonar.qualitygate.wait=true \
       /d:sonar.python.version=3.12 \
       /d:sonar.cs.opencover.reportsPaths="coverage-results/sonar/coverage.opencover.xml,coverage-results/sonar/**/coverage.opencover.xml" \

@@ -11,6 +11,8 @@ namespace LeanKernel.Tests.Unit.TurnRuntime;
 
 public class HistoryShaperTests
 {
+    private static readonly ILogger<HistoryShaper> Logger = Mock.Of<ILogger<HistoryShaper>>();
+
     private static IPermit CreatePermit()
     {
         var mock = new Mock<IPermit>();
@@ -32,12 +34,23 @@ public class HistoryShaperTests
         };
     }
 
+    private static IHistorySummarizer CreateSummarizer(string? summary = null)
+    {
+        var mock = new Mock<IHistorySummarizer>();
+        mock.Setup(service => service.SummarizeAsync(
+                It.IsAny<IReadOnlyList<ChatMessage>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(summary);
+        return mock.Object;
+    }
+
     [Fact]
     public async Task ExecuteAsync_EmptyHistory_Noop()
     {
         var shaper = new HistoryShaper(
             Options.Create(new TurnPipelineSettings { RecentTurnsVerbatim = 10 }),
-            Mock.Of<ILogger<HistoryShaper>>());
+            CreateSummarizer(),
+            Logger);
 
         var context = CreateContext();
         await shaper.ExecuteAsync(context);
@@ -50,7 +63,8 @@ public class HistoryShaperTests
     {
         var shaper = new HistoryShaper(
             Options.Create(new TurnPipelineSettings { RecentTurnsVerbatim = 10 }),
-            Mock.Of<ILogger<HistoryShaper>>());
+            CreateSummarizer(),
+            Logger);
 
         var context = CreateContext();
         for (int i = 0; i < 5; i++)
@@ -66,7 +80,8 @@ public class HistoryShaperTests
     {
         var shaper = new HistoryShaper(
             Options.Create(new TurnPipelineSettings { RecentTurnsVerbatim = 5 }),
-            Mock.Of<ILogger<HistoryShaper>>());
+            CreateSummarizer(),
+            Logger);
 
         var context = CreateContext();
         for (int i = 0; i < 20; i++)
@@ -89,7 +104,8 @@ public class HistoryShaperTests
                 CompactedTurnsMax = 10,
                 EnableCompaction = false,
             }),
-            Mock.Of<ILogger<HistoryShaper>>());
+            CreateSummarizer(),
+            Logger);
 
         var context = CreateContext();
         for (int i = 0; i < 20; i++)
@@ -98,5 +114,60 @@ public class HistoryShaperTests
         await shaper.ExecuteAsync(context);
 
         context.ShapedHistory.Should().HaveCount(5);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CompactionAndSummarizationEnabled_PreservesChronologicalOrder()
+    {
+        var shaper = new HistoryShaper(
+            Options.Create(new TurnPipelineSettings
+            {
+                RecentTurnsVerbatim = 2,
+                CompactedTurnsMax = 2,
+                SummarizedTurnsMax = 2,
+                EnableCompaction = true,
+                EnableSummarization = true,
+            }),
+            CreateSummarizer("Older summary"),
+            Logger);
+
+        var context = CreateContext();
+        for (int i = 0; i < 6; i++)
+            context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+
+        await shaper.ExecuteAsync(context);
+
+        context.ShapedHistory.Should().HaveCount(5);
+        context.ShapedHistory[0].Role.Should().Be(ChatRole.System);
+        context.ShapedHistory[0].Text.Should().Contain("Older summary");
+        context.ShapedHistory.Select(message => message.Text)
+            .Should()
+            .ContainInOrder("msg-2", "msg-3", "msg-4", "msg-5");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SummarizationEnabledAndUnavailable_FallsBackToVerbatimSummarizedRange()
+    {
+        var shaper = new HistoryShaper(
+            Options.Create(new TurnPipelineSettings
+            {
+                RecentTurnsVerbatim = 2,
+                CompactedTurnsMax = 2,
+                SummarizedTurnsMax = 2,
+                EnableCompaction = true,
+                EnableSummarization = true,
+            }),
+            CreateSummarizer(null),
+            Logger);
+
+        var context = CreateContext();
+        for (int i = 0; i < 6; i++)
+            context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+
+        await shaper.ExecuteAsync(context);
+
+        context.ShapedHistory.Select(message => message.Text)
+            .Should()
+            .ContainInOrder("msg-0", "msg-1", "msg-2", "msg-3", "msg-4", "msg-5");
     }
 }

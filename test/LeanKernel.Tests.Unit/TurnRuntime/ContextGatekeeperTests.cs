@@ -144,7 +144,34 @@ public class ContextGatekeeperTests
 
         ctx.Admitted.Should().BeEmpty();
         ctx.AdmissionTrace.Should().ContainSingle(r =>
-            r.Source == "system" && r.Reason == "budget_exhausted");
+            r.Source == "system" && r.Reason == "system_budget_exhausted");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SystemBudgetExceeded_ItemRejectedBySystemBudget()
+    {
+        var settings = DefaultSettings();
+        settings.MaxContextTokens = 1000;
+        settings.SystemContextTokenBudget = 100;
+
+        var ctx = CreateContext();
+        ctx.Candidates.Add(new ContextItem
+        {
+            Source = "system",
+            Content = "Large system prompt",
+            EstimatedTokens = 150,
+            Score = 1.0,
+        });
+
+        var gatekeeper = new ContextGatekeeper(
+            Options.Create(settings),
+            Mock.Of<ILogger<ContextGatekeeper>>());
+
+        await gatekeeper.ExecuteAsync(ctx);
+
+        ctx.Admitted.Should().BeEmpty();
+        ctx.AdmissionTrace.Should().ContainSingle(r =>
+            r.Source == "system" && r.Reason == "system_budget_exhausted");
     }
 
     [Fact]
@@ -174,6 +201,33 @@ public class ContextGatekeeperTests
 
         ctx.Admitted.Should().HaveCount(2);
         ctx.AdmissionTrace.Count(r => r.Reason == "max_candidates_reached").Should().Be(3);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RetrievalBudgetTooSmall_ItemRejected()
+    {
+        var settings = DefaultSettings();
+        settings.RetrievalTokenBudget = 100;
+        settings.MaxContextTokens = 1000;
+
+        var ctx = CreateContext();
+        ctx.Candidates.Add(new ContextItem
+        {
+            Source = "memory",
+            Content = "Very large retrieval item",
+            EstimatedTokens = 200,
+            Score = 0.95,
+        });
+
+        var gatekeeper = new ContextGatekeeper(
+            Options.Create(settings),
+            Mock.Of<ILogger<ContextGatekeeper>>());
+
+        await gatekeeper.ExecuteAsync(ctx);
+
+        ctx.Admitted.Should().BeEmpty();
+        ctx.AdmissionTrace.Should().ContainSingle(r =>
+            r.Source == "memory" && r.Reason == "budget_exhausted");
     }
 
     [Fact]

@@ -4,6 +4,6 @@ obj/
 config/litellm/config.yaml
 config/litellm/litellm_config.generated.yaml
 .sonarqube/
-coverage-results/
+coverage-results*/
 .playwright-mcp/
-**/coverage.cobertura.xml
+**/coverage.*.xml

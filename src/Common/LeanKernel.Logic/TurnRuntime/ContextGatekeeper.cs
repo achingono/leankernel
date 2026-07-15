@@ -22,6 +22,7 @@ public sealed class ContextGatekeeper(
     public Task ExecuteAsync(TurnContext context, CancellationToken cancellationToken = default)
     {
         context.RemainingBudget = _settings.MaxContextTokens;
+        var remainingSystemBudget = Math.Min(_settings.SystemContextTokenBudget, context.RemainingBudget);
 
         // Allocate system/identity budget first
         var systemItems = context.Candidates
@@ -29,14 +30,14 @@ public sealed class ContextGatekeeper(
             .OrderByDescending(c => c.Score)
             .ToList();
 
-        var systemBudgetUsed = 0;
         foreach (var item in systemItems)
         {
-            if (item.EstimatedTokens <= context.RemainingBudget)
+            if (item.EstimatedTokens <= context.RemainingBudget &&
+                item.EstimatedTokens <= remainingSystemBudget)
             {
                 context.Admitted.Add(item);
                 context.RemainingBudget -= item.EstimatedTokens;
-                systemBudgetUsed += item.EstimatedTokens;
+                remainingSystemBudget -= item.EstimatedTokens;
 
                 context.AdmissionTrace.Add(new AdmissionRecord
                 {
@@ -49,27 +50,23 @@ public sealed class ContextGatekeeper(
             }
             else
             {
+                var rejectionReason = item.EstimatedTokens > remainingSystemBudget
+                    ? "system_budget_exhausted"
+                    : "budget_exhausted";
+
                 context.AdmissionTrace.Add(new AdmissionRecord
                 {
                     Source = item.Source,
                     Admitted = false,
-                    Reason = "budget_exhausted",
+                    Reason = rejectionReason,
                     TokenCost = item.EstimatedTokens,
                     RemainingBudget = context.RemainingBudget
                 });
 
                 logger.LogWarning(
-                    "System context item from {Source} rejected: {TokenCost} tokens exceeds remaining budget {Budget}.",
-                    item.Source, item.EstimatedTokens, context.RemainingBudget);
+                    "System context item from {Source} rejected: {TokenCost} tokens exceeds remaining budget {Budget} or remaining system budget {SystemBudget}.",
+                    item.Source, item.EstimatedTokens, context.RemainingBudget, remainingSystemBudget);
             }
-        }
-
-        // Cap system budget usage
-        if (systemBudgetUsed > _settings.SystemContextTokenBudget)
-        {
-            logger.LogWarning(
-                "System context used {Used} tokens, exceeding budget of {Budget}.",
-                systemBudgetUsed, _settings.SystemContextTokenBudget);
         }
 
         // Allocate retrieval/memory budget
@@ -108,7 +105,8 @@ public sealed class ContextGatekeeper(
                 continue;
             }
 
-            if (item.EstimatedTokens <= context.RemainingBudget && retrievalBudget > 0)
+            if (item.EstimatedTokens <= context.RemainingBudget &&
+                item.EstimatedTokens <= retrievalBudget)
             {
                 context.Admitted.Add(item);
                 context.RemainingBudget -= item.EstimatedTokens;

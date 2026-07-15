@@ -1,5 +1,6 @@
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.TurnRuntime;
+using Microsoft.Extensions.Options;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -13,9 +14,30 @@ public static class TurnPipelineServiceExtensions
     /// </summary>
     public static IServiceCollection AddTurnPipeline(this IServiceCollection services)
     {
-        services.Configure<TurnPipelineSettings>(_ => { });
+        services
+            .AddOptions<TurnPipelineSettings>()
+            .BindConfiguration("TurnPipeline")
+            .Validate(
+                settings =>
+                    settings.MaxContextTokens > 0 &&
+                    settings.SystemContextTokenBudget >= 0 &&
+                    settings.RetrievalTokenBudget >= 0 &&
+                    settings.SystemContextTokenBudget <= settings.MaxContextTokens &&
+                    settings.RetrievalTokenBudget <= settings.MaxContextTokens &&
+                    settings.RecentTurnsVerbatim >= 0 &&
+                    settings.CompactedTurnsMax >= 0 &&
+                    settings.SummarizedTurnsMax >= 0 &&
+                    settings.SummarizationTemperature is >= 0 and <= 1 &&
+                    settings.SummarizationMaxOutputTokens > 0 &&
+                    settings.MaxRetrievalCandidates >= 0 &&
+                    settings.MinRetrievalScore is >= 0 and <= 1 &&
+                    settings.MaxContinuationRounds >= 1 &&
+                    settings.MaxPipelineDuration > TimeSpan.Zero,
+                "Invalid TurnPipeline settings.")
+            .ValidateOnStart();
 
         services.AddScoped<ContextGatekeeper>();
+        services.AddScoped<IHistorySummarizer, HistorySummarizer>();
         services.AddScoped<HistoryShaper>();
         services.AddScoped<PromptAssembler>();
         services.AddSingleton<TurnProgressBroker>();

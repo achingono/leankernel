@@ -12,6 +12,7 @@ namespace LeanKernel.Logic.TurnRuntime;
 /// </summary>
 public sealed class HistoryShaper(
     IOptions<TurnPipelineSettings> settings,
+    IHistorySummarizer historySummarizer,
     ILogger<HistoryShaper> logger) : ITurnStage
 {
     private readonly TurnPipelineSettings _settings = settings.Value;
@@ -20,7 +21,7 @@ public sealed class HistoryShaper(
     public string Name => "HistoryShaper";
 
     /// <inheritdoc />
-    public Task ExecuteAsync(TurnContext context, CancellationToken cancellationToken = default)
+    public async Task ExecuteAsync(TurnContext context, CancellationToken cancellationToken = default)
     {
         // History is loaded by ChatHistoryProvider before the pipeline runs.
         // This stage shapes the loaded history into tiers.
@@ -30,7 +31,7 @@ public sealed class HistoryShaper(
         if (context.ShapedHistory.Count == 0)
         {
             logger.LogDebug("No history to shape for conversation {ConversationId}.", context.ConversationId);
-            return Task.CompletedTask;
+            return;
         }
 
         var totalTurns = context.ShapedHistory.Count;
@@ -59,6 +60,30 @@ public sealed class HistoryShaper(
         // For Phase 03: keep verbatim only. Compaction and summarization are opt-in.
         context.ShapedHistory.Clear();
 
+        if (_settings.EnableSummarization && summarizedRange.Count > 0)
+        {
+            var summary = await historySummarizer
+                .SummarizeAsync(summarizedRange, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                context.ShapedHistory.Add(new ChatMessage(
+                    ChatRole.System,
+                    $"Summary of earlier conversation turns:\n{summary}"));
+                logger.LogDebug(
+                    "History: summarized {SummarizedCount} turns into one summary message.",
+                    summarizedRange.Count);
+            }
+            else
+            {
+                context.ShapedHistory.AddRange(summarizedRange);
+                logger.LogWarning(
+                    "History summarization unavailable; kept {SummarizedCount} turns verbatim.",
+                    summarizedRange.Count);
+            }
+        }
+
         if (_settings.EnableCompaction && compactedRange.Count > 0)
         {
             // Placeholder: in a full implementation, compactedRange would be
@@ -70,16 +95,6 @@ public sealed class HistoryShaper(
                 compactedRange.Count);
         }
 
-        if (_settings.EnableSummarization && summarizedRange.Count > 0)
-        {
-            // Placeholder: summarizedRange would be summarized by LLM.
-            // For now, keep them as-is.
-            context.ShapedHistory.AddRange(summarizedRange);
-            logger.LogDebug(
-                "History: {SummarizedCount} turns in summarized window (summarization not yet implemented).",
-                summarizedRange.Count);
-        }
-
         // Always include verbatim window
         context.ShapedHistory.AddRange(verbatim);
 
@@ -87,6 +102,5 @@ public sealed class HistoryShaper(
             "History shaped: {Total} total, {Verbatim} verbatim, {Compacted} compacted, {Summarized} summarized.",
             totalTurns, verbatim.Count, compactedRange.Count, summarizedRange.Count);
 
-        return Task.CompletedTask;
     }
 }

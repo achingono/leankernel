@@ -39,6 +39,16 @@ public sealed class TurnPipelineSettings
     public bool EnableSummarization { get; set; } = false;
 
     /// <summary>
+    /// Sampling temperature used for history summarization.
+    /// </summary>
+    public double SummarizationTemperature { get; set; } = 0.1;
+
+    /// <summary>
+    /// Maximum number of output tokens produced by history summarization.
+    /// </summary>
+    public int SummarizationMaxOutputTokens { get; set; } = 512;
+
+    /// <summary>
     /// Maximum number of memory/retrieval candidates to admit.
     /// </summary>
     public int MaxRetrievalCandidates { get; set; } = 10;

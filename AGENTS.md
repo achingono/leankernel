@@ -41,8 +41,11 @@ When implementing user-requested changes:
 1. Copy the relevant blank files from [`docs/templates/`](docs/templates/) into a new folder under [`docs/plans/`](docs/plans/).
 2. Draft a concrete implementation plan in that folder.
 3. Review the plan with a different model/session before implementation.
-4. Implement the change.
-5. Run verification appropriate to the scope.
+4. Implement the change and associated tests.
+5. Ensure code coverage is at-least 80%.
+6. Run verification appropriate to the scope.
+7. Run `scripts/quality/sonarqube-scan.sh` and address all `Blocker`, `Critical`, and `Major` issues reported.
+8. Run a [deep review](.agents/prompts/deep-review.prompt.md) sub-agent and address all issues reported.
 
 ## Planning Templates
 

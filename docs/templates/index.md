@@ -1,5 +1,13 @@
 # Phase [NN] [Phase Name]
 
+## Companion Documents
+- [Inputs](inputs.md)
+- [Activities](activities.md)
+- [Outputs](outputs.md)
+- [Exit Criteria](exit-criteria.md)
+- [Risk Register](risk-register.md)
+- [Evidence](evidence.md)
+
 ## Objective
 _One paragraph stating what this phase achieves and why._
 
