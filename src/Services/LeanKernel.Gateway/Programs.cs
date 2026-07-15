@@ -168,6 +168,9 @@ builder.Services.AddGBrainMemory(gbrainSettings);
 // Shared tool registry
 builder.Services.AddToolRegistry();
 
+// Turn pipeline (context gatekeeping, history shaping, prompt assembly)
+builder.Services.AddTurnPipeline();
+
 // Chat client (OpenAI-compatible)
 builder.Services.AddLeanKernelChatClient();
 
