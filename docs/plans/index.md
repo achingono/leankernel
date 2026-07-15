@@ -17,7 +17,7 @@ from a gap analysis of the mature source implementation against the current rebu
 | --- | --- | --- | --- |
 | 01 | [Tool Runtime Enablement](phase-01-built-in-tools/index.md) | Built-in + dynamic tool runtime behind `/v1/responses` | **Complete** |
 | 02 | [Runtime Boundary Remediation](phase-02-runtime-boundary-remediation/index.md) | Project/runtime boundary cleanup | **Complete** |
-| 03 | [Turn Runtime And Context Gating](phase-03-turn-runtime/index.md) | Turn pipeline, deny-by-default context + budgets, history shaping, scoped retrieval, long-running tasks | Not started |
+| 03 | [Turn Runtime And Context Gating](phase-03-turn-runtime/index.md) | Turn pipeline, deny-by-default context + budgets, history shaping, scoped retrieval, long-running tasks | **In Progress** |
 | 04 | [Model Intelligence And Response Quality](phase-04-model-intelligence/index.md) | Model routing/escalation, shadow routing, quality gates, response enhancement, degradation, multi-agent |
 | 05 | [Tool Expansion](phase-05-tool-expansion/index.md) | Filesystem suite, data tools, web_fetch/http, browser tool, document ingestion |
 | 06 | [Channels](phase-06-channels/index.md) | Channel abstraction/router, Signal adapter, fail-closed auth, keep-alive, attachments |
