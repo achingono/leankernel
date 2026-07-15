@@ -75,4 +75,14 @@ public class TenantEntity : IAuditable, IRecyclable
     /// Gets or sets the sessions associated with this tenant.
     /// </summary>
     public virtual ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();
+
+    /// <summary>
+    /// Gets or sets sender bindings associated with this tenant.
+    /// </summary>
+    public virtual ICollection<ChannelSenderBindingEntity> ChannelSenderBindings { get; set; } = new List<ChannelSenderBindingEntity>();
+
+    /// <summary>
+    /// Gets or sets channel memory policy overrides associated with this tenant.
+    /// </summary>
+    public virtual ICollection<ChannelMemoryPolicyEntity> ChannelMemoryPolicies { get; set; } = new List<ChannelMemoryPolicyEntity>();
 }

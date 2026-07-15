@@ -14,6 +14,8 @@ Projects in the solution:
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, design-time factory |
 | `src/Common/LeanKernel.Logic` | Chat history provider, memory pipeline, identity resolution, MAF-facing logic services |
 | `src/Services/LeanKernel.Gateway` | Web host, endpoint mapping, auth/session middleware, GBrain wiring, agent session store |
+| `src/Terminals/LeanKernel.Channels.Signal` | Signal channel terminal process (JSON-RPC socket transport to signal-cli sidecar) |
+| `src/Terminals/LeanKernel.Channels.Teams` | Teams Bot Framework terminal process (webhook ingress + connector egress) |
 
 Test projects:
 
@@ -26,10 +28,5 @@ Test projects:
 - `Gateway` depends on `Logic`, `Data`, and `Core`
 - `Logic` depends on `Data` and `Core`
 - `Data` depends on `Core`
+- Channel terminals are edge processes and do not participate in `Gateway`/`Logic`/`Data` assembly dependency direction
 - `Core` is the bottom layer
-
-## Current Non-Structure
-
-The repository README still lists additional services and terminals that are not present in this rebuild yet. Those should be treated as roadmap intent, not as implemented modules.
-
-Reference: [`../../README.md`](../../README.md)

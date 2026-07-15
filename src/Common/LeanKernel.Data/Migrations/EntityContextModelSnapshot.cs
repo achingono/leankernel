@@ -80,6 +80,91 @@ namespace LeanKernel.Data.Migrations
                     b.ToTable("Channels");
                 });
 
+            modelBuilder.Entity("LeanKernel.Entities.ChannelMemoryPolicyEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccessList")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ShareList")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("TenantId", "ChannelId")
+                        .IsUnique();
+
+                    b.ToTable("ChannelMemoryPolicies");
+                });
+
+            modelBuilder.Entity("LeanKernel.Entities.ChannelSenderBindingEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BearerToken")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Issuer")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TenantId", "ChannelId", "UserId");
+
+                    b.HasIndex("TenantId", "ChannelId", "Issuer", "Subject")
+                        .IsUnique();
+
+                    b.ToTable("ChannelSenderBindings");
+                });
+
             modelBuilder.Entity("LeanKernel.Entities.SessionEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -365,6 +450,52 @@ namespace LeanKernel.Data.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("LeanKernel.Entities.ChannelMemoryPolicyEntity", b =>
+                {
+                    b.HasOne("LeanKernel.Entities.ChannelEntity", "Channel")
+                        .WithMany("MemoryPolicies")
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LeanKernel.Entities.TenantEntity", "Tenant")
+                        .WithMany("ChannelMemoryPolicies")
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Channel");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("LeanKernel.Entities.ChannelSenderBindingEntity", b =>
+                {
+                    b.HasOne("LeanKernel.Entities.ChannelEntity", "Channel")
+                        .WithMany("SenderBindings")
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LeanKernel.Entities.TenantEntity", "Tenant")
+                        .WithMany("ChannelSenderBindings")
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LeanKernel.Entities.UserEntity", "User")
+                        .WithMany("ChannelSenderBindings")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Channel");
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("LeanKernel.Entities.SessionEntity", b =>
                 {
                     b.HasOne("LeanKernel.Entities.ChannelEntity", "Channel")
@@ -525,6 +656,10 @@ namespace LeanKernel.Data.Migrations
 
             modelBuilder.Entity("LeanKernel.Entities.ChannelEntity", b =>
                 {
+                    b.Navigation("MemoryPolicies");
+
+                    b.Navigation("SenderBindings");
+
                     b.Navigation("Sessions");
                 });
 
@@ -533,8 +668,17 @@ namespace LeanKernel.Data.Migrations
                     b.Navigation("Turns");
                 });
 
+            modelBuilder.Entity("LeanKernel.Entities.TenantEntity", b =>
+                {
+                    b.Navigation("ChannelMemoryPolicies");
+
+                    b.Navigation("ChannelSenderBindings");
+                });
+
             modelBuilder.Entity("LeanKernel.Entities.UserEntity", b =>
                 {
+                    b.Navigation("ChannelSenderBindings");
+
                     b.Navigation("Sessions");
                 });
 #pragma warning restore 612, 618

@@ -42,6 +42,16 @@ public class EntityContext : DbContext
     public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
 
     /// <summary>
+    /// Gets the persisted channel sender bindings.
+    /// </summary>
+    public DbSet<ChannelSenderBindingEntity> ChannelSenderBindings => Set<ChannelSenderBindingEntity>();
+
+    /// <summary>
+    /// Gets the persisted channel memory policy overrides.
+    /// </summary>
+    public DbSet<ChannelMemoryPolicyEntity> ChannelMemoryPolicies => Set<ChannelMemoryPolicyEntity>();
+
+    /// <summary>
     /// Gets the persisted agent session state blobs.
     /// </summary>
     public DbSet<AgentStateEntity> AgentStates => Set<AgentStateEntity>();
@@ -145,6 +155,46 @@ public class EntityContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(100);
             entity.HasIndex(e => e.Name).IsUnique();
         });
+
+        // ChannelSenderBindingEntity
+        modelBuilder.Entity<ChannelSenderBindingEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Issuer).HasMaxLength(200);
+            entity.Property(e => e.Subject).HasMaxLength(500);
+            entity.Property(e => e.BearerToken).HasColumnType("text");
+            entity.HasIndex(e => new { e.TenantId, e.ChannelId, e.Issuer, e.Subject }).IsUnique();
+            entity.HasIndex(e => new { e.TenantId, e.ChannelId, e.UserId });
+            entity.HasOne(e => e.Tenant)
+                .WithMany(t => t.ChannelSenderBindings)
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.ChannelSenderBindings)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Channel)
+                .WithMany(c => c.SenderBindings)
+                .HasForeignKey(e => e.ChannelId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ChannelMemoryPolicyEntity
+        modelBuilder.Entity<ChannelMemoryPolicyEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ShareList).HasColumnType("text");
+            entity.Property(e => e.AccessList).HasColumnType("text");
+            entity.HasIndex(e => new { e.TenantId, e.ChannelId }).IsUnique();
+            entity.HasOne(e => e.Tenant)
+                .WithMany(t => t.ChannelMemoryPolicies)
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Channel)
+                .WithMany(c => c.MemoryPolicies)
+                .HasForeignKey(e => e.ChannelId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     /// <summary>
@@ -164,7 +214,7 @@ public class EntityContext : DbContext
         }
 
         await EnsureDefaultTenantAsync(hostName);
-        await EnsureOpenAiChannelAsync();
+        await EnsureKnownChannelsAsync();
     }
 
     /// <summary>
@@ -209,18 +259,37 @@ public class EntityContext : DbContext
     /// Ensures the well-known OpenAI HTTP channel exists.
     /// </summary>
     /// <returns>A task that completes when the channel check finishes.</returns>
-    private async Task EnsureOpenAiChannelAsync()
+    private async Task EnsureKnownChannelsAsync()
     {
-        if (await Channels.AnyAsync(channel => channel.Name == ChannelEntity.OpenAiHttpName))
+        var knownChannelNames = new[]
+        {
+            ChannelEntity.OpenAiHttpName,
+            ChannelEntity.SignalName,
+            ChannelEntity.TeamsName
+        };
+
+        var existing = await Channels
+            .AsNoTracking()
+            .Select(channel => channel.Name)
+            .ToListAsync();
+
+        var missingNames = knownChannelNames
+            .Except(existing, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (missingNames.Count == 0)
         {
             return;
         }
 
-        Channels.Add(new ChannelEntity
+        foreach (var missingName in missingNames)
         {
-            Id = Guid.NewGuid(),
-            Name = ChannelEntity.OpenAiHttpName
-        });
+            Channels.Add(new ChannelEntity
+            {
+                Id = Guid.NewGuid(),
+                Name = missingName
+            });
+        }
 
         try
         {

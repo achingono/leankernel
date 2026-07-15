@@ -7,12 +7,14 @@
 | Person identity model | Person entity + channel-identity mapping | C# + EF migration |
 | Identity resolution update | Resolves personId + channelId per request | C# source |
 | Identity linking flow | Verified link/unlink (one-time code) | C# source |
-| Person-scoped memory | `MemoryScope` + `GBrainMemoryClient` keyed by personId | C# source |
-| Preference profile | Person-level preferences surfaced to context | C# source |
-| Permit and memory-scope update | `IPermit` adds person context; memory stays person-scoped without rekeying agent-session isolation | C# source |
-| Memory migration | Reversible, dry-run-capable channel->person key migration | C# + script |
-| Configuration + validation | Scope mode, history-sharing, linking settings | C# + appsettings |
-| Tests | Cross-channel sharing, isolation, tenant, migration coverage | xUnit projects |
+| Person-keyed, channel-retaining memory | `MemoryScope` + `GBrainMemoryClient` keyed `memory/{tenantId}/{personId}/{channelId}/{key}` | C# source |
+| Policy-driven memory reads | Read fan-out across the effective readable-channel set from Phase 06 policy (directional AND) with de-duplication | C# source |
+| Cross-channel 5W1H reconciliation | Write-time supersession/merge across the mutually visible channel set + reconciliation pass on policy widening; deterministic conflict resolution, provenance retained, conflict flagging | C# source |
+| Preference profile | Person-level preferences surfaced to context with the same policy-driven visibility | C# source |
+| Permit and memory-scope update | `IPermit` adds person context; memory scope carries personId + channelId without rekeying agent-session isolation | C# source |
+| Memory migration | Reversible, dry-run-capable channel->person key migration that retains channelId | C# + script |
+| Configuration + validation | Linking requirements, history-sharing settings (consumes Phase 06 sharing policy) | C# + appsettings |
+| Tests | Wildcard-default sharing, policy-narrowed isolation/partial sharing, cross-channel 5W1H reconciliation (no divergence; isolated channels diverge), conflict flagging, unlinked isolation, tenant safety, migration coverage | xUnit projects |
 | Documentation | Identity-partitioning + memory-pipeline docs updated | Markdown |
 
 ## Optional Outputs

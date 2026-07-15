@@ -14,10 +14,22 @@ public interface IIdentityResolver
     Task<TenantEntity?> ResolveTenantAsync(string hostName, CancellationToken ct = default);
 
     /// <summary>
+    /// Resolves a <see cref="TenantEntity"/> by id.
+    /// Returns null if not found or inactive.
+    /// </summary>
+    Task<TenantEntity?> ResolveTenantByIdAsync(Guid tenantId, CancellationToken ct = default);
+
+    /// <summary>
     /// Resolves or creates a <see cref="UserEntity"/> from an authenticated claims principal.
     /// Looks up by issuer + subject; creates a new user if not found.
     /// </summary>
     Task<UserEntity> ResolveOrCreateUserAsync(ClaimsPrincipal principal, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves an existing <see cref="UserEntity"/> from an authenticated claims principal.
+    /// Looks up by issuer + subject and does not create new users.
+    /// </summary>
+    Task<UserEntity?> ResolveUserAsync(ClaimsPrincipal principal, CancellationToken ct = default);
 
     /// <summary>
     /// Resolves or creates a guest <see cref="UserEntity"/> for an anonymous session within a tenant.
@@ -30,4 +42,21 @@ public interface IIdentityResolver
     /// Resolves or creates the canonical <see cref="ChannelEntity"/> for the OpenAI HTTP surface.
     /// </summary>
     Task<ChannelEntity> ResolveOrCreateChannelAsync(string channelName, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves an existing channel by name.
+    /// Returns null if not found.
+    /// </summary>
+    Task<ChannelEntity?> ResolveChannelAsync(string channelName, CancellationToken ct = default);
+
+    /// <summary>
+    /// Validates that a pre-provisioned sender binding exists and is active.
+    /// </summary>
+    Task<bool> IsChannelSenderBindingActiveAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid channelId,
+        string issuer,
+        string subject,
+        CancellationToken ct = default);
 }

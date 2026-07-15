@@ -145,6 +145,71 @@ services:
       retries: 5
       start_period: 30s
 
+  signal-terminal:
+    build:
+      context: .
+      dockerfile: src/Terminals/LeanKernel.Channels.Signal/Dockerfile
+    container_name: leankernel-signal-terminal
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - CONNECTIONSTRINGS__POSTGRES=Host=database;Port=5432;Database=${POSTGRES_DB:-leankernel};Username=${POSTGRES_USER:-leankernel};Password=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - GATEWAY__BASEURL=http://gateway:${LEANKERNEL_GATEWAY_PORT:-8080}
+      - GATEWAY__MODEL=${LEANKERNEL_DEFAULT_MODEL:-medium}
+      - SIGNAL__HOST=${SIGNAL_SOCKET_HOST:-signal-cli}
+      - SIGNAL__PORT=${SIGNAL_SOCKET_PORT:-8080}
+      - TZ=${TZ:-America/Toronto}
+    depends_on:
+      database:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+      signal-cli:
+        condition: service_started
+    restart: unless-stopped
+
+  signal-cli:
+    image: bbernhard/signal-cli-rest-api:latest
+    container_name: leankernel-signal-cli
+    environment:
+      - MODE=json-rpc
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - signal-data:/home/.local/share/signal-cli
+    ports:
+      - "${SIGNAL_CLI_PORT:-8081}:8080"
+    restart: unless-stopped
+
+  teams-terminal:
+    build:
+      context: .
+      dockerfile: src/Terminals/LeanKernel.Channels.Teams/Dockerfile
+    container_name: leankernel-teams-terminal
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=${TEAMS_TERMINAL_PORT:-3978}
+      - CONNECTIONSTRINGS__POSTGRES=Host=database;Port=5432;Database=${POSTGRES_DB:-leankernel};Username=${POSTGRES_USER:-leankernel};Password=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - GATEWAY__BASEURL=http://gateway:${LEANKERNEL_GATEWAY_PORT:-8080}
+      - GATEWAY__MODEL=${LEANKERNEL_DEFAULT_MODEL:-medium}
+      - BOT__APPID=${TEAMS_APP_ID:-}
+      - BOT__APPPASSWORD=${TEAMS_APP_PASSWORD:-}
+      - BOT__AUTHORITY=${TEAMS_AUTHORITY:-https://login.microsoftonline.com}
+      - TZ=${TZ:-America/Toronto}
+    ports:
+      - "${TEAMS_TERMINAL_PORT:-3978}:${TEAMS_TERMINAL_PORT:-3978}"
+    depends_on:
+      database:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${TEAMS_TERMINAL_PORT:-3978}/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   database-data:
   gbrain-data:
+  signal-data:

@@ -183,6 +183,103 @@ public class TenantResolutionMiddlewareTests
         ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
     }
 
+    [Fact]
+    public async Task InvokeAsync_ChannelClaims_ResolvesFromClaimsAndBinding()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+
+        var resolver = new Mock<IIdentityResolver>();
+        resolver
+            .Setup(r => r.ResolveTenantByIdAsync(tenantId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TenantEntity { Id = tenantId, Name = "Tenant", HostName = "tenant.test", IsActive = true });
+        resolver
+            .Setup(r => r.ResolveChannelAsync(ChannelEntity.SignalName, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
+        resolver
+            .Setup(r => r.ResolveUserAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserEntity { Id = userId, Issuer = "signal", Subject = "+15551234" });
+        resolver
+            .Setup(r => r.IsChannelSenderBindingActiveAsync(
+                tenantId,
+                userId,
+                channelId,
+                "signal",
+                "+15551234",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/v1/responses";
+        ctx.Request.Host = new HostString("ignored.test");
+        var identity = new System.Security.Claims.ClaimsIdentity(
+            [
+                new System.Security.Claims.Claim("lk_tenant_id", tenantId.ToString()),
+                new System.Security.Claims.Claim("lk_channel", ChannelEntity.SignalName),
+                new System.Security.Claims.Claim("lk_sender_iss", "signal"),
+                new System.Security.Claims.Claim("lk_sender_sub", "+15551234")
+            ],
+            "Bearer");
+        ctx.User = new System.Security.Claims.ClaimsPrincipal(identity);
+
+        var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
+
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings);
+
+        ctx.Response.StatusCode.Should().NotBe(StatusCodes.Status401Unauthorized);
+        ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId);
+        ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(userId);
+        ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ChannelClaims_MissingBinding_Returns401()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+
+        var resolver = new Mock<IIdentityResolver>();
+        resolver
+            .Setup(r => r.ResolveTenantByIdAsync(tenantId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TenantEntity { Id = tenantId, Name = "Tenant", HostName = "tenant.test", IsActive = true });
+        resolver
+            .Setup(r => r.ResolveChannelAsync(ChannelEntity.SignalName, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
+        resolver
+            .Setup(r => r.ResolveUserAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserEntity { Id = userId, Issuer = "signal", Subject = "+15551234" });
+        resolver
+            .Setup(r => r.IsChannelSenderBindingActiveAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/v1/responses";
+        ctx.Request.Host = new HostString("ignored.test");
+        var identity = new System.Security.Claims.ClaimsIdentity(
+            [
+                new System.Security.Claims.Claim("lk_tenant_id", tenantId.ToString()),
+                new System.Security.Claims.Claim("lk_channel", ChannelEntity.SignalName),
+                new System.Security.Claims.Claim("lk_sender_iss", "signal"),
+                new System.Security.Claims.Claim("lk_sender_sub", "+15551234")
+            ],
+            "Bearer");
+        ctx.User = new System.Security.Claims.ClaimsPrincipal(identity);
+
+        var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
+
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings);
+
+        ctx.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
     // ─── Test doubles ─────────────────────────────────────────────────────────
 
     private sealed class TestSessionFeature : ISessionFeature

@@ -103,6 +103,71 @@ public class IdentityResolverTests
         db.Channels.Count().Should().Be(1);
     }
 
+    [Fact]
+    public async Task ResolveUserAsync_WhenMissing_ReturnsNull()
+    {
+        var resolver = CreateResolver(out _);
+
+        var principal = Principal("missing-user", "signal", "Missing", "missing@test");
+
+        var existing = await resolver.ResolveUserAsync(principal);
+
+        existing.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResolveUserAsync_WhenExisting_ReturnsUser()
+    {
+        var resolver = CreateResolver(out _);
+
+        var principal = Principal("existing-sub", "signal", "Existing", "existing@test");
+        var created = await resolver.ResolveOrCreateUserAsync(principal);
+
+        var existing = await resolver.ResolveUserAsync(principal);
+
+        existing.Should().NotBeNull();
+        existing!.Id.Should().Be(created.Id);
+    }
+
+    [Fact]
+    public async Task IsChannelSenderBindingActiveAsync_RequiresExactMatch()
+    {
+        var resolver = CreateResolver(out var db);
+        var tenantId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+        var principal = Principal("+15551234", "signal", "Signal User", "signal@test");
+        var user = await resolver.ResolveOrCreateUserAsync(principal);
+
+        db.Tenants.Add(new TenantEntity
+        {
+            Id = tenantId,
+            Name = "Tenant",
+            HostName = "tenant.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.Channels.Add(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ChannelId = channelId,
+            UserId = user.Id,
+            Issuer = "signal",
+            Subject = "+15551234",
+            BearerToken = "test-token",
+            IsActive = true
+        });
+        await db.SaveChangesAsync();
+
+        var active = await resolver.IsChannelSenderBindingActiveAsync(tenantId, user.Id, channelId, "signal", "+15551234");
+        var wrongSubject = await resolver.IsChannelSenderBindingActiveAsync(tenantId, user.Id, channelId, "signal", "+15557654");
+
+        active.Should().BeTrue();
+        wrongSubject.Should().BeFalse();
+    }
+
     /// <summary>
     /// M5: Two tenants sharing the same anonymous session ID must resolve to different guest users.
     /// </summary>

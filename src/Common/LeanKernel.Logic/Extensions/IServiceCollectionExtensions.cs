@@ -1,4 +1,5 @@
 using System.ClientModel;
+using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
@@ -27,6 +28,7 @@ public static class IServiceCollectionExtensions
     {
         services.AddScoped<ChatHistoryProvider, DbChatHistoryProvider>();
         services.AddScoped<AIContextProvider, MemoryProvider>();
+        services.AddScoped<IChannelMemoryPolicyResolver, ChannelMemoryPolicyResolver>();
         services.AddMemoryPageServices();
         return services;
     }

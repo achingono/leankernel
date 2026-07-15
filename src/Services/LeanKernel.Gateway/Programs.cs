@@ -34,6 +34,7 @@ if (builder.Environment.IsDevelopment())
 
 // Bind configuration
 var identityConfig = builder.Configuration.GetSection("Identity").Get<IdentitySettings>() ?? new IdentitySettings();
+var agentConfig = builder.Configuration.GetSection("Agents").Get<AgentSettings>() ?? new AgentSettings();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -113,6 +114,7 @@ builder.Services.AddAuthentication("Bearer")
             options.TokenValidationParameters.IssuerSigningKey = key;
         }
 
+        options.TokenValidationParameters.RequireSignedTokens = hasSigningKey;
         options.TokenValidationParameters.ValidateIssuerSigningKey = hasSigningKey;
         options.TokenValidationParameters.ValidateIssuer = hasIssuer;
         options.TokenValidationParameters.ValidateAudience = hasAudience;
@@ -120,6 +122,19 @@ builder.Services.AddAuthentication("Bearer")
 
         if (hasIssuer)
             options.TokenValidationParameters.ValidIssuer = tokenSettings.Issuer;
+
+        var trustedChannelIssuers = agentConfig.Channels.TrustedIssuers
+            .Where(issuer => !string.IsNullOrWhiteSpace(issuer))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (trustedChannelIssuers.Count > 0)
+        {
+            options.TokenValidationParameters.ValidIssuers = hasIssuer
+                ? trustedChannelIssuers.Append(tokenSettings.Issuer)
+                : trustedChannelIssuers;
+            options.TokenValidationParameters.ValidateIssuer = true;
+        }
 
         if (hasAudience)
             options.TokenValidationParameters.ValidAudience = tokenSettings.Audience;
@@ -135,6 +150,7 @@ builder.Services.AddAuthentication("Bearer")
         }
     });
 builder.Services.AddAuthorization();
+builder.Services.AddHostedService<ChannelConfigurationValidatorHostedService>();
 
 // CORS
 builder.Services.AddCors(options =>

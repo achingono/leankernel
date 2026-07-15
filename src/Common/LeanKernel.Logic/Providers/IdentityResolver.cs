@@ -26,15 +26,21 @@ public sealed class IdentityResolver(
     }
 
     /// <inheritdoc />
+    public async Task<TenantEntity?> ResolveTenantByIdAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        if (tenantId == Guid.Empty)
+            return null;
+
+        using var context = await dbContextFactory.CreateDbContextAsync(ct);
+        return await context.Tenants
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == tenantId && t.IsActive, ct);
+    }
+
+    /// <inheritdoc />
     public async Task<UserEntity> ResolveOrCreateUserAsync(ClaimsPrincipal principal, CancellationToken ct = default)
     {
-        var issuer = principal.FindFirst(ClaimTypes.AuthenticationMethod)?.Value
-                     ?? principal.FindFirst("iss")?.Value
-                     ?? string.Empty;
-        var subject = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                      ?? principal.FindFirst("sub")?.Value
-                      ?? principal.FindFirst(ClaimTypes.Sid)?.Value
-                      ?? string.Empty;
+        var (issuer, subject) = ExtractIssuerAndSubject(principal);
 
         if (string.IsNullOrEmpty(subject))
         {
@@ -96,6 +102,27 @@ public sealed class IdentityResolver(
         logger.LogInformation("Created new user {UserId} for issuer={Issuer}, subject={Subject}",
             user.Id, issuer, subject);
         return user;
+    }
+
+    /// <inheritdoc />
+    public async Task<UserEntity?> ResolveUserAsync(ClaimsPrincipal principal, CancellationToken ct = default)
+    {
+        var (issuer, subject) = ExtractIssuerAndSubject(principal);
+
+        if (string.IsNullOrWhiteSpace(subject))
+            return null;
+
+        using var context = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var existing = await context.Users
+            .FirstOrDefaultAsync(u => u.Issuer == issuer && u.Subject == subject && !u.IsDeleted, ct);
+
+        if (existing is null)
+            return null;
+
+        existing.LastActivity = DateTime.UtcNow;
+        await context.SaveChangesAsync(ct);
+        return existing;
     }
 
     /// <inheritdoc />
@@ -181,5 +208,57 @@ public sealed class IdentityResolver(
 
         logger.LogInformation("Created channel {ChannelId} (name={Name})", channel.Id, channelName);
         return channel;
+    }
+
+    /// <inheritdoc />
+    public async Task<ChannelEntity?> ResolveChannelAsync(string channelName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(channelName))
+            return null;
+
+        using var context = await dbContextFactory.CreateDbContextAsync(ct);
+        return await context.Channels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(channel => channel.Name == channelName, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsChannelSenderBindingActiveAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid channelId,
+        string issuer,
+        string subject,
+        CancellationToken ct = default)
+    {
+        if (tenantId == Guid.Empty || userId == Guid.Empty || channelId == Guid.Empty)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(subject))
+            return false;
+
+        using var context = await dbContextFactory.CreateDbContextAsync(ct);
+        return await context.ChannelSenderBindings.AnyAsync(binding =>
+            binding.IsActive
+            && binding.TenantId == tenantId
+            && binding.UserId == userId
+            && binding.ChannelId == channelId
+            && binding.Issuer == issuer
+            && binding.Subject == subject,
+            ct);
+    }
+
+    private static (string Issuer, string Subject) ExtractIssuerAndSubject(ClaimsPrincipal principal)
+    {
+        var issuer = principal.FindFirst("lk_sender_iss")?.Value
+                     ?? principal.FindFirst(ClaimTypes.AuthenticationMethod)?.Value
+                     ?? principal.FindFirst("iss")?.Value
+                     ?? string.Empty;
+        var subject = principal.FindFirst("lk_sender_sub")?.Value
+                      ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                      ?? principal.FindFirst("sub")?.Value
+                      ?? principal.FindFirst(ClaimTypes.Sid)?.Value
+                      ?? string.Empty;
+        return (issuer, subject);
     }
 }

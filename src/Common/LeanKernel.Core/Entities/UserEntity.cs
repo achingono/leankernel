@@ -66,4 +66,9 @@ public class UserEntity : IAuditable, IRecyclable
     /// Gets or sets the sessions associated with this user.
     /// </summary>
     public virtual ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();
+
+    /// <summary>
+    /// Gets or sets sender bindings associated with this user.
+    /// </summary>
+    public virtual ICollection<ChannelSenderBindingEntity> ChannelSenderBindings { get; set; } = new List<ChannelSenderBindingEntity>();
 }

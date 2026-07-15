@@ -29,4 +29,9 @@ public class AgentSettings
     /// Gets or sets the tool runtime configuration nested under <c>Agents:Tools</c>.
     /// </summary>
     public ToolSettings Tools { get; set; } = new ToolSettings();
+
+    /// <summary>
+    /// Gets or sets the channel terminal and policy configuration nested under <c>Agents:Channels</c>.
+    /// </summary>
+    public ChannelSettings Channels { get; set; } = new ChannelSettings();
 }

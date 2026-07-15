@@ -17,6 +17,11 @@ namespace LeanKernel.Gateway.Providers;
 /// </remarks>
 public sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
+    private const string ChannelNameClaimType = "lk_channel";
+    private const string ChannelTenantIdClaimType = "lk_tenant_id";
+    private const string ChannelSenderIssuerClaimType = "lk_sender_iss";
+    private const string ChannelSenderSubjectClaimType = "lk_sender_sub";
+
     /// <summary>Key used to store the resolved tenant identifier in <see cref="HttpContext.Items"/>.</summary>
     public const string TenantKey = "LK.TenantId";
 
@@ -52,16 +57,72 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             return;
         }
 
-        var host = context.Request.Host.Host;
-        var tenant = await resolver.ResolveTenantAsync(host, cancellationToken);
+        if (context.User?.Identity?.IsAuthenticated == true
+            && context.User is ClaimsPrincipal authenticatedPrincipal
+            && HasChannelClaims(authenticatedPrincipal))
+        {
+            var tenantClaim = authenticatedPrincipal.FindFirst(ChannelTenantIdClaimType)?.Value;
+            var channelClaim = authenticatedPrincipal.FindFirst(ChannelNameClaimType)?.Value;
 
-        if (tenant is null)
+            if (!Guid.TryParse(tenantClaim, out var tenantId) || string.IsNullOrWhiteSpace(channelClaim))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
+            var tenant = await resolver.ResolveTenantByIdAsync(tenantId, cancellationToken);
+            var channel = await resolver.ResolveChannelAsync(channelClaim, cancellationToken);
+            var user = await resolver.ResolveUserAsync(authenticatedPrincipal, cancellationToken);
+
+            if (tenant is null || channel is null || user is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
+            var senderIssuer = authenticatedPrincipal.FindFirst(ChannelSenderIssuerClaimType)?.Value
+                ?? authenticatedPrincipal.FindFirst("iss")?.Value
+                ?? string.Empty;
+            var senderSubject = authenticatedPrincipal.FindFirst(ChannelSenderSubjectClaimType)?.Value
+                ?? authenticatedPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? authenticatedPrincipal.FindFirst("sub")?.Value
+                ?? string.Empty;
+
+            var isActiveBinding = await resolver.IsChannelSenderBindingActiveAsync(
+                tenant.Id,
+                user.Id,
+                channel.Id,
+                senderIssuer,
+                senderSubject,
+                cancellationToken);
+
+            if (!isActiveBinding)
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
+            context.Items[TenantKey] = tenant.Id;
+            context.Items[UserIdKey] = user.Id;
+            context.Items[ChannelIdKey] = channel.Id;
+            var channelBadge = authenticatedPrincipal.ToBadge();
+            channelBadge.Id = user.Id;
+            context.Items[BadgeKey] = channelBadge;
+
+            await next(context);
+            return;
+        }
+
+        var host = context.Request.Host.Host;
+        var hostTenant = await resolver.ResolveTenantAsync(host, cancellationToken);
+
+        if (hostTenant is null)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return;
         }
 
-        context.Items[TenantKey] = tenant.Id;
+        context.Items[TenantKey] = hostTenant.Id;
 
         Guid userId;
         Badge badge;
@@ -75,13 +136,12 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         }
         else
         {
-            // Force session materialization before using Session.Id as identity key (M6).
             context.Session.SetString(SessionInitMarker, "1");
 
             var sessionId = context.Session.Id;
             var settings = identitySettings.Value;
             var guestUser = await resolver.ResolveGuestUserAsync(
-                tenant.Id, settings.AnonymousUserName, sessionId, cancellationToken);
+                hostTenant.Id, settings.AnonymousUserName, sessionId, cancellationToken);
             userId = guestUser.Id;
             badge = new Badge
             {
@@ -94,13 +154,16 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         context.Items[UserIdKey] = userId;
         context.Items[BadgeKey] = badge;
 
-        var channel = await resolver.ResolveOrCreateChannelAsync(
+        var openAiChannel = await resolver.ResolveOrCreateChannelAsync(
             ChannelEntity.OpenAiHttpName, cancellationToken);
-        context.Items[ChannelIdKey] = channel.Id;
+        context.Items[ChannelIdKey] = openAiChannel.Id;
 
         await next(context);
     }
 
     private static bool ShouldBypass(PathString path) =>
         s_bypassPaths.Any(p => path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase));
+
+    private static bool HasChannelClaims(ClaimsPrincipal principal) =>
+        principal.HasClaim(claim => claim.Type == ChannelNameClaimType || claim.Type == ChannelTenantIdClaimType);
 }

@@ -1,19 +1,24 @@
 # Phase 06 Activities
 
 ## Step-By-Step Activities
-1. Define the channel abstraction: an adapter contract (receive loop, send, reconnect) and a `ChannelRouter` that maps inbound messages to identity + turn invocation.
-2. Implement a `ChannelHostedService` that hosts enabled channel adapters as background services with lifecycle management.
-3. Implement fail-closed `ChannelAuthenticator`: per-channel sender allowlists where unknown senders are rejected and never processed.
-4. Implement the Signal adapter: poll the Signal daemon, parse inbound messages and attachments, dispatch through the router, and send responses; reconnect with backoff on failure.
-5. Implement typing-indicator keep-alive so long-running turns periodically signal activity on the channel.
-6. Map inbound channel sender/account to the existing tenant/user/channel partitioning via the identity resolver, creating channel-scoped identities as needed.
-7. Add configuration (channel enable flags, Signal endpoint/account, sender allowlists) consistent with the current config shape; validate at startup.
-8. Add tests: routing dispatch, fail-closed auth, keep-alive timing/signaling, attachment parsing, identity mapping, and reconnect behavior.
-9. Document the channel abstraction and Signal adapter in `docs/features/`.
+1. Define the channel terminal abstraction: an adapter contract (native-transport receive loop, send, reconnect) and a Gateway HTTP client that submits a turn with provisioned claims and consumes the streaming (SSE) response. A `ChannelRouter` maps an inbound native message to the correct sender binding and Gateway call.
+2. Scaffold the terminal projects under `src/Terminals`: `LeanKernel.Channels.Signal` and `LeanKernel.Channels.Teams`, each a standalone client process (add to the solution; keep dependencies to shared contracts only).
+3. Implement per-binding credential provisioning: during channel/user configuration, establish a sender→(tenant, user) binding and issue a credential (prefer short-lived tokens minted from a stored per-binding signing key over long-lived JWTs). Store bindings and support rotation/revocation. This makes sender auth fail-closed by construction: no binding ⇒ no token ⇒ rejected.
+4. Gateway-side: trust and validate channel token issuer(s); resolve `TenantId` from the token/binding (not the HTTP host) and `ChannelId` from the authenticated claims (not the hardcoded `openai-http`); resolve the sender to the **already-existing** persisted `UserEntity` via issuer/subject (resolve-not-create for channels, e.g., `iss=signal`, `sub=<phone>`; `iss=teams`, `sub=<aad-oid>`). Reject if no matching user/binding.
+5. Implement the Signal terminal: poll the Signal daemon, parse inbound messages and attachments, look up the sender binding, call the Gateway with the provisioned claims, stream the response back to Signal; reconnect with backoff on failure.
+6. Implement the Teams terminal: receive Microsoft Teams Bot Framework activities, parse messages and attachments, look up the sender binding (AAD object id), call the Gateway with provisioned claims, return the response as a Teams activity; handle retries/reconnect.
+7. Implement typing-indicator keep-alive so long-running turns keep the channel session alive; derive liveness from the Gateway's streaming response and signal activity on the native transport without disturbing final output ordering.
+8. Define the per-channel memory sharing/isolation policy: a `Share` allow-list (channels permitted to read this channel's memory) and an `Access` allow-list (channels whose memory this channel may read), each accepting explicit channel names or the wildcard `*`, with `*` as the default for both directions. Persist per-channel overrides, load tenant-level defaults from configuration, and expose a resolution service/contract that yields, for a given channel, both (a) the effective set of channels whose memory it may read (directional AND: channel X's memory is readable in channel C iff X shares to C **and** C accesses X) and (b) the *mutually visible* set (channels visible to each other) that Phase 10 uses as the 5W1H fact-reconciliation boundary. Signal policy changes so Phase 10 can reconcile facts when sharing is widened. Enforcement and reconciliation are deferred to Phase 10.
+9. Add configuration (channel enable flags, Signal daemon endpoint/account, Teams Bot Framework settings, per-binding credential/JWT provisioning, sender bindings, memory sharing policy defaults) consistent with the current config shape; validate at startup, including rejecting bindings that reference unknown tenants/users and policy entries that reference unknown channels, and normalizing wildcard usage.
+10. Add tests: Gateway channel-claim trust and `ChannelId`/`TenantId` resolution from claims; sender→existing-user resolution; fail-closed rejection of unprovisioned senders (terminal and Gateway); Signal and Teams receive/send/reconnect; keep-alive over SSE; attachment parsing; and memory-policy resolution (wildcard default, explicit lists, directional AND intersection, isolation via empty lists).
+11. Document the channel terminal abstraction, the Signal and Teams terminals, the refined Option B claims/binding model, and the memory sharing/isolation policy model in `docs/features/`.
 
 ## Review Focus
-- Auth is genuinely fail-closed (default reject) with no bypass path.
-- Inbound identity mapping preserves tenant/user/channel isolation.
+- Auth is genuinely fail-closed by construction (no binding ⇒ rejected) with no bypass path, at both the terminal and the Gateway.
+- Provisioned credentials are least-privilege and revocable; a leaked credential can only assert pre-bound identities, never arbitrary users, and never crosses tenants.
+- Tenant is resolved from the binding/claims and `ChannelId` from claims (not hardcoded `openai-http`); the sender resolves to the correct existing user, with no cross-tenant or cross-user leakage.
+- Terminals hold no business logic beyond transport + binding lookup; identity resolution and turn execution stay single-sourced in the Gateway.
 - Reconnect logic does not busy-loop or drop messages silently.
-- Keep-alive does not interfere with turn output ordering.
+- Keep-alive over SSE does not interfere with final turn output ordering.
 - Attachment parsing handles malformed input safely.
+- Memory sharing policy defaults to wildcard (full sharing), supports explicit isolation, and resolves with correct directional AND semantics.
