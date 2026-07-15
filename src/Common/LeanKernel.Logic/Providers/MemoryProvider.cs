@@ -6,7 +6,7 @@ using LeanKernel.Logic.Memory;
 namespace LeanKernel.Logic.Providers;
 
 /// <summary>
-/// Provides AI context (memory retrieval) backed by GBrain via <see cref="IMemoryClient"/>,
+/// Provides AI context (memory retrieval) backed by Memory via <see cref="IMemoryClient"/>,
 /// scoped by tenant/user/channel identity.
 /// </summary>
 public class MemoryProvider(

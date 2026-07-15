@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LeanKernel.Logic.Tools.Memory;
 
 /// <summary>
-/// Provides the LeanKernel-owned <c>memory_write</c> tool backed by GBrain.
+/// Provides the LeanKernel-owned <c>memory_write</c> tool backed by Memory.
 /// </summary>
 public static class MemoryWriteTool
 {
@@ -21,7 +21,7 @@ public static class MemoryWriteTool
         return new ToolDefinition
         {
             Name = ToolName,
-            Description = "Create or update a knowledge page in GBrain",
+            Description = "Create or update a knowledge page in Memory",
             Category = "knowledge",
             Parameters =
             [

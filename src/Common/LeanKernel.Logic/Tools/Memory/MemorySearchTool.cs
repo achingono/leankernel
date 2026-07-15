@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LeanKernel.Logic.Tools.Memory;
 
 /// <summary>
-/// Provides the LeanKernel-owned <c>memory_search</c> tool backed by GBrain.
+/// Provides the LeanKernel-owned <c>memory_search</c> tool backed by Memory.
 /// </summary>
 public static class MemorySearchTool
 {
@@ -23,7 +23,7 @@ public static class MemorySearchTool
         return new ToolDefinition
         {
             Name = ToolName,
-            Description = "Search GBrain knowledge pages for documents matching the given query",
+            Description = "Search Memory knowledge pages for documents matching the given query",
             Category = "knowledge",
             Parameters =
             [

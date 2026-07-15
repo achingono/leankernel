@@ -53,7 +53,7 @@ public sealed class MemoryItem
 }
 
 /// <summary>
-/// Provides memory search and persistence capabilities backed by GBrain or an in-memory stub.
+/// Provides memory search and persistence capabilities backed by Memory or an in-memory stub.
 /// </summary>
 public interface IMemoryClient
 {
@@ -86,7 +86,7 @@ public interface IMemoryClient
 }
 
 /// <summary>
-/// A no-op / stub memory client for environments where GBrain is not available.
+/// A no-op / stub memory client for environments where Memory is not available.
 /// </summary>
 public sealed class StubMemoryClient : IMemoryClient
 {

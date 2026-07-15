@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LeanKernel.Logic.Tools.Memory;
 
 /// <summary>
-/// Provides the LeanKernel-owned <c>memory_read</c> tool backed by GBrain.
+/// Provides the LeanKernel-owned <c>memory_read</c> tool backed by Memory.
 /// </summary>
 public static class MemoryReadTool
 {
@@ -23,7 +23,7 @@ public static class MemoryReadTool
         return new ToolDefinition
         {
             Name = ToolName,
-            Description = "Retrieve a knowledge page from GBrain by its key",
+            Description = "Retrieve a knowledge page from Memory by its key",
             Category = "knowledge",
             Parameters =
             [
