@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace LeanKernel.Entities;
 
@@ -83,4 +85,20 @@ public sealed class TurnEntity: IAuditable, IRecyclable
     /// Gets or sets the parent session navigation property.
     /// </summary>
     public SessionEntity Session { get; set; } = null!;
+
+    /// <summary>
+    /// Computes a deterministic idempotency key for this turn to prevent duplicate inserts on retry.
+    /// The key is derived from session, role, content, and a time-bucket to allow legitimate
+    /// repeated content while rejecting logical duplicates within a short window.
+    /// </summary>
+    public string ComputeIdempotencyKey()
+    {
+        // Bucket timestamp to 5-minute windows so retries within the same window are deduped
+        // but genuinely repeated content across longer intervals is preserved.
+        var bucket = new DateTimeOffset(Timestamp.Year, Timestamp.Month, Timestamp.Day,
+            Timestamp.Hour, Timestamp.Minute / 5 * 5, 0, TimeSpan.Zero);
+        var input = $"{SessionId:N}|{Role}|{Content}|{bucket:O}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
 }

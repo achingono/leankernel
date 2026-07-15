@@ -90,8 +90,30 @@ public class DbChatHistoryProvider(
             conversationId,
             cancellationToken);
 
-        AddRequestTurns(scope, context.RequestMessages, sessionGuid);
-        AddResponseTurns(scope, context.ResponseMessages, sessionGuid);
+        // Collect candidate turns and assign idempotency keys before checking for duplicates.
+        var requestTurns = BuildTurnEntities(scope, context.RequestMessages, sessionGuid, isRequest: true);
+        var responseTurns = BuildTurnEntities(scope, context.ResponseMessages, sessionGuid, isRequest: false);
+        var allCandidateTurns = requestTurns.Concat(responseTurns).ToList();
+
+        if (allCandidateTurns.Count == 0)
+            return;
+
+        // Load existing idempotency keys for this session to detect retries.
+        var existingKeys = new HashSet<string>(
+            await scope.Turns
+                .Where(t => t.SessionId == sessionGuid && t.Metadata != null)
+                .Select(t => t.Metadata!)
+                .ToListAsync(cancellationToken),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var turn in allCandidateTurns)
+        {
+            if (!existingKeys.Contains(turn.Metadata!))
+            {
+                scope.Turns.Add(turn);
+                existingKeys.Add(turn.Metadata!);
+            }
+        }
 
         await scope.SaveChangesAsync(cancellationToken);
     }
@@ -161,35 +183,25 @@ public class DbChatHistoryProvider(
     }
 
     /// <summary>
-    /// Persists eligible request-side messages as turns.
+    /// Builds turn entities from chat messages, filtering by persistence rules and computing idempotency keys.
     /// </summary>
-    private static void AddRequestTurns(EntityContext dbContext, IEnumerable<ChatMessage>? requestMessages, Guid sessionGuid)
+    private static List<TurnEntity> BuildTurnEntities(
+        EntityContext dbContext,
+        IEnumerable<ChatMessage>? messages,
+        Guid sessionGuid,
+        bool isRequest)
     {
-        if (requestMessages is null)
-        {
-            return;
-        }
+        if (messages is null)
+            return [];
 
-        foreach (var message in requestMessages.Where(ShouldPersistRequestMessage))
-        {
-            dbContext.Turns.Add(ToTurnEntity(message, sessionGuid, message.Role!.Value.ToString().ToLowerInvariant()));
-        }
-    }
+        var filter = isRequest
+            ? (Func<ChatMessage, bool>)ShouldPersistRequestMessage
+            : ShouldPersistResponseMessage;
 
-    /// <summary>
-    /// Persists eligible response-side messages as turns.
-    /// </summary>
-    private static void AddResponseTurns(EntityContext dbContext, IEnumerable<ChatMessage>? responseMessages, Guid sessionGuid)
-    {
-        if (responseMessages is null)
-        {
-            return;
-        }
-
-        foreach (var message in responseMessages.Where(ShouldPersistResponseMessage))
-        {
-            dbContext.Turns.Add(ToTurnEntity(message, sessionGuid, "assistant"));
-        }
+        return messages
+            .Where(filter)
+            .Select(m => ToTurnEntity(m, sessionGuid, isRequest ? m.Role!.Value.ToString().ToLowerInvariant() : "assistant"))
+            .ToList();
     }
 
     /// <summary>
@@ -210,11 +222,11 @@ public class DbChatHistoryProvider(
     }
 
     /// <summary>
-    /// Converts a chat message into a persisted turn entity.
+    /// Converts a chat message into a persisted turn entity with an idempotency key in Metadata.
     /// </summary>
     private static TurnEntity ToTurnEntity(ChatMessage message, Guid sessionGuid, string role)
     {
-        return new TurnEntity
+        var turn = new TurnEntity
         {
             SessionId = sessionGuid,
             Role = role,
@@ -229,6 +241,9 @@ public class DbChatHistoryProvider(
                 Email = string.Empty
             }
         };
+
+        turn.Metadata = turn.ComputeIdempotencyKey();
+        return turn;
     }
 
     /// <summary>

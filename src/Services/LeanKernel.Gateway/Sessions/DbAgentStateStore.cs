@@ -42,7 +42,7 @@ public class DbAgentStateStore(
                 return JsonSerializer.Deserialize<ChatClientAgentSession>(doc, s_jsonOptions)
                     ?? await agent.CreateSessionAsync(cancellationToken);
             }
-            catch (Exception ex)
+            catch (JsonException ex)
             {
                 logger.LogWarning(ex, "Failed to deserialize agent session state for conversation {ConversationId}; starting a new session.", conversationId);
                 // Fall through to create new session if deserialization fails
@@ -100,7 +100,8 @@ public class DbAgentStateStore(
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            // Reload the winning state from the store and retry once.
+            // Reload the winning state from the store and retry once (last-writer-wins).
+            logger.LogWarning(ex, "Concurrency conflict saving agent state for {ConversationId}; reloading and overwriting.", conversationId);
             foreach (var entry in ex.Entries)
                 await entry.ReloadAsync(cancellationToken);
 
