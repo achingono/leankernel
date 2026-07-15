@@ -21,18 +21,14 @@ Emanate is reference material for browser/session API patterns; implementation r
 
 ## Current-State Analysis
 ### LeanKernel (target)
-- Tool framework exists (`ToolDefinition`, `ToolRegistry`, `ToolExecutor`).
-- Built-ins are registered centrally in `ToolsServiceCollectionExtensions`.
-- Existing internet tools (`web_fetch`, `http_request`) demonstrate:
+- Tool framework exists in the current rebuild under `src/Common/LeanKernel.Logic/Tools/` (`ToolDefinition`, `ToolRegistry`, `IToolRegistry`, `ToolGovernancePolicy`).
+- Built-ins are registered into the shared registry at startup through `RegisterToolsAsync()` and exposed to the agent from `AddLeanKernelAgent(...)`.
+- Existing built-ins (`web_search`, `file_search`, calculation helpers, memory tools) demonstrate:
   - parameter validation,
-  - SSRF protections,
+  - scoped service resolution via `IServiceScopeFactory`,
   - JSON-serialized structured output,
-  - test scaffolding (`IServiceScopeFactory` with stub `HttpMessageHandler`).
-- Hardening primitives available in `LeanKernelHardeningServiceCollectionExtensions`:
-  - named `IHttpClientFactory` clients with `Bearer` auth,
-  - `CorrelationIdDelegatingHandler` auto-attached to every client,
-  - `IProviderHealthProbe` pattern (`LiteLlmHealthProbe`, `GBrainHealthProbe`),
-  - `ResilienceConfig` (retry, circuit breaker, timeout) and `RateLimitConfig`.
+  - startup registration through the current tool registry path.
+- Gateway already uses named/typed `HttpClient` registrations and health-check wiring for external dependencies (`AddGBrainMemory`, `AddGatewayHealthChecks`, `LiteLlmHealthCheck`, `GBrainHealthCheck`).
 - Convention: every existing built-in tool is **single-purpose** (one operation per tool).
 
 ### Emanate (reference)
@@ -47,7 +43,7 @@ Emanate is reference material for browser/session API patterns; implementation r
 - `browser_run_task` — natural-language task → script run.
 - `browser_run_script` — explicit Playwright script (gated; off by default).
 - `browser_get_run` — fetch status + artifact manifest for a run.
-- `browser_get_artifact` — fetch a specific artifact (screenshot/log) by run+id, base64-encoded when binary.
+- `browser_get_artifact` — fetch a specific artifact (screenshot/log) by run+id with model-facing size limits.
 
 ### B. Execution model — async with required polling
 **Decision:** `POST /runs` returns **immediately** with `runId` and `status=queued|running`. The tool **does not block** for completion. Agents (or `WorkerAgent` loops) poll via `browser_get_run`.
@@ -58,26 +54,26 @@ Optional v1.1 follow-up: `wait_seconds` parameter on `browser_get_run` for short
 ### C. Browser-state lifecycle — stateless per run (v1)
 **Decision:** Each run launches a fresh Playwright context. **No persistent sessions, no login flows in v1.** Aligns with Webwright; sidesteps the credential-handling surface area that dominates Emanate's complexity. Persistent session profiles deferred to a later PRD.
 
-### D. Artifact access — service-served URLs + dedicated fetch tool
-**Decision:** Browser service serves artifacts at stable paths (`/runs/{runId}/artifacts/{artifactId}`). The run manifest returns relative paths + content-type + byte size. Agents fetch screenshots via `browser_get_artifact` (returns base64 + content-type) — they are **not** inlined into every status response.
+### D. Artifact access — manifest-first responses + bounded fetch tool
+**Decision:** Browser service serves artifacts at stable paths (`/runs/{runId}/artifacts/{artifactId}`). The run manifest returns relative paths + content-type + byte size only. Agents fetch a specific artifact via `browser_get_artifact`, which returns truncated text for text artifacts and only inlines base64 for binaries small enough to fit the model-facing budget. Artifacts are **not** inlined into status responses.
 
 ### E. Service ownership and language
 **Decision:** Browser service lives in this repository under `services/browser-service/` and is a **Node.js + Playwright** service (TypeScript). Rationale: closest mapping to Emanate reference code, smallest Playwright surface to maintain, no Python runtime added to the stack. Service Dockerfile uses the official `mcr.microsoft.com/playwright:v1.x-jammy` base image.
 
 ### F. Tool output shape
-**Decision:** Tool handlers return `ToolResult.Output` as a **JSON-serialized object** (camelCase), matching `HttpRequestTool`. Shape per tool documented below; agents are instructed via tool descriptions to parse JSON.
+**Decision:** Tool handlers return `ToolResult.Output` as a **JSON-serialized object** (camelCase), matching the current built-in tool pattern. Shape per tool is documented below; agents are instructed via tool descriptions to parse JSON.
 
 ### G. Cancellation contract
-**Decision:** `CancellationToken` from `IToolExecutor` triggers `DELETE /runs/{runId}` on the browser service (best-effort, non-blocking). Browser service treats `DELETE` as a stop signal and marks run `cancelled`.
+**Decision:** The `CancellationToken` passed into the tool handler triggers `DELETE /runs/{runId}` on the browser service (best-effort, non-blocking). Browser service treats `DELETE` as a stop signal and marks run `cancelled`.
 
 ### H. Concurrency control
-**Decision:** Browser service enforces a global semaphore (default 4 concurrent runs, configurable) and per-`requestKey` serialization (1 concurrent per key) modeled on Emanate's `ResearchRateLimiter`. `requestKey` is supplied by the tool caller (e.g. session ID) and defaults to a per-process bucket. LeanKernel side adds **no** in-process limit; relies on service.
+**Decision:** Browser service enforces a global semaphore (default 4 concurrent runs, configurable) and per-owner serialization (1 concurrent per owner key) modeled on Emanate's `ResearchRateLimiter`. LeanKernel derives the owner key server-side from the current permit and request context (tenant/user/channel plus anonymous-session or conversation dimension where present) and sends it to the browser service as internal metadata. Tool callers do not supply this key. LeanKernel side adds **no** in-process limit; it relies on the service-side queue and owner budget checks.
 
 ### I. Authentication
-**Decision:** Static `Bearer` token in `Authorization` header (v1). Token sourced from `LeanKernel:BrowserService:ApiToken` configuration, overridable via standard `LEANKERNEL__BROWSERSERVICE__APITOKEN` environment variable. mTLS is a deferred follow-up.
+**Decision:** Static `Bearer` token in `Authorization` header (v1). Token is configured under the existing tool-runtime configuration branch (`Agents:Tools:Browser:ApiToken`) and can be overridden through the corresponding environment variable. mTLS is a deferred follow-up.
 
 ### J. Observability and correlation
-**Decision:** Register the browser-service client through `IHttpClientFactory` so `CorrelationIdDelegatingHandler` is auto-applied (see `ConfigureAll<HttpClientFactoryOptions>` in `LeanKernelHardeningServiceCollectionExtensions`). Tool handler creates an `ActivitySource("LeanKernel.Tools.Browser")` span per call. Add a `BrowserServiceHealthProbe : IProviderHealthProbe` that hits `/health` on the service and is registered alongside the existing probes.
+**Decision:** Register the browser-service client through `IHttpClientFactory` using the same Gateway composition style as existing external dependencies. Tool handlers log `runId` and resolved identity dimensions, and the gateway adds a `BrowserServiceHealthCheck : IHealthCheck` that probes `/health` alongside the existing LiteLLM and GBrain checks.
 
 ## Tool Contracts (LeanKernel side)
 
@@ -89,7 +85,6 @@ All four tools register under `Category = "browser"` so operators can allow the 
 | `task` | string | yes | Natural-language task |
 | `start_url` | string | no | Initial navigation target (must be absolute http/https) |
 | `checkpoint_labels` | string[] | no | Labels the agent expects to verify |
-| `request_key` | string | no | Idempotency / serialization key |
 | `request_id` | string | no | Idempotency key for retry-safe submission |
 
 Output: `{ runId, status, submittedAt }`
@@ -122,16 +117,23 @@ Output:
 |---|---|---|---|
 | `run_id` | string | yes | |
 | `artifact_id` | string | yes | |
-| `max_bytes` | int | no | Cap; default from `MaxArtifactBytes` config |
+| `max_bytes` | int | no | Cap; default from `MaxInlineArtifactBytes` config |
 
-Output: `{ runId, artifactId, contentType, base64, truncated }`
+Output: `{ runId, artifactId, contentType, bytes, text, base64, truncated }`
+
+Rules:
+- text artifacts return UTF-8 `text` truncated to `MaxArtifactTextChars`
+- binary artifacts return `base64` only when `bytes <= MaxInlineArtifactBytes`
+- oversized binary artifacts return metadata only with `truncated = true`
 
 ## Browser Service API Contract (container)
 - `POST /runs` → `202 Accepted`, body `{ runId, status, submittedAt }`
 - `GET  /runs/{runId}` → run status + artifact manifest
 - `GET  /runs/{runId}/artifacts/{artifactId}` → raw artifact (binary or text)
 - `DELETE /runs/{runId}` → cancel signal (idempotent)
-- `GET  /health` → `200 {status:"ok"}` for `IProviderHealthProbe`
+- `GET  /health` → `200 {status:"ok"}` for the gateway health-check integration
+
+Every run is stamped at creation time with the resolved tenant/user/channel ownership metadata from the current permit. `GET`, artifact fetch, and `DELETE` operations must reject cross-owner access even when the caller knows a valid `runId`.
 
 ### Error envelope (expanded)
 ```json
@@ -162,11 +164,14 @@ Codes:
 ## Security and Governance
 - **LeanKernel side:**
   - `browser_run_script` defaults to **off** in `ToolGovernancePolicy`.
-  - Input URL validation reuses `web_fetch` / `http_request` SSRF guard helpers (move shared helpers to `BuiltIn/Common/UrlSafety.cs` if duplicated).
+  - Input URL validation reuses the existing egress-validation approach used by dynamic HTTP tools: allowlisted hosts only, `http/https` only, and private/loopback hosts blocked.
   - Tool input size capped (`task` ≤ 4 KB, `script` ≤ 32 KB).
+  - Run submissions stamp the resolved tenant/user/channel ownership metadata onto the browser-service request.
+  - Owner-scoped serialization keys are derived from the current permit/request context, never trusted from tool input.
 - **Browser service side:**
   - Domain allowlist (default empty = block-all) and denylist for known-bad hosts.
   - Per-run step limit, total wall-clock timeout, max artifact bytes per run.
+  - Per-owner concurrency and run-budget limits are enforced before admission.
   - Secret redaction in logs (regex-based: API keys, bearer tokens, common cookie names).
   - Disallowed protocols: `file:`, `ftp:`, `data:` (except for inline asset capture).
   - Artifact retention: configurable TTL (default 24h) + max artifacts per run.
@@ -175,24 +180,29 @@ Codes:
   - mTLS deferred.
 
 ## Configuration
-Add a new section to `appsettings.json` under `LeanKernel`:
+Extend the existing tool runtime configuration under `Agents:Tools`:
 
 ```json
-"BrowserService": {
-  "BaseUrl": "http://browser-service:3000",
-  "ApiToken": "",
-  "RequestTimeoutSeconds": 15,
-  "MaxArtifactBytes": 2000000,
-  "MaxOutputChars": 12000,
-  "AllowRunScript": false,
-  "HealthProbe": { "Enabled": true }
+"Agents": {
+  "Tools": {
+    "Browser": {
+      "ServiceBaseUrl": "http://browser-service:3000",
+      "ApiToken": "",
+      "RequestTimeoutSeconds": 15,
+      "MaxInlineArtifactBytes": 131072,
+      "MaxArtifactTextChars": 12000,
+      "AllowRunScript": false,
+      "MaxRunsPerHourPerOwner": 20,
+      "HealthProbeEnabled": true
+    }
+  }
 }
 ```
 
-Add a `BrowserServiceConfig` class to `LeanKernel.Abstractions/Configuration/` and reference it from `LeanKernelConfig`. `RequestTimeoutSeconds` applies to LeanKernel↔service calls (short, since the service is async); long-running run execution is bounded by service-side limits.
+Add a `BrowserToolSettings` class under the current logic configuration surface (for example `src/Common/LeanKernel.Logic/Configuration/`) and bind it from `Agents:Tools:Browser`. `RequestTimeoutSeconds` applies only to LeanKernel↔service calls; long-running browser execution remains bounded by service-side limits. Keep browser-tool settings under the existing `Agents:Tools` branch rather than introducing a new top-level config root.
 
 ## docker-compose integration
-Add a new service to `docker-compose.yml` (current stack: `engine`, `database`, `litellm`, etc.):
+Add a new service to `docker-compose.yml` alongside the current `database`, `litellm`, `gbrain`, and `gateway` services:
 
 ```yaml
 services:
@@ -215,21 +225,19 @@ volumes:
   browseradata:
 ```
 
-The `engine` service gains a `depends_on: browser-service` and an env var `LEANKERNEL__BROWSERSERVICE__BASEURL=http://browser-service:3000`.
+The `gateway` service gains `depends_on: browser-service` plus tool-runtime settings such as `AGENTS__TOOLS__BROWSER__SERVICEBASEURL=http://browser-service:3000` and `AGENTS__TOOLS__BROWSER__APITOKEN=...`.
 
 ## Implementation Plan
-1. Add `BrowserServiceConfig` to `LeanKernel.Abstractions/Configuration/` and wire it into `LeanKernelConfig`.
-2. Add typed HTTP client and DTOs in `LeanKernel.Tools/BuiltIn/Browser/`:
+1. Add `BrowserToolSettings` under the current configuration model in `src/Common/LeanKernel.Logic/Configuration/` and bind it from `Agents:Tools:Browser`.
+2. Add typed HTTP client and DTOs in `src/Common/LeanKernel.Logic/Tools/BuiltIn/Browser/`:
    - `IBrowserServiceClient` (interface), `BrowserServiceClient` (impl using named `HttpClient`).
    - Request/response DTOs and error mapper.
 3. Add four tool definitions in the same folder, each as `static class`:
    - `BrowserRunTaskTool`, `BrowserRunScriptTool`, `BrowserGetRunTool`, `BrowserGetArtifactTool`.
-4. Register tools in `ToolsServiceCollectionExtensions`. Also register:
-   - named `HttpClient` for browser service (with `Bearer` token + base URL),
-   - `BrowserServiceClient` as singleton,
-   - `BrowserServiceHealthProbe` in `LeanKernelHardeningServiceCollectionExtensions` alongside existing probes.
+4. Extend the current startup registration path so `RegisterToolsAsync()` adds the browser tools when enabled. Register the browser-service named `HttpClient` and a `BrowserServiceHealthCheck` through the existing Gateway DI/health-check extensions.
 5. Add `services/browser-service/` (Node.js + TypeScript + Playwright):
    - HTTP server, run queue, artifact store on `/app/data/runs/<runId>/`,
+   - owner metadata stamping and owner-check enforcement on every follow-up API,
    - Playwright launcher with stealth defaults inspired by Emanate's `createStealthContext`,
    - cancellation, retention sweep, health endpoint,
    - Dockerfile based on `mcr.microsoft.com/playwright:v1.x-jammy`.
@@ -254,32 +262,33 @@ The `engine` service gains a `depends_on: browser-service` and an env var `LEANK
 
 ## Risks and Mitigations
 - **Service dependency risk:** Browser service downtime blocks tool calls.
-  - Mitigation: short LeanKernel-side timeout (15s) → fast `SERVICE_UNAVAILABLE`; `BrowserServiceHealthProbe` surfaces status via `/api/health`; degradation policy can hide the tools.
+  - Mitigation: short LeanKernel-side timeout (15s) → fast `SERVICE_UNAVAILABLE`; `BrowserServiceHealthCheck` surfaces status via `/health`; degradation policy can hide the tools.
 - **Security risk (navigation abuse):** untrusted targets and data exfiltration.
   - Mitigation: empty allowlist by default, denylist for known-bad, protocol restrictions, redaction, bounded outputs.
 - **Long-running run risk:** runs exceed HTTP timeout.
   - Mitigation: async submit-then-poll contract is the primary design; no long-blocking tool call.
 - **Artifact growth risk:** screenshot/log accumulation.
-  - Mitigation: TTL sweep + max artifacts/run + cap on per-fetch bytes.
+  - Mitigation: TTL sweep + max artifacts/run + manifest-only status responses + small model-facing fetch caps.
 - **`run_script` abuse risk:** arbitrary Playwright code can do destructive things.
   - Mitigation: gated off by default; even when on, browser service runs scripts in a sandboxed Node VM with restricted globals and the same domain/timeout limits as `run_task`.
 - **Cancellation leak:** abandoned LLM tool calls leave browser tabs open.
   - Mitigation: `CancellationToken` → `DELETE /runs/{runId}` + service-side reaper that kills runs idle past max wall-clock.
 
 ## Acceptance Criteria
-- Four browser tools appear in registry and execute through `IToolExecutor`.
+- Four browser tools appear in the shared registry and are exposed through the current tool runtime.
 - Each tool validates arguments per its contract above.
 - `browser_run_script` is hidden unless explicitly allowed.
 - Browser service errors are mapped to the documented error code table.
 - Run status responses include artifact references and checkpoint evidence metadata.
+- Run status, artifact retrieval, and cancellation enforce owner-scope checks derived from the current permit.
+- Model-facing artifact retrieval is bounded: status stays manifest-only, text is truncated, and large binaries are not inlined.
 - Cancellation propagates from tool to service.
-- `BrowserServiceHealthProbe` reports through `/api/health`.
+- `BrowserServiceHealthCheck` reports through `/health`.
 - Tests and quality gates pass under repository validation sequence.
 
 ## Open Decisions (deferred)
-- Should `request_key` default to the calling `sessionId` automatically (cross-cutting plumbing)?
 - Retention TTL default (24h proposed) — confirm against compliance requirements.
-- Whether to add a SpendGuard-style budget for browser runs (separate from token spend).
+- Whether owner scoping should require same-conversation access in addition to tenant/user/channel ownership for `GET` and `DELETE` semantics.
 
 ## Independent Plan Review Notes
 - Keep LeanKernel focused on tool orchestration; avoid embedding Playwright directly.

@@ -1,5 +1,13 @@
 # Phase 02 Runtime Boundary Remediation
 
+## Companion Documents
+- [Inputs](inputs.md)
+- [Activities](activities.md)
+- [Outputs](outputs.md)
+- [Exit Criteria](exit-criteria.md)
+- [Risk Register](risk-register.md)
+- [Evidence](evidence.md)
+
 ## Objective
 Remediate the contextual runtime issues identified in the post-Sonar code review by restoring consistent tenant/user/channel isolation, hardening trust boundaries at the HTTP edge, correcting state and transcript lifecycle behavior, and reducing persistence-model drift. This phase is intended to close the gap between the accepted architecture decisions and the current implementation so that memory, conversation history, and durable agent state behave safely under real multi-tenant and concurrent production traffic.
 

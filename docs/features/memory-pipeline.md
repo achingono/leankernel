@@ -39,5 +39,7 @@ The logic layer is provider-agnostic.
 
 - `LeanKernel.Logic` depends on `IMemoryClient`
 - `LeanKernel.Gateway` provides the GBrain-backed implementation
+- memory pages are passed to the transport with scope-relative keys
+- agent-session isolation is a separate runtime concern and is not controlled by `IdentityIsolationKeyProvider` on the memory path
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Providers/GBrainMemoryClient.cs`](../../src/Services/LeanKernel.Gateway/Providers/GBrainMemoryClient.cs)
+Reference: [`../../src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs`](../../src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs)

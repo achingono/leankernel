@@ -1,5 +1,13 @@
 # Phase 01 Tool Runtime Enablement
 
+## Companion Documents
+- [Inputs](inputs.md)
+- [Activities](activities.md)
+- [Outputs](outputs.md)
+- [Exit Criteria](exit-criteria.md)
+- [Risk Register](risk-register.md)
+- [Evidence](evidence.md)
+
 ## Objective
 Enable provider-agnostic tool execution for the `leankernel` agent behind the existing `/v1/responses` surface by introducing a LeanKernel-owned tool runtime that supports both built-in tools and custom user-defined tools. In this phase, “built-in” means stable LeanKernel tool contracts such as `web_search`, `file_search`, deterministic `calculate` / aggregation helpers, and GBrain-backed `wiki_*` knowledge tools that are executed locally through MAF function-calling primitives, not provider-hosted OpenAI/Foundry tools whose availability depends on the upstream model provider. Phase 01 is intentionally limited to `web_search`, `file_search`, `calculate`, lightweight aggregation tools, `wiki_search`, `wiki_read`, `wiki_write`, and startup-only `SKILL.md`-defined HTTP user tools.
 

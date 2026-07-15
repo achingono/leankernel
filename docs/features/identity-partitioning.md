@@ -33,6 +33,12 @@ Code anchors:
 - memory retrieval and persistence scope
 - startup seeding of tenant/channel records
 
+These boundaries are enforced through different runtime paths:
+
+- `IdentityIsolationKeyProvider` scopes agent-session storage keys
+- `MemoryScope` and `IMemoryClient` scope memory retrieval and persistence
+- `DbChatHistoryProvider` verifies transcript ownership against the current permit
+
 ## Why It Matters
 
 This keeps transcript data, runtime state, and memory context isolated per tenant/user/channel boundary instead of relying on raw claims or host strings alone.

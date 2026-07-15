@@ -43,6 +43,8 @@ Reference: [`../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.c
 4. After invocation, fact extraction and normalization run.
 5. Scope-relative normalized memory pages are persisted back through `IMemoryClient`.
 
+Memory scoping uses the memory pipeline's `MemoryScope` and transport-specific implementation. It does not reuse the agent-session isolation key provider.
+
 Reference: [`../../src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs`](../../src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs)
 
 ## Agent State Flow
@@ -50,6 +52,8 @@ Reference: [`../../src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs`](../
 1. The MAF conversation id is scoped through `IdentityIsolationKeyProvider`.
 2. `DbAgentStateStore` loads or creates the runtime session.
 3. Serialized session state is stored in `AgentStateEntity` for future resumption.
+
+This flow is intentionally separate from durable memory scope so transcript/session continuity can evolve independently from long-term memory behavior.
 
 References:
 

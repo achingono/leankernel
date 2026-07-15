@@ -11,7 +11,7 @@ The gateway reads configuration primarily from:
 |---|---|
 | `ConnectionStrings` | Database provider inputs. Local defaults use SQLite. |
 | `OpenAI` | Base model endpoint, API key, default model, memory model settings, fact extraction model settings. |
-| `Agents` | Default agent metadata and root path. |
+| `Agents` | Default agent metadata, root path, and nested tool runtime settings. |
 | `Identity` | Anonymous user defaults plus token/OpenID settings. |
 | `Files` | Root data path. |
 | `Cors` | Local policy settings. |
@@ -25,6 +25,17 @@ The gateway reads configuration primarily from:
 - `FactExtraction`
 
 These are used by the logic-layer memory pipeline.
+
+## Agents Subsections
+
+`Agents` currently includes the tool runtime branch under `Agents:Tools`.
+
+- tool enablement and allowlists
+- web-search provider settings
+- dynamic HTTP egress settings
+- built-in calculation helper settings
+
+The current implementation does not use a top-level `LeanKernel` configuration root. New runtime settings should extend the existing top-level sections rather than introducing `LeanKernel:*` duplicates.
 
 Code anchors:
 

@@ -46,7 +46,7 @@ The intended result is that `LeanKernel.Logic` owns the page-shaping, dimension 
 
 - Implemented in `src/Common/LeanKernel.Logic/Memory`: `FactExtractionService`, `MemoryPageParser`, `MemoryPageRenderer`, `MemoryPageNormalizer`, `MemoryDimensionClassifier`, `MemoryPageLinker`, `MemoryGraphReasoner`, `MemoryFieldRepairService`, `MemoryPageKeyBuilder`, `DisabledChatClient`, `ReasoningModel`, and core records.
 - Integrated into `MemoryProvider` write/read flow in `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` (fact extraction -> normalization -> scope-relative save key; compact summary retrieval; fallback raw save on failure).
-- Added model-tier configuration and keyed clients: `SmallModelSettings`, `FactExtractionSettings`, and DI registration in `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs`.
+- Added model-tier configuration and keyed clients: `MemorySettings`, `FactExtractionSettings`, and DI registration in `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs`.
 - Kept transport boundary intact: GBrain implementation remains in `src/Services/LeanKernel.Gateway/Providers`, while Logic only depends on `IMemoryClient` abstractions.
 - Test status: memory-focused unit suites exist and pass; coverage for memory pipeline namespace exceeds 80% in latest runs.
 
@@ -325,7 +325,7 @@ Three distinct model tiers with separate configuration:
 |------|---------|----------------|----------------|
 | **Primary** | Main chat/agent responses | gpt-4o, gpt-4.1 | `OpenAISettings.DefaultModel` |
 | **Fact Extraction** | Conversation → fact strings (JSON array) | gpt-4o-mini, gpt-4o, gpt-4.1-mini | `FactExtractionSettings` |
-| **Reasoning/Repair** | Dimensions, graph edges, field repair | gpt-4o-mini, phi-3-mini, haiku | `SmallModelSettings` |
+| **Reasoning/Repair** | Dimensions, graph edges, field repair | gpt-4o-mini, phi-3-mini, haiku | `MemorySettings` |
 
 **Fact extraction requires a more capable model** because:
 - Input: full conversation transcript (up to 12K chars / ~3K tokens)
@@ -338,7 +338,7 @@ The reasoning/repair passes operate on smaller, structured inputs with constrain
 public sealed class FactExtractionSettings
 {
     public const string SectionName = "FactExtraction";
-    public string ModelId { get; set; } = "gpt-4o-mini";  // distinct from SmallModelSettings.ModelId
+    public string ModelId { get; set; } = "gpt-4o-mini";  // distinct from OpenAISettings.DefaultModel when desired
     public double Temperature { get; set; } = 0.1;
     public int MaxOutputTokens { get; set; } = 1024;
     // No Enabled flag — extraction always requires LLM
@@ -489,7 +489,7 @@ Rules:
 
 #### Error handling & degradation (dimension extraction)
 
-- **Timeout**: respect `SmallModelSettings.Timeout`; on timeout, log warning with `pageKey`, `attempt`, `elapsedMs` and fall back to deterministic dimensions.
+- **Timeout**: respect `MemorySettings.TimeoutSeconds`; on timeout, log warning with `pageKey`, `attempt`, `elapsedMs` and fall back to deterministic dimensions.
 - **Invalid JSON**: if response fails schema validation (missing required fields, extra fields, wrong types), log warning with raw response (truncated to 500 chars) and fall back.
 - **Empty/low-confidence**: if `PrimaryDimension` is empty or confidence heuristics (e.g., rationale length < 10 chars) suggest low quality, treat as invalid and fall back.
 - **Circuit breaker**: track consecutive failures per process; after 5 failures in 60s, disable small-model dimension pass for 5 min (configurable) and log metric.
@@ -597,7 +597,7 @@ Every LLM-added edge must be retained only if it passes post-validation against 
 
 #### Error handling & degradation (graph reasoning)
 
-- **Timeout**: same `SmallModelSettings.Timeout` budget; on timeout, drop LLM edges for this normalization, log warning, proceed with deterministic links only.
+- **Timeout**: same `MemorySettings.TimeoutSeconds` budget; on timeout, drop LLM edges for this normalization, log warning, proceed with deterministic links only.
 - **Invalid JSON / schema violation**: drop all proposed edges, log warning with truncation, proceed with deterministic links.
 - **Confidence threshold**: configurable minimum (default 0.7); edges below threshold are dropped.
 - **Candidate validation**: each proposed `TargetKey` must exist in the candidate set passed to the reasoner; unknown keys are dropped.
@@ -841,12 +841,12 @@ The PRD is titled "import 5W1H logic," but the source contains only about half o
 
 ### 16.4 Small-model configuration (D3, NFR7)
 
-Configuration section `LeanKernel:SmallModel` (maps to `SmallModelSettings`):
+Use the existing `OpenAI:Memory` configuration branch (maps to `MemorySettings` in the current rebuild):
 
 ```json
 {
-  "LeanKernel": {
-    "SmallModel": {
+  "OpenAI": {
+    "Memory": {
       "ModelId": "gpt-4o-mini",
       "MaxOutputTokens": 512,
       "MaxConcurrency": 4,
@@ -860,10 +860,10 @@ Configuration section `LeanKernel:SmallModel` (maps to `SmallModelSettings`):
 Registration pattern in `IServiceCollectionExtensions`:
 
 ```csharp
-services.Configure<SmallModelSettings>(config.GetSection("LeanKernel:SmallModel"));
+services.Configure<MemorySettings>(config.GetSection("OpenAI:Memory"));
 
 services.AddChatClient(sp => {
-    var settings = sp.GetRequiredService<IOptions<SmallModelSettings>>().Value;
+    var settings = sp.GetRequiredService<IOptions<MemorySettings>>().Value;
     if (!settings.Enabled) return new DisabledChatClient();
     var client = new OpenAIClient(...).GetChatClient(settings.ModelId).AsIChatClient();
     return client;
@@ -900,12 +900,12 @@ Strictness: `AllowTrailingCommas = false`, `ReadCommentHandling = Skip` to rejec
 
 ### 16.4 Small-model client configuration (D3, NFR7, NFR8)
 
-Add a new configuration section bound in `Program.cs` / `Startup.cs`:
+Use the current `MemorySettings` and `FactExtractionSettings` bindings already rooted under `OpenAI`:
 
 ```csharp
-public sealed class SmallModelSettings
+public sealed class MemorySettings
 {
-    public const string SectionName = "SmallModel";
+    public const string SectionName = "Memory";
 
     public string ModelId { get; set; } = "gpt-4o-mini";   // distinct from OpenAISettings.DefaultModel
     public int MaxOutputTokens { get; set; } = 512;
@@ -920,7 +920,7 @@ Registration (keyed service, scoped to match `MemoryProvider` lifetime):
 ```csharp
 services.AddKeyedChatClient("small-model", (sp, _) =>
 {
-    var cfg = sp.GetRequiredService<IOptions<SmallModelSettings>>().Value;
+    var cfg = sp.GetRequiredService<IOptions<MemorySettings>>().Value;
     if (!cfg.Enabled) return new DisabledChatClient(); // no-op implementation
 
     var client = new OpenAIClient(
@@ -936,7 +936,7 @@ public interface IReasoningModel : IChatClient { }
 services.AddKeyedScoped<IReasoningModel, ChatClientAdapter>("small-model");
 
 // Fact extraction client (separate key, NO disabled fallback — always requires LLM)
-services.Configure<FactExtractionSettings>(config.GetSection("LeanKernel:FactExtraction"));
+services.Configure<FactExtractionSettings>(config.GetSection("OpenAI:FactExtraction"));
 
 services.AddKeyedChatClient("fact-extraction", (sp, _) =>
 {
@@ -1049,7 +1049,7 @@ All small-model calls use `CancellationToken` linked to `TimeoutSeconds` config.
 
 - [x] Add core records: `MemoryPageSnapshot`, `MemoryPageNormalizationResult` (with computed `IsPartial`), `MemoryDimensionScore`, `MemoryPageLink`, and internal `RelatedEvidenceCandidate` / `RelatedEvidencePage` mirrors of the source shapes (§6.3).
 - [x] Add the canonical field constant `["Who","What","When","Where","Why","How"]` as the single source of order (port of `JobExecutor.FiveWOneHFields`).
-- [x] Add `SmallModelSettings` config section (`model id`, `max output tokens`, `max concurrency`, `timeout`, `enabled`) and keyed `IChatClient` / `IReasoningModel` registration (D3, NFR7, §16.4).
+- [x] Add `MemorySettings` under `OpenAI:Memory` (`model id`, `max output tokens`, `max concurrency`, `timeout`, `enabled`) and keyed `IChatClient` / `IReasoningModel` registration (D3, NFR7, §16.4).
 - [x] Add `FactExtractionSettings` config section (`model id`, `temperature`, `max output tokens`) and keyed `IChatClient` registration (key: `"fact-extraction"`) — NO enabled flag (§6.4).
 - [x] Register all new services and both model clients via `AddContextProviders`/`AddMemoryPageServices` (D5).
 - [x] Confirm and wire the writeback source of `Session`, `Turn`, and `RecordedAt` available to `MemoryProvider.StoreAIContextAsync` (D4).
