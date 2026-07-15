@@ -7,6 +7,7 @@ Feature documentation is organized by implemented capability area.
 - [Agent runtime](agent-runtime.md)
 - [Identity partitioning](identity-partitioning.md)
 - [Memory pipeline](memory-pipeline.md)
+- [Tool runtime](tool-runtime.md)
 
 ## Related Pages
 

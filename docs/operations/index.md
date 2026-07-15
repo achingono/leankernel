@@ -6,6 +6,7 @@ Operational guidance for the current local stack.
 
 - [Docker compose stack](docker-compose-stack.md)
 - [Health and observability](health-and-observability.md)
+- [Tool configuration](tool-configuration.md)
 
 ## Related Pages
 

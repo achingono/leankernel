@@ -51,7 +51,7 @@ public static class IServiceCollectionExtensions
         services.AddScoped<IMemoryService, GBrainService>();
 
         // Capability pre-check (transient — used once at startup)
-        services.AddTransient<GBrainCapabilityCheck>();
+        services.AddTransient<IMemoryCapabilityCheck, GBrainCapabilityCheck>();
 
         return services;
     }

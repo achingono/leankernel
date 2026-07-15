@@ -30,10 +30,18 @@ These are used by the logic-layer memory pipeline.
 
 `Agents` currently includes the tool runtime branch under `Agents:Tools`.
 
-- tool enablement and allowlists
-- web-search provider settings
-- dynamic HTTP egress settings
-- built-in calculation helper settings
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `Agents:Tools:Enabled` | Master switch for the tool runtime | `true` |
+| `Agents:Tools:WebSearch:Provider` | Preferred web-search backend (`brave` or `duckduckgo`) | `brave` |
+| `Agents:Tools:WebSearch:ApiKeyEnv` | Env var holding the Brave API key | `BRAVE_API_KEY` |
+| `Agents:Tools:WebSearch:AllowHosts` | Egress allowlist for web search | `["api.search.brave.com", "api.duckduckgo.com"]` |
+| `Agents:Tools:AllowedToolNames` | Name allowlist (takes precedence when non-empty) | `[]` (all allowed) |
+| `Agents:Tools:AllowedCategories` | Category allowlist (applied when name list is empty) | `[]` (all allowed) |
+| `Agents:Tools:SkillBasePaths` | Directories scanned for `SKILL.md` at startup | `["/app/data/skills"]` |
+| `Agents:Tools:DynamicHttp:AllowHosts` | Global egress ceiling layered over per-skill `egress.allowHosts` | `[]` |
+| `Agents:Tools:BuiltIns:Calculation:Enabled` | Enables deterministic local calculation/aggregation helpers | `true` |
+| `Agents:Tools:BuiltIns:Calculation:MaxInputItems` | Upper bound for aggregate/group/count inputs | `1000` |
 
 The current implementation does not use a top-level `LeanKernel` configuration root. New runtime settings should extend the existing top-level sections rather than introducing `LeanKernel:*` duplicates.
 
@@ -41,6 +49,7 @@ Code anchors:
 
 - [`../../src/Common/LeanKernel.Logic/Configuration/MemorySettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/MemorySettings.cs)
 - [`../../src/Common/LeanKernel.Logic/Configuration/FactExtractionSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/FactExtractionSettings.cs)
+- [`../../src/Common/LeanKernel.Logic/Configuration/ToolSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/ToolSettings.cs)
 
 ## Provider Selection Notes
 
