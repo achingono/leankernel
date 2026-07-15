@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using FluentAssertions;
-using LeanKernel.Gateway.Tools.Dynamic;
+using LeanKernel.Logic.Tools.Dynamic;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.DependencyInjection;

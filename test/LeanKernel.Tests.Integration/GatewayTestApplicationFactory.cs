@@ -37,6 +37,8 @@ public class GatewayTestApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            var databaseName = $"IntegrationTests_{Guid.NewGuid():N}";
+
             // Remove ALL EF Core services registered by AddEntityContext for EntityContext,
             // including factory-related and options-configuration services that carry the
             // SQLite provider extension and would conflict with the InMemory replacement.
@@ -55,7 +57,9 @@ public class GatewayTestApplicationFactory : WebApplicationFactory<Program>
             }
 
             services.AddDbContext<LeanKernel.Data.EntityContext>(options =>
-                options.UseInMemoryDatabase($"IntegrationTests_{Guid.NewGuid():N}"));
+                options.UseInMemoryDatabase(databaseName));
+            services.AddDbContextFactory<LeanKernel.Data.EntityContext>(options =>
+                options.UseInMemoryDatabase(databaseName));
 
             // Remove external health checks that depend on services unavailable in tests
             services.Configure<HealthCheckServiceOptions>(opts =>

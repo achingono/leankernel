@@ -4,7 +4,7 @@ using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace LeanKernel.Gateway.Tools.BuiltIn;
+namespace LeanKernel.Logic.Tools.BuiltIn;
 
 /// <summary>
 /// Provides deterministic local calculation and aggregation built-in tools:

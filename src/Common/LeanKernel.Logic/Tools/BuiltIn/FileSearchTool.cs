@@ -1,11 +1,11 @@
 using System.Text;
 using System.Text.Json;
-using LeanKernel.Gateway.Configuration;
+using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace LeanKernel.Gateway.Tools.BuiltIn;
+namespace LeanKernel.Logic.Tools.BuiltIn;
 
 /// <summary>
 /// Provides the LeanKernel-owned <c>file_search</c> built-in tool.

@@ -108,9 +108,9 @@ public sealed class MemoryFieldRepairService
             .ToList();
 
         return $"""
-Current fields JSON: {JsonSerializer.Serialize(currentFields, SmallModelJson.Options)}
-Missing fields JSON: {JsonSerializer.Serialize(missingFields, SmallModelJson.Options)}
-Related evidence JSON: {JsonSerializer.Serialize(related, SmallModelJson.Options)}
+Current fields JSON: {JsonSerializer.Serialize(currentFields, ModelResponseJson.Options)}
+Missing fields JSON: {JsonSerializer.Serialize(missingFields, ModelResponseJson.Options)}
+Related evidence JSON: {JsonSerializer.Serialize(related, ModelResponseJson.Options)}
 
 Page content:
 {snapshot.Content}

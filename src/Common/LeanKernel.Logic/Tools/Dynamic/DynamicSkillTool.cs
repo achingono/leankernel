@@ -6,7 +6,7 @@ using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace LeanKernel.Gateway.Tools.Dynamic;
+namespace LeanKernel.Logic.Tools.Dynamic;
 
 /// <summary>
 /// Converts a <see cref="SkillOperation"/> into a LeanKernel <see cref="ToolDefinition"/>

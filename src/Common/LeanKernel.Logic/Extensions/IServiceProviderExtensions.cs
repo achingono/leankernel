@@ -1,27 +1,22 @@
-using LeanKernel.Gateway.Providers;
-using LeanKernel.Gateway.Tools.BuiltIn;
-using LeanKernel.Gateway.Tools.Dynamic;
-using LeanKernel.Gateway.Tools.Wiki;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Tools;
-using Microsoft.Extensions.DependencyInjection;
+using LeanKernel.Logic.Tools.BuiltIn;
+using LeanKernel.Logic.Tools.Dynamic;
+using LeanKernel.Logic.Tools.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace LeanKernel.Gateway.Tools;
+namespace Microsoft.Extensions.DependencyInjection;
 
-/// <summary>
-/// Orchestrates startup registration of built-in tools, wiki tools, and dynamic SKILL.md tools
-/// into the shared <see cref="IToolRegistry"/>.
-/// </summary>
-public static class ToolRuntimeStartup
+public static class IServiceProviderExtensions
 {
     /// <summary>
     /// Discovers and registers all tools into the registry.
     /// Called once at startup from the DI registration path.
     /// </summary>
     public static async Task RegisterToolsAsync(
-        IServiceProvider services,
+        this IServiceProvider services,
         CancellationToken ct = default)
     {
         var registry = services.GetRequiredService<IToolRegistry>();
@@ -36,13 +31,13 @@ public static class ToolRuntimeStartup
             return;
         }
 
-        logger.LogInformation("Tool runtime starting. Registering built-in, wiki, and dynamic tools.");
+        logger.LogInformation("Tool runtime starting. Registering built-in, memory, and dynamic tools.");
 
         // Built-in tools
         RegisterBuiltInTools(registry, settings, scopeFactory, logger);
 
-        // GBrain wiki tools
-        await RegisterWikiToolsAsync(registry, services, scopeFactory, logger, ct)
+        // Memory tools
+        await RegisterMemoryToolsAsync(registry, services, scopeFactory, logger, ct)
             .ConfigureAwait(false);
 
         // Dynamic SKILL.md tools
@@ -75,62 +70,62 @@ public static class ToolRuntimeStartup
         }
     }
 
-    private static async Task RegisterWikiToolsAsync(
+    private static async Task RegisterMemoryToolsAsync(
         IToolRegistry registry,
         IServiceProvider services,
         IServiceScopeFactory scopeFactory,
         ILogger logger,
         CancellationToken ct)
     {
-        var gbrain = services.GetService<IGBrainMcpClient>();
-        if (gbrain is null)
+        var memoryService = services.GetService<IMemoryService>();
+        if (memoryService is null)
         {
-            logger.LogInformation("GBrain MCP client not registered — wiki tools will not be registered.");
+            logger.LogInformation("Memory MCP client not registered — memory tools will not be registered.");
             return;
         }
 
-        GBrainCapabilityResult capability;
+        MemoryCapabilityResult capability;
         try
         {
-            var capabilityCheck = services.GetRequiredService<GBrainCapabilityCheck>();
+            var capabilityCheck = services.GetRequiredService<IMemoryCapabilityCheck>();
             capability = await capabilityCheck.ProbeAsync(ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "GBrain capability pre-check failed unexpectedly. Wiki tools will not be registered.");
+            logger.LogWarning(ex, "Memory capability pre-check failed unexpectedly. Memory tools will not be registered.");
             return;
         }
 
-        if (capability.Status == GBrainCapabilityStatus.Misconfigured)
+        if (capability.Status == MemoryCapabilityStatus.Misconfigured)
         {
             throw new InvalidOperationException(
-                $"GBrain configuration is invalid: {capability.Reason}");
+                $"Memory configuration is invalid: {capability.Reason}");
         }
 
-        if (capability.Status == GBrainCapabilityStatus.Unavailable)
+        if (capability.Status == MemoryCapabilityStatus.Unavailable)
         {
-            logger.LogWarning("GBrain unavailable: {Reason}. Wiki tools will not be registered.", capability.Reason);
+            logger.LogWarning("Memory unavailable: {Reason}. Memory tools will not be registered.", capability.Reason);
             return;
         }
 
         if (capability.CanSearch)
         {
-            TryRegister(registry, WikiSearchTool.Create(scopeFactory), logger);
+            TryRegister(registry, MemorySearchTool.Create(scopeFactory), logger);
         }
 
         if (capability.CanRead)
         {
-            TryRegister(registry, WikiReadTool.Create(scopeFactory), logger);
+            TryRegister(registry, MemoryReadTool.Create(scopeFactory), logger);
         }
 
         if (capability.CanWrite)
         {
-            TryRegister(registry, WikiWriteTool.Create(scopeFactory), logger);
+            TryRegister(registry, MemoryWriteTool.Create(scopeFactory), logger);
         }
 
-        if (capability.Status == GBrainCapabilityStatus.Degraded)
+        if (capability.Status == MemoryCapabilityStatus.Degraded)
         {
-            logger.LogWarning("GBrain degraded: {Reason}", capability.Reason);
+            logger.LogWarning("Memory degraded: {Reason}", capability.Reason);
         }
     }
 
@@ -252,4 +247,5 @@ public static class ToolRuntimeStartup
 
         return uri.Host;
     }
+
 }

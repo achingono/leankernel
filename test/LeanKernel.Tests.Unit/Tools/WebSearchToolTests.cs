@@ -1,6 +1,6 @@
 using System.Net;
 using FluentAssertions;
-using LeanKernel.Gateway.Tools.BuiltIn;
+using LeanKernel.Logic.Tools.BuiltIn;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.DependencyInjection;

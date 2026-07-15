@@ -5,7 +5,7 @@ using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace LeanKernel.Gateway.Tools.BuiltIn;
+namespace LeanKernel.Logic.Tools.BuiltIn;
 
 /// <summary>
 /// Provides the LeanKernel-owned <c>web_search</c> built-in tool.

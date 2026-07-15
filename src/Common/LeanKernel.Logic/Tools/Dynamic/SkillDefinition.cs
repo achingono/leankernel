@@ -1,4 +1,4 @@
-namespace LeanKernel.Gateway.Tools.Dynamic;
+namespace LeanKernel.Logic.Tools.Dynamic;
 
 /// <summary>
 /// Represents a parsed SKILL.md manifest defining one or more HTTP tool operations.

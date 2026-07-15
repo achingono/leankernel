@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace LeanKernel.Gateway.Tools.Dynamic;
+namespace LeanKernel.Logic.Tools.Dynamic;
 
 /// <summary>
 /// Validates HTTP egress targets for dynamic skill tools,

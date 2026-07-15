@@ -9,7 +9,6 @@ using LeanKernel.Gateway.HealthChecks;
 using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
 using LeanKernel.Gateway.Sessions;
-using LeanKernel.Gateway.Tools;
 using LeanKernel.Logic;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Providers;
@@ -219,7 +218,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 var agentToolSettings = app.Configuration.GetSection("Agents:Tools").Get<ToolSettings>() ?? new ToolSettings();
 if (agentToolSettings.Enabled)
 {
-    ToolRuntimeStartup.RegisterToolsAsync(app.Services).GetAwaiter().GetResult();
+    app.Services.RegisterToolsAsync().GetAwaiter().GetResult();
 }
 
 // Apply forwarded headers before anything reads Request.Host

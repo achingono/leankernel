@@ -1,5 +1,5 @@
 using FluentAssertions;
-using LeanKernel.Gateway.Tools.BuiltIn;
+using LeanKernel.Logic.Tools.BuiltIn;
 using LeanKernel.Logic.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;

@@ -1,4 +1,4 @@
-namespace LeanKernel.Gateway.Providers;
+namespace LeanKernel.Gateway.Memory;
 
 /// <summary>
 /// Represents an error returned by the GBrain MCP service.

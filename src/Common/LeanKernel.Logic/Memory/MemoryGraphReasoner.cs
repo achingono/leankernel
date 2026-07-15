@@ -58,7 +58,7 @@ public sealed class MemoryGraphReasoner
 
             var text = await _reasoningModel.CompleteAsync(
                 "Propose bounded memory graph edges. Return strict JSON.",
-                JsonSerializer.Serialize(request, SmallModelJson.Options),
+                JsonSerializer.Serialize(request, ModelResponseJson.Options),
                 512,
                 cancellationToken).ConfigureAwait(false);
 
@@ -67,7 +67,7 @@ public sealed class MemoryGraphReasoner
                 return deterministicLinks;
             }
 
-            var parsed = JsonSerializer.Deserialize<GraphReasoningResponse>(json, SmallModelJson.Options);
+            var parsed = JsonSerializer.Deserialize<GraphReasoningResponse>(json, ModelResponseJson.Options);
             if (parsed?.Links is null || parsed.Links.Count == 0)
             {
                 return deterministicLinks;

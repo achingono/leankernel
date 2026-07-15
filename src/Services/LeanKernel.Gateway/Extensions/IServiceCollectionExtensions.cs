@@ -1,8 +1,10 @@
 using LeanKernel.Data;
 using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.HealthChecks;
+using LeanKernel.Gateway.Memory;
 using LeanKernel.Gateway.Providers;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -46,7 +48,7 @@ public static class IServiceCollectionExtensions
         services.AddScoped<IMemoryClient, GBrainMemoryClient>();
 
         // GBrain knowledge service for callable wiki tools
-        services.AddScoped<IKnowledgeService, GBrainKnowledgeService>();
+        services.AddScoped<IMemoryService, GBrainService>();
 
         // Capability pre-check (transient — used once at startup)
         services.AddTransient<GBrainCapabilityCheck>();

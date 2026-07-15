@@ -41,9 +41,10 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
     public async Task InvokeAsync(
         HttpContext context,
         IIdentityResolver resolver,
-        IOptions<IdentitySettings> identitySettings,
-        CancellationToken cancellationToken = default)
+        IOptions<IdentitySettings> identitySettings)
     {
+        var cancellationToken = context.RequestAborted;
+
         // Skip tenant resolution for health probes and other bypass paths.
         if (ShouldBypass(context.Request.Path))
         {

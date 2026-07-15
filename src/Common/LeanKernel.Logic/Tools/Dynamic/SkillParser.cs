@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace LeanKernel.Gateway.Tools.Dynamic;
+namespace LeanKernel.Logic.Tools.Dynamic;
 
 /// <summary>
 /// Parses SKILL.md files with YAML frontmatter into <see cref="SkillDefinition"/> instances.

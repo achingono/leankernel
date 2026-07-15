@@ -114,7 +114,7 @@ public sealed class MemoryDimensionClassifier
         CancellationToken cancellationToken)
     {
         var systemPrompt = "Extract and rank memory dimensions. Return strict JSON only.";
-        var userPrompt = JsonSerializer.Serialize(request, SmallModelJson.Options);
+        var userPrompt = JsonSerializer.Serialize(request, ModelResponseJson.Options);
         var result = await _reasoningModel.CompleteAsync(systemPrompt, userPrompt, 512, cancellationToken)
             .ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(result))
@@ -129,7 +129,7 @@ public sealed class MemoryDimensionClassifier
 
         try
         {
-            return JsonSerializer.Deserialize<DimensionExtractionResponse>(json, SmallModelJson.Options);
+            return JsonSerializer.Deserialize<DimensionExtractionResponse>(json, ModelResponseJson.Options);
         }
         catch (JsonException)
         {

@@ -1,20 +1,20 @@
 using System.Text.Json;
-using LeanKernel.Gateway.Providers;
+using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace LeanKernel.Gateway.Tools.Wiki;
+namespace LeanKernel.Logic.Tools.Memory;
 
 /// <summary>
-/// Provides the LeanKernel-owned <c>wiki_search</c> tool backed by GBrain.
+/// Provides the LeanKernel-owned <c>memory_search</c> tool backed by GBrain.
 /// </summary>
-public static class WikiSearchTool
+public static class MemorySearchTool
 {
-    private const string ToolName = "wiki_search";
+    private const string ToolName = "memory_search";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// Creates the wiki_search tool definition.
+    /// Creates the memory_search tool definition.
     /// </summary>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
@@ -55,9 +55,9 @@ public static class WikiSearchTool
                 try
                 {
                     using var scope = scopeFactory.CreateScope();
-                    var knowledge = scope.ServiceProvider.GetRequiredService<IKnowledgeService>();
+                    var memoryService = scope.ServiceProvider.GetRequiredService<IMemoryService>();
 
-                    var results = await knowledge.SearchAsync(query, limit, ct).ConfigureAwait(false);
+                    var results = await memoryService.SearchAsync(query, limit, ct).ConfigureAwait(false);
                     return new ToolResult
                     {
                         ToolName = ToolName,

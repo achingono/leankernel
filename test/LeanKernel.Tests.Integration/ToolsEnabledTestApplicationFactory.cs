@@ -1,4 +1,3 @@
-using LeanKernel.Gateway.Tools;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -49,6 +48,8 @@ public class ToolsEnabledTestApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            var databaseName = $"ToolTests_{Guid.NewGuid():N}";
+
             // Replace EF Core for tests
             var entityType = typeof(LeanKernel.Data.EntityContext);
             var optionsConfigType = typeof(Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<>).MakeGenericType(entityType);
@@ -65,7 +66,9 @@ public class ToolsEnabledTestApplicationFactory : WebApplicationFactory<Program>
             }
 
             services.AddDbContext<LeanKernel.Data.EntityContext>(options =>
-                options.UseInMemoryDatabase($"ToolTests_{Guid.NewGuid():N}"));
+                options.UseInMemoryDatabase(databaseName));
+            services.AddDbContextFactory<LeanKernel.Data.EntityContext>(options =>
+                options.UseInMemoryDatabase(databaseName));
 
             // Remove external health checks
             services.Configure<HealthCheckServiceOptions>(opts =>

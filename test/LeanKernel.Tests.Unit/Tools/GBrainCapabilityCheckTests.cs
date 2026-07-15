@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FluentAssertions;
-using LeanKernel.Gateway.Providers;
+using LeanKernel.Gateway.Memory;
+using LeanKernel.Logic.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -31,7 +32,7 @@ public class GBrainCapabilityCheckTests
         var check = CreateCheck();
         var result = await check.ProbeAsync();
 
-        result.Status.Should().Be(GBrainCapabilityStatus.Full);
+        result.Status.Should().Be(MemoryCapabilityStatus.Full);
         result.CanSearch.Should().BeTrue();
         result.CanRead.Should().BeTrue();
         result.CanWrite.Should().BeTrue();
@@ -46,7 +47,7 @@ public class GBrainCapabilityCheckTests
         var check = CreateCheck();
         var result = await check.ProbeAsync();
 
-        result.Status.Should().Be(GBrainCapabilityStatus.Unavailable);
+        result.Status.Should().Be(MemoryCapabilityStatus.Unavailable);
         result.CanSearch.Should().BeFalse();
     }
 
@@ -63,7 +64,7 @@ public class GBrainCapabilityCheckTests
         var check = CreateCheck();
         var result = await check.ProbeAsync();
 
-        result.Status.Should().Be(GBrainCapabilityStatus.Degraded);
+        result.Status.Should().Be(MemoryCapabilityStatus.Degraded);
         result.CanSearch.Should().BeTrue();
         result.CanRead.Should().BeFalse();
         result.CanWrite.Should().BeTrue();
@@ -79,7 +80,7 @@ public class GBrainCapabilityCheckTests
         var check = CreateCheck();
         var result = await check.ProbeAsync();
 
-        result.Status.Should().Be(GBrainCapabilityStatus.Full);
+        result.Status.Should().Be(MemoryCapabilityStatus.Full);
         result.CanSearch.Should().BeTrue();
         result.CanRead.Should().BeTrue();
         result.CanWrite.Should().BeTrue();

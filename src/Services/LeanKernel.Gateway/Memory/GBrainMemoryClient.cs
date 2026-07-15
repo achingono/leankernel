@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using LeanKernel.Logic.Providers;
 using Microsoft.Extensions.Logging;
 
-namespace LeanKernel.Gateway.Providers;
+namespace LeanKernel.Gateway.Memory;
 
 /// <summary>
 /// Implements <see cref="IMemoryClient"/> backed by the GBrain MCP service.

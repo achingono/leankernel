@@ -1,7 +1,7 @@
 using System.Text.Json;
 using FluentAssertions;
-using LeanKernel.Gateway.Providers;
-using LeanKernel.Gateway.Tools.Wiki;
+using LeanKernel.Logic.Memory;
+using LeanKernel.Logic.Tools.Memory;
 using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -12,10 +12,10 @@ namespace LeanKernel.Tests.Unit.Tools;
 
 public class WikiToolTests
 {
-    private IServiceScopeFactory BuildScopeFactory(IKnowledgeService knowledge)
+    private IServiceScopeFactory BuildScopeFactory(IMemoryService memoryService)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(knowledge);
+        services.AddSingleton(memoryService);
         var sp = services.BuildServiceProvider();
 
         var mockFactory = new Mock<IServiceScopeFactory>();
@@ -30,16 +30,16 @@ public class WikiToolTests
         return mockFactory.Object;
     }
 
-    // WikiSearchTool
+    // MemorySearchTool
 
     [Fact]
     public async Task WikiSearch_ReturnsResults()
     {
-        var mockKnowledge = new Mock<IKnowledgeService>();
+        var mockKnowledge = new Mock<IMemoryService>();
         mockKnowledge.Setup(k => k.SearchAsync("test", 10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new KnowledgeSearchResult { Key = "page/1", Content = "Content", Score = 0.9 }]);
+            .ReturnsAsync([new MemorySearchResult { Key = "page/1", Content = "Content", Score = 0.9 }]);
 
-        var tool = WikiSearchTool.Create(BuildScopeFactory(mockKnowledge.Object));
+        var tool = MemorySearchTool.Create(BuildScopeFactory(mockKnowledge.Object));
         var result = await tool.Handler(
             new Dictionary<string, object?> { ["query"] = "test" },
             CancellationToken.None);
@@ -51,8 +51,8 @@ public class WikiToolTests
     [Fact]
     public async Task WikiSearch_MissingQuery_ReturnsError()
     {
-        var mockKnowledge = new Mock<IKnowledgeService>();
-        var tool = WikiSearchTool.Create(BuildScopeFactory(mockKnowledge.Object));
+        var mockKnowledge = new Mock<IMemoryService>();
+        var tool = MemorySearchTool.Create(BuildScopeFactory(mockKnowledge.Object));
 
         var result = await tool.Handler(new Dictionary<string, object?>(), CancellationToken.None);
 
@@ -63,11 +63,11 @@ public class WikiToolTests
     [Fact]
     public async Task WikiSearch_Exception_ReturnsError()
     {
-        var mockKnowledge = new Mock<IKnowledgeService>();
+        var mockKnowledge = new Mock<IMemoryService>();
         mockKnowledge.Setup(k => k.SearchAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("GBrain error"));
 
-        var tool = WikiSearchTool.Create(BuildScopeFactory(mockKnowledge.Object));
+        var tool = MemorySearchTool.Create(BuildScopeFactory(mockKnowledge.Object));
         var result = await tool.Handler(
             new Dictionary<string, object?> { ["query"] = "test" },
             CancellationToken.None);
@@ -79,21 +79,21 @@ public class WikiToolTests
     [Fact]
     public void WikiSearch_Properties_AreCorrect()
     {
-        var tool = WikiSearchTool.Create(BuildScopeFactory(new Mock<IKnowledgeService>().Object));
-        tool.Name.Should().Be("wiki_search");
+        var tool = MemorySearchTool.Create(BuildScopeFactory(new Mock<IMemoryService>().Object));
+        tool.Name.Should().Be("memory_search");
         tool.Category.Should().Be("knowledge");
     }
 
-    // WikiReadTool
+    // MemoryReadTool
 
     [Fact]
     public async Task WikiRead_ReturnsPage()
     {
-        var mockKnowledge = new Mock<IKnowledgeService>();
+        var mockKnowledge = new Mock<IMemoryService>();
         mockKnowledge.Setup(k => k.GetPageAsync("docs/readme", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new KnowledgePage { Key = "docs/readme", Content = "# README" });
+            .ReturnsAsync(new MemoryPage { Key = "docs/readme", Content = "# README" });
 
-        var tool = WikiReadTool.Create(BuildScopeFactory(mockKnowledge.Object));
+        var tool = MemoryReadTool.Create(BuildScopeFactory(mockKnowledge.Object));
         var result = await tool.Handler(
             new Dictionary<string, object?> { ["key"] = "docs/readme" },
             CancellationToken.None);
@@ -105,11 +105,11 @@ public class WikiToolTests
     [Fact]
     public async Task WikiRead_PageNotFound_ReturnsError()
     {
-        var mockKnowledge = new Mock<IKnowledgeService>();
+        var mockKnowledge = new Mock<IMemoryService>();
         mockKnowledge.Setup(k => k.GetPageAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((KnowledgePage?)null);
+            .ReturnsAsync((MemoryPage?)null);
 
-        var tool = WikiReadTool.Create(BuildScopeFactory(mockKnowledge.Object));
+        var tool = MemoryReadTool.Create(BuildScopeFactory(mockKnowledge.Object));
         var result = await tool.Handler(
             new Dictionary<string, object?> { ["key"] = "missing" },
             CancellationToken.None);
@@ -121,23 +121,23 @@ public class WikiToolTests
     [Fact]
     public async Task WikiRead_MissingKey_ReturnsError()
     {
-        var tool = WikiReadTool.Create(BuildScopeFactory(new Mock<IKnowledgeService>().Object));
+        var tool = MemoryReadTool.Create(BuildScopeFactory(new Mock<IMemoryService>().Object));
         var result = await tool.Handler(new Dictionary<string, object?>(), CancellationToken.None);
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("required");
     }
 
-    // WikiWriteTool
+    // MemoryWriteTool
 
     [Fact]
     public async Task WikiWrite_SavesPage()
     {
-        var mockKnowledge = new Mock<IKnowledgeService>();
+        var mockKnowledge = new Mock<IMemoryService>();
         mockKnowledge.Setup(k => k.PutPageAsync("wiki/test", "# Content", It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var tool = WikiWriteTool.Create(BuildScopeFactory(mockKnowledge.Object));
+        var tool = MemoryWriteTool.Create(BuildScopeFactory(mockKnowledge.Object));
         var result = await tool.Handler(
             new Dictionary<string, object?> { ["key"] = "wiki/test", ["content"] = "# Content" },
             CancellationToken.None);
@@ -150,7 +150,7 @@ public class WikiToolTests
     [Fact]
     public async Task WikiWrite_MissingKey_ReturnsError()
     {
-        var tool = WikiWriteTool.Create(BuildScopeFactory(new Mock<IKnowledgeService>().Object));
+        var tool = MemoryWriteTool.Create(BuildScopeFactory(new Mock<IMemoryService>().Object));
         var result = await tool.Handler(
             new Dictionary<string, object?> { ["content"] = "content" },
             CancellationToken.None);
@@ -162,7 +162,7 @@ public class WikiToolTests
     [Fact]
     public async Task WikiWrite_MissingContent_ReturnsError()
     {
-        var tool = WikiWriteTool.Create(BuildScopeFactory(new Mock<IKnowledgeService>().Object));
+        var tool = MemoryWriteTool.Create(BuildScopeFactory(new Mock<IMemoryService>().Object));
         var result = await tool.Handler(
             new Dictionary<string, object?> { ["key"] = "wiki/test" },
             CancellationToken.None);

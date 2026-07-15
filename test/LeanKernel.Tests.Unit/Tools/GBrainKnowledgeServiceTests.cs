@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FluentAssertions;
-using LeanKernel.Gateway.Providers;
+using LeanKernel.Gateway.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -10,10 +10,10 @@ namespace LeanKernel.Tests.Unit.Tools;
 public class GBrainKnowledgeServiceTests
 {
     private readonly Mock<IGBrainMcpClient> _mockClient = new();
-    private readonly ILogger<GBrainKnowledgeService> _logger =
-        new Mock<ILogger<GBrainKnowledgeService>>().Object;
+    private readonly ILogger<GBrainService> _logger =
+        new Mock<ILogger<GBrainService>>().Object;
 
-    private GBrainKnowledgeService CreateService() =>
+    private GBrainService CreateService() =>
         new(_mockClient.Object, _logger);
 
     private static JsonElement ParseJson(string json)
@@ -133,14 +133,14 @@ public class GBrainKnowledgeServiceTests
     [Fact]
     public void Constructor_NullClient_Throws()
     {
-        var act = () => new GBrainKnowledgeService(null!, _logger);
+        var act = () => new GBrainService(null!, _logger);
         act.Should().Throw<ArgumentNullException>();
     }
 
     [Fact]
     public void Constructor_NullLogger_Throws()
     {
-        var act = () => new GBrainKnowledgeService(_mockClient.Object, null!);
+        var act = () => new GBrainService(_mockClient.Object, null!);
         act.Should().Throw<ArgumentNullException>();
     }
 }

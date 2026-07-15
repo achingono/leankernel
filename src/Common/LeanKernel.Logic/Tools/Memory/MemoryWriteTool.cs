@@ -1,20 +1,18 @@
-using System.Text.Json;
-using LeanKernel.Gateway.Providers;
+using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Tools;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace LeanKernel.Gateway.Tools.Wiki;
+namespace LeanKernel.Logic.Tools.Memory;
 
 /// <summary>
-/// Provides the LeanKernel-owned <c>wiki_read</c> tool backed by GBrain.
+/// Provides the LeanKernel-owned <c>memory_write</c> tool backed by GBrain.
 /// </summary>
-public static class WikiReadTool
+public static class MemoryWriteTool
 {
-    private const string ToolName = "wiki_read";
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private const string ToolName = "memory_write";
 
     /// <summary>
-    /// Creates the wiki_read tool definition.
+    /// Creates the memory_write tool definition.
     /// </summary>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
@@ -23,7 +21,7 @@ public static class WikiReadTool
         return new ToolDefinition
         {
             Name = ToolName,
-            Description = "Retrieve a knowledge page from GBrain by its key",
+            Description = "Create or update a knowledge page in GBrain",
             Category = "knowledge",
             Parameters =
             [
@@ -31,39 +29,43 @@ public static class WikiReadTool
                 {
                     Name = "key",
                     Type = "string",
-                    Description = "The page key (slug) to retrieve",
+                    Description = "The page key (slug) to create or update",
+                    Required = true
+                },
+                new ToolParameter
+                {
+                    Name = "content",
+                    Type = "string",
+                    Description = "The Markdown content to store in the page",
                     Required = true
                 }
             ],
             Handler = async (args, ct) =>
             {
                 var key = ToolArgumentReader.GetString(args, "key");
+                var content = ToolArgumentReader.GetString(args, "content");
+
                 if (string.IsNullOrWhiteSpace(key))
                 {
                     return new ToolResult { ToolName = ToolName, Success = false, Error = "key is required" };
                 }
 
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    return new ToolResult { ToolName = ToolName, Success = false, Error = "content is required" };
+                }
+
                 try
                 {
                     using var scope = scopeFactory.CreateScope();
-                    var knowledge = scope.ServiceProvider.GetRequiredService<IKnowledgeService>();
+                    var knowledge = scope.ServiceProvider.GetRequiredService<IMemoryService>();
 
-                    var page = await knowledge.GetPageAsync(key, ct).ConfigureAwait(false);
-                    if (page is null)
-                    {
-                        return new ToolResult
-                        {
-                            ToolName = ToolName,
-                            Success = false,
-                            Error = $"Page not found: {key}"
-                        };
-                    }
-
+                    await knowledge.PutPageAsync(key, content, ct).ConfigureAwait(false);
                     return new ToolResult
                     {
                         ToolName = ToolName,
                         Success = true,
-                        Output = JsonSerializer.Serialize(page, JsonOptions)
+                        Output = $"Page '{key}' saved successfully."
                     };
                 }
                 catch (Exception ex)

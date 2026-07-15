@@ -1,5 +1,5 @@
 using FluentAssertions;
-using LeanKernel.Gateway.Tools.Dynamic;
+using LeanKernel.Logic.Tools.Dynamic;
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;

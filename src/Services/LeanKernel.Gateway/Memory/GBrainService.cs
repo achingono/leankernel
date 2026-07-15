@@ -1,31 +1,32 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LeanKernel.Logic.Memory;
 using Microsoft.Extensions.Logging;
 
-namespace LeanKernel.Gateway.Providers;
+namespace LeanKernel.Gateway.Memory;
 
 /// <summary>
-/// Implements <see cref="IKnowledgeService"/> backed by the GBrain MCP service.
-/// Maps knowledge operations to GBrain MCP tool calls: search, get_page, put_page.
+/// Implements <see cref="IMemoryService"/> backed by the GBrain MCP service.
+/// Maps memory operations to GBrain MCP tool calls: search, get_page, put_page.
 /// </summary>
-public sealed class GBrainKnowledgeService : IKnowledgeService
+public sealed class GBrainService : IMemoryService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IGBrainMcpClient _client;
-    private readonly ILogger<GBrainKnowledgeService> _logger;
+    private readonly ILogger<GBrainService> _logger;
 
     /// <summary>
-    /// Initializes a new instance of <see cref="GBrainKnowledgeService"/>.
+    /// Initializes a new instance of <see cref="GBrainService"/>.
     /// </summary>
-    public GBrainKnowledgeService(IGBrainMcpClient client, ILogger<GBrainKnowledgeService> logger)
+    public GBrainService(IGBrainMcpClient client, ILogger<GBrainService> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<KnowledgeSearchResult>> SearchAsync(
+    public async Task<IReadOnlyList<MemorySearchResult>> SearchAsync(
         string query,
         int maxResults = 10,
         CancellationToken ct = default)
@@ -54,7 +55,7 @@ public sealed class GBrainKnowledgeService : IKnowledgeService
     }
 
     /// <inheritdoc />
-    public async Task<KnowledgePage?> GetPageAsync(string key, CancellationToken ct = default)
+    public async Task<MemoryPage?> GetPageAsync(string key, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
@@ -95,7 +96,7 @@ public sealed class GBrainKnowledgeService : IKnowledgeService
             .ConfigureAwait(false);
     }
 
-    private static IReadOnlyList<KnowledgeSearchResult> DeserializeSearchResults(JsonElement result)
+    private static IReadOnlyList<MemorySearchResult> DeserializeSearchResults(JsonElement result)
     {
         if (result.ValueKind == JsonValueKind.Array)
         {
@@ -114,16 +115,16 @@ public sealed class GBrainKnowledgeService : IKnowledgeService
         return [];
     }
 
-    private static KnowledgeSearchResult MapSearchItem(JsonElement item)
+    private static MemorySearchResult MapSearchItem(JsonElement item)
     {
         var key = item.TryGetProperty("slug", out var s) ? s.GetString() ?? string.Empty : string.Empty;
         var content = item.TryGetProperty("compiled_truth", out var c) ? c.GetString() ?? string.Empty : string.Empty;
         var score = item.TryGetProperty("score", out var sc) && sc.TryGetDouble(out var d) ? d : 0.0;
 
-        return new KnowledgeSearchResult { Key = key, Content = content, Score = score };
+        return new MemorySearchResult { Key = key, Content = content, Score = score };
     }
 
-    private static KnowledgePage? DeserializePage(string requestedKey, JsonElement result)
+    private static MemoryPage? DeserializePage(string requestedKey, JsonElement result)
     {
         if (result.ValueKind == JsonValueKind.Null || result.ValueKind == JsonValueKind.Undefined)
         {
@@ -136,7 +137,7 @@ public sealed class GBrainKnowledgeService : IKnowledgeService
             return null;
         }
 
-        return new KnowledgePage
+        return new MemoryPage
         {
             Key = page.Slug ?? requestedKey,
             Content = page.CompiledTruth ?? page.Content ?? string.Empty,

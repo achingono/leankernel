@@ -1,4 +1,4 @@
-namespace LeanKernel.Gateway.Configuration;
+namespace LeanKernel.Logic.Configuration;
 
 /// <summary>
 /// Configures file storage settings for the gateway.

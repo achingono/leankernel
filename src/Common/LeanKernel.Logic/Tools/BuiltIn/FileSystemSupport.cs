@@ -1,4 +1,4 @@
-namespace LeanKernel.Gateway.Tools.BuiltIn;
+namespace LeanKernel.Logic.Tools.BuiltIn;
 
 /// <summary>
 /// Provides filesystem safety helpers for file tools.

@@ -6,7 +6,7 @@ namespace LeanKernel.Logic.Memory;
 /// <summary>
 /// Centralizes JSON serializer options used when communicating with the small reasoning model.
 /// </summary>
-internal static class SmallModelJson
+internal static class ModelResponseJson
 {
     /// <summary>
     /// The shared serializer options for strict JSON requests and responses.

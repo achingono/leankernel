@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using FluentAssertions;
-using LeanKernel.Gateway.Providers;
+using LeanKernel.Gateway.Memory;
 using LeanKernel.Gateway.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

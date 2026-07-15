@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 
-namespace LeanKernel.Gateway.Providers;
+namespace LeanKernel.Gateway.Memory;
 
 /// <summary>
 /// Contract for low-level GBrain MCP transport.
