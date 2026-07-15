@@ -80,6 +80,38 @@ namespace LeanKernel.Data.Migrations
                     b.ToTable("Channels");
                 });
 
+            modelBuilder.Entity("LeanKernel.Entities.ChannelMemoryPolicyEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Access")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Share")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("TenantId", "ChannelId")
+                        .IsUnique();
+
+                    b.ToTable("ChannelMemoryPolicies");
+                });
+
             modelBuilder.Entity("LeanKernel.Entities.SessionEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -363,6 +395,23 @@ namespace LeanKernel.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("LeanKernel.Entities.ChannelMemoryPolicyEntity", b =>
+                {
+                    b.HasOne("LeanKernel.Entities.ChannelEntity", "Channel")
+                        .WithMany()
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LeanKernel.Entities.TenantEntity", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Channel");
                 });
 
             modelBuilder.Entity("LeanKernel.Entities.SessionEntity", b =>

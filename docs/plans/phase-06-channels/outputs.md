@@ -9,8 +9,9 @@
 | Channel authenticator | Fail-closed per-channel sender allowlists | C# source |
 | Keep-alive | Typing-indicator keep-alive for long-running turns | C# source |
 | Attachment parsing | Inbound attachment directive parser | C# source |
-| Configuration + validation | Channel enable, Signal endpoint, allowlists | C# + appsettings |
-| Tests | Routing, auth, keep-alive, attachments, identity, reconnect | xUnit projects |
+| Memory sharing policy | Directional per-channel `Share`/`Access` allow-lists (wildcard default) + persistence + resolution contract consumed by Phase 10 | C# + EF migration |
+| Configuration + validation | Channel enable, Signal endpoint, allowlists, memory policy defaults | C# + appsettings |
+| Tests | Routing, auth, keep-alive, attachments, identity, reconnect, memory-policy resolution | xUnit projects |
 | Documentation | Channels feature docs | Markdown |
 
 ## Optional Outputs

@@ -10,6 +10,8 @@
 | Source Signal adapter | `~/source/repos/leankernel/src/LeanKernel.Channels/{SignalChannel,TypingIndicatorKeepAlive,SignalAttachmentParser}.cs` | Reviewer |
 | Channel docs | `~/source/repos/leankernel/docs/features/channels/`, `channel-routing.md` | Reviewer |
 | Config shape | `docs/configuration/index.md`, AGENTS.md config-shape rules | Repository owner |
+| Memory scope + client (policy consumer) | `src/Common/LeanKernel.Logic/Providers/IMemoryClient.cs`, `src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs` (BuildScopedSlug/Namespace) | Rebuild maintainer |
+| Cross-channel memory phase | `docs/plans/phase-10-cross-channel-memory/` (enforces the policy defined here) | Rebuild maintainer |
 
 ## Optional Inputs
 - Source `channel-consolidation.md` and typing-indicator keepalive PRD for acceptance detail.

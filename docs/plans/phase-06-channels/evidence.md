@@ -10,3 +10,5 @@
 | Source keep-alive | `~/source/repos/leankernel/src/LeanKernel.Channels/TypingIndicatorKeepAlive.cs` | Behavioral reference |
 | Source attachment parsing | `~/source/repos/leankernel/src/LeanKernel.Channels/SignalAttachmentParser.cs` | Behavioral reference |
 | Rebuild identity/channel | `src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs` | Integration point |
+| Channel entity (policy home) | `src/Common/LeanKernel.Core/Entities/ChannelEntity.cs` | Where per-channel sharing policy is persisted |
+| Memory client (policy consumer) | `src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs` | Phase 10 enforces the policy here (`memory/{tenantId}/{...}/{channelId}/{key}`) |

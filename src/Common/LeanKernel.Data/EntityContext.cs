@@ -9,6 +9,10 @@ namespace LeanKernel.Data;
 public class EntityContext : DbContext
 {
     /// <summary>
+    /// Well-known channel name for the Signal transport.
+    /// </summary>
+    public const string SignalChannelName = "signal";
+    /// <summary>
     /// Initializes a new instance of the <see cref="EntityContext"/> class.
     /// </summary>
     /// <param name="options">The configured EF Core options for this context.</param>
@@ -45,6 +49,11 @@ public class EntityContext : DbContext
     /// Gets the persisted agent session state blobs.
     /// </summary>
     public DbSet<AgentStateEntity> AgentStates => Set<AgentStateEntity>();
+
+    /// <summary>
+    /// Gets the persisted per-channel memory sharing/isolation policies.
+    /// </summary>
+    public DbSet<ChannelMemoryPolicyEntity> ChannelMemoryPolicies => Set<ChannelMemoryPolicyEntity>();
 
     /// <summary>
     /// Configures the entity mappings, indexes, relationships, and query filters.
@@ -145,6 +154,23 @@ public class EntityContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(100);
             entity.HasIndex(e => e.Name).IsUnique();
         });
+
+        // ChannelMemoryPolicyEntity
+        modelBuilder.Entity<ChannelMemoryPolicyEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Share).HasMaxLength(1000);
+            entity.Property(e => e.Access).HasMaxLength(1000);
+            entity.HasIndex(e => new { e.TenantId, e.ChannelId }).IsUnique();
+            entity.HasOne(e => e.Channel)
+                .WithMany()
+                .HasForeignKey(e => e.ChannelId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<TenantEntity>()
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     /// <summary>
@@ -164,7 +190,8 @@ public class EntityContext : DbContext
         }
 
         await EnsureDefaultTenantAsync(hostName);
-        await EnsureOpenAiChannelAsync();
+        await EnsureChannelAsync(ChannelEntity.OpenAiHttpName);
+        await EnsureChannelAsync(SignalChannelName);
     }
 
     /// <summary>
@@ -206,12 +233,13 @@ public class EntityContext : DbContext
     }
 
     /// <summary>
-    /// Ensures the well-known OpenAI HTTP channel exists.
+    /// Ensures a channel with the given name exists, creating it if necessary.
     /// </summary>
+    /// <param name="channelName">The well-known channel name to ensure exists.</param>
     /// <returns>A task that completes when the channel check finishes.</returns>
-    private async Task EnsureOpenAiChannelAsync()
+    private async Task EnsureChannelAsync(string channelName)
     {
-        if (await Channels.AnyAsync(channel => channel.Name == ChannelEntity.OpenAiHttpName))
+        if (await Channels.AnyAsync(channel => channel.Name == channelName))
         {
             return;
         }
@@ -219,7 +247,7 @@ public class EntityContext : DbContext
         Channels.Add(new ChannelEntity
         {
             Id = Guid.NewGuid(),
-            Name = ChannelEntity.OpenAiHttpName
+            Name = channelName
         });
 
         try

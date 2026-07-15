@@ -30,4 +30,14 @@ public interface IIdentityResolver
     /// Resolves or creates the canonical <see cref="ChannelEntity"/> for the OpenAI HTTP surface.
     /// </summary>
     Task<ChannelEntity> ResolveOrCreateChannelAsync(string channelName, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves or creates a user identity bound to an external channel sender identifier.
+    /// </summary>
+    Task<UserEntity> ResolveOrCreateChannelUserAsync(
+        Guid tenantId,
+        string channelName,
+        string externalUserId,
+        string? displayName = null,
+        CancellationToken ct = default);
 }

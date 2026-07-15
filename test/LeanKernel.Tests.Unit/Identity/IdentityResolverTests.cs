@@ -126,6 +126,34 @@ public class IdentityResolverTests
         db.Users.Count().Should().Be(2);
     }
 
+    [Fact]
+    public async Task ResolveOrCreateChannelUserAsync_SameSender_ReusesUser()
+    {
+        var resolver = CreateResolver(out var db);
+        var tenantId = Guid.NewGuid();
+
+        var user1 = await resolver.ResolveOrCreateChannelUserAsync(tenantId, "signal", "+15551230001", "Alice");
+        var user2 = await resolver.ResolveOrCreateChannelUserAsync(tenantId, "signal", "+15551230001", "Alice");
+
+        user2.Id.Should().Be(user1.Id);
+        user1.Issuer.Should().Be("channel:signal");
+        user1.Subject.Should().Be($"{tenantId:N}:+15551230001");
+        db.Users.Count().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ResolveOrCreateChannelUserAsync_DifferentSenders_CreateDistinctUsers()
+    {
+        var resolver = CreateResolver(out var db);
+        var tenantId = Guid.NewGuid();
+
+        var user1 = await resolver.ResolveOrCreateChannelUserAsync(tenantId, "signal", "+15551230001", "Alice");
+        var user2 = await resolver.ResolveOrCreateChannelUserAsync(tenantId, "signal", "+15551230002", "Bob");
+
+        user2.Id.Should().NotBe(user1.Id);
+        db.Users.Count().Should().Be(2);
+    }
+
     /// <summary>
     /// Creates an identity resolver backed by an isolated in-memory context.
     /// </summary>

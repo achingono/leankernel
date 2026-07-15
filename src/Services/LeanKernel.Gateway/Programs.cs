@@ -4,6 +4,7 @@ using LeanKernel;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Gateway;
+using LeanKernel.Gateway.Channels;
 using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.HealthChecks;
 using LeanKernel.Gateway.Providers;
@@ -72,6 +73,7 @@ builder.Services.Configure<FactExtractionSettings>(builder.Configuration.GetSect
 builder.Services.Configure<IdentitySettings>(builder.Configuration.GetSection("Identity"));
 builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("Files"));
 builder.Services.Configure<GBrainSettings>(builder.Configuration.GetSection("GBrain"));
+builder.Services.Configure<ChannelsSettings>(builder.Configuration.GetSection("Channels"));
 
 // Request-scoped identity accessors
 builder.Services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
@@ -176,6 +178,20 @@ builder.Services.AddTurnPipeline();
 
 // Chat client (OpenAI-compatible)
 builder.Services.AddLeanKernelChatClient();
+
+// Channel transport layer
+builder.Services.AddSingleton<ChannelAuthenticator>();
+builder.Services.AddSingleton<ISignalAttachmentParser, SignalAttachmentParser>();
+builder.Services.AddSingleton<IChannelRouter, ChannelRouter>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IChannel, SignalChannel>();
+builder.Services.AddHostedService<ChannelHostedService>();
+
+// Memory sharing policy resolver
+builder.Services.AddScoped<IChannelMemoryPolicyResolver, ChannelMemoryPolicyResolver>();
+
+// Named HTTP clients for channel adapters
+builder.Services.AddHttpClient("signal-daemon");
 
 // Health checks for dependent services
 builder.Services.AddGatewayHealthChecks();

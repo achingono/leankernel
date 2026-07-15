@@ -182,4 +182,77 @@ public sealed class IdentityResolver(
         logger.LogInformation("Created channel {ChannelId} (name={Name})", channel.Id, channelName);
         return channel;
     }
+
+    /// <inheritdoc />
+    public async Task<UserEntity> ResolveOrCreateChannelUserAsync(
+        Guid tenantId,
+        string channelName,
+        string externalUserId,
+        string? displayName = null,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(channelName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalUserId);
+
+        var issuer = $"channel:{channelName.Trim().ToLowerInvariant()}";
+        var subject = $"{tenantId:N}:{externalUserId.Trim()}";
+        var resolvedName = string.IsNullOrWhiteSpace(displayName) ? externalUserId : displayName.Trim();
+
+        using var context = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var existing = await context.Users
+            .FirstOrDefaultAsync(u => u.Issuer == issuer && u.Subject == subject && !u.IsDeleted, ct);
+
+        if (existing is not null)
+        {
+            existing.LastActivity = DateTime.UtcNow;
+            if (string.IsNullOrWhiteSpace(existing.UserName))
+            {
+                existing.UserName = resolvedName;
+            }
+
+            if (string.IsNullOrWhiteSpace(existing.FullName))
+            {
+                existing.FullName = resolvedName;
+            }
+
+            await context.SaveChangesAsync(ct);
+            return existing;
+        }
+
+        var user = new UserEntity
+        {
+            Id = Guid.NewGuid(),
+            Issuer = issuer,
+            Subject = subject,
+            UserName = resolvedName,
+            FullName = resolvedName,
+            IsActive = true,
+            IsGuest = true,
+            CreatedOn = DateTime.UtcNow
+        };
+
+        context.Users.Add(user);
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+            return user;
+        }
+        catch (DbUpdateException)
+        {
+            context.ChangeTracker.Clear();
+            var conflicted = await context.Users
+                .FirstOrDefaultAsync(u => u.Issuer == issuer && u.Subject == subject && !u.IsDeleted, ct);
+
+            if (conflicted is not null)
+            {
+                conflicted.LastActivity = DateTime.UtcNow;
+                await context.SaveChangesAsync(ct);
+                return conflicted;
+            }
+
+            throw;
+        }
+    }
 }
