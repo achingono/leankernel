@@ -39,6 +39,16 @@ public sealed class TurnPipelineSettings
     public bool EnableSummarization { get; set; } = false;
 
     /// <summary>
+    /// Maximum number of sentences to retain after embedding-based compaction.
+    /// </summary>
+    public int CompactionMaxSentences { get; set; } = 12;
+
+    /// <summary>
+    /// The LiteLLM embedding model alias used for compaction sentence scoring.
+    /// </summary>
+    public string CompactionEmbeddingModel { get; set; } = "embedding-small";
+
+    /// <summary>
     /// Sampling temperature used for history summarization.
     /// </summary>
     public double SummarizationTemperature { get; set; } = 0.1;

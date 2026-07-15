@@ -44,12 +44,23 @@ public class HistoryShaperTests
         return mock.Object;
     }
 
+    private static IHistoryCompactor CreateCompactor(string? compacted = null)
+    {
+        var mock = new Mock<IHistoryCompactor>();
+        mock.Setup(service => service.CompactAsync(
+                It.IsAny<IReadOnlyList<ChatMessage>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(compacted);
+        return mock.Object;
+    }
+
     [Fact]
     public async Task ExecuteAsync_EmptyHistory_Noop()
     {
         var shaper = new HistoryShaper(
             Options.Create(new TurnPipelineSettings { RecentTurnsVerbatim = 10 }),
             CreateSummarizer(),
+            CreateCompactor(),
             Logger);
 
         var context = CreateContext();
@@ -64,6 +75,7 @@ public class HistoryShaperTests
         var shaper = new HistoryShaper(
             Options.Create(new TurnPipelineSettings { RecentTurnsVerbatim = 10 }),
             CreateSummarizer(),
+            CreateCompactor(),
             Logger);
 
         var context = CreateContext();
@@ -81,6 +93,7 @@ public class HistoryShaperTests
         var shaper = new HistoryShaper(
             Options.Create(new TurnPipelineSettings { RecentTurnsVerbatim = 5 }),
             CreateSummarizer(),
+            CreateCompactor(),
             Logger);
 
         var context = CreateContext();
@@ -105,6 +118,7 @@ public class HistoryShaperTests
                 EnableCompaction = false,
             }),
             CreateSummarizer(),
+            CreateCompactor(),
             Logger);
 
         var context = CreateContext();
@@ -114,6 +128,68 @@ public class HistoryShaperTests
         await shaper.ExecuteAsync(context);
 
         context.ShapedHistory.Should().HaveCount(5);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CompactionEnabled_CallsCompactor()
+    {
+        var compactor = new Mock<IHistoryCompactor>();
+        compactor.Setup(c => c.CompactAsync(
+                It.IsAny<IReadOnlyList<ChatMessage>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Compacted: key fact A. Key fact B.");
+
+        var shaper = new HistoryShaper(
+            Options.Create(new TurnPipelineSettings
+            {
+                RecentTurnsVerbatim = 2,
+                CompactedTurnsMax = 3,
+                EnableCompaction = true,
+            }),
+            CreateSummarizer(),
+            compactor.Object,
+            Logger);
+
+        var context = CreateContext();
+        for (int i = 0; i < 5; i++)
+            context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+
+        await shaper.ExecuteAsync(context);
+
+        context.ShapedHistory.Should().HaveCount(3);
+        context.ShapedHistory[0].Role.Should().Be(ChatRole.User);
+        context.ShapedHistory[0].Text.Should().Contain("Historical context (compacted, untrusted)");
+        context.ShapedHistory[0].Text.Should().Contain("Compacted: key fact A.");
+        context.ShapedHistory[1].Text.Should().Be("msg-3");
+        context.ShapedHistory[2].Text.Should().Be("msg-4");
+        compactor.Verify(c => c.CompactAsync(
+            It.IsAny<IReadOnlyList<ChatMessage>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CompactionUnavailable_FallsBackToVerbatim()
+    {
+        var shaper = new HistoryShaper(
+            Options.Create(new TurnPipelineSettings
+            {
+                RecentTurnsVerbatim = 2,
+                CompactedTurnsMax = 3,
+                EnableCompaction = true,
+            }),
+            CreateSummarizer(),
+            CreateCompactor(null),
+            Logger);
+
+        var context = CreateContext();
+        for (int i = 0; i < 5; i++)
+            context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+
+        await shaper.ExecuteAsync(context);
+
+        context.ShapedHistory.Should().HaveCount(5);
+        context.ShapedHistory.Select(m => m.Text)
+            .Should().ContainInOrder("msg-0", "msg-1", "msg-2", "msg-3", "msg-4");
     }
 
     [Fact]
@@ -129,6 +205,7 @@ public class HistoryShaperTests
                 EnableSummarization = true,
             }),
             CreateSummarizer("Older summary"),
+            CreateCompactor("Compacted facts"),
             Logger);
 
         var context = CreateContext();
@@ -137,12 +214,14 @@ public class HistoryShaperTests
 
         await shaper.ExecuteAsync(context);
 
-        context.ShapedHistory.Should().HaveCount(5);
+        context.ShapedHistory.Should().HaveCount(4);
         context.ShapedHistory[0].Role.Should().Be(ChatRole.System);
         context.ShapedHistory[0].Text.Should().Contain("Older summary");
-        context.ShapedHistory.Select(message => message.Text)
-            .Should()
-            .ContainInOrder("msg-2", "msg-3", "msg-4", "msg-5");
+        context.ShapedHistory[1].Role.Should().Be(ChatRole.User);
+        context.ShapedHistory[1].Text.Should().Contain("Historical context (compacted, untrusted)");
+        context.ShapedHistory[1].Text.Should().Contain("Compacted facts");
+        context.ShapedHistory[2].Text.Should().Be("msg-4");
+        context.ShapedHistory[3].Text.Should().Be("msg-5");
     }
 
     [Fact]
@@ -158,6 +237,7 @@ public class HistoryShaperTests
                 EnableSummarization = true,
             }),
             CreateSummarizer(null),
+            CreateCompactor(null),
             Logger);
 
         var context = CreateContext();

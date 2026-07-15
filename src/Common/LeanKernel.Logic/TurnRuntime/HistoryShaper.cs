@@ -13,6 +13,7 @@ namespace LeanKernel.Logic.TurnRuntime;
 public sealed class HistoryShaper(
     IOptions<TurnPipelineSettings> settings,
     IHistorySummarizer historySummarizer,
+    IHistoryCompactor historyCompactor,
     ILogger<HistoryShaper> logger) : ITurnStage
 {
     private readonly TurnPipelineSettings _settings = settings.Value;
@@ -42,7 +43,7 @@ public sealed class HistoryShaper(
             .Skip(totalTurns - verbatimCount)
             .ToList();
 
-        // Tier 2: Compacted turns — eligible for compaction if enabled
+        // Tier 2: Compacted turns — eligible for embedding-based compaction if enabled
         var compactedStart = Math.Max(0, totalTurns - verbatimCount - _settings.CompactedTurnsMax);
         var compactedEnd = Math.Max(0, totalTurns - verbatimCount);
         var compactedRange = context.ShapedHistory
@@ -57,9 +58,9 @@ public sealed class HistoryShaper(
             .Take(compactedStart - summarizedStart)
             .ToList();
 
-        // For Phase 03: keep verbatim only. Compaction and summarization are opt-in.
         context.ShapedHistory.Clear();
 
+        // Tier 3: LLM-based abstractive summarization (oldest window)
         if (_settings.EnableSummarization && summarizedRange.Count > 0)
         {
             var summary = await historySummarizer
@@ -84,18 +85,32 @@ public sealed class HistoryShaper(
             }
         }
 
+        // Tier 2: Embedding-based extractive compaction (middle window)
         if (_settings.EnableCompaction && compactedRange.Count > 0)
         {
-            // Placeholder: in a full implementation, compactedRange would be
-            // processed by ConversationCompactor to extract key facts.
-            // For now, keep them as-is but mark them for later compaction.
-            context.ShapedHistory.AddRange(compactedRange);
-            logger.LogDebug(
-                "History: {CompactedCount} turns in compacted window (compaction not yet implemented).",
-                compactedRange.Count);
+            var compacted = await historyCompactor
+                .CompactAsync(compactedRange, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(compacted))
+            {
+                context.ShapedHistory.Add(new ChatMessage(
+                    ChatRole.User,
+                    $"Historical context (compacted, untrusted):\n{compacted}"));
+                logger.LogDebug(
+                    "History: compacted {CompactedCount} turns into extractive summary.",
+                    compactedRange.Count);
+            }
+            else
+            {
+                context.ShapedHistory.AddRange(compactedRange);
+                logger.LogWarning(
+                    "History compaction unavailable; kept {CompactedCount} turns verbatim.",
+                    compactedRange.Count);
+            }
         }
 
-        // Always include verbatim window
+        // Tier 1: Always include verbatim window
         context.ShapedHistory.AddRange(verbatim);
 
         logger.LogDebug(

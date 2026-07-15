@@ -46,6 +46,7 @@ When implementing user-requested changes:
 6. Run verification appropriate to the scope.
 7. Run `scripts/quality/sonarqube-scan.sh` and address all `Blocker`, `Critical`, and `Major` issues reported.
 8. Run a [deep review](.agents/prompts/deep-review.prompt.md) sub-agent and address all issues reported.
+9. Update documentation to reflect current implementation state.
 
 ## Planning Templates
 

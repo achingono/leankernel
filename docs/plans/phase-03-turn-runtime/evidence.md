@@ -25,3 +25,9 @@
 | DI registration | `src/Common/LeanKernel.Logic/TurnRuntime/TurnPipelineServiceExtensions.cs` | Done |
 | Gateway wiring | `src/Services/LeanKernel.Gateway/Programs.cs:172` | Done |
 | Unit tests | `test/LeanKernel.Tests.Unit/TurnRuntime/` (4 files, 21 tests) | Done |
+| ScopedRetrievalStage | `src/Common/LeanKernel.Logic/TurnRuntime/ScopedRetrievalStage.cs` | Done |
+| Unit tests (retrieval) | `test/LeanKernel.Tests.Unit/TurnRuntime/ScopedRetrievalStageTests.cs` (9 tests) | Done |
+| IHistoryCompactor | `src/Common/LeanKernel.Logic/TurnRuntime/IHistoryCompactor.cs` | Done |
+| EmbeddingHistoryCompactor | `src/Common/LeanKernel.Logic/TurnRuntime/EmbeddingHistoryCompactor.cs` | Done |
+| IEmbeddingClient + HttpEmbeddingClient | `src/Common/LeanKernel.Logic/TurnRuntime/HttpEmbeddingClient.cs` | Done |
+| Unit tests (compactor) | `test/LeanKernel.Tests.Unit/TurnRuntime/EmbeddingHistoryCompactorTests.cs` (6 tests) | Done |

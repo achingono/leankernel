@@ -1,9 +1,13 @@
 using FluentAssertions;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.TurnRuntime;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Moq;
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.TurnRuntime;
@@ -79,5 +83,50 @@ public class TurnPipelineServiceExtensionsTests
         var readOptions = () => _ = options.Value;
 
         readOptions.Should().Throw<OptionsValidationException>();
+    }
+
+    [Fact]
+    public void AddTurnPipeline_RegistersScopedRetrievalStageAsFirstStage()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder().Build();
+
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IMemoryClient>(Mock.Of<IMemoryClient>());
+        services.AddSingleton<IEmbeddingClient>(Mock.Of<IEmbeddingClient>());
+        services.AddKeyedSingleton<IChatClient>("small-model", Mock.Of<IChatClient>());
+        services.Configure<AgentSettings>(s => s.DefaultInstructions = "test");
+        services.AddLogging();
+        services.AddTurnPipeline();
+
+        using var provider = services.BuildServiceProvider();
+        var stages = provider.GetServices<ITurnStage>().ToList();
+
+        stages.Should().NotBeEmpty();
+        stages[0].Should().BeOfType<ScopedRetrievalStage>();
+    }
+
+    [Fact]
+    public void AddTurnPipeline_RegistersAllFourStagesInOrder()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder().Build();
+
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IMemoryClient>(Mock.Of<IMemoryClient>());
+        services.AddSingleton<IEmbeddingClient>(Mock.Of<IEmbeddingClient>());
+        services.AddKeyedSingleton<IChatClient>("small-model", Mock.Of<IChatClient>());
+        services.Configure<AgentSettings>(s => s.DefaultInstructions = "test");
+        services.AddLogging();
+        services.AddTurnPipeline();
+
+        using var provider = services.BuildServiceProvider();
+        var stages = provider.GetServices<ITurnStage>().ToList();
+
+        stages.Should().HaveCount(4);
+        stages[0].Should().BeOfType<ScopedRetrievalStage>();
+        stages[1].Should().BeOfType<ContextGatekeeper>();
+        stages[2].Should().BeOfType<HistoryShaper>();
+        stages[3].Should().BeOfType<PromptAssembler>();
     }
 }

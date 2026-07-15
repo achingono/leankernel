@@ -36,12 +36,15 @@ public static class TurnPipelineServiceExtensions
                 "Invalid TurnPipeline settings.")
             .ValidateOnStart();
 
+        services.AddScoped<ScopedRetrievalStage>();
         services.AddScoped<ContextGatekeeper>();
         services.AddScoped<IHistorySummarizer, HistorySummarizer>();
+        services.AddScoped<IHistoryCompactor, EmbeddingHistoryCompactor>();
         services.AddScoped<HistoryShaper>();
         services.AddScoped<PromptAssembler>();
         services.AddSingleton<TurnProgressBroker>();
 
+        services.AddScoped<ITurnStage>(sp => sp.GetRequiredService<ScopedRetrievalStage>());
         services.AddScoped<ITurnStage>(sp => sp.GetRequiredService<ContextGatekeeper>());
         services.AddScoped<ITurnStage>(sp => sp.GetRequiredService<HistoryShaper>());
         services.AddScoped<ITurnStage>(sp => sp.GetRequiredService<PromptAssembler>());

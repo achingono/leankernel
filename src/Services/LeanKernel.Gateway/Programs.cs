@@ -168,6 +168,9 @@ builder.Services.AddGBrainMemory(gbrainSettings);
 // Shared tool registry
 builder.Services.AddToolRegistry();
 
+// Embedding client for compaction sentence scoring
+builder.Services.AddEmbeddingClient();
+
 // Turn pipeline (context gatekeeping, history shaping, prompt assembly)
 builder.Services.AddTurnPipeline();
 

@@ -7,7 +7,9 @@ using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.Tools;
+using LeanKernel.Logic.TurnRuntime;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -67,6 +69,36 @@ public static class IServiceCollectionExtensions
         // Named HTTP clients for tool egress
         services.AddHttpClient("web-search");
         services.AddHttpClient("dynamic-skill");
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the LiteLLM-backed embedding client for compaction sentence scoring.
+    /// </summary>
+    public static IServiceCollection AddEmbeddingClient(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddOptions<EmbeddingClientSettings>()
+            .Configure<IOptions<OpenAISettings>>((embedding, openAiOptions) =>
+            {
+                var cfg = openAiOptions.Value;
+                var baseUrl = cfg.BaseUrl.TrimEnd('/');
+                if (baseUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
+                {
+                    baseUrl = baseUrl[..^3];
+                }
+
+                embedding.Endpoint = $"{baseUrl}/v1/embeddings";
+                embedding.ApiKey = cfg.ApiKey;
+                embedding.AuthScheme = "Bearer";
+            });
+
+        services.AddHttpClient<IEmbeddingClient, HttpEmbeddingClient>((_, client) =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
 
         return services;
     }
