@@ -141,7 +141,9 @@ public class EntityContext : DbContext
             entity.Property(e => e.FullName).HasMaxLength(200);
             entity.Property(e => e.Issuer).HasMaxLength(500);
             entity.Property(e => e.Subject).HasMaxLength(500);
+            entity.Property(e => e.PersonId);
             entity.HasIndex(e => e.Email);
+            entity.HasIndex(e => e.PersonId);
             entity.HasIndex(e => new { e.Issuer, e.Subject }).IsUnique();
             entity.HasQueryFilter(e => !e.IsDeleted);
             entity.OwnsOne(e => e.CreatedBy);

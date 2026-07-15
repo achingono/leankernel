@@ -59,4 +59,19 @@ public interface IIdentityResolver
         string issuer,
         string subject,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves the canonical person identifier for a persisted user.
+    /// </summary>
+    Task<Guid> ResolvePersonIdAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Links two users to the same canonical person within a tenant.
+    /// </summary>
+    Task<Guid> LinkUsersAsync(Guid tenantId, Guid sourceUserId, Guid targetUserId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Unlinks a user from a shared canonical person, re-isolating that user.
+    /// </summary>
+    Task UnlinkUserAsync(Guid tenantId, Guid userId, CancellationToken ct = default);
 }

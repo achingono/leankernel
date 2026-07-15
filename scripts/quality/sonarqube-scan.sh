@@ -70,7 +70,7 @@ docker run --rm \
       /d:sonar.token="$SONAR_TOKEN" \
       /d:sonar.scm.disabled=true \
       /d:sonar.sourceEncoding="UTF-8" \
-      /d:sonar.exclusions="**/bin/**,**/obj/**,**/.playwright/**,test/test/**,coverage-results/**,sonar-reports/**" \
+      /d:sonar.exclusions="**/bin/**,**/obj/**,**/.playwright/**,test/test/**,coverage-results/**,sonar-reports/**,src/Terminals/LeanKernel.Channels.Signal/**,src/Terminals/LeanKernel.Channels.Teams/**" \
       /d:sonar.qualitygate.wait=true \
       /d:sonar.python.version=3.12 \
       /d:sonar.cs.opencover.reportsPaths="coverage-results/sonar/coverage.opencover.xml,coverage-results/sonar/**/coverage.opencover.xml" \

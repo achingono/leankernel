@@ -1,17 +1,19 @@
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using LeanKernel.Entities;
 using LeanKernel.Logic.Memory;
 
 namespace LeanKernel.Logic.Providers;
 
 /// <summary>
 /// Provides AI context (memory retrieval) backed by Memory via <see cref="IMemoryClient"/>,
-/// scoped by tenant/user/channel identity.
+/// scoped by tenant/person/channel identity.
 /// </summary>
 public class MemoryProvider(
     IMemoryClient memoryClient,
     IPermit permit,
+    IChannelMemoryPolicyResolver memoryPolicyResolver,
     MemoryPageParser parser,
     MemoryPageRenderer renderer,
     MemoryPageNormalizer normalizer,
@@ -34,7 +36,7 @@ public class MemoryProvider(
         var scope = new MemoryScope
         {
             TenantId = permit.TenantId,
-            UserId = permit.UserId,
+            PersonId = permit.PersonId,
             ChannelId = permit.ChannelId
         };
 
@@ -46,7 +48,7 @@ public class MemoryProvider(
             if (memories.Count == 0)
                 return new AIContext { Messages = [] };
 
-            var admitted = memories
+            var admitted = ApplyOverlayPrecedence(memories, scope.ChannelId)
                 .OrderByDescending(m => m.Score)
                 .Take(MaxMemoryResults)
                 .ToList();
@@ -65,8 +67,8 @@ public class MemoryProvider(
         catch (Exception ex)
         {
             // Degrade gracefully when memory service is unavailable
-            logger.LogWarning(ex, "Memory search failed for scope (tenant={TenantId}, user={UserId}, channel={ChannelId}); continuing without memory context.",
-                scope.TenantId, scope.UserId, scope.ChannelId);
+            logger.LogWarning(ex, "Memory search failed for scope (tenant={TenantId}, person={PersonId}, channel={ChannelId}); continuing without memory context.",
+                scope.TenantId, scope.PersonId, scope.ChannelId);
             return new AIContext { Messages = [] };
         }
     }
@@ -87,7 +89,7 @@ public class MemoryProvider(
         var scope = new MemoryScope
         {
             TenantId = permit.TenantId,
-            UserId = permit.UserId,
+            PersonId = permit.PersonId,
             ChannelId = permit.ChannelId
         };
 
@@ -133,7 +135,18 @@ public class MemoryProvider(
                 var seed = factExtractionService.RenderSeedPage(fact, sessionId, turnId, recordedAt);
                 var seedSnapshot = parser.Parse(string.Empty, seed);
 
-                var related = await memoryClient.SearchMemoriesAsync(scope, fact, 24, cancellationToken).ConfigureAwait(false);
+                var policy = await memoryPolicyResolver
+                    .ResolveAsync(scope.TenantId, scope.ChannelId, cancellationToken)
+                    .ConfigureAwait(false);
+                var relatedScope = new MemoryScope
+                {
+                    TenantId = scope.TenantId,
+                    PersonId = scope.PersonId,
+                    ChannelId = scope.ChannelId,
+                    SearchChannelIds = policy.MutuallyVisibleChannelIds
+                };
+
+                var related = await memoryClient.SearchMemoriesAsync(relatedScope, fact, 24, cancellationToken).ConfigureAwait(false);
                 var relatedPages = related
                     .Select(item => parser.Parse(item.Key, item.Text))
                     .ToList();
@@ -152,6 +165,101 @@ public class MemoryProvider(
             var fallbackKey = $"facts/what/fact-fallback/{Guid.NewGuid():N}";
             await memoryClient.SaveMemoryAsync(scope, fallbackKey, fallbackFact, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private IReadOnlyList<MemoryItem> ApplyOverlayPrecedence(IReadOnlyList<MemoryItem> memories, Guid localChannelId)
+    {
+        if (memories.Count <= 1)
+        {
+            return memories;
+        }
+
+        var resolved = new Dictionary<string, (MemoryItem Item, MemoryPageSnapshot Snapshot)>(StringComparer.Ordinal);
+
+        foreach (var memory in memories)
+        {
+            MemoryPageSnapshot snapshot;
+
+            try
+            {
+                snapshot = parser.Parse(memory.Key, memory.Text);
+            }
+            catch
+            {
+                resolved.TryAdd(memory.Key, (memory, new MemoryPageSnapshot(
+                    memory.Key,
+                    memory.Text,
+                    memory.Text,
+                    memory.Text,
+                    DateTimeOffset.MinValue,
+                    new Dictionary<string, string>(),
+                    new Dictionary<string, string?>(),
+                    null,
+                    null,
+                    [],
+                    null,
+                    "what",
+                    [],
+                    [],
+                    false)));
+                continue;
+            }
+
+            var groupKey = BuildOverlayGroupKey(memory, snapshot);
+
+            if (!resolved.TryGetValue(groupKey, out var existing))
+            {
+                resolved[groupKey] = (memory, snapshot);
+                continue;
+            }
+
+            if (CompareOverlay(memory, snapshot, existing.Item, existing.Snapshot, localChannelId) > 0)
+            {
+                resolved[groupKey] = (memory, snapshot);
+            }
+        }
+
+        return resolved.Values
+            .Select(entry => entry.Item)
+            .ToList();
+    }
+
+    private static int CompareOverlay(
+        MemoryItem candidate,
+        MemoryPageSnapshot candidateSnapshot,
+        MemoryItem existing,
+        MemoryPageSnapshot existingSnapshot,
+        Guid localChannelId)
+    {
+        var candidateLocal = candidate.ChannelId == localChannelId;
+        var existingLocal = existing.ChannelId == localChannelId;
+
+        if (candidateLocal != existingLocal)
+        {
+            return candidateLocal ? 1 : -1;
+        }
+
+        var timeComparison = candidateSnapshot.EffectiveTimestamp.CompareTo(existingSnapshot.EffectiveTimestamp);
+        if (timeComparison != 0)
+        {
+            return timeComparison;
+        }
+
+        return candidate.Score.CompareTo(existing.Score);
+    }
+
+    private static string BuildOverlayGroupKey(MemoryItem item, MemoryPageSnapshot snapshot)
+    {
+        if (!string.IsNullOrWhiteSpace(item.ScopeRelativeKey))
+        {
+            var parts = item.ScopeRelativeKey.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 4 && string.Equals(parts[0], "facts", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"facts/{parts[1]}/{parts[2]}";
+            }
+        }
+
+        return $"facts/{MemoryPageFields.NormalizeDimension(snapshot.PrimaryDimension)}/{snapshot.NormalizedFactText}";
     }
 
     /// <summary>

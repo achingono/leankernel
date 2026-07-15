@@ -23,6 +23,7 @@ public class RequestContextPermitTests
         ClaimsPrincipal? principal = null,
         string hostName = "localhost",
         Guid? resolvedUserId = null,
+        Guid? resolvedPersonId = null,
         Guid? resolvedTenantId = null,
         Guid? resolvedChannelId = null,
         Badge? resolvedBadge = null)
@@ -40,6 +41,7 @@ public class RequestContextPermitTests
         // Pre-populate HttpContext.Items as the middleware would (new architecture).
         if (resolvedTenantId.HasValue) ctx.Items[TenantResolutionMiddleware.TenantKey] = resolvedTenantId.Value;
         if (resolvedUserId.HasValue) ctx.Items[TenantResolutionMiddleware.UserIdKey] = resolvedUserId.Value;
+        if (resolvedPersonId.HasValue) ctx.Items[TenantResolutionMiddleware.PersonIdKey] = resolvedPersonId.Value;
         if (resolvedChannelId.HasValue) ctx.Items[TenantResolutionMiddleware.ChannelIdKey] = resolvedChannelId.Value;
         if (resolvedBadge is not null) ctx.Items[TenantResolutionMiddleware.BadgeKey] = resolvedBadge;
 
@@ -131,6 +133,15 @@ public class RequestContextPermitTests
         var (permit, _, _) = CreateSut(principal: principal, resolvedUserId: userId);
 
         permit.UserId.Should().Be(userId);
+    }
+
+    [Fact]
+    public void PersonId_WhenResolved_UsesPersonContext()
+    {
+        var personId = Guid.NewGuid();
+        var (permit, _, _) = CreateSut(resolvedPersonId: personId, resolvedUserId: Guid.NewGuid());
+
+        permit.PersonId.Should().Be(personId);
     }
 
     /// <summary>

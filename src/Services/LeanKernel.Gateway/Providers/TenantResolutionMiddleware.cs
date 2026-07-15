@@ -28,6 +28,9 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
     /// <summary>Key used to store the resolved user identifier in <see cref="HttpContext.Items"/>.</summary>
     public const string UserIdKey = "LK.UserId";
 
+    /// <summary>Key used to store the resolved canonical person identifier in <see cref="HttpContext.Items"/>.</summary>
+    public const string PersonIdKey = "LK.PersonId";
+
     /// <summary>Key used to store the resolved channel identifier in <see cref="HttpContext.Items"/>.</summary>
     public const string ChannelIdKey = "LK.ChannelId";
 
@@ -104,6 +107,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 
             context.Items[TenantKey] = tenant.Id;
             context.Items[UserIdKey] = user.Id;
+            context.Items[PersonIdKey] = user.PersonId == Guid.Empty ? user.Id : user.PersonId;
             context.Items[ChannelIdKey] = channel.Id;
             var channelBadge = authenticatedPrincipal.ToBadge();
             channelBadge.Id = user.Id;
@@ -125,12 +129,14 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         context.Items[TenantKey] = hostTenant.Id;
 
         Guid userId;
+        Guid personId;
         Badge badge;
 
         if (context.User?.Identity?.IsAuthenticated == true && context.User is ClaimsPrincipal cp)
         {
             var user = await resolver.ResolveOrCreateUserAsync(cp, cancellationToken);
             userId = user.Id;
+            personId = user.PersonId == Guid.Empty ? user.Id : user.PersonId;
             badge = cp.ToBadge();
             badge.Id = user.Id;
         }
@@ -143,6 +149,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             var guestUser = await resolver.ResolveGuestUserAsync(
                 hostTenant.Id, settings.AnonymousUserName, sessionId, cancellationToken);
             userId = guestUser.Id;
+            personId = guestUser.PersonId == Guid.Empty ? guestUser.Id : guestUser.PersonId;
             badge = new Badge
             {
                 Id = guestUser.Id,
@@ -152,6 +159,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         }
 
         context.Items[UserIdKey] = userId;
+        context.Items[PersonIdKey] = personId;
         context.Items[BadgeKey] = badge;
 
         var openAiChannel = await resolver.ResolveOrCreateChannelAsync(

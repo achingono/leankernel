@@ -1,4 +1,5 @@
 using FluentAssertions;
+using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
@@ -21,11 +22,13 @@ public class MemoryProviderTests
     private static IPermit CreatePermit(
         Guid? tenantId = null,
         Guid? userId = null,
+        Guid? personId = null,
         Guid? channelId = null)
     {
         var mock = new Mock<IPermit>();
         mock.Setup(p => p.TenantId).Returns(tenantId ?? Guid.NewGuid());
         mock.Setup(p => p.UserId).Returns(userId ?? Guid.NewGuid());
+        mock.Setup(p => p.PersonId).Returns(personId ?? userId ?? Guid.NewGuid());
         mock.Setup(p => p.ChannelId).Returns(channelId ?? Guid.NewGuid());
         mock.Setup(p => p.IsAuthenticated).Returns(true);
         return mock.Object;
@@ -41,7 +44,7 @@ public class MemoryProviderTests
         var scope = new MemoryScope
         {
             TenantId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            PersonId = Guid.NewGuid(),
             ChannelId = Guid.NewGuid()
         };
 
@@ -60,7 +63,7 @@ public class MemoryProviderTests
         var scope = new MemoryScope
         {
             TenantId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            PersonId = Guid.NewGuid(),
             ChannelId = Guid.NewGuid()
         };
 
@@ -76,21 +79,21 @@ public class MemoryProviderTests
     public void MemoryScope_Properties_SetCorrectly()
     {
         var tenantId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
+        var personId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
 
         var scope = new MemoryScope
         {
             TenantId = tenantId,
-            UserId = userId,
+            PersonId = personId,
             ChannelId = channelId,
-            Namespace = "test-ns"
+            SearchChannelIds = [channelId]
         };
 
         scope.TenantId.Should().Be(tenantId);
-        scope.UserId.Should().Be(userId);
+        scope.PersonId.Should().Be(personId);
         scope.ChannelId.Should().Be(channelId);
-        scope.Namespace.Should().Be("test-ns");
+        scope.SearchChannelIds.Should().ContainSingle().Which.Should().Be(channelId);
     }
 
     /// <summary>
@@ -138,6 +141,7 @@ public class MemoryProviderTests
         var act = () => new MemoryProvider(
             memoryClient.Object,
             permit,
+            Mock.Of<IChannelMemoryPolicyResolver>(),
             parser,
             renderer,
             normalizer,
@@ -158,7 +162,7 @@ public class MemoryProviderTests
         var scope = new MemoryScope
         {
             TenantId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            PersonId = Guid.NewGuid(),
             ChannelId = Guid.NewGuid()
         };
 

@@ -63,6 +63,12 @@ public class UserEntity : IAuditable, IRecyclable
     public bool IsGuest { get; set; }
 
     /// <summary>
+    /// Gets or sets the canonical person identifier used to link channel-native identities.
+    /// Defaults to <see cref="Id"/> for unlinked users.
+    /// </summary>
+    public Guid PersonId { get; set; }
+
+    /// <summary>
     /// Gets or sets the sessions associated with this user.
     /// </summary>
     public virtual ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();

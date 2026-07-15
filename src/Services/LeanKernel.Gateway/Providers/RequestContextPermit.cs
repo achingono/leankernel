@@ -35,6 +35,12 @@ public sealed class RequestContextPermit(
         Ctx?.Items[TenantResolutionMiddleware.UserIdKey] is Guid uid ? uid : Guid.Empty;
 
     /// <inheritdoc />
+    public Guid PersonId =>
+        Ctx?.Items[TenantResolutionMiddleware.PersonIdKey] is Guid pid
+            ? pid
+            : UserId;
+
+    /// <inheritdoc />
     public Guid TenantId =>
         Ctx?.Items[TenantResolutionMiddleware.TenantKey] is Guid tid ? tid : Guid.Empty;
 

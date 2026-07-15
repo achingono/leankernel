@@ -3,13 +3,18 @@ namespace LeanKernel;
 using LeanKernel.Entities;
 
 /// <summary>
-/// Resolved request-scoped identity context providing tenant, user, and channel partitioning keys.
+/// Resolved request-scoped identity context providing tenant, person, user, and channel partitioning keys.
 /// </summary>
 public interface IPermit
 {
     /// <summary>
-    /// Gets the canonical user identifier (persisted <c>UserEntity.Id</c>).
+    /// Gets the canonical person identifier used for cross-channel memory partitioning.
     /// </summary>
+    Guid PersonId { get; }
+
+    /// <summary>
+     /// Gets the canonical user identifier (persisted <c>UserEntity.Id</c>).
+     /// </summary>
     Guid UserId { get; }
 
     /// <summary>

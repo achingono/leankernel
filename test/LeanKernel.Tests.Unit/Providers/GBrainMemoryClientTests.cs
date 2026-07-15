@@ -1,4 +1,5 @@
 using FluentAssertions;
+using LeanKernel.Entities;
 using LeanKernel.Gateway.Memory;
 using LeanKernel.Logic.Providers;
 using Microsoft.Extensions.Logging;
@@ -17,15 +18,30 @@ public class GBrainMemoryClientTests
     /// </summary>
     private static MemoryScope CreateScope(
         Guid? tenantId = null,
-        Guid? userId = null,
+        Guid? personId = null,
         Guid? channelId = null)
     {
         return new MemoryScope
         {
             TenantId = tenantId ?? Guid.NewGuid(),
-            UserId = userId ?? Guid.NewGuid(),
+            PersonId = personId ?? Guid.NewGuid(),
             ChannelId = channelId ?? Guid.NewGuid()
         };
+    }
+
+    private static Mock<IChannelMemoryPolicyResolver> CreatePolicyResolver(Guid? channelId = null)
+    {
+        var resolver = new Mock<IChannelMemoryPolicyResolver>();
+        resolver
+            .Setup(r => r.ResolveAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid tenantId, Guid sourceChannelId, CancellationToken _) => new ChannelMemoryPolicyResolution
+            {
+                TenantId = tenantId,
+                ChannelId = sourceChannelId,
+                ReadableChannelIds = [channelId ?? sourceChannelId],
+                MutuallyVisibleChannelIds = [channelId ?? sourceChannelId]
+            });
+        return resolver;
     }
 
     /// <summary>
@@ -34,7 +50,10 @@ public class GBrainMemoryClientTests
     [Fact]
     public void Constructor_NullClient_Throws()
     {
-        var act = () => new GBrainMemoryClient(null!, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var act = () => new GBrainMemoryClient(
+            null!,
+            Mock.Of<IChannelMemoryPolicyResolver>(),
+            Mock.Of<ILogger<GBrainMemoryClient>>());
 
         act.Should().Throw<ArgumentNullException>();
     }
@@ -47,7 +66,10 @@ public class GBrainMemoryClientTests
     {
         var mockClient = new Mock<IGBrainMcpClient>();
 
-        var act = () => new GBrainMemoryClient(mockClient.Object, null!);
+        var act = () => new GBrainMemoryClient(
+            mockClient.Object,
+            Mock.Of<IChannelMemoryPolicyResolver>(),
+            null!);
 
         act.Should().Throw<ArgumentNullException>();
     }
@@ -63,7 +85,7 @@ public class GBrainMemoryClientTests
             .Setup(c => c.CallToolAsync(It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new GBrainException("service unavailable"));
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         var scope = CreateScope();
 
         var results = await client.SearchMemoriesAsync(scope, "test query");
@@ -82,7 +104,7 @@ public class GBrainMemoryClientTests
             .Setup(c => c.CallToolAsync(It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((System.Text.Json.JsonElement?)null);
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         var scope = CreateScope();
 
         var results = await client.SearchMemoriesAsync(scope, "test query");
@@ -101,7 +123,7 @@ public class GBrainMemoryClientTests
             .Setup(c => c.CallToolAsync(It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new GBrainException("write failed"));
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         var scope = CreateScope();
 
         var act = async () => await client.SaveMemoryAsync(scope, "key", "content");
@@ -120,7 +142,7 @@ public class GBrainMemoryClientTests
             .Setup(c => c.CallToolAsync(It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((System.Text.Json.JsonElement?)null);
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         var scope = CreateScope();
 
         await client.SaveMemoryAsync(scope, "test-key", "test content");
@@ -143,7 +165,7 @@ public class GBrainMemoryClientTests
             .Setup(c => c.CallToolAsync(It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((System.Text.Json.JsonElement?)null);
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         var scope = CreateScope();
 
         await client.SearchMemoriesAsync(scope, "query", 5);
@@ -166,10 +188,10 @@ public class GBrainMemoryClientTests
             .Setup(c => c.CallToolAsync(It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((System.Text.Json.JsonElement?)null);
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         var scope = CreateScope(
             tenantId: Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            userId: Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            personId: Guid.Parse("22222222-2222-2222-2222-222222222222"),
             channelId: Guid.Parse("33333333-3333-3333-3333-333333333333"));
 
         await client.SaveMemoryAsync(scope, "my-key", "content");
@@ -194,7 +216,7 @@ public class GBrainMemoryClientTests
             .Setup(c => c.CallToolAsync("search", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(json);
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         var scope = CreateScope();
 
         var results = await client.SearchMemoriesAsync(scope, "test");
@@ -217,7 +239,7 @@ public class GBrainMemoryClientTests
             .Setup(c => c.CallToolAsync("search", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(json);
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         var scope = CreateScope();
 
         var results = await client.SearchMemoriesAsync(scope, "test");
@@ -228,7 +250,7 @@ public class GBrainMemoryClientTests
     }
 
     /// <summary>
-    /// C3: Search must use a namespace derived from TenantId/UserId/ChannelId, not scope.Namespace.
+    /// C3: Search must use a namespace derived from TenantId/PersonId/ChannelId.
     /// Ensures search and save use the same identity-scoped namespace for correct recall.
     /// </summary>
     [Fact]
@@ -249,15 +271,15 @@ public class GBrainMemoryClientTests
             .ReturnsAsync((System.Text.Json.JsonElement?)null);
 
         var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-        var userId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var personId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
         var channelId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
-        var scope = CreateScope(tenantId, userId, channelId);
+        var scope = CreateScope(tenantId, personId, channelId);
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver(channelId).Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         await client.SearchMemoriesAsync(scope, "test query");
 
         capturedNamespace.Should().Be(
-            $"memory/{tenantId}/{userId}/{channelId}",
+            $"memory/{tenantId}/{personId}/{channelId}",
             because: "C3: search must use the same namespace as save to prevent cross-tenant recall");
     }
 
@@ -296,7 +318,7 @@ public class GBrainMemoryClientTests
         var scopeA = CreateScope();
         var scopeB = CreateScope(); // Different random GUIDs
 
-        var client = new GBrainMemoryClient(mockClient.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver(scopeB.ChannelId).Object, Mock.Of<ILogger<GBrainMemoryClient>>());
         await client.SaveMemoryAsync(scopeA, "key", "content");
         await client.SearchMemoriesAsync(scopeB, "query");
 
@@ -306,5 +328,68 @@ public class GBrainMemoryClientTests
             because: "search must namespace under scope B's tenant");
         searchNamespace.Should().NotBe(saveSlug![..searchNamespace!.Length],
             because: "cross-scope recall must be impossible");
+    }
+
+    [Fact]
+    public async Task SearchMemoriesAsync_PolicyFanOut_ReturnsChannelScopedResults()
+    {
+        var channelA = Guid.NewGuid();
+        var channelB = Guid.NewGuid();
+        var scope = CreateScope(channelId: channelA);
+
+        var policyResolver = new Mock<IChannelMemoryPolicyResolver>();
+        policyResolver
+            .Setup(r => r.ResolveAsync(scope.TenantId, channelA, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChannelMemoryPolicyResolution
+            {
+                TenantId = scope.TenantId,
+                ChannelId = channelA,
+                ReadableChannelIds = [channelA, channelB],
+                MutuallyVisibleChannelIds = [channelA, channelB]
+            });
+
+        var first = System.Text.Json.JsonDocument.Parse(
+            $$"""[{"slug":"memory/{{scope.TenantId}}/{{scope.PersonId}}/{{channelA}}/facts/what/jane/x","compiled_truth":"A","score":0.4}]""")
+            .RootElement.Clone();
+        var second = System.Text.Json.JsonDocument.Parse(
+            $$"""[{"slug":"memory/{{scope.TenantId}}/{{scope.PersonId}}/{{channelB}}/facts/what/jane/x","compiled_truth":"B","score":0.9}]""")
+            .RootElement.Clone();
+
+        var callCount = 0;
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("search", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                callCount++;
+                return callCount == 1 ? first : second;
+            });
+
+        var client = new GBrainMemoryClient(mockClient.Object, policyResolver.Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var result = await client.SearchMemoriesAsync(scope, "jane", 10);
+
+        result.Should().HaveCount(2);
+        result.Select(item => item.Text).Should().Contain(["A", "B"]);
+    }
+
+    [Fact]
+    public async Task SearchMemoriesAsync_ParsesScopedKey_Metadata()
+    {
+        var scope = CreateScope();
+        var json = System.Text.Json.JsonDocument.Parse(
+            $$"""[{"slug":"memory/{{scope.TenantId}}/{{scope.PersonId}}/{{scope.ChannelId}}/facts/who/jane/x1","compiled_truth":"content","score":0.8}]""")
+            .RootElement.Clone();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("search", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json);
+
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver(scope.ChannelId).Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var result = await client.SearchMemoriesAsync(scope, "jane", 10);
+
+        result.Should().ContainSingle();
+        result[0].ChannelId.Should().Be(scope.ChannelId);
+        result[0].ScopeRelativeKey.Should().Be("facts/who/jane/x1");
     }
 }

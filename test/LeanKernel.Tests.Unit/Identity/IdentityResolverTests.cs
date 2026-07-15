@@ -62,6 +62,7 @@ public class IdentityResolverTests
 
         var created = await resolver.ResolveOrCreateUserAsync(principal);
         created.Subject.Should().Be("sub-1");
+        created.PersonId.Should().Be(created.Id);
 
         var fetched = await resolver.ResolveOrCreateUserAsync(principal);
         fetched.Id.Should().Be(created.Id);
@@ -94,6 +95,7 @@ public class IdentityResolverTests
         var guest1 = await resolver.ResolveGuestUserAsync(tenantId, "anonymous", "session-1");
         var guest2 = await resolver.ResolveGuestUserAsync(tenantId, "anonymous", "session-1");
         guest2.Id.Should().Be(guest1.Id);
+        guest2.PersonId.Should().Be(guest1.PersonId);
 
         var channel1 = await resolver.ResolveOrCreateChannelAsync("openai-http");
         var channel2 = await resolver.ResolveOrCreateChannelAsync("openai-http");
@@ -189,6 +191,375 @@ public class IdentityResolverTests
             because: "subject must embed tenantId so the same session ID is unique across tenants");
         guestB.Subject.Should().Contain(tenantB.ToString("N"));
         db.Users.Count().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task LinkAndUnlinkUsersAsync_UpdatesPersonMembership()
+    {
+        var resolver = CreateResolver(out var db);
+        var tenantId = Guid.NewGuid();
+        db.Tenants.Add(new TenantEntity
+        {
+            Id = tenantId,
+            Name = "Tenant",
+            HostName = "tenant-link.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        await db.SaveChangesAsync();
+
+        var userA = await resolver.ResolveOrCreateUserAsync(Principal("a", "iss-a", "A", "a@test"));
+        var userB = await resolver.ResolveOrCreateUserAsync(Principal("b", "iss-b", "B", "b@test"));
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new ChannelEntity { Id = channelId, Name = "unit-test-channel" });
+        db.Sessions.Add(new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            UserId = userA.Id,
+            ChannelId = channelId,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.Sessions.Add(new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            UserId = userB.Id,
+            ChannelId = channelId,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ChannelId = channelId,
+            UserId = userA.Id,
+            Issuer = "iss-a",
+            Subject = "a",
+            IsActive = true
+        });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ChannelId = channelId,
+            UserId = userB.Id,
+            Issuer = "iss-b",
+            Subject = "b",
+            IsActive = true
+        });
+        await db.SaveChangesAsync();
+
+        var linkedPersonId = await resolver.LinkUsersAsync(tenantId, userA.Id, userB.Id);
+        linkedPersonId.Should().Be(userA.PersonId);
+
+        var resolvedPersonB = await resolver.ResolvePersonIdAsync(userB.Id);
+        resolvedPersonB.Should().Be(linkedPersonId);
+
+        await resolver.UnlinkUserAsync(tenantId, userB.Id);
+        var unlinkedPersonB = await resolver.ResolvePersonIdAsync(userB.Id);
+        unlinkedPersonB.Should().Be(userB.Id);
+    }
+
+    [Fact]
+    public async Task LinkUsersAsync_WhenUserOutsideTenant_Throws()
+    {
+        var resolver = CreateResolver(out var db);
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        db.Tenants.Add(new TenantEntity
+        {
+            Id = tenantA,
+            Name = "Tenant A",
+            HostName = "a-link.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.Tenants.Add(new TenantEntity
+        {
+            Id = tenantB,
+            Name = "Tenant B",
+            HostName = "b-link.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new ChannelEntity { Id = channelId, Name = "link-test-channel" });
+        await db.SaveChangesAsync();
+
+        var userA = await resolver.ResolveOrCreateUserAsync(Principal("ta", "iss-ta", "TA", "ta@test"));
+        var userB = await resolver.ResolveOrCreateUserAsync(Principal("tb", "iss-tb", "TB", "tb@test"));
+
+        db.Sessions.Add(new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantA,
+            UserId = userA.Id,
+            ChannelId = channelId,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.Sessions.Add(new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantB,
+            UserId = userB.Id,
+            ChannelId = channelId,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantA,
+            ChannelId = channelId,
+            UserId = userA.Id,
+            Issuer = "iss-ta",
+            Subject = "ta",
+            IsActive = true
+        });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantB,
+            ChannelId = channelId,
+            UserId = userB.Id,
+            Issuer = "iss-tb",
+            Subject = "tb",
+            IsActive = true
+        });
+        await db.SaveChangesAsync();
+
+        var act = () => resolver.LinkUsersAsync(tenantA, userA.Id, userB.Id);
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task UnlinkUserAsync_WhenAnchorUser_ReassignsTenantMembersAndIsIdempotent()
+    {
+        var resolver = CreateResolver(out var db);
+        var tenantId = Guid.NewGuid();
+        db.Tenants.Add(new TenantEntity
+        {
+            Id = tenantId,
+            Name = "Tenant",
+            HostName = "anchor-unlink.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new ChannelEntity { Id = channelId, Name = "anchor-channel" });
+        await db.SaveChangesAsync();
+
+        var userA = await resolver.ResolveOrCreateUserAsync(Principal("anchor-a", "iss-anchor", "A", "a@anchor.test"));
+        var userB = await resolver.ResolveOrCreateUserAsync(Principal("anchor-b", "iss-anchor", "B", "b@anchor.test"));
+
+        db.Sessions.Add(new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            UserId = userA.Id,
+            ChannelId = channelId,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.Sessions.Add(new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            UserId = userB.Id,
+            ChannelId = channelId,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ChannelId = channelId,
+            UserId = userA.Id,
+            Issuer = "iss-anchor",
+            Subject = "anchor-a",
+            IsActive = true
+        });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ChannelId = channelId,
+            UserId = userB.Id,
+            Issuer = "iss-anchor",
+            Subject = "anchor-b",
+            IsActive = true
+        });
+        await db.SaveChangesAsync();
+
+        await resolver.LinkUsersAsync(tenantId, userA.Id, userB.Id);
+
+        await resolver.UnlinkUserAsync(tenantId, userA.Id);
+        await resolver.UnlinkUserAsync(tenantId, userA.Id);
+
+        var personA = await resolver.ResolvePersonIdAsync(userA.Id);
+        var personB = await resolver.ResolvePersonIdAsync(userB.Id);
+
+        personA.Should().Be(userA.Id);
+        personB.Should().NotBe(userA.Id);
+    }
+
+    [Fact]
+    public async Task LinkUsersAsync_DoesNotMutateCrossTenantClusterMembers()
+    {
+        var resolver = CreateResolver(out var db);
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+
+        db.Tenants.Add(new TenantEntity
+        {
+            Id = tenantA,
+            Name = "Tenant A",
+            HostName = "cluster-a.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.Tenants.Add(new TenantEntity
+        {
+            Id = tenantB,
+            Name = "Tenant B",
+            HostName = "cluster-b.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new ChannelEntity { Id = channelId, Name = "cluster-channel" });
+        await db.SaveChangesAsync();
+
+        var sourceA = new UserEntity
+        {
+            Id = Guid.NewGuid(),
+            PersonId = Guid.Empty,
+            Issuer = "iss-source",
+            Subject = "source-a",
+            UserName = "source-a",
+            FullName = "Source",
+            Email = "source@a.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        };
+        sourceA.PersonId = sourceA.Id;
+
+        var targetA = new UserEntity
+        {
+            Id = Guid.NewGuid(),
+            PersonId = Guid.Empty,
+            Issuer = "iss-target",
+            Subject = "target-a",
+            UserName = "target-a",
+            FullName = "Target",
+            Email = "target@a.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        };
+        targetA.PersonId = targetA.Id;
+
+        var tenantBUser = new UserEntity
+        {
+            Id = Guid.NewGuid(),
+            PersonId = Guid.Empty,
+            Issuer = "iss-other",
+            Subject = "other-b",
+            UserName = "other-b",
+            FullName = "Other",
+            Email = "other@b.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        };
+        tenantBUser.PersonId = targetA.PersonId;
+
+        db.Users.Add(sourceA);
+        db.Users.Add(targetA);
+        db.Users.Add(tenantBUser);
+        await db.SaveChangesAsync();
+
+        db.Sessions.Add(new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantA,
+            UserId = sourceA.Id,
+            ChannelId = channelId,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.Sessions.Add(new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantA,
+            UserId = targetA.Id,
+            ChannelId = channelId,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.Sessions.Add(new SessionEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantB,
+            UserId = tenantBUser.Id,
+            ChannelId = channelId,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+        });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantA,
+            ChannelId = channelId,
+            UserId = sourceA.Id,
+            Issuer = "iss-source",
+            Subject = "source-a",
+            IsActive = true
+        });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantA,
+            ChannelId = channelId,
+            UserId = targetA.Id,
+            Issuer = "iss-target",
+            Subject = "target-a",
+            IsActive = true
+        });
+        db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantB,
+            ChannelId = channelId,
+            UserId = tenantBUser.Id,
+            Issuer = "iss-other",
+            Subject = "other-b",
+            IsActive = true
+        });
+
+        await db.SaveChangesAsync();
+
+        var originalTenantBPersonId = tenantBUser.PersonId;
+        await resolver.LinkUsersAsync(tenantA, sourceA.Id, targetA.Id);
+
+        var tenantBPersonAfter = await resolver.ResolvePersonIdAsync(tenantBUser.Id);
+        tenantBPersonAfter.Should().Be(originalTenantBPersonId);
     }
 
     /// <summary>

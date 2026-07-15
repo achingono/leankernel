@@ -1,4 +1,5 @@
 using FluentAssertions;
+using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
@@ -69,6 +70,71 @@ public class MemoryProviderBehaviorTests
         context.Messages!.First().Text.Should().Contain("dimensions:");
     }
 
+    [Fact]
+    public async Task ProvideContext_OverlayPrefersLocalChannelFact()
+    {
+        var localChannel = Guid.NewGuid();
+        var remoteChannel = Guid.NewGuid();
+
+        var localText = """
+# Learned Fact
+
+Local channel answer
+
+- Session: s-local
+- Turn: t-local
+- RecordedAt: 2026-07-11T12:00:00Z
+""";
+
+        var remoteText = """
+# Learned Fact
+
+Remote channel answer
+
+- Session: s-remote
+- Turn: t-remote
+- RecordedAt: 2026-07-12T12:00:00Z
+""";
+
+        var memory = new InMemoryMemoryClient
+        {
+            SearchResults =
+            [
+                new MemoryItem
+                {
+                    Key = "memory/tenant/person/" + remoteChannel + "/facts/what/jane/x",
+                    ScopeRelativeKey = "facts/what/jane/x",
+                    ChannelId = remoteChannel,
+                    Text = remoteText,
+                    Score = 0.9
+                },
+                new MemoryItem
+                {
+                    Key = "memory/tenant/person/" + localChannel + "/facts/what/jane/x",
+                    ScopeRelativeKey = "facts/what/jane/x",
+                    ChannelId = localChannel,
+                    Text = localText,
+                    Score = 0.4
+                }
+            ]
+        };
+
+        var (provider, _) = CreateSut(memory, channelId: localChannel);
+        var invoking = new AIContextProvider.InvokingContext(
+            new TestAIAgent(),
+            new TestAgentSession(),
+            new AIContext
+            {
+                Messages = [new ChatMessage(ChatRole.User, "what is the fact")]
+            });
+
+        var context = await provider.ProvideForTestAsync(invoking);
+
+        context.Messages.Should().HaveCount(1);
+        context.Messages!.First().Text.Should().Contain("Local channel answer");
+        context.Messages!.First().Text.Should().NotContain("Remote channel answer");
+    }
+
     /// <summary>
     /// Verifies normalized facts are persisted after invocation.
     /// </summary>
@@ -120,13 +186,26 @@ public class MemoryProviderBehaviorTests
     private static (TestableMemoryProvider Provider, TestAgentSession Session) CreateSut(
         InMemoryMemoryClient memoryClient,
         string? extractionResponse = "[]",
-        bool extractionThrows = false)
+        bool extractionThrows = false,
+        Guid? channelId = null)
     {
         var permit = new Mock<IPermit>();
         permit.SetupGet(p => p.TenantId).Returns(Guid.NewGuid());
         permit.SetupGet(p => p.UserId).Returns(Guid.NewGuid());
-        permit.SetupGet(p => p.ChannelId).Returns(Guid.NewGuid());
+        permit.SetupGet(p => p.PersonId).Returns(Guid.NewGuid());
+        permit.SetupGet(p => p.ChannelId).Returns(channelId ?? Guid.NewGuid());
         permit.SetupGet(p => p.SessionId).Returns("permit-session");
+
+        var policyResolver = new Mock<IChannelMemoryPolicyResolver>();
+        policyResolver
+            .Setup(x => x.ResolveAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid tenantId, Guid channelId, CancellationToken _) => new ChannelMemoryPolicyResolution
+            {
+                TenantId = tenantId,
+                ChannelId = channelId,
+                ReadableChannelIds = [channelId],
+                MutuallyVisibleChannelIds = [channelId]
+            });
 
         var renderer = new MemoryPageRenderer();
         var reasoning = new StubReasoningModel();
@@ -147,6 +226,7 @@ public class MemoryProviderBehaviorTests
             new TestableMemoryProvider(
                 memoryClient,
                 permit.Object,
+                policyResolver.Object,
                 new MemoryPageParser(),
                 renderer,
                 normalizer,
@@ -161,6 +241,7 @@ public class MemoryProviderBehaviorTests
     /// </summary>
     /// <param name="memoryClient">The memory client to wrap.</param>
     /// <param name="permit">The permit used to resolve memory scope.</param>
+    /// <param name="memoryPolicyResolver">The channel memory policy resolver.</param>
     /// <param name="parser">The memory page parser to use.</param>
     /// <param name="renderer">The memory page renderer to use.</param>
     /// <param name="normalizer">The page normalizer to use.</param>
@@ -170,13 +251,14 @@ public class MemoryProviderBehaviorTests
     private sealed class TestableMemoryProvider(
         IMemoryClient memoryClient,
         IPermit permit,
+        IChannelMemoryPolicyResolver memoryPolicyResolver,
         MemoryPageParser parser,
         MemoryPageRenderer renderer,
         MemoryPageNormalizer normalizer,
         FactExtractionService factExtractionService,
         TimeProvider timeProvider,
         Microsoft.Extensions.Logging.ILogger<MemoryProvider> logger)
-        : MemoryProvider(memoryClient, permit, parser, renderer, normalizer, factExtractionService, timeProvider, logger)
+        : MemoryProvider(memoryClient, permit, memoryPolicyResolver, parser, renderer, normalizer, factExtractionService, timeProvider, logger)
     {
         /// <summary>
         /// Invokes context provisioning for tests.

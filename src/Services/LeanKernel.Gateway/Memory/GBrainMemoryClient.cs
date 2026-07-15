@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LeanKernel.Entities;
 using LeanKernel.Logic.Providers;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,7 @@ namespace LeanKernel.Gateway.Memory;
 public sealed class GBrainMemoryClient : IMemoryClient
 {
     private readonly IGBrainMcpClient _client;
+    private readonly IChannelMemoryPolicyResolver _memoryPolicyResolver;
     private readonly ILogger<GBrainMemoryClient> _logger;
 
     /// <summary>
@@ -19,9 +21,13 @@ public sealed class GBrainMemoryClient : IMemoryClient
     /// </summary>
     /// <param name="client">The low-level MCP client used to call GBrain tools.</param>
     /// <param name="logger">The logger for memory operation diagnostics.</param>
-    public GBrainMemoryClient(IGBrainMcpClient client, ILogger<GBrainMemoryClient> logger)
+    public GBrainMemoryClient(
+        IGBrainMcpClient client,
+        IChannelMemoryPolicyResolver memoryPolicyResolver,
+        ILogger<GBrainMemoryClient> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
+        _memoryPolicyResolver = memoryPolicyResolver ?? throw new ArgumentNullException(nameof(memoryPolicyResolver));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -32,24 +38,48 @@ public sealed class GBrainMemoryClient : IMemoryClient
         int maxResults = 10,
         CancellationToken ct = default)
     {
-        _logger.LogDebug("GBrain memory search: {Query} (max={Max}, tenant={Tenant})",
-            query, maxResults, scope.TenantId);
+        _logger.LogDebug("GBrain memory search: {Query} (max={Max}, tenant={Tenant}, person={Person})",
+            query, maxResults, scope.TenantId, scope.PersonId);
 
         try
         {
-            var result = await _client.CallToolAsync("search", new
-            {
-                query,
-                limit = maxResults,
-                namespace_name = BuildScopedNamespace(scope)
-            }, ct).ConfigureAwait(false);
+            var channelIds = scope.SearchChannelIds?.Count > 0
+                ? scope.SearchChannelIds.Distinct().ToArray()
+                : (await _memoryPolicyResolver.ResolveAsync(scope.TenantId, scope.ChannelId, ct).ConfigureAwait(false))
+                    .ReadableChannelIds
+                    .Append(scope.ChannelId)
+                    .Distinct()
+                    .ToArray();
 
-            if (result is null)
+            var aggregated = new Dictionary<string, MemoryItem>(StringComparer.Ordinal);
+
+            foreach (var channelId in channelIds)
             {
-                return [];
+                var result = await _client.CallToolAsync("search", new
+                {
+                    query,
+                    limit = maxResults,
+                    namespace_name = BuildScopedNamespace(scope, channelId)
+                }, ct).ConfigureAwait(false);
+
+                if (result is null)
+                {
+                    continue;
+                }
+
+                foreach (var item in DeserializeSearchResults(result.Value))
+                {
+                    if (!aggregated.TryGetValue(item.Key, out var existing) || item.Score > existing.Score)
+                    {
+                        aggregated[item.Key] = item;
+                    }
+                }
             }
 
-            return DeserializeSearchResults(result.Value);
+            return aggregated.Values
+                .OrderByDescending(item => item.Score)
+                .Take(maxResults)
+                .ToList();
         }
         catch (GBrainException ex)
         {
@@ -79,13 +109,13 @@ public sealed class GBrainMemoryClient : IMemoryClient
 
     /// <summary>
     /// Builds the GBrain namespace used to scope memory search results.
-    /// Derived from the same tenant/user/channel identifiers used by <see cref="BuildScopedSlug"/>.
+    /// Derived from the same tenant/person/channel identifiers used by <see cref="BuildScopedSlug"/>.
     /// </summary>
     /// <param name="scope">The memory scope to derive the namespace from.</param>
     /// <returns>The scoped namespace string.</returns>
-    private static string BuildScopedNamespace(MemoryScope scope)
+    private static string BuildScopedNamespace(MemoryScope scope, Guid channelId)
     {
-        return $"memory/{scope.TenantId}/{scope.UserId}/{scope.ChannelId}";
+        return $"memory/{scope.TenantId}/{scope.PersonId}/{channelId}";
     }
 
     /// <summary>
@@ -96,7 +126,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
     /// <returns>The scoped GBrain slug.</returns>
     private static string BuildScopedSlug(MemoryScope scope, string key)
     {
-        return $"memory/{scope.TenantId}/{scope.UserId}/{scope.ChannelId}/{key}";
+        return $"memory/{scope.TenantId}/{scope.PersonId}/{scope.ChannelId}/{key}";
     }
 
     /// <summary>
@@ -121,13 +151,42 @@ public sealed class GBrainMemoryClient : IMemoryClient
     /// </summary>
     /// <param name="item">The GBrain search item to map.</param>
     /// <returns>The mapped memory item.</returns>
-    private static MemoryItem MapToMemoryItem(GBrainMemorySearchItem item) => new()
+    private static MemoryItem MapToMemoryItem(GBrainMemorySearchItem item)
     {
-        Key = item.Key,
-        Text = item.Content,
-        Score = item.Score,
-        Source = "gbrain"
-    };
+        var (channelId, scopeRelativeKey) = TryParseScopedKey(item.Key);
+
+        return new MemoryItem
+        {
+            Key = item.Key,
+            Text = item.Content,
+            Score = item.Score,
+            Source = "gbrain",
+            ChannelId = channelId,
+            ScopeRelativeKey = scopeRelativeKey
+        };
+    }
+
+    private static (Guid? ChannelId, string? ScopeRelativeKey) TryParseScopedKey(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return (null, null);
+        }
+
+        var parts = key.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 5 || !string.Equals(parts[0], "memory", StringComparison.OrdinalIgnoreCase))
+        {
+            return (null, key);
+        }
+
+        var scopeRelativeKey = string.Join('/', parts.Skip(4));
+        if (!Guid.TryParse(parts[3], out var channelId))
+        {
+            return (null, scopeRelativeKey);
+        }
+
+        return (channelId, scopeRelativeKey);
+    }
 }
 
 /// <summary>

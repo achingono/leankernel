@@ -11,9 +11,9 @@ public sealed class MemoryScope
     public Guid TenantId { get; init; }
 
     /// <summary>
-    /// Gets the user identifier.
+    /// Gets the canonical person identifier.
     /// </summary>
-    public Guid UserId { get; init; }
+    public Guid PersonId { get; init; }
 
     /// <summary>
     /// Gets the channel identifier.
@@ -21,9 +21,10 @@ public sealed class MemoryScope
     public Guid ChannelId { get; init; }
 
     /// <summary>
-    /// Gets the optional namespace for memory admission policy.
+    /// Gets the optional explicit channel set used for read fan-out.
+    /// When null, the memory client resolves the readable set from policy.
     /// </summary>
-    public string? Namespace { get; init; }
+    public IReadOnlyCollection<Guid>? SearchChannelIds { get; init; }
 }
 
 /// <summary>
@@ -50,6 +51,16 @@ public sealed class MemoryItem
     /// Gets the source or origin of the memory.
     /// </summary>
     public string? Source { get; init; }
+
+    /// <summary>
+    /// Gets the channel identifier parsed from the scoped memory key when available.
+    /// </summary>
+    public Guid? ChannelId { get; init; }
+
+    /// <summary>
+    /// Gets the scope-relative key when available.
+    /// </summary>
+    public string? ScopeRelativeKey { get; init; }
 }
 
 /// <summary>

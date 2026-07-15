@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 namespace LeanKernel.Logic.TurnRuntime;
 
 /// <summary>
-/// Retrieves memory/knowledge candidates scoped by tenant/user/channel from
+/// Retrieves memory/knowledge candidates scoped by tenant/person/channel from
 /// <see cref="IMemoryClient"/> and adds them to <see cref="TurnContext.Candidates"/>
 /// before admission gating. Runs before <see cref="ContextGatekeeper"/>.
 /// </summary>
@@ -36,7 +36,7 @@ public sealed class ScopedRetrievalStage(
         var scope = new MemoryScope
         {
             TenantId = permit.TenantId,
-            UserId = permit.UserId,
+            PersonId = permit.PersonId,
             ChannelId = permit.ChannelId,
         };
 
@@ -48,8 +48,8 @@ public sealed class ScopedRetrievalStage(
             if (memories.Count == 0)
             {
                 logger.LogDebug(
-                    "No memory candidates returned for scope (tenant={TenantId}, user={UserId}, channel={ChannelId}).",
-                    scope.TenantId, scope.UserId, scope.ChannelId);
+                    "No memory candidates returned for scope (tenant={TenantId}, person={PersonId}, channel={ChannelId}).",
+                    scope.TenantId, scope.PersonId, scope.ChannelId);
                 return;
             }
 
@@ -69,21 +69,21 @@ public sealed class ScopedRetrievalStage(
                     {
                         ["memory_key"] = memory.Key,
                         ["tenant_id"] = scope.TenantId.ToString(),
-                        ["user_id"] = scope.UserId.ToString(),
+                        ["person_id"] = scope.PersonId.ToString(),
                         ["channel_id"] = scope.ChannelId.ToString(),
                     },
                 });
             }
 
             logger.LogDebug(
-                "Scoped retrieval added {Count} memory candidates for scope (tenant={TenantId}, user={UserId}, channel={ChannelId}).",
-                memories.Count, scope.TenantId, scope.UserId, scope.ChannelId);
+                "Scoped retrieval added {Count} memory candidates for scope (tenant={TenantId}, person={PersonId}, channel={ChannelId}).",
+                memories.Count, scope.TenantId, scope.PersonId, scope.ChannelId);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
-                "Scoped retrieval failed for scope (tenant={TenantId}, user={UserId}, channel={ChannelId}); continuing without memory context.",
-                scope.TenantId, scope.UserId, scope.ChannelId);
+                "Scoped retrieval failed for scope (tenant={TenantId}, person={PersonId}, channel={ChannelId}); continuing without memory context.",
+                scope.TenantId, scope.PersonId, scope.ChannelId);
         }
     }
 

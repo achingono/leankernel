@@ -27,10 +27,12 @@ public class ScopedRetrievalStageTests
     private static IPermit CreatePermit(
         Guid? tenantId = null,
         Guid? userId = null,
+        Guid? personId = null,
         Guid? channelId = null)
     {
         var mock = new Mock<IPermit>();
         mock.Setup(p => p.UserId).Returns(userId ?? Guid.NewGuid());
+        mock.Setup(p => p.PersonId).Returns(personId ?? userId ?? Guid.NewGuid());
         mock.Setup(p => p.TenantId).Returns(tenantId ?? Guid.NewGuid());
         mock.Setup(p => p.ChannelId).Returns(channelId ?? Guid.NewGuid());
         mock.Setup(p => p.HostName).Returns("localhost");
@@ -60,7 +62,7 @@ public class ScopedRetrievalStageTests
     public async Task ExecuteAsync_MemoriesReturned_AddsCandidates()
     {
         var tenantId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
+        var personId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
 
         var memoryClient = new Mock<IMemoryClient>();
@@ -95,7 +97,7 @@ public class ScopedRetrievalStageTests
     public async Task ExecuteAsync_MemoryScope_UsesPermitPartitioning()
     {
         var tenantId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
+        var personId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
 
         MemoryScope? capturedScope = null;
@@ -109,7 +111,7 @@ public class ScopedRetrievalStageTests
             .Callback<MemoryScope, string, int, CancellationToken>((scope, _, _, _) => capturedScope = scope)
             .ReturnsAsync(new List<MemoryItem>());
 
-        var ctx = CreateContext(permit: CreatePermit(tenantId, userId, channelId));
+        var ctx = CreateContext(permit: CreatePermit(tenantId, Guid.NewGuid(), personId, channelId));
         var stage = new ScopedRetrievalStage(
             memoryClient.Object,
             CreateSettings(),
@@ -119,7 +121,7 @@ public class ScopedRetrievalStageTests
 
         capturedScope.Should().NotBeNull();
         capturedScope!.TenantId.Should().Be(tenantId);
-        capturedScope.UserId.Should().Be(userId);
+        capturedScope.PersonId.Should().Be(personId);
         capturedScope.ChannelId.Should().Be(channelId);
     }
 
@@ -174,7 +176,7 @@ public class ScopedRetrievalStageTests
     public async Task ExecuteAsync_CandidatesHaveMetadata_ContainsScopeKeys()
     {
         var tenantId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
+        var personId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
 
         var memoryClient = new Mock<IMemoryClient>();
@@ -189,7 +191,7 @@ public class ScopedRetrievalStageTests
                 new() { Key = "facts/what/name", Text = "Alice", Score = 0.8 },
             });
 
-        var ctx = CreateContext(permit: CreatePermit(tenantId, userId, channelId));
+        var ctx = CreateContext(permit: CreatePermit(tenantId, Guid.NewGuid(), personId, channelId));
         var stage = new ScopedRetrievalStage(
             memoryClient.Object,
             CreateSettings(),
@@ -200,7 +202,7 @@ public class ScopedRetrievalStageTests
         ctx.Candidates.Should().HaveCount(1);
         var candidate = ctx.Candidates[0];
         candidate.Metadata["tenant_id"].Should().Be(tenantId.ToString());
-        candidate.Metadata["user_id"].Should().Be(userId.ToString());
+        candidate.Metadata["person_id"].Should().Be(personId.ToString());
         candidate.Metadata["channel_id"].Should().Be(channelId.ToString());
         candidate.Metadata["memory_key"].Should().Be("facts/what/name");
     }

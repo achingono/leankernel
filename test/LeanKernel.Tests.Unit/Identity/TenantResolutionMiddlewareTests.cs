@@ -145,6 +145,7 @@ public class TenantResolutionMiddlewareTests
         ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId,
             because: "TenantId must be stored in Items for RequestContextPermit to read");
         ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(userId);
+        ctx.Items[TenantResolutionMiddleware.PersonIdKey].Should().Be(userId);
         ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
     }
 
@@ -180,6 +181,7 @@ public class TenantResolutionMiddlewareTests
 
         ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId);
         ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(guestUserId);
+        ctx.Items[TenantResolutionMiddleware.PersonIdKey].Should().Be(guestUserId);
         ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
     }
 
@@ -230,6 +232,7 @@ public class TenantResolutionMiddlewareTests
         ctx.Response.StatusCode.Should().NotBe(StatusCodes.Status401Unauthorized);
         ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId);
         ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(userId);
+        ctx.Items[TenantResolutionMiddleware.PersonIdKey].Should().Be(userId);
         ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
     }
 
