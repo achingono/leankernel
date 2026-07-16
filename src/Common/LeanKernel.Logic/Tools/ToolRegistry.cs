@@ -39,4 +39,12 @@ public sealed class ToolRegistry : IToolRegistry
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         return _tools.ContainsKey(name);
     }
+
+    /// <inheritdoc />
+    public ToolDefinition? GetTool(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        _tools.TryGetValue(name, out var tool);
+        return tool;
+    }
 }

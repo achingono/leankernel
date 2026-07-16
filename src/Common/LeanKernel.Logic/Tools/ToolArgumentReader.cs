@@ -108,4 +108,112 @@ public static class ToolArgumentReader
             _ => System.Text.Json.JsonSerializer.Serialize(raw)
         };
     }
+
+    /// <summary>
+    /// Returns a string value or empty string when missing (source-compatible).
+    /// </summary>
+    public static string GetStringOrEmpty(IReadOnlyDictionary<string, object?> args, string key)
+    {
+        return GetString(args, key) ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Returns an integer value with a default fallback (source-compatible).
+    /// </summary>
+    public static int GetInt32OrDefault(IReadOnlyDictionary<string, object?> args, string key, int defaultValue)
+    {
+        return GetInt(args, key) ?? defaultValue;
+    }
+
+    /// <summary>
+    /// Returns a boolean value with a default fallback (source-compatible).
+    /// </summary>
+    public static bool GetBoolOrDefault(IReadOnlyDictionary<string, object?> args, string key, bool defaultValue)
+    {
+        return GetBool(args, key) ?? defaultValue;
+    }
+
+    /// <summary>
+    /// Returns a string map from the argument dictionary, or an empty dictionary when missing.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> GetStringDictionary(IReadOnlyDictionary<string, object?> args, string key)
+    {
+        if (!args.TryGetValue(key, out var raw) || raw is null)
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        if (raw is IDictionary<string, string> typedMap)
+        {
+            return new Dictionary<string, string>(typedMap, StringComparer.Ordinal);
+        }
+
+        if (raw is IDictionary<string, object?> objectMap)
+        {
+            return objectMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString() ?? string.Empty, StringComparer.Ordinal);
+        }
+
+        if (raw is JsonElement element && element.ValueKind == JsonValueKind.Object)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var property in element.EnumerateObject())
+            {
+                result[property.Name] = property.Value.ValueKind switch
+                {
+                    JsonValueKind.Null => string.Empty,
+                    JsonValueKind.String => property.Value.GetString() ?? string.Empty,
+                    _ => property.Value.ToString() ?? string.Empty
+                };
+            }
+            return result;
+        }
+
+        return new Dictionary<string, string>(StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Returns an object dictionary from the argument dictionary, or an empty dictionary when missing.
+    /// </summary>
+    public static Dictionary<string, object?> GetObjectDictionary(IReadOnlyDictionary<string, object?> args, string key)
+    {
+        if (!args.TryGetValue(key, out var raw) || raw is null)
+        {
+            return new Dictionary<string, object?>(StringComparer.Ordinal);
+        }
+
+        if (raw is Dictionary<string, object?> dictionary)
+        {
+            return new Dictionary<string, object?>(dictionary, StringComparer.Ordinal);
+        }
+
+        if (raw is IReadOnlyDictionary<string, object?> readOnlyDictionary)
+        {
+            return readOnlyDictionary.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        }
+
+        if (raw is JsonElement element && element.ValueKind == JsonValueKind.Object)
+        {
+            var result = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var property in element.EnumerateObject())
+            {
+                result[property.Name] = ConvertJsonValue(property.Value);
+            }
+            return result;
+        }
+
+        return new Dictionary<string, object?>(StringComparer.Ordinal);
+    }
+
+    private static object? ConvertJsonValue(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Number => value.TryGetInt64(out var int64Value) ? int64Value : (object)value.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            _ => value.GetRawText()
+        };
+    }
 }

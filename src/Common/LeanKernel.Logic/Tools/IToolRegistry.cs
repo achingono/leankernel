@@ -29,4 +29,11 @@ public interface IToolRegistry
     /// <param name="name">The tool name to check.</param>
     /// <returns>True when a tool with that name is registered.</returns>
     bool Contains(string name);
+
+    /// <summary>
+    /// Gets a registered tool by name, or null if not found.
+    /// </summary>
+    /// <param name="name">The tool name to look up.</param>
+    /// <returns>The tool definition, or null.</returns>
+    ToolDefinition? GetTool(string name);
 }

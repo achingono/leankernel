@@ -2,6 +2,10 @@ using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Tools;
 using LeanKernel.Logic.Tools.BuiltIn;
+using LeanKernel.Logic.Tools.BuiltIn.Browser;
+using LeanKernel.Logic.Tools.BuiltIn.Data;
+using LeanKernel.Logic.Tools.BuiltIn.FileSystem;
+using LeanKernel.Logic.Tools.BuiltIn.Internet;
 using LeanKernel.Logic.Tools.Dynamic;
 using LeanKernel.Logic.Tools.Memory;
 using Microsoft.Extensions.Logging;
@@ -67,6 +71,59 @@ public static class IServiceProviderExtensions
         else
         {
             logger.LogInformation("Calculation/aggregation helpers are disabled (Agents:Tools:BuiltIns:Calculation:Enabled=false).");
+        }
+
+        if (settings.FileSystem.Enabled)
+        {
+            TryRegister(registry, FileReadTool.Create(scopeFactory), logger);
+            TryRegister(registry, FileWriteTool.Create(scopeFactory), logger);
+            TryRegister(registry, FileEditTool.Create(scopeFactory), logger);
+            TryRegister(registry, FileStatTool.Create(scopeFactory), logger);
+            TryRegister(registry, FileCopyTool.Create(scopeFactory), logger);
+            TryRegister(registry, FileMoveTool.Create(scopeFactory), logger);
+            TryRegister(registry, FileDeleteTool.Create(scopeFactory), logger);
+            TryRegister(registry, FileTouchTool.Create(scopeFactory), logger);
+            TryRegister(registry, FileChmodTool.Create(scopeFactory), logger);
+            TryRegister(registry, DirectoryListTool.Create(scopeFactory), logger);
+            TryRegister(registry, DirectoryCreateTool.Create(scopeFactory), logger);
+            TryRegister(registry, ExtractTextTool.Create(scopeFactory), logger);
+        }
+        else
+        {
+            logger.LogInformation("FileSystem tools are disabled (Agents:Tools:FileSystem:Enabled=false).");
+        }
+
+        if (settings.Internet.Enabled)
+        {
+            TryRegister(registry, WebFetchTool.Create(scopeFactory), logger);
+            TryRegister(registry, HttpRequestTool.Create(scopeFactory), logger);
+        }
+        else
+        {
+            logger.LogInformation("Internet tools are disabled (Agents:Tools:Internet:Enabled=false).");
+        }
+
+        if (settings.DatabaseQuery.Enabled)
+        {
+            TryRegister(registry, DatabaseQueryTool.Create(scopeFactory), logger);
+            TryRegister(registry, JsonTransformTool.Create(scopeFactory), logger);
+            TryRegister(registry, CsvXlsxReadWriteTool.Create(scopeFactory), logger);
+        }
+        else
+        {
+            logger.LogInformation("Database query tools are disabled (Agents:Tools:DatabaseQuery:Enabled=false).");
+        }
+
+        if (settings.Webwright.Enabled)
+        {
+            TryRegister(registry, BrowserToolDefinitions.CreateRunTaskTool(scopeFactory), logger);
+            TryRegister(registry, BrowserToolDefinitions.CreateGetRunTool(scopeFactory), logger);
+            TryRegister(registry, BrowserToolDefinitions.CreateGetArtifactTool(scopeFactory), logger);
+            TryRegister(registry, BrowserToolDefinitions.CreateCancelRunTool(scopeFactory), logger);
+        }
+        else
+        {
+            logger.LogInformation("Browser tools are disabled (Agents:Tools:Webwright:Enabled=false).");
         }
     }
 

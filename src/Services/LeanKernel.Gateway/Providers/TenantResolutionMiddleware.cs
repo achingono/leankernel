@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Diagnostics.CodeAnalysis;
 using LeanKernel.Entities;
 using LeanKernel.Gateway.Configuration;
 using Microsoft.Extensions.Options;
@@ -46,6 +47,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
     /// <summary>
     /// Resolves the request-scoped identity and invokes the next middleware.
     /// </summary>
+    [SuppressMessage("Critical Code Smell", "S3776", Justification = "Request identity resolution keeps channel and anonymous flows explicit to preserve security checks.")]
     public async Task InvokeAsync(
         HttpContext context,
         IIdentityResolver resolver,

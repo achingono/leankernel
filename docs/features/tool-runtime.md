@@ -20,16 +20,13 @@ Reference: [`../../src/Common/LeanKernel.Logic/Tools/`](../../src/Common/LeanKer
 
 LeanKernel-owned tools executed locally with no provider dependency:
 
-| Tool | Description |
+| Category | Tools |
 |------|-------------|
-| `web_search` | Brave Search with DuckDuckGo fallback (configurable via `Agents:Tools:WebSearch`) |
-| `file_search` | Local file search bounded to `Files:RootPath` with path-confinement |
-| `calculate` | Arithmetic expression evaluator |
-| `count` | Count elements in a JSON array |
-| `sum` | Sum numeric values in a JSON array |
-| `average` | Average numeric values in a JSON array |
-| `min_max` | Min/max of numeric values in a JSON array |
-| `group_by` | Group JSON objects by a key and compute aggregates |
+| Search/utility | `web_search`, `file_search`, `calculate`, `count`, `sum`, `average`, `min_max`, `group_by` |
+| Filesystem | `file_read`, `file_write`, `file_edit`, `file_stat`, `file_copy`, `file_move`, `file_delete`, `file_touch`, `file_chmod`, `directory_list`, `directory_create`, `extract_text` |
+| Internet | `web_fetch`, `http_request` |
+| Data | `database_query`, `json_transform`, `csv_xlsx_read_write` |
+| Browser | `browser_run_task`, `browser_get_run`, `browser_get_artifact`, `browser_cancel_run` |
 
 All built-in tools use per-request DI scopes (Appendix C pattern) to preserve identity
 partitioning at invocation time.
@@ -105,9 +102,11 @@ operations:
 
 ## Safety Boundaries
 
-- **Filesystem**: `file_search` is bounded to `Files:RootPath` via `FileSystemSupport.ResolveWithinRoot`
+- **Filesystem**: file-system tools are bounded to `Files:RootPath` via `FileSystemSupport.ResolveWithinRoot`
 - **HTTP egress**: `EgressValidator` blocks loopback, private, and link-local hosts; enforces
   allowlist intersection; re-validates every redirect hop
+- **Browser sidecar**: browser tools route through `IWebwrightClient` with bounded payloads and
+  explicit artifact-size limits (`Agents:Tools:Webwright:MaxArtifactBytes`)
 - **Governance**: `ToolGovernancePolicy` filters tools by `AllowedToolNames` (name allowlist,
   takes precedence) or `AllowedCategories` (category allowlist)
 - **Master switch**: `Agents:Tools:Enabled=false` disables the entire tool runtime

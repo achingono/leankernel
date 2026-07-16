@@ -36,6 +36,34 @@ falls back to DuckDuckGo otherwise. Override the provider or key env var:
 }
 ```
 
+## Browser Sidecar
+
+Browser tools (`browser_run_task`, `browser_get_run`, `browser_get_artifact`,
+`browser_cancel_run`) are enabled via `Agents:Tools:Webwright:Enabled=true` and require a
+reachable Webwright sidecar.
+
+```json
+{
+  "Agents": {
+    "Tools": {
+      "Webwright": {
+        "Enabled": true,
+        "BaseUrl": "http://webwright:8000",
+        "ApiToken": "",
+        "RequestTimeoutSeconds": 15,
+        "MaxArtifactBytes": 2000000,
+        "DefaultModel": "tool"
+      }
+    }
+  }
+}
+```
+
+## Internet Tool Limits
+
+`web_fetch` and `http_request` use `Agents:Tools:Internet:MaxRedirects` to bound redirect
+chasing and re-validate each hop against egress controls.
+
 ## Governance Allowlists
 
 Restrict which tools the agent can see by name or category:
@@ -96,3 +124,4 @@ error.
 | Dynamic tool not loaded | Parse failure or invalid `SKILL.md` | Check startup warnings for the specific file |
 | `web_search` returns error | Brave API key missing/invalid | Set `BRAVE_API_KEY` env var or verify key |
 | Tool execution returns "Access denied" | File path outside `Files:RootPath` | Ensure target files are within the allowed root |
+| `browser_*` tools fail at runtime | Webwright sidecar unreachable or invalid token | Verify `Agents:Tools:Webwright:*` config and sidecar health |

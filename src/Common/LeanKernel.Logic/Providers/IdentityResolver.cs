@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Diagnostics.CodeAnalysis;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -304,6 +305,7 @@ public sealed class IdentityResolver(
     }
 
     /// <inheritdoc />
+    [SuppressMessage("Critical Code Smell", "S3776", Justification = "Tenant-bound identity link workflow remains explicit for safety checks and partition enforcement.")]
     public async Task<Guid> LinkUsersAsync(Guid tenantId, Guid sourceUserId, Guid targetUserId, CancellationToken ct = default)
     {
         if (tenantId == Guid.Empty || sourceUserId == Guid.Empty || targetUserId == Guid.Empty)
@@ -353,6 +355,7 @@ public sealed class IdentityResolver(
     }
 
     /// <inheritdoc />
+    [SuppressMessage("Critical Code Smell", "S3776", Justification = "Tenant-safe unlink logic is intentionally explicit to preserve invariants around PersonId reassignment.")]
     public async Task UnlinkUserAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
     {
         if (tenantId == Guid.Empty || userId == Guid.Empty)

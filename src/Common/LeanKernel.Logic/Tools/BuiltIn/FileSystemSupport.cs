@@ -1,3 +1,7 @@
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Text;
+
 namespace LeanKernel.Logic.Tools.BuiltIn;
 
 /// <summary>
@@ -5,15 +9,12 @@ namespace LeanKernel.Logic.Tools.BuiltIn;
 /// </summary>
 public static class FileSystemSupport
 {
+    private static readonly char[] PathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
+
     /// <summary>
     /// Resolves a candidate path within the allowed root, returning null when the
     /// resolved path would escape the root boundary.
     /// </summary>
-    /// <param name="rootPath">The allowed root directory (absolute or relative).</param>
-    /// <param name="subPath">The user-supplied sub-path to resolve. Null or empty means the root itself.</param>
-    /// <returns>
-    /// The fully resolved absolute path if it is within the root, or <c>null</c> if it escapes the root.
-    /// </returns>
     public static string? ResolveWithinRoot(string rootPath, string? subPath)
     {
         if (string.IsNullOrWhiteSpace(rootPath))
@@ -30,12 +31,15 @@ public static class FileSystemSupport
         }
         else
         {
-            // Combine and fully resolve to eliminate any .. traversal
             candidate = Path.GetFullPath(Path.Combine(root, subPath));
         }
 
-        // Ensure candidate is rooted at the allowed root
         if (!IsWithinRoot(root, candidate))
+        {
+            return null;
+        }
+
+        if (HasSymlinkSegment(root, candidate))
         {
             return null;
         }
@@ -52,5 +56,160 @@ public static class FileSystemSupport
         var normalizedCandidate = Path.GetFullPath(candidate);
         return normalizedCandidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase)
                || string.Equals(normalizedCandidate, Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Returns true when the path has a text-like extension suitable for direct reading.
+    /// </summary>
+    public static bool IsTextLikeExtension(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return true;
+        }
+
+        return Path.GetExtension(path).ToLowerInvariant() is
+            ".txt" or ".md" or ".json" or ".xml" or ".csv" or ".html" or ".htm" or
+            ".yaml" or ".yml" or ".log" or ".ini" or ".cfg" or ".cs" or ".jsonl" or
+            ".ts" or ".js" or ".py" or ".sh" or ".css" or ".sql" or ".toml" or ".env" or "";
+    }
+
+    /// <summary>
+    /// Returns true when the file is a candidate for OCR extraction.
+    /// </summary>
+    public static bool IsOcrCandidate(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        return Path.GetExtension(path).ToLowerInvariant() is
+            ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".tiff" or ".tif" or ".pdf";
+    }
+
+    /// <summary>
+    /// Returns true when the file is an EPUB candidate.
+    /// </summary>
+    public static bool IsEpubCandidate(string? path)
+    {
+        return !string.IsNullOrWhiteSpace(path)
+            && string.Equals(Path.GetExtension(path), ".epub", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Returns true when the file is a DOCX candidate.
+    /// </summary>
+    public static bool IsDocxCandidate(string? path)
+    {
+        return !string.IsNullOrWhiteSpace(path)
+            && string.Equals(Path.GetExtension(path), ".docx", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Returns true when the file is a PPTX candidate.
+    /// </summary>
+    public static bool IsPptxCandidate(string? path)
+    {
+        return !string.IsNullOrWhiteSpace(path)
+            && string.Equals(Path.GetExtension(path), ".pptx", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Creates a scratch file path in the configured scratch directory.
+    /// </summary>
+    public static string EnsureScratchPath(string scratchRoot, string extension)
+    {
+        var root = Path.GetFullPath(scratchRoot);
+        Directory.CreateDirectory(root);
+        return Path.Combine(root, $"{Guid.NewGuid():N}{extension}");
+    }
+
+    /// <summary>
+    /// Runs a Python script with arguments and returns stdout.
+    /// </summary>
+    public static async Task<string> RunPythonAsync(
+        string pythonExecutable,
+        string script,
+        IReadOnlyCollection<string> arguments,
+        CancellationToken ct)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = pythonExecutable,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        psi.ArgumentList.Add("-");
+        foreach (var argument in arguments)
+        {
+            psi.ArgumentList.Add(argument);
+        }
+
+        var stdout = new StringBuilder();
+        var stderr = new StringBuilder();
+
+        using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        if (!process.Start())
+        {
+            throw new InvalidOperationException("Unable to start Python process.");
+        }
+
+        await process.StandardInput.WriteAsync(script);
+        await process.StandardInput.FlushAsync();
+        process.StandardInput.Close();
+
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync(ct);
+
+        stdout.Append(await outputTask);
+        stderr.Append(await errorTask);
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(stderr.ToString())
+                ? "Python extraction process failed."
+                : stderr.ToString().Trim());
+        }
+
+        return stdout.ToString();
+    }
+
+    private static bool HasSymlinkSegment(string root, string candidate)
+    {
+        var current = Path.GetFullPath(root);
+        var relative = Path.GetRelativePath(current, candidate);
+        if (relative == ".")
+        {
+            return IsReparsePoint(current);
+        }
+
+        foreach (var segment in relative.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            if ((Directory.Exists(current) || File.Exists(current)) && IsReparsePoint(current))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsReparsePoint(string path)
+    {
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+        }
+        catch
+        {
+            return true;
+        }
     }
 }

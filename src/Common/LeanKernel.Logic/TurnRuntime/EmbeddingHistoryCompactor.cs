@@ -16,8 +16,6 @@ public sealed partial class EmbeddingHistoryCompactor(
     IOptions<TurnPipelineSettings> settings,
     ILogger<EmbeddingHistoryCompactor> logger) : IHistoryCompactor
 {
-    private const int EmbeddingBatchSize = 64;
-
     private readonly TurnPipelineSettings _settings = settings.Value;
 
     /// <inheritdoc />

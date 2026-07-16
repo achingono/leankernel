@@ -2,6 +2,7 @@ using FluentAssertions;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Logic.Tools.BuiltIn.Browser;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -111,5 +112,32 @@ public class ServiceCollectionExtensionsTests
         // Just verify it resolves without throwing (model selection logic exercised via factory)
         var chatClient = sp.GetRequiredService<Microsoft.Extensions.AI.IChatClient>();
         chatClient.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddToolRegistry_RegistersWebwrightClientAndConfiguredHttpClient()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddOptions();
+        services.Configure<AgentSettings>(options =>
+        {
+            options.Tools.Webwright.BaseUrl = "https://browser.example";
+            options.Tools.Webwright.RequestTimeoutSeconds = 42;
+            options.Tools.Webwright.ApiToken = "token-value";
+        });
+
+        services.AddToolRegistry();
+
+        using var sp = services.BuildServiceProvider();
+        sp.GetRequiredService<IWebwrightClient>().Should().BeOfType<WebwrightClient>();
+
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+        var client = httpClientFactory.CreateClient(WebwrightClient.HttpClientName);
+        client.BaseAddress.Should().Be(new Uri("https://browser.example/"));
+        client.Timeout.Should().Be(TimeSpan.FromSeconds(42));
+        client.DefaultRequestHeaders.Authorization.Should().NotBeNull();
+        client.DefaultRequestHeaders.Authorization!.Scheme.Should().Be("Bearer");
+        client.DefaultRequestHeaders.Authorization.Parameter.Should().Be("token-value");
     }
 }

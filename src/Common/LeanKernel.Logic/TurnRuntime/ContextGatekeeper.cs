@@ -1,4 +1,5 @@
 using LeanKernel.Logic.Configuration;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -19,6 +20,7 @@ public sealed class ContextGatekeeper(
     public string Name => "ContextGatekeeper";
 
     /// <inheritdoc />
+    [SuppressMessage("Critical Code Smell", "S3776", Justification = "Gatekeeping policy is structured in explicit budget stages for traceability.")]
     public Task ExecuteAsync(TurnContext context, CancellationToken cancellationToken = default)
     {
         context.RemainingBudget = _settings.MaxContextTokens;

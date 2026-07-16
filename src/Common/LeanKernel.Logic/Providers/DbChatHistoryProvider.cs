@@ -91,8 +91,8 @@ public class DbChatHistoryProvider(
             cancellationToken);
 
         // Collect candidate turns and assign idempotency keys before checking for duplicates.
-        var requestTurns = BuildTurnEntities(scope, context.RequestMessages, sessionGuid, isRequest: true);
-        var responseTurns = BuildTurnEntities(scope, context.ResponseMessages, sessionGuid, isRequest: false);
+        var requestTurns = BuildTurnEntities(context.RequestMessages, sessionGuid, isRequest: true);
+        var responseTurns = BuildTurnEntities(context.ResponseMessages, sessionGuid, isRequest: false);
         var allCandidateTurns = requestTurns.Concat(responseTurns).ToList();
 
         if (allCandidateTurns.Count == 0)
@@ -186,7 +186,6 @@ public class DbChatHistoryProvider(
     /// Builds turn entities from chat messages, filtering by persistence rules and computing idempotency keys.
     /// </summary>
     private static List<TurnEntity> BuildTurnEntities(
-        EntityContext dbContext,
         IEnumerable<ChatMessage>? messages,
         Guid sessionGuid,
         bool isRequest)

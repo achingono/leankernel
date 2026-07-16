@@ -42,6 +42,20 @@ These are used by the logic-layer memory pipeline.
 | `Agents:Tools:DynamicHttp:AllowHosts` | Global egress ceiling layered over per-skill `egress.allowHosts` | `[]` |
 | `Agents:Tools:BuiltIns:Calculation:Enabled` | Enables deterministic local calculation/aggregation helpers | `true` |
 | `Agents:Tools:BuiltIns:Calculation:MaxInputItems` | Upper bound for aggregate/group/count inputs | `1000` |
+| `Agents:Tools:FileSystem:Enabled` | Enables filesystem tool family (`file_*`, `directory_*`, `extract_text`) | `true` |
+| `Agents:Tools:Internet:Enabled` | Enables internet tool family (`web_fetch`, `http_request`) | `true` |
+| `Agents:Tools:Internet:MaxRedirects` | Redirect hop ceiling for internet tools | `3` |
+| `Agents:Tools:DatabaseQuery:Enabled` | Enables database query/data transform tools | `false` |
+| `Agents:Tools:DatabaseQuery:MaxRows` | Maximum rows returned by `database_query` | `200` |
+| `Agents:Tools:DatabaseQuery:DefaultTimeoutSeconds` | Max DB timeout ceiling for `database_query` | `30` |
+| `Agents:Tools:DatabaseQuery:Connections` | Named DB connection definitions for `database_query` | `[]` |
+| `Agents:Tools:Webwright:Enabled` | Enables browser tools (`browser_*`) | `false` |
+| `Agents:Tools:Webwright:BaseUrl` | Browser sidecar base URL | `http://webwright:8000` |
+| `Agents:Tools:Webwright:ApiToken` | Bearer token for browser sidecar calls | `""` |
+| `Agents:Tools:Webwright:RequestTimeoutSeconds` | Timeout for browser sidecar requests | `15` |
+| `Agents:Tools:Webwright:MaxArtifactBytes` | Model-facing maximum artifact bytes | `2000000` |
+| `Agents:Tools:Webwright:DefaultModel` | Default model alias sent with browser tasks | `tool` |
+| `Agents:Tools:DocumentIngestion:Enabled` | Enables document ingestion queue/hosted services | `false` |
 
 The current implementation does not use a top-level `LeanKernel` configuration root. New runtime settings should extend the existing top-level sections rather than introducing `LeanKernel:*` duplicates.
 

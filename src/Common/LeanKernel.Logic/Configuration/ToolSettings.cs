@@ -41,6 +41,31 @@ public sealed class ToolSettings
     /// Gets or sets the built-in calculation and aggregation tool configuration.
     /// </summary>
     public BuiltInCalculationSettings BuiltIns { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the database query tool configuration.
+    /// </summary>
+    public DatabaseQuerySettings DatabaseQuery { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the browser automation sidecar configuration.
+    /// </summary>
+    public WebwrightSettings Webwright { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the filesystem tool configuration.
+    /// </summary>
+    public FileSystemToolSettings FileSystem { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the internet tool configuration.
+    /// </summary>
+    public InternetToolSettings Internet { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the document ingestion configuration.
+    /// </summary>
+    public DocumentIngestionToolSettings DocumentIngestion { get; set; } = new();
 }
 
 /// <summary>
@@ -103,4 +128,191 @@ public sealed class CalculationSettings
     /// Gets or sets the upper bound for aggregate/group/count inputs.
     /// </summary>
     public int MaxInputItems { get; set; } = 1000;
+}
+
+/// <summary>
+/// Database query tool configuration nested under <c>Agents:Tools:DatabaseQuery</c>.
+/// </summary>
+public sealed class DatabaseQuerySettings
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether the database query tool is enabled.
+    /// </summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum number of rows to return in a query.
+    /// </summary>
+    public int MaxRows { get; set; } = 200;
+
+    /// <summary>
+    /// Gets or sets the default timeout in seconds for a database query.
+    /// </summary>
+    public int DefaultTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the list of database query connections.
+    /// </summary>
+    public List<DatabaseQueryConnectionSettings> Connections { get; set; } = [];
+}
+
+/// <summary>
+/// Configuration for a single database query connection.
+/// </summary>
+public sealed class DatabaseQueryConnectionSettings
+{
+    /// <summary>
+    /// Gets or sets the name of the connection.
+    /// </summary>
+    public required string Name { get; set; }
+
+    /// <summary>
+    /// Gets or sets the database provider name: "postgres" or "sqlite".
+    /// </summary>
+    public required string Provider { get; set; }
+
+    /// <summary>
+    /// Gets or sets the connection string.
+    /// </summary>
+    public required string ConnectionString { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the connection is read-only.
+    /// </summary>
+    public bool ReadOnly { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the list of allowed schemas for this connection.
+    /// </summary>
+    public List<string> AllowedSchemas { get; set; } = [];
+}
+
+/// <summary>
+/// Browser automation sidecar configuration nested under <c>Agents:Tools:Webwright</c>.
+/// </summary>
+public sealed class WebwrightSettings
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether browser tools are enabled.
+    /// </summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the base URL of the browser automation sidecar.
+    /// </summary>
+    public string BaseUrl { get; set; } = "http://webwright:8000";
+
+    /// <summary>
+    /// Gets or sets the API token for the browser automation sidecar.
+    /// </summary>
+    public string ApiToken { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the request timeout in seconds.
+    /// </summary>
+    public int RequestTimeoutSeconds { get; set; } = 15;
+
+    /// <summary>
+    /// Gets or sets the maximum artifact size in bytes.
+    /// </summary>
+    public int MaxArtifactBytes { get; set; } = 2_000_000;
+
+    /// <summary>
+    /// Gets or sets the maximum output characters.
+    /// </summary>
+    public int MaxOutputChars { get; set; } = 12_000;
+
+    /// <summary>
+    /// Gets or sets the default LiteLLM model alias used by browser tasks.
+    /// </summary>
+    public string DefaultModel { get; set; } = "tool";
+
+    /// <summary>
+    /// Gets or sets the health probe configuration.
+    /// </summary>
+    public WebwrightHealthProbeSettings HealthProbe { get; set; } = new();
+}
+
+/// <summary>
+/// Browser automation health probe settings.
+/// </summary>
+public sealed class WebwrightHealthProbeSettings
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether the health probe is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+}
+
+/// <summary>
+/// Filesystem tool configuration nested under <c>Agents:Tools:FileSystem</c>.
+/// </summary>
+public sealed class FileSystemToolSettings
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether filesystem tools are enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+}
+
+/// <summary>
+/// Internet tool configuration nested under <c>Agents:Tools:Internet</c>.
+/// </summary>
+public sealed class InternetToolSettings
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether internet tools (web_fetch, http_request) are enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the maximum redirect hops for web_fetch and http_request.
+    /// </summary>
+    public int MaxRedirects { get; set; } = 3;
+}
+
+/// <summary>
+/// Document ingestion tool configuration nested under <c>Agents:Tools:DocumentIngestion</c>.
+/// </summary>
+public sealed class DocumentIngestionToolSettings
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether document ingestion is enabled.
+    /// </summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum number of concurrent ingestion jobs.
+    /// </summary>
+    public int MaxConcurrentJobs { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the ingestion queue capacity.
+    /// </summary>
+    public int QueueCapacity { get; set; } = 100;
+
+    /// <summary>
+    /// Gets or sets the enqueue timeout in seconds.
+    /// </summary>
+    public int EnqueueTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the folder watch settle delay in seconds.
+    /// </summary>
+    public int WatchSettleDelaySeconds { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the maximum retry count for folder watch operations.
+    /// </summary>
+    public int WatchMaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the base delay in seconds for retry backoff.
+    /// </summary>
+    public int WatchRetryBaseDelaySeconds { get; set; } = 1;
+
+    /// <summary>
+    /// Gets or sets the maximum delay in seconds for retry backoff.
+    /// </summary>
+    public int WatchRetryMaxDelaySeconds { get; set; } = 60;
 }
