@@ -14,4 +14,6 @@ public sealed class SignalSettings
     public int Port { get; set; } = 8080;
     public int ReceiveTimeoutSeconds { get; set; } = 20;
     public int ReconnectDelaySeconds { get; set; } = 1;
+    public int MaxImageAttachmentsPerMessage { get; set; } = 3;
+    public int MaxImageAttachmentBytes { get; set; } = 5 * 1024 * 1024;
 }

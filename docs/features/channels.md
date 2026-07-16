@@ -38,6 +38,7 @@ The gateway now supports channel-first identity and transport integration throug
 - Missing token lookup is logged and the inbound message is fail-closed.
 - Signal sender extraction requires `envelope.sourceNumber` (phone number); messages without it are rejected.
 - Signal message extraction reads `envelope.dataMessage.message` and supports `envelope.syncMessage.sentMessage.message` for sync events.
+- Signal image attachments are fetched from the Signal sidecar (`/v1/attachments/{id}`) and forwarded as `input_image` data URLs to the Gateway `responses` endpoint for multimodal model understanding.
 
 ## Teams ingress hardening
 

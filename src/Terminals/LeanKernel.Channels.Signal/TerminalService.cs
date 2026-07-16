@@ -34,13 +34,18 @@ public sealed class TerminalService(
             }
 
             var attachmentHints = AttachmentParser.ParseAttachmentHints(inbound.Text);
-            var output = await gatewayClient.RunTurnAsync(inbound.Text, inbound.BearerToken, stoppingToken);
+            var input = AttachmentParser.BuildGatewayInput(inbound.Text, inbound.Attachments, attachmentHints);
+            var output = await gatewayClient.RunTurnAsync(input, inbound.BearerToken, stoppingToken);
 
-            if (attachmentHints.Count > 0)
+            var attachmentCount = inbound.Attachments.Count > 0
+                ? inbound.Attachments.Count
+                : attachmentHints.Count;
+
+            if (attachmentCount > 0)
             {
                 output = output with
                 {
-                    Text = $"{output.Text}\n\n(attachments={attachmentHints.Count})"
+                    Text = $"{output.Text}\n\n(attachments={attachmentCount})"
                 };
             }
 
@@ -51,7 +56,7 @@ public sealed class TerminalService(
 
 public sealed class GatewayChannelClient(HttpClient httpClient, IOptions<GatewaySettings> settings)
 {
-    public async Task<GatewayTurnResult> RunTurnAsync(string input, string bearerToken, CancellationToken ct)
+    public async Task<GatewayTurnResult> RunTurnAsync(object input, string bearerToken, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
@@ -532,7 +537,7 @@ public sealed class SocketTransportClient(
 
     private async Task EnqueueInboundIfValidAsync(JsonElement item, string account, CancellationToken ct)
     {
-        if (!TryParseSignalMessage(item, out var sender, out var text, logger))
+        if (!TryParseSignalMessage(item, out var sender, out var text, out var attachments, logger))
             return;
 
         var token = await credentials.ResolveBearerTokenAsync(sender, ct);
@@ -542,7 +547,8 @@ public sealed class SocketTransportClient(
             return;
         }
 
-        _pending.Enqueue(new InboundMessage(account, sender, text, token));
+        var hydratedAttachments = await EnrichAttachmentsAsync(attachments, ct);
+        _pending.Enqueue(new InboundMessage(account, sender, text, token, hydratedAttachments));
     }
 
     private async Task EnsureAccountsLoadedAsync(CancellationToken ct)
@@ -628,10 +634,16 @@ public sealed class SocketTransportClient(
         !string.IsNullOrWhiteSpace(value)
         && Regex.IsMatch(value, "^\\+?[0-9]{7,20}$");
 
-    private static bool TryParseSignalMessage(JsonElement item, out string sender, out string text, ILogger logger)
+    private static bool TryParseSignalMessage(
+        JsonElement item,
+        out string sender,
+        out string text,
+        out IReadOnlyList<InboundAttachment> attachments,
+        ILogger logger)
     {
         sender = string.Empty;
         text = string.Empty;
+        attachments = [];
 
         if (!item.TryGetProperty("envelope", out var envelope))
         {
@@ -668,10 +680,162 @@ public sealed class SocketTransportClient(
             ? messageElement.GetString() ?? string.Empty
             : string.Empty;
 
-        if (string.IsNullOrWhiteSpace(text))
+        attachments = ParseInboundAttachments(dataMessage);
+
+        if (string.IsNullOrWhiteSpace(text) && attachments.Count > 0)
+            text = "[non-text Signal message with attachment metadata]";
+
+        if (string.IsNullOrWhiteSpace(text) && attachments.Count == 0)
             logger.LogDebug("Signal message from {Sender} rejected: message text is empty.", sender);
 
-        return !string.IsNullOrWhiteSpace(text);
+        return !string.IsNullOrWhiteSpace(text) || attachments.Count > 0;
+    }
+
+    private static IReadOnlyList<InboundAttachment> ParseInboundAttachments(JsonElement dataMessage)
+    {
+        if (!dataMessage.TryGetProperty("attachments", out var attachmentsElement)
+            || attachmentsElement.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var attachments = new List<InboundAttachment>();
+
+        foreach (var attachment in attachmentsElement.EnumerateArray())
+        {
+            if (attachment.ValueKind != JsonValueKind.Object)
+                continue;
+
+            var attachmentId = TryReadAttachmentId(attachment);
+
+            var contentType = attachment.TryGetProperty("contentType", out var contentTypeElement)
+                ? contentTypeElement.GetString() ?? string.Empty
+                : string.Empty;
+            var fileName = attachment.TryGetProperty("filename", out var filenameElement)
+                ? filenameElement.GetString() ?? string.Empty
+                : string.Empty;
+
+            attachments.Add(new InboundAttachment(attachmentId, contentType, fileName, string.Empty));
+        }
+
+        return attachments;
+    }
+
+    private static string TryReadAttachmentId(JsonElement attachment)
+    {
+        if (attachment.TryGetProperty("id", out var idElement))
+            return ReadAttachmentIdValue(idElement);
+
+        if (attachment.TryGetProperty("attachmentId", out var attachmentIdElement))
+            return ReadAttachmentIdValue(attachmentIdElement);
+
+        return string.Empty;
+    }
+
+    private static string ReadAttachmentIdValue(JsonElement value) =>
+        value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString() ?? string.Empty,
+            JsonValueKind.Number => value.GetRawText(),
+            _ => string.Empty
+        };
+
+    private async Task<IReadOnlyList<InboundAttachment>> EnrichAttachmentsAsync(
+        IReadOnlyList<InboundAttachment> attachments,
+        CancellationToken ct)
+    {
+        if (attachments.Count == 0)
+            return attachments;
+
+        var maxImagesPerMessage = Math.Max(0, settings.Value.MaxImageAttachmentsPerMessage);
+        var maxImageAttachmentBytes = settings.Value.MaxImageAttachmentBytes;
+
+        if (maxImagesPerMessage == 0 || maxImageAttachmentBytes <= 0)
+            return attachments;
+
+        var enriched = new List<InboundAttachment>(attachments.Count);
+        var forwardedCount = 0;
+
+        foreach (var attachment in attachments)
+        {
+            if (!attachment.IsImage
+                || string.IsNullOrWhiteSpace(attachment.AttachmentId)
+                || forwardedCount >= maxImagesPerMessage)
+            {
+                enriched.Add(attachment);
+                continue;
+            }
+
+            var imageDataUrl = await TryDownloadImageDataUrlAsync(attachment, maxImageAttachmentBytes, ct);
+            if (string.IsNullOrWhiteSpace(imageDataUrl))
+            {
+                enriched.Add(attachment);
+                continue;
+            }
+
+            enriched.Add(attachment with { ImageDataUrl = imageDataUrl });
+            forwardedCount++;
+        }
+
+        return enriched;
+    }
+
+    private async Task<string> TryDownloadImageDataUrlAsync(InboundAttachment attachment, int maxAttachmentBytes, CancellationToken ct)
+    {
+        try
+        {
+            var httpClient = httpClientFactory.CreateClient("signal-api");
+
+            using var response = await httpClient.GetAsync($"/v1/attachments/{Uri.EscapeDataString(attachment.AttachmentId)}", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogDebug(
+                    "Signal attachment download failed for id {AttachmentId} with status {StatusCode}.",
+                    attachment.AttachmentId,
+                    response.StatusCode);
+                return string.Empty;
+            }
+
+            var contentLength = response.Content.Headers.ContentLength;
+            if (contentLength.HasValue && contentLength.Value > maxAttachmentBytes)
+            {
+                logger.LogInformation(
+                    "Skipping Signal attachment {AttachmentId}: size {SizeBytes} exceeds limit {LimitBytes}.",
+                    attachment.AttachmentId,
+                    contentLength.Value,
+                    maxAttachmentBytes);
+                return string.Empty;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+            if (bytes.Length == 0)
+                return string.Empty;
+
+            if (bytes.Length > maxAttachmentBytes)
+            {
+                logger.LogInformation(
+                    "Skipping Signal attachment {AttachmentId}: downloaded size {SizeBytes} exceeds limit {LimitBytes}.",
+                    attachment.AttachmentId,
+                    bytes.Length,
+                    maxAttachmentBytes);
+                return string.Empty;
+            }
+
+            var mediaType = !string.IsNullOrWhiteSpace(attachment.ContentType)
+                ? attachment.ContentType
+                : response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+
+            if (!mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            var base64 = Convert.ToBase64String(bytes);
+            return $"data:{mediaType};base64,{base64}";
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogDebug(ex, "Signal attachment download failed for id {AttachmentId} due to HTTP error.", attachment.AttachmentId);
+            return string.Empty;
+        }
     }
 }
 
@@ -718,4 +882,14 @@ public sealed class DatabaseChannelCredentialProvider(
     }
 }
 
-public sealed record InboundMessage(string Account, string Sender, string Text, string BearerToken);
+public sealed record InboundMessage(
+    string Account,
+    string Sender,
+    string Text,
+    string BearerToken,
+    IReadOnlyList<InboundAttachment> Attachments);
+
+public sealed record InboundAttachment(string AttachmentId, string ContentType, string FileName, string ImageDataUrl)
+{
+    public bool IsImage => ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+}
