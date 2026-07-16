@@ -6,6 +6,7 @@ The gateway now supports channel-first identity and transport integration throug
 
 - Signal and Teams adapters run as out-of-process clients under `src/Terminals/LeanKernel.Channels.Signal` and `src/Terminals/LeanKernel.Channels.Teams`.
 - Terminals forward inbound messages to the Gateway OpenAI-compatible endpoint and return the response to the native channel transport.
+- Signal terminal sends typing-indicator keep-alive events while waiting on gateway turn execution and sends stop-typing before delivering the final reply.
 - Inbound messages without provisioned credentials are rejected fail-closed before they are sent to the Gateway.
 - Terminal code uses transport-neutral class names (`TerminalService`, `GatewayClient`, `Settings`) and channel-specific project boundaries rather than duplicated `Signal*`/`Teams*` type prefixes.
 

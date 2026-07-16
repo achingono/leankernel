@@ -211,6 +211,27 @@ Remote channel answer
         memory.Saved[0].Content.Should().Contain("# Learned Fact");
     }
 
+    [Fact]
+    public async Task StoreContext_DoesNotThrow_WhenFallbackSaveFails()
+    {
+        var memory = new InMemoryMemoryClient
+        {
+            ThrowOnSave = true
+        };
+        var (provider, session) = CreateSut(memory, extractionResponse: null, extractionThrows: true);
+
+        var invoked = new AIContextProvider.InvokedContext(
+            new TestAIAgent(),
+            session,
+            [new ChatMessage(ChatRole.User, "u")],
+            [new ChatMessage(ChatRole.Assistant, "a")]);
+
+        var act = async () => await provider.StoreForTestAsync(invoked);
+
+        await act.Should().NotThrowAsync();
+        memory.Saved.Should().BeEmpty();
+    }
+
     /// <summary>
     /// Creates a provider under test with configurable extraction behavior.
     /// </summary>
@@ -311,6 +332,7 @@ Remote channel answer
     {
         public IReadOnlyList<MemoryItem> SearchResults { get; init; } = [];
         public List<(string Key, string Content)> Saved { get; } = [];
+        public bool ThrowOnSave { get; init; }
 
         /// <inheritdoc />
         public Task<IReadOnlyList<MemoryItem>> SearchMemoriesAsync(MemoryScope scope, string query, int maxResults = 10, CancellationToken ct = default)
@@ -321,6 +343,11 @@ Remote channel answer
         /// <inheritdoc />
         public Task SaveMemoryAsync(MemoryScope scope, string key, string content, CancellationToken ct = default)
         {
+            if (ThrowOnSave)
+            {
+                throw new InvalidOperationException("save failed");
+            }
+
             Saved.Add((key, content));
             return Task.CompletedTask;
         }

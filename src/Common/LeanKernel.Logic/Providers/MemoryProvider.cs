@@ -163,7 +163,20 @@ public class MemoryProvider(
             var rawContent = !string.IsNullOrWhiteSpace(assistantText) ? assistantText : userText ?? string.Empty;
             var fallbackFact = renderer.RenderSeedPage(rawContent, sessionId, turnId, recordedAt);
             var fallbackKey = $"facts/what/fact-fallback/{Guid.NewGuid():N}";
-            await memoryClient.SaveMemoryAsync(scope, fallbackKey, fallbackFact, cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                await memoryClient.SaveMemoryAsync(scope, fallbackKey, fallbackFact, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception fallbackEx)
+            {
+                logger.LogWarning(
+                    fallbackEx,
+                    "Fallback memory save failed for scope (tenant={TenantId}, person={PersonId}, channel={ChannelId}); continuing turn without persistence.",
+                    scope.TenantId,
+                    scope.PersonId,
+                    scope.ChannelId);
+            }
         }
     }
 

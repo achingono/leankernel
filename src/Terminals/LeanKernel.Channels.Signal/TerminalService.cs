@@ -14,7 +14,8 @@ namespace LeanKernel.Channels.Signal;
 public sealed class TerminalService(
     ILogger<TerminalService> logger,
     ITransportClient transport,
-    GatewayChannelClient gatewayClient) : BackgroundService
+    GatewayChannelClient gatewayClient,
+    IOptions<SignalSettings> signalSettings) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -33,23 +34,42 @@ public sealed class TerminalService(
                 continue;
             }
 
-            var attachmentHints = AttachmentParser.ParseAttachmentHints(inbound.Text);
-            var input = AttachmentParser.BuildGatewayInput(inbound.Text, inbound.Attachments, attachmentHints);
-            var output = await gatewayClient.RunTurnAsync(input, inbound.BearerToken, stoppingToken);
-
-            var attachmentCount = inbound.Attachments.Count > 0
-                ? inbound.Attachments.Count
-                : attachmentHints.Count;
-
-            if (attachmentCount > 0)
+            try
             {
-                output = output with
-                {
-                    Text = $"{output.Text}\n\n(attachments={attachmentCount})"
-                };
-            }
+                var attachmentHints = AttachmentParser.ParseAttachmentHints(inbound.Text);
+                var input = AttachmentParser.BuildGatewayInput(inbound.Text, inbound.Attachments, attachmentHints);
+                await using var typingKeepAlive = TypingIndicatorKeepAlive.Start(
+                    transport,
+                    inbound.Account,
+                    inbound.Sender,
+                    signalSettings.Value,
+                    logger,
+                    stoppingToken);
 
-            await transport.SendAsync(inbound.Account, inbound.Sender, output.Text, output.TextStyles, stoppingToken);
+                var output = await gatewayClient.RunTurnAsync(input, inbound.BearerToken, stoppingToken);
+
+                var attachmentCount = inbound.Attachments.Count > 0
+                    ? inbound.Attachments.Count
+                    : attachmentHints.Count;
+
+                if (attachmentCount > 0)
+                {
+                    output = output with
+                    {
+                        Text = $"{output.Text}\n\n(attachments={attachmentCount})"
+                    };
+                }
+
+                await transport.SendAsync(inbound.Account, inbound.Sender, output.Text, output.TextStyles, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Signal message processing failed for sender {Sender}; continuing.", inbound.Sender);
+            }
         }
     }
 }
@@ -403,6 +423,120 @@ public interface ITransportClient
 {
     Task<InboundMessage?> ReceiveAsync(CancellationToken ct);
     Task SendAsync(string account, string recipient, string text, IReadOnlyList<SignalTextStyle> textStyles, CancellationToken ct);
+    Task StartTypingAsync(string account, string recipient, CancellationToken ct);
+    Task StopTypingAsync(string account, string recipient, CancellationToken ct);
+}
+
+public sealed class TypingIndicatorKeepAlive : IAsyncDisposable
+{
+    private readonly ITransportClient _transport;
+    private readonly string _account;
+    private readonly string _recipient;
+    private readonly ILogger _logger;
+    private readonly SignalSettings _settings;
+    private readonly PeriodicTimer? _timer;
+    private readonly CancellationTokenSource _loopCts;
+    private readonly Task? _loopTask;
+    private int _stopped;
+
+    private TypingIndicatorKeepAlive(
+        ITransportClient transport,
+        string account,
+        string recipient,
+        SignalSettings settings,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        _transport = transport;
+        _account = account;
+        _recipient = recipient;
+        _logger = logger;
+        _settings = settings;
+        _loopCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+        if (settings.TypingIndicatorEnabled)
+        {
+            var keepAliveSeconds = Math.Max(1, settings.TypingKeepAliveSeconds);
+            _timer = new PeriodicTimer(TimeSpan.FromSeconds(keepAliveSeconds));
+            _loopTask = Task.Run(() => RunLoopAsync(_loopCts.Token));
+        }
+    }
+
+    public static TypingIndicatorKeepAlive Start(
+        ITransportClient transport,
+        string account,
+        string recipient,
+        SignalSettings settings,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        var keepAlive = new TypingIndicatorKeepAlive(transport, account, recipient, settings, logger, ct);
+        _ = keepAlive.TryStartTypingAsync(ct);
+        return keepAlive;
+    }
+
+    public async Task StopAsync()
+    {
+        if (Interlocked.Exchange(ref _stopped, 1) != 0)
+            return;
+
+        _loopCts.Cancel();
+        if (_loopTask is not null)
+        {
+            try
+            {
+                await _loopTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Ignore cancellation during shutdown.
+            }
+        }
+
+        if (_settings.TypingIndicatorEnabled)
+        {
+            using var stopCts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, _settings.TypingStopTimeoutSeconds)));
+            try
+            {
+                await _transport.StopTypingAsync(_account, _recipient, stopCts.Token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Signal typing-indicator stop failed for {Recipient}.", _recipient);
+            }
+        }
+
+        _timer?.Dispose();
+        _loopCts.Dispose();
+    }
+
+    public ValueTask DisposeAsync() => new(StopAsync());
+
+    private async Task RunLoopAsync(CancellationToken ct)
+    {
+        if (_timer is null)
+            return;
+
+        while (await _timer.WaitForNextTickAsync(ct))
+        {
+            await TryStartTypingAsync(ct);
+        }
+    }
+
+    private async Task TryStartTypingAsync(CancellationToken ct)
+    {
+        try
+        {
+            await _transport.StartTypingAsync(_account, _recipient, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Signal typing-indicator refresh failed for {Recipient}.", _recipient);
+        }
+    }
 }
 
 public sealed class SocketTransportClient(
@@ -480,6 +614,12 @@ public sealed class SocketTransportClient(
                 response.StatusCode);
         }
     }
+
+    public Task StartTypingAsync(string account, string recipient, CancellationToken ct) =>
+        SendTypingIndicatorAsync(account, recipient, stop: false, ct);
+
+    public Task StopTypingAsync(string account, string recipient, CancellationToken ct) =>
+        SendTypingIndicatorAsync(account, recipient, stop: true, ct);
 
     private async Task<string?> ReceiveViaWebSocketAsync(string account, CancellationToken ct)
     {
@@ -633,6 +773,44 @@ public sealed class SocketTransportClient(
     private static bool IsAccountName(string? value) =>
         !string.IsNullOrWhiteSpace(value)
         && Regex.IsMatch(value, "^\\+?[0-9]{7,20}$");
+
+    private async Task SendTypingIndicatorAsync(string account, string recipient, bool stop, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(account) || string.IsNullOrWhiteSpace(recipient))
+            return;
+
+        try
+        {
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, settings.Value.TypingRequestTimeoutSeconds)));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+            var httpClient = httpClientFactory.CreateClient("signal-api");
+            using var request = new HttpRequestMessage(
+                stop ? HttpMethod.Delete : HttpMethod.Put,
+                $"/v1/typing-indicator/{Uri.EscapeDataString(account)}")
+            {
+                Content = JsonContent.Create(new { recipient })
+            };
+
+            using var response = await httpClient.SendAsync(request, linkedCts.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogDebug(
+                    "Signal typing indicator returned {StatusCode} for account {Account} recipient {Recipient} (stop={Stop}).",
+                    (int)response.StatusCode,
+                    account,
+                    recipient,
+                    stop);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogDebug(ex,
+                "Signal typing indicator request failed for account {Account} recipient {Recipient} (stop={Stop}).",
+                account,
+                recipient,
+                stop);
+        }
+    }
 
     private static bool TryParseSignalMessage(
         JsonElement item,

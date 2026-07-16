@@ -16,4 +16,8 @@ public sealed class SignalSettings
     public int ReconnectDelaySeconds { get; set; } = 1;
     public int MaxImageAttachmentsPerMessage { get; set; } = 3;
     public int MaxImageAttachmentBytes { get; set; } = 5 * 1024 * 1024;
+    public bool TypingIndicatorEnabled { get; set; } = true;
+    public int TypingKeepAliveSeconds { get; set; } = 7;
+    public int TypingStopTimeoutSeconds { get; set; } = 2;
+    public int TypingRequestTimeoutSeconds { get; set; } = 3;
 }
