@@ -249,6 +249,27 @@ public class GBrainMemoryClientTests
         results[0].Source.Should().Be("gbrain");
     }
 
+    [Fact]
+    public async Task SearchMemoriesAsync_ArrayFormat_UsesChunkTextFallbackWhenCompiledTruthMissing()
+    {
+        var json = System.Text.Json.JsonDocument.Parse(
+            """[{"slug":"a","chunk_text":"chunk content","score":0.8}]""")
+            .RootElement.Clone();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("search", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json);
+
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var scope = CreateScope();
+
+        var results = await client.SearchMemoriesAsync(scope, "test");
+
+        results.Should().HaveCount(1);
+        results[0].Text.Should().Be("chunk content");
+    }
+
     /// <summary>
     /// C3: Search must use a namespace derived from TenantId/PersonId/ChannelId.
     /// Ensures search and save use the same identity-scoped namespace for correct recall.

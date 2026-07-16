@@ -118,7 +118,24 @@ public sealed class GBrainService : IMemoryService
     private static MemorySearchResult MapSearchItem(JsonElement item)
     {
         var key = item.TryGetProperty("slug", out var s) ? s.GetString() ?? string.Empty : string.Empty;
-        var content = item.TryGetProperty("compiled_truth", out var c) ? c.GetString() ?? string.Empty : string.Empty;
+        var content = string.Empty;
+        if (item.TryGetProperty("compiled_truth", out var compiledTruth) && !string.IsNullOrWhiteSpace(compiledTruth.GetString()))
+        {
+            content = compiledTruth.GetString() ?? string.Empty;
+        }
+        else if (item.TryGetProperty("chunk_text", out var chunkText) && !string.IsNullOrWhiteSpace(chunkText.GetString()))
+        {
+            content = chunkText.GetString() ?? string.Empty;
+        }
+        else if (item.TryGetProperty("content", out var rawContent) && !string.IsNullOrWhiteSpace(rawContent.GetString()))
+        {
+            content = rawContent.GetString() ?? string.Empty;
+        }
+        else if (item.TryGetProperty("title", out var title) && !string.IsNullOrWhiteSpace(title.GetString()))
+        {
+            content = title.GetString() ?? string.Empty;
+        }
+
         var score = item.TryGetProperty("score", out var sc) && sc.TryGetDouble(out var d) ? d : 0.0;
 
         return new MemorySearchResult { Key = key, Content = content, Score = score };

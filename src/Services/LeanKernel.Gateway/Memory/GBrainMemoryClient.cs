@@ -158,7 +158,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
         return new MemoryItem
         {
             Key = item.Key,
-            Text = item.Content,
+            Text = item.GetBestContent(),
             Score = item.Score,
             Source = "gbrain",
             ChannelId = channelId,
@@ -209,6 +209,35 @@ internal sealed class GBrainMemorySearchItem
     [JsonPropertyName("compiled_truth")]
     public string Content { get; set; } = string.Empty;
 
+    [JsonPropertyName("chunk_text")]
+    public string ChunkText { get; set; } = string.Empty;
+
+    [JsonPropertyName("content")]
+    public string RawContent { get; set; } = string.Empty;
+
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = string.Empty;
+
     [JsonPropertyName("score")]
     public double Score { get; set; }
+
+    public string GetBestContent()
+    {
+        if (!string.IsNullOrWhiteSpace(Content))
+        {
+            return Content;
+        }
+
+        if (!string.IsNullOrWhiteSpace(ChunkText))
+        {
+            return ChunkText;
+        }
+
+        if (!string.IsNullOrWhiteSpace(RawContent))
+        {
+            return RawContent;
+        }
+
+        return Title;
+    }
 }

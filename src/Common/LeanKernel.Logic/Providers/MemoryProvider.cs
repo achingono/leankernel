@@ -267,22 +267,31 @@ public class MemoryProvider(
     /// </summary>
     private string BuildCompactSummary(string key, string content)
     {
+        static string Truncate(string text)
+            => text.Length <= 200 ? text : text[..200];
+
         try
         {
             var page = parser.Parse(key, content);
+
+            if (string.IsNullOrWhiteSpace(page.FactText))
+            {
+                return Truncate(content);
+            }
+
             var dims = string.Join(",", new[] { page.PrimaryDimension }.Concat(page.SecondaryDimensions).Distinct(StringComparer.Ordinal));
             var summary = $"- {page.PrimaryDimension}: {page.FactText} [dimensions: {dims}] [links: {page.Links.Count}]";
-            return summary.Length <= 200 ? summary : summary[..200];
+            return Truncate(summary);
         }
         catch (FormatException ex)
         {
             logger.LogDebug(ex, "Memory page parse failed for key {Key}; using raw content fallback.", key);
-            return content.Length <= 200 ? content : content[..200];
+            return Truncate(content);
         }
         catch (InvalidOperationException ex)
         {
             logger.LogDebug(ex, "Memory page render failed for key {Key}; using raw content fallback.", key);
-            return content.Length <= 200 ? content : content[..200];
+            return Truncate(content);
         }
     }
 }

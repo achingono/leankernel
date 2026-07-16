@@ -71,6 +71,37 @@ public class MemoryProviderBehaviorTests
     }
 
     [Fact]
+    public async Task ProvideContext_FallsBackToRawSnippet_WhenParsedFactTextIsEmpty()
+    {
+        var memory = new InMemoryMemoryClient
+        {
+            SearchResults =
+            [
+                new MemoryItem
+                {
+                    Key = "memory/tenant/person/channel/imported/who/karen-leung",
+                    Text = "Karen has shown she won't champion internal advancement; manage distance and focus on exit.",
+                    Score = 0.9
+                }
+            ]
+        };
+
+        var (provider, _) = CreateSut(memory);
+        var invoking = new AIContextProvider.InvokingContext(
+            new TestAIAgent(),
+            new TestAgentSession(),
+            new AIContext
+            {
+                Messages = [new ChatMessage(ChatRole.User, "What do you know about Karen?")]
+            });
+
+        var context = await provider.ProvideForTestAsync(invoking);
+
+        context.Messages.Should().HaveCount(1);
+        context.Messages!.First().Text.Should().Contain("Karen has shown she won't champion internal advancement");
+    }
+
+    [Fact]
     public async Task ProvideContext_OverlayPrefersLocalChannelFact()
     {
         var localChannel = Guid.NewGuid();
