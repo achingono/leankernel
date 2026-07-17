@@ -1,0 +1,119 @@
+name: Build and Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'docker-compose*.yml'
+      - 'scripts/**'
+      - '.github/workflows/build-and-test.yml'
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'docker-compose*.yml'
+      - 'scripts/**'
+      - '.github/workflows/build-and-test.yml'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Ensure Node.js is available as the Playwright CLI requires it
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # This action automatically installs the required browsers and OS system dependencies
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Action Dependencies
+        working-directory: .github/actions/test-reporter
+        run: |
+          npm config set strict-ssl false
+          max_attempts=3
+          attempt=1
+          until timeout 300 npm install; do
+            if [ $attempt -ge $max_attempts ]; then
+              echo "Action dependency install failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            echo "Action dependency install timed out or failed (attempt $attempt/${max_attempts}), retrying in 10s..."
+            attempt=$((attempt + 1))
+            sleep 10
+          done          
+
+      - name: Restore
+        run: dotnet restore src/LeanKernel.sln
+
+      - name: Documentation link check
+        run: python3 scripts/quality/check-doc-links.py
+
+      - name: Build
+        run: dotnet build src/LeanKernel.sln --no-restore -v minimal
+
+      - name: Test
+        run: dotnet test src/LeanKernel.sln --no-build -v minimal --filter 'FullyQualifiedName!~Playwright' --logger "trx;LogFileName=results.trx" --collect:"XPlat Code Coverage"
+
+      - name: Coverage gate
+        run: scripts/quality/test-coverage.sh
+    
+      - name: Check results
+        if: always()
+        id: check-results
+        run: |
+          if find . \( -name "results-*.xml" -o -name "*.trx" \) -type f 2>/dev/null | grep -q .; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        
+      - name: Report Results
+        if: always() && steps.check-results.outputs.exists == 'true'
+        uses: ./.github/actions/test-reporter
+        with:
+          test-results-path: '**/results-*.{xml,trx}'
+          coverage-path: '**/coverage.*.xml'
+          name: Test Results
+          fail-on-error: false
+
+      - name: Upload results
+        if: always() && steps.check-results.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            **/results-*.{xml,trx}
+            **/coverage.*.xml

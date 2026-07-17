@@ -1,0 +1,14 @@
+{
+  "name": "test-reporter",
+  "version": "1.0.0",
+  "description": "Custom test reporter for JUnit XML and TRX files",
+  "main": "report-tests.js",
+  "dependencies": {
+    "glob": "^10.3.10",
+    "node-fetch": "^3.3.2",
+    "xml2js": "^0.6.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
