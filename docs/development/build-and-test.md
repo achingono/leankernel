@@ -25,6 +25,33 @@ Current test projects:
 - `test/LeanKernel.Tests.Integration`
 - `test/LeanKernel.Tests.Playwright`
 
+## Docker Deployment E2E Lifecycle Test
+
+The Playwright test project now includes a docker-targeted lifecycle e2e that validates:
+
+- test user creation in Postgres
+- seeded memory insertion in GBrain
+- request execution through `/v1/responses`
+- seeded memory retrieval in the response
+- post-turn memory persistence in GBrain
+
+This test is opt-in and only runs when explicitly enabled:
+
+```bash
+LEANKERNEL_DOCKER_E2E_ENABLED=true \
+dotnet test test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj --filter "FullyQualifiedName~DockerLifecycleE2ETests"
+```
+
+Optional environment variables:
+
+- `LEANKERNEL_E2E_GATEWAY_URL` (default `http://localhost:8080`)
+- `LEANKERNEL_E2E_GBRAIN_URL` (default `http://localhost:8789`)
+- `LEANKERNEL_E2E_POSTGRES_CONNECTION` (default local docker compose Postgres)
+- `LEANKERNEL_E2E_MODEL` (default `medium`)
+- `LEANKERNEL_E2E_GBRAIN_AUTH_TOKEN` (optional bearer token for GBrain MCP)
+- `LEANKERNEL_E2E_GBRAIN_TOKEN_FILE` (optional token-file path; defaults to `data/gbrain/.engine-token` when present)
+- `LEANKERNEL_E2E_REQUIRE_PERSISTENCE` (optional; set `true` to fail when post-turn persistence marker is not observed)
+
 ## Coverage Gate
 
 ```bash
