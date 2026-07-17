@@ -1,8 +1,8 @@
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Mcp;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Tools;
 using LeanKernel.Logic.Tools.BuiltIn;
-using LeanKernel.Logic.Tools.BuiltIn.Browser;
 using LeanKernel.Logic.Tools.BuiltIn.Data;
 using LeanKernel.Logic.Tools.BuiltIn.FileSystem;
 using LeanKernel.Logic.Tools.BuiltIn.Internet;
@@ -42,6 +42,10 @@ public static class IServiceProviderExtensions
 
         // Memory tools
         await RegisterMemoryToolsAsync(registry, services, scopeFactory, logger, ct)
+            .ConfigureAwait(false);
+
+        // MCP server tools (SDK-based discovery)
+        await RegisterMcpToolsAsync(registry, services, logger, ct)
             .ConfigureAwait(false);
 
         // Dynamic SKILL.md tools
@@ -114,16 +118,36 @@ public static class IServiceProviderExtensions
             logger.LogInformation("Database query tools are disabled (Agents:Tools:DatabaseQuery:Enabled=false).");
         }
 
-        if (settings.Webwright.Enabled)
+        // Webwright removed — replaced by MCP server tools registered via RegisterMcpToolsAsync
+    }
+
+    private static async Task RegisterMcpToolsAsync(
+        IToolRegistry registry,
+        IServiceProvider services,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        var mcpProvider = services.GetService<IMcpToolProvider>();
+        if (mcpProvider is null)
         {
-            TryRegister(registry, BrowserToolDefinitions.CreateRunTaskTool(scopeFactory), logger);
-            TryRegister(registry, BrowserToolDefinitions.CreateGetRunTool(scopeFactory), logger);
-            TryRegister(registry, BrowserToolDefinitions.CreateGetArtifactTool(scopeFactory), logger);
-            TryRegister(registry, BrowserToolDefinitions.CreateCancelRunTool(scopeFactory), logger);
+            logger.LogInformation("MCP tool provider not registered. Skipping MCP tool discovery.");
+            return;
         }
-        else
+
+        IReadOnlyList<ToolDefinition> mcpTools;
+        try
         {
-            logger.LogInformation("Browser tools are disabled (Agents:Tools:Webwright:Enabled=false).");
+            mcpTools = await mcpProvider.DiscoverToolsAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "MCP tool discovery failed. No MCP tools will be registered.");
+            return;
+        }
+
+        foreach (var tool in mcpTools)
+        {
+            TryRegister(registry, tool, logger);
         }
     }
 

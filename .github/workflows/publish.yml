@@ -33,6 +33,10 @@ jobs:
             dockerfile: src/Terminals/LeanKernel.Channels.Teams/Dockerfile
             context: .
             platforms: linux/amd64,linux/arm64
+          - image: webwright
+            dockerfile: config/webwright/Dockerfile
+            context: .
+            platforms: linux/amd64,linux/arm64
 
     steps:
       - name: Checkout code
@@ -148,7 +152,7 @@ jobs:
 
           {
             echo "tags<<EOF"
-            for image in gateway gbrain signal teams; do
+            for image in gateway gbrain signal teams webwright; do
               echo "${registry_repo}/${image}:${version}"
               echo "${registry_repo}/${image}:${minor}"
               echo "${registry_repo}/${image}:${major}"

@@ -3,7 +3,7 @@ using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.Telemetry;
-using LeanKernel.Logic.Tools.BuiltIn.Browser;
+using LeanKernel.Logic.Mcp;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -122,30 +122,33 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddToolRegistry_RegistersWebwrightClientAndConfiguredHttpClient()
+    public void AddToolRegistry_RegistersMcpToolProviderAndMcpHealthProbe()
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddOptions();
         services.Configure<AgentSettings>(options =>
         {
-            options.Tools.Webwright.BaseUrl = "https://browser.example";
-            options.Tools.Webwright.RequestTimeoutSeconds = 42;
-            options.Tools.Webwright.ApiToken = "token-value";
+            options.Tools.McpServers =
+            [
+                new McpServerSettings
+                {
+                    Name = "playwright",
+                    Endpoint = "http://playwright-mcp:3100",
+                    Enabled = true,
+                    TransportMode = "StreamableHttp",
+                    ConnectionTimeoutSeconds = 30,
+                }
+            ];
         });
 
         services.AddToolRegistry();
 
         using var sp = services.BuildServiceProvider();
-        sp.GetRequiredService<IWebwrightClient>().Should().BeOfType<WebwrightClient>();
-
-        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-        var client = httpClientFactory.CreateClient(WebwrightClient.HttpClientName);
-        client.BaseAddress.Should().Be(new Uri("https://browser.example/"));
-        client.Timeout.Should().Be(TimeSpan.FromSeconds(42));
-        client.DefaultRequestHeaders.Authorization.Should().NotBeNull();
-        client.DefaultRequestHeaders.Authorization!.Scheme.Should().Be("Bearer");
-        client.DefaultRequestHeaders.Authorization.Parameter.Should().Be("token-value");
+        sp.GetRequiredService<IMcpToolProvider>().Should().BeOfType<McpToolProvider>();
+        sp.GetServices<LeanKernel.Logic.Tools.IProviderHealthProbe>()
+            .Should()
+            .ContainSingle(probe => probe is McpServersHealthProbe);
     }
 
     [Fact]

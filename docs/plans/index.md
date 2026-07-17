@@ -53,6 +53,14 @@ path, foundation for model routing (04), learning (07), and spend guardrails (08
 | --- | --- | --- | --- |
 | 17 | [Model Telemetry In Chat History](phase-17-model-telemetry-chat-history/index.md) | Persist LiteLLM model/provider/token-usage/cost per assistant turn for budget accounting and supervised tuning | **Ready to implement** |
 
+## Infrastructure And Tooling
+
+Infrastructure improvements that enhance development experience and tool integration.
+
+| Phase | Plan | Focus | Status |
+| --- | --- | --- | --- |
+| 18 | [Phase 18](phase-18-webwright-mcp-integration/index.md) | MCP SDK integration for Webwright-first browser tooling, exposing only Webwright MCP tools in initial rollout | **In progress** |
+
 ## Standalone PRDs
 
 | Plan | Focus |
@@ -60,4 +68,4 @@ path, foundation for model routing (04), learning (07), and spend guardrails (08
 | [Identity-Partitioned Agent Runtime](prd-agent-runtime-persistence.md) | Agent runtime on Microsoft Agent Framework |
 | [Agent Runtime Persistence — Gap Analysis](prd-agent-runtime-persistence-analysis.md) | Gap analysis for the runtime persistence PRD |
 | [Import 5W1H Memory Logic](prd-5w1h-memory-logic.md) | 5W1H memory pipeline into `LeanKernel.Logic` |
-| [Browser Built-in Tool + Playwright Service](browser-built-in-tool-playwright-service-prd.md) | Browser automation tool (superseded/expanded by Phase 05) |
+| [Browser Built-in Tool + Playwright Service](browser-built-in-tool-playwright-service-prd.md) | Browser automation tool (superseded/expanded by Phase 05, now replaced by Phase 18) |

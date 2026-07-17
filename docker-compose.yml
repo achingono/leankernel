@@ -107,6 +107,52 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Playwright (Browser Engine Run-Server) ─────────────────────
+  # Shared Chromium browser pool exposed via WebSocket on port 6000.
+  # Used by both the Webwright sidecar (LLM-driven) and the Playwright
+  # sidecar (direct operations) for browser automation.
+  playwright:
+    image: mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION:-1.60.0}-noble
+    container_name: leankernel-playwright
+    environment:
+      - TZ=${TZ:-America/Toronto}
+      - PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION:-1.60.0}
+    command: ["/bin/sh", "-c", "npx -y playwright@${PLAYWRIGHT_VERSION:-1.60.0} run-server --port 6000 --host 0.0.0.0"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - browserdata:/home/pwuser/outputs
+    shm_size: 1gb
+    restart: unless-stopped
+
+  # ── Webwright (Community MCP Package) ─────────────────────────
+  webwright:
+    build:
+      context: .
+      dockerfile: config/webwright/Dockerfile
+    container_name: leankernel-webwright
+    user: "0:0"
+    environment:
+      - TZ=${TZ:-America/Toronto}
+      - OUTPUT_ROOT=/home/pwuser/outputs
+      - WEBWRIGHT_RUN_TIMEOUT_MS=${WEBWRIGHT_RUN_TIMEOUT_MS:-120000}
+    volumes:
+      - browserdata:/home/pwuser/outputs
+    ports:
+      - "${WEBWRIGHT_PORT:-8000}:8000"
+    depends_on:
+      playwright:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   gateway:
     build:
       context: .
@@ -125,6 +171,12 @@ services:
       - OPENAI__MEMORY__MODELID=${LEANKERNEL_MEMORY_MODEL:-small}
       - OPENAI__FACTEXTRACTION__MODELID=${LEANKERNEL_FACT_EXTRACTION_MODEL:-small}
       - GBRAIN__BASEURL=http://gbrain:8789
+      - AGENTS__TOOLS__MCPSERVERS__0__NAME=webwright
+      - AGENTS__TOOLS__MCPSERVERS__0__ENABLED=${WEBWRIGHT_MCP_ENABLED:-false}
+      - AGENTS__TOOLS__MCPSERVERS__0__ENDPOINT=http://webwright:8000/mcp
+      - AGENTS__TOOLS__MCPSERVERS__0__TRANSPORTMODE=${WEBWRIGHT_MCP_TRANSPORT_MODE:-AutoDetect}
+      - AGENTS__TOOLS__MCPSERVERS__0__CONNECTIONTIMEOUTSECONDS=${WEBWRIGHT_MCP_TIMEOUT_SECONDS:-30}
+      - AGENTS__TOOLS__MCPSERVERS__0__REQUIRED=${WEBWRIGHT_MCP_REQUIRED:-false}
       - TZ=${TZ:-America/Toronto}
     volumes:
       - gbrain-data:/app/data/gbrain:ro
@@ -136,6 +188,8 @@ services:
       litellm:
         condition: service_healthy
       gbrain:
+        condition: service_healthy
+      webwright:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -213,3 +267,4 @@ volumes:
   database-data:
   gbrain-data:
   signal-data:
+  browserdata:

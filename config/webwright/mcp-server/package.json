@@ -1,0 +1,11 @@
+{
+  "name": "leankernel-webwright-mcp-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.18.1",
+    "playwright": "1.60.0",
+    "zod": "3.25.76"
+  }
+}

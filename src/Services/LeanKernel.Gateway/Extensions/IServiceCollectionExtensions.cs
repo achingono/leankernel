@@ -6,7 +6,7 @@ using LeanKernel.Gateway.Providers;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
-using LeanKernel.Logic.Tools.BuiltIn.Browser;
+using LeanKernel.Logic.Mcp;
 using LeanKernel.Logic.Tools;
 using LeanKernel.Logic.TurnRuntime;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -66,30 +66,12 @@ public static class IServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         services.AddSingleton<IToolRegistry, ToolRegistry>();
-        services.AddSingleton<IWebwrightClient, WebwrightClient>();
+        services.AddSingleton<IMcpToolProvider, McpToolProvider>();
+        services.AddSingleton<IProviderHealthProbe, McpServersHealthProbe>();
 
         // Named HTTP clients for tool egress
         services.AddHttpClient("web-search");
         services.AddHttpClient("dynamic-skill");
-        services.AddHttpClient(WebwrightClient.HttpClientName, (sp, client) =>
-        {
-            var settings = sp.GetService<IOptions<AgentSettings>>()?.Value.Tools.Webwright ?? new WebwrightSettings();
-            var baseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl)
-                ? "http://webwright:8000"
-                : settings.BaseUrl.TrimEnd('/');
-
-            client.BaseAddress = new Uri($"{baseUrl}/");
-            client.Timeout = TimeSpan.FromSeconds(Math.Max(1, settings.RequestTimeoutSeconds));
-
-            if (string.IsNullOrWhiteSpace(settings.ApiToken))
-            {
-                client.DefaultRequestHeaders.Authorization = null;
-            }
-            else
-            {
-                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", settings.ApiToken);
-            }
-        });
 
         return services;
     }

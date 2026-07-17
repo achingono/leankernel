@@ -52,6 +52,31 @@ Optional environment variables:
 - `LEANKERNEL_E2E_GBRAIN_TOKEN_FILE` (optional token-file path; defaults to `data/gbrain/.engine-token` when present)
 - `LEANKERNEL_E2E_REQUIRE_PERSISTENCE` (optional; set `true` to fail when post-turn persistence marker is not observed)
 
+## Docker Webwright MCP E2E Test
+
+The Playwright test project includes an opt-in docker-targeted Webwright MCP e2e that validates:
+
+- Webwright MCP session initialization over `/mcp`
+- MCP tool discovery (`tools/list`)
+- browser run lifecycle (`browser_run_task` -> `browser_get_run`)
+- artifact retrieval and PNG payload validation (`browser_get_artifact`)
+
+This test is opt-in and only runs when explicitly enabled:
+
+```bash
+docker compose up -d webwright playwright
+
+LEANKERNEL_DOCKER_E2E_ENABLED=true \
+dotnet test test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj --filter "FullyQualifiedName~DockerWebwrightE2ETests"
+```
+
+Optional environment variables:
+
+- `LEANKERNEL_E2E_WEBWRIGHT_URL` (default `http://localhost:8000`)
+- `LEANKERNEL_E2E_WEBWRIGHT_RUN_TIMEOUT_SECONDS` (default `90`)
+
+Note: the test-level timeout is `LEANKERNEL_E2E_WEBWRIGHT_RUN_TIMEOUT_SECONDS + 120 seconds`.
+
 ## Coverage Gate
 
 ```bash

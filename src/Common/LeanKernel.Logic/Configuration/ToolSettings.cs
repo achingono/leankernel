@@ -48,9 +48,10 @@ public sealed class ToolSettings
     public DatabaseQuerySettings DatabaseQuery { get; set; } = new();
 
     /// <summary>
-    /// Gets or sets the browser automation sidecar configuration.
+    /// Gets or sets the pre-configured MCP server endpoints.
+    /// Tools from enabled servers are discovered at startup and registered in the tool registry.
     /// </summary>
-    public WebwrightSettings Webwright { get; set; } = new();
+    public IReadOnlyList<McpServerSettings> McpServers { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the filesystem tool configuration.
@@ -185,63 +186,6 @@ public sealed class DatabaseQueryConnectionSettings
     /// Gets or sets the list of allowed schemas for this connection.
     /// </summary>
     public List<string> AllowedSchemas { get; set; } = [];
-}
-
-/// <summary>
-/// Browser automation sidecar configuration nested under <c>Agents:Tools:Webwright</c>.
-/// </summary>
-public sealed class WebwrightSettings
-{
-    /// <summary>
-    /// Gets or sets a value indicating whether browser tools are enabled.
-    /// </summary>
-    public bool Enabled { get; set; }
-
-    /// <summary>
-    /// Gets or sets the base URL of the browser automation sidecar.
-    /// </summary>
-    public string BaseUrl { get; set; } = "http://webwright:8000";
-
-    /// <summary>
-    /// Gets or sets the API token for the browser automation sidecar.
-    /// </summary>
-    public string ApiToken { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Gets or sets the request timeout in seconds.
-    /// </summary>
-    public int RequestTimeoutSeconds { get; set; } = 15;
-
-    /// <summary>
-    /// Gets or sets the maximum artifact size in bytes.
-    /// </summary>
-    public int MaxArtifactBytes { get; set; } = 2_000_000;
-
-    /// <summary>
-    /// Gets or sets the maximum output characters.
-    /// </summary>
-    public int MaxOutputChars { get; set; } = 12_000;
-
-    /// <summary>
-    /// Gets or sets the default LiteLLM model alias used by browser tasks.
-    /// </summary>
-    public string DefaultModel { get; set; } = "tool";
-
-    /// <summary>
-    /// Gets or sets the health probe configuration.
-    /// </summary>
-    public WebwrightHealthProbeSettings HealthProbe { get; set; } = new();
-}
-
-/// <summary>
-/// Browser automation health probe settings.
-/// </summary>
-public sealed class WebwrightHealthProbeSettings
-{
-    /// <summary>
-    /// Gets or sets a value indicating whether the health probe is enabled.
-    /// </summary>
-    public bool Enabled { get; set; } = true;
 }
 
 /// <summary>

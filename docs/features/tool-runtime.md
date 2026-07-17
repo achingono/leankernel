@@ -26,10 +26,14 @@ LeanKernel-owned tools executed locally with no provider dependency:
 | Filesystem | `file_read`, `file_write`, `file_edit`, `file_stat`, `file_copy`, `file_move`, `file_delete`, `file_touch`, `file_chmod`, `directory_list`, `directory_create`, `extract_text` |
 | Internet | `web_fetch`, `http_request` |
 | Data | `database_query`, `json_transform`, `csv_xlsx_read_write` |
-| Browser | `browser_run_task`, `browser_get_run`, `browser_get_artifact`, `browser_cancel_run` |
 
 All built-in tools use per-request DI scopes (Appendix C pattern) to preserve identity
 partitioning at invocation time.
+
+### MCP-Discovered Tools
+
+The runtime can discover tools from configured MCP endpoints under `Agents:Tools:McpServers`.
+Phase 18 rollout exposes only Webwright MCP tools to agents.
 
 ### Memory/Knowledge Tools
 
@@ -105,8 +109,8 @@ operations:
 - **Filesystem**: file-system tools are bounded to `Files:RootPath` via `FileSystemSupport.ResolveWithinRoot`
 - **HTTP egress**: `EgressValidator` blocks loopback, private, and link-local hosts; enforces
   allowlist intersection; re-validates every redirect hop
-- **Browser sidecar**: browser tools route through `IWebwrightClient` with bounded payloads and
-  explicit artifact-size limits (`Agents:Tools:Webwright:MaxArtifactBytes`)
+- **MCP servers**: external browser automation tools are discovered from pre-configured
+  `Agents:Tools:McpServers` endpoints; this phase exposes Webwright MCP tools only
 - **Governance**: `ToolGovernancePolicy` filters tools by `AllowedToolNames` (name allowlist,
   takes precedence) or `AllowedCategories` (category allowlist)
 - **Master switch**: `Agents:Tools:Enabled=false` disables the entire tool runtime

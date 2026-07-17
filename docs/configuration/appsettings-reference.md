@@ -50,12 +50,13 @@ These are used by the logic-layer memory pipeline.
 | `Agents:Tools:DatabaseQuery:MaxRows` | Maximum rows returned by `database_query` | `200` |
 | `Agents:Tools:DatabaseQuery:DefaultTimeoutSeconds` | Max DB timeout ceiling for `database_query` | `30` |
 | `Agents:Tools:DatabaseQuery:Connections` | Named DB connection definitions for `database_query` | `[]` |
-| `Agents:Tools:Webwright:Enabled` | Enables browser tools (`browser_*`) | `false` |
-| `Agents:Tools:Webwright:BaseUrl` | Browser sidecar base URL | `http://webwright:8000` |
-| `Agents:Tools:Webwright:ApiToken` | Bearer token for browser sidecar calls | `""` |
-| `Agents:Tools:Webwright:RequestTimeoutSeconds` | Timeout for browser sidecar requests | `15` |
-| `Agents:Tools:Webwright:MaxArtifactBytes` | Model-facing maximum artifact bytes | `2000000` |
-| `Agents:Tools:Webwright:DefaultModel` | Default model alias sent with browser tasks | `tool` |
+| `Agents:Tools:McpServers` | Pre-configured MCP server definitions discovered at startup | `[]` |
+| `Agents:Tools:McpServers[i]:Name` | MCP server name used for categorization and logs | required |
+| `Agents:Tools:McpServers[i]:Endpoint` | MCP HTTP/SSE endpoint URL | required |
+| `Agents:Tools:McpServers[i]:Enabled` | Enables discovery for this MCP server | `true` |
+| `Agents:Tools:McpServers[i]:TransportMode` | MCP transport mode (`AutoDetect`, `StreamableHttp`, `Sse`) | `AutoDetect` |
+| `Agents:Tools:McpServers[i]:ConnectionTimeoutSeconds` | MCP connection timeout for discovery/probes | `30` |
+| `Agents:Tools:McpServers[i]:Required` | Fails startup discovery when true and server is unreachable | `false` |
 | `Agents:Tools:DocumentIngestion:Enabled` | Enables document ingestion queue/hosted services | `false` |
 | `Agents:Telemetry:Enabled` | Enables capture and persistence of model/token/cost telemetry | `true` |
 | `Agents:Telemetry:Currency` | Currency code for reported/estimated cost | `USD` |
