@@ -77,6 +77,23 @@ Optional environment variables:
 
 Note: the test-level timeout is `LEANKERNEL_E2E_WEBWRIGHT_RUN_TIMEOUT_SECONDS + 120 seconds`.
 
+## Docker Gateway Webwright Tool-Call E2E Test
+
+The Playwright test project also includes an opt-in gateway-level e2e that validates the
+model-triggered tool chain end-to-end:
+
+- `/v1/responses` requests include `agent.name = "leankernel"`
+- the gateway discovers Webwright MCP tools at startup
+- the response path successfully invokes Webwright browser tools through the gateway
+- the completion text contains the expected Webwright result marker
+
+This test is opt-in and only runs when explicitly enabled:
+
+```bash
+LEANKERNEL_DOCKER_E2E_ENABLED=true \
+dotnet test test/LeanKernel.Tests.Playwright/LeanKernel.Tests.Playwright.csproj --filter "FullyQualifiedName~RunningDockerDeployment_GatewayWebwrightToolCallsSucceed"
+```
+
 ## Coverage Gate
 
 ```bash

@@ -1,0 +1,5 @@
+model:
+  backend: openai
+  base_url: ${LITELLM_BASE_URL}
+  api_key: ${LITELLM_API_KEY}
+  model: ${WEBWRIGHT_MODEL}

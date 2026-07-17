@@ -59,7 +59,7 @@ Infrastructure improvements that enhance development experience and tool integra
 
 | Phase | Plan | Focus | Status |
 | --- | --- | --- | --- |
-| 18 | [Phase 18](phase-18-webwright-mcp-integration/index.md) | MCP SDK integration for Webwright-first browser tooling, exposing only Webwright MCP tools in initial rollout | **In progress** |
+| 18 | [Phase 18](phase-18-webwright-mcp-integration/index.md) | MCP SDK integration for Webwright-first browser tooling, exposing only Webwright MCP tools in the shipped rollout | **Complete** |
 
 ## Standalone PRDs
 

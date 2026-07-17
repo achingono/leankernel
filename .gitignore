@@ -7,3 +7,4 @@ config/litellm/litellm_config.generated.yaml
 coverage-results*/
 .playwright-mcp/
 **/coverage.*.xml
+__pycache__/

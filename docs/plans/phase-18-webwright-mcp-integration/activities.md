@@ -24,7 +24,7 @@
    - Avoid custom JSON-RPC DTOs/parsers unless a documented SDK gap requires a narrow extension
 
 4. **Integrate Webwright MCP into Agent Tool Chain**
-   - Configure community Webwright MCP package as a pre-configured MCP server endpoint
+   - Configure community Webwright MCP service as a pre-configured MCP server endpoint
    - Add Webwright MCP server/service wiring in local runtime and docker-compose where applicable
    - Test startup-time tool discovery and registration from the pre-configured Webwright MCP endpoint
    - Verify discovered Webwright tools work correctly through tool registry and agent invocation paths
@@ -35,17 +35,17 @@
    - Capture contingency activation steps for a later phase if reassessment triggers are met
 
 6. **Remove Custom Playwright Implementation**
-   - Remove `PlaywrightToolDefinitions.cs`, `IPlaywrightClient.cs`, `PlaywrightClient.cs`, `PlaywrightModels.cs`
-   - Remove `PlaywrightSidecarSettings` from `ToolSettings.cs`
-   - Remove Playwright client DI registration from `IServiceCollectionExtensions.cs`
-   - Remove Playwright tool registration from `IServiceProviderExtensions.cs`
-   - Remove Playwright configuration from `appsettings.json`
-   - Remove `playwright-sidecar` service from `docker-compose.yml`
+    - Remove `PlaywrightToolDefinitions.cs`, `IPlaywrightClient.cs`, `PlaywrightClient.cs`, `PlaywrightModels.cs`
+    - Remove `PlaywrightSidecarSettings` from `ToolSettings.cs`
+    - Remove Playwright client DI registration from `IServiceCollectionExtensions.cs`
+    - Remove Playwright tool registration from `IServiceProviderExtensions.cs`
+    - Remove Playwright configuration from `appsettings.json`
+    - Remove `playwright-sidecar` service from `docker-compose.yml`
 
 7. **Update Browser Tool Definitions**
-   - Update `BrowserToolDefinitions.cs` descriptions to reference MCP-based Webwright tools
-   - Clarify that direct Playwright MCP tools are not exposed in this phase
-   - Ensure Webwright disambiguation is clear
+    - Update browser tool documentation to reference MCP-based Webwright tools
+    - Clarify that direct Playwright MCP tools are not exposed in this phase
+    - Ensure Webwright disambiguation is clear
 
 8. **Add Configuration and DI**
    - Add MCP server configuration under the existing `Agents:Tools` configuration shape in `appsettings.json`
@@ -64,11 +64,11 @@
    - Run code coverage and quality checks
 
 10. **Documentation Updates**
-   - Update `docs/features/browser-tool.md` to reflect MCP-based implementation
-   - Document Webwright-only exposure decision and future reassessment triggers
-   - Update configuration documentation
-   - Update architecture documentation
-   - Update `docs/plans/index.md` with new phase
+    - Update tool runtime and operations docs to reflect MCP-based implementation
+    - Document Webwright-only exposure decision and future reassessment triggers
+    - Update configuration documentation
+    - Update architecture documentation
+    - Update `docs/plans/index.md` with new phase
 
 ## Review Focus
 - MCP client architecture and HTTP/SSE-only transport abstraction

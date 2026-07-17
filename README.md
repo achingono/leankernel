@@ -1,6 +1,6 @@
 # LeanKernel
 
-LeanKernel is the current `.NET 10` LeanKernel rebuild: a small modular monolith centered on Microsoft Agent Framework (MAF), an ASP.NET gateway, EF-backed persistence, and a GBrain-backed memory pipeline.
+LeanKernel is the current `.NET 10` LeanKernel rebuild: a gateway-centered microservice stack built around Microsoft Agent Framework (MAF), an ASP.NET gateway, EF-backed persistence, and companion services for LiteLLM, GBrain, and Webwright MCP tooling.
 
 This repository currently implements the rebuild that lives in this worktree. Older LeanKernel layouts and module maps should be treated as reference material, not as the current workspace structure.
 
@@ -19,7 +19,7 @@ LeanKernel is aimed at teams that want an agent runtime they can actually inspec
 
 - You want a practical starting point for agent-backed product work on .NET.
 - You care about identity partitioning, persistence boundaries, and testable runtime behavior.
-- You want one codebase that covers API hosting, runtime composition, persistence, and memory plumbing without immediately splitting into many services.
+- You want one workspace that covers API hosting, runtime composition, persistence, and memory plumbing while still running as a service-oriented stack.
 - You prefer a rebuild that is explicit about what exists today instead of promising an unimplemented platform surface.
 
 ## Current Workspace
@@ -146,7 +146,8 @@ Contributor and coding-agent guidance lives in [`AGENTS.md`](AGENTS.md).
 
 ## Current Scope Notes
 
-- The implemented runtime is the gateway plus the common libraries described above.
+- The implemented runtime is a gateway-centric service stack. The .NET projects in this worktree cover the gateway plus the shared libraries described above.
+- `docker-compose.yml` supplies the companion runtime services used by the gateway, including PostgreSQL, LiteLLM, GBrain, Webwright, and Playwright.
 - `src/Services` currently contains only `LeanKernel.Gateway`.
 - `src/Terminals` currently exists as a placeholder directory and does not contain active projects.
-- If older docs or logs mention a much larger service map, treat that as historical or aspirational unless the matching project exists in this worktree.
+- If older docs or logs mention a much larger monolith-style module map, treat that as historical or aspirational unless the matching project or container exists in this worktree.

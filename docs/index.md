@@ -1,6 +1,6 @@
 # LeanKernel Documentation
 
-This documentation set covers the current modular-monolith LeanKernel rebuild in this workspace.
+This documentation set covers the current gateway-centered LeanKernel service stack in this workspace.
 
 It follows the same conventions as the reference docs in `~/source/repos/leankernel/docs`:
 
@@ -29,6 +29,7 @@ flowchart LR
     Gateway --> Agent[Named AIAgent]
     Agent --> History[DbChatHistoryProvider]
     Agent --> Memory[MemoryProvider]
+    Agent --> Tools[Tool runtime / MCP Webwright]
     History --> Data[(EntityContext)]
     Memory --> GBrain[GBrain MCP]
     Agent --> State[DbAgentStateStore]

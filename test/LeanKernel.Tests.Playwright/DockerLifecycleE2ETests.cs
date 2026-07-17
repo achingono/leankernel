@@ -10,6 +10,40 @@ namespace LeanKernel.Tests.Playwright;
 public sealed class DockerLifecycleE2ETests
 {
     [Fact]
+    public async Task RunningDockerDeployment_GatewayWebwrightToolCallsSucceed()
+    {
+        var config = DockerE2eConfig.FromEnvironment();
+        if (!config.Enabled)
+        {
+            return;
+        }
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        var ct = cts.Token;
+
+        await config.ValidatePreflightAsync(ct);
+
+        using var gateway = BuildHttpClient(config.GatewayBaseUrl);
+
+        var prompt =
+            "Use the webwright MCP tool browser_run_task to open https://example.com and extract the page title. " +
+            "Then call browser_get_run for the returned runId to confirm the run succeeded. " +
+            "Reply exactly as webwright-success:<title>.";
+
+        var responseText = await SubmitResponsesAsync(
+            gateway,
+            config.Model,
+            prompt,
+            bearerToken: null,
+            ct);
+
+        Assert.Contains("webwright-success", responseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Example Domain", responseText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("task was canceled", responseText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("mcp tool invocation failed", responseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task RunningDockerDeployment_ExecutesFullLifecycle()
     {
         var config = DockerE2eConfig.FromEnvironment();

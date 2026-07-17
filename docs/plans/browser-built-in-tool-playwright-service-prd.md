@@ -1,5 +1,8 @@
 # Browser Built-in Tool + Playwright Service PRD
 
+> Superseded by Phase 18 Webwright MCP integration. This document is kept as historical design
+> context for the removed browser-sidecar approach.
+
 ## Summary
 Add a new LeanKernel built-in tool family that executes browser automation through a **separate HTTP Playwright service container**.  
 Emanate is reference material for browser/session API patterns; implementation remains LeanKernel-native.

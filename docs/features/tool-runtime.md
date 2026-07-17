@@ -33,7 +33,16 @@ partitioning at invocation time.
 ### MCP-Discovered Tools
 
 The runtime can discover tools from configured MCP endpoints under `Agents:Tools:McpServers`.
-Phase 18 rollout exposes only Webwright MCP tools to agents.
+Phase 18 ships Webwright MCP browser tooling through the gateway tool runtime. The gateway
+discovers the configured Webwright endpoint at startup, registers LeanKernel-owned adapters in
+`IToolRegistry`, and exposes the resulting browser tools to the agent through the normal
+function-invocation pipeline.
+
+Current Webwright tool surface includes `browser_run_task`, `browser_get_run`,
+`browser_cancel_run`, and `browser_get_artifact`.
+
+Each tool invocation creates a fresh MCP client for the configured server rather than reusing
+the discovery client.
 
 ### Memory/Knowledge Tools
 
@@ -110,7 +119,8 @@ operations:
 - **HTTP egress**: `EgressValidator` blocks loopback, private, and link-local hosts; enforces
   allowlist intersection; re-validates every redirect hop
 - **MCP servers**: external browser automation tools are discovered from pre-configured
-  `Agents:Tools:McpServers` endpoints; this phase exposes Webwright MCP tools only
+  `Agents:Tools:McpServers` endpoints; Phase 18 exposes Webwright MCP tools through the gateway
+  tool runtime
 - **Governance**: `ToolGovernancePolicy` filters tools by `AllowedToolNames` (name allowlist,
   takes precedence) or `AllowedCategories` (category allowlist)
 - **Master switch**: `Agents:Tools:Enabled=false` disables the entire tool runtime

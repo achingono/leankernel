@@ -1,0 +1,7 @@
+# FastAPI service + Playwright client + MCP server
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic>=2.11.0,<3
+playwright==1.60.0
+pyyaml>=6.0
+mcp>=1.27,<2

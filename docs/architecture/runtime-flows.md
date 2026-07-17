@@ -59,3 +59,13 @@ References:
 
 - [`../../src/Services/LeanKernel.Gateway/Providers/IdentityIsolationKeyProvider.cs`](../../src/Services/LeanKernel.Gateway/Providers/IdentityIsolationKeyProvider.cs)
 - [`../../src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs`](../../src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs)
+
+## Tool Invocation Flow
+
+1. Gateway startup discovers configured MCP servers from `Agents:Tools:McpServers`.
+2. Webwright tools are adapted into LeanKernel `ToolDefinition` entries and registered in `IToolRegistry`.
+3. `AddLeanKernelAgent(...)` attaches the registered tools to `ChatOptions.Tools` for the `leankernel` agent.
+4. `.UseFunctionInvocation()` routes the model's tool calls through LeanKernel tool handlers.
+5. Each Webwright tool handler creates a fresh MCP client for the configured server, invokes the tool, and returns the formatted result.
+
+Reference: [`../../src/Common/LeanKernel.Logic/Mcp/`](../../src/Common/LeanKernel.Logic/Mcp/)

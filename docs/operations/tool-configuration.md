@@ -39,7 +39,12 @@ falls back to DuckDuckGo otherwise. Override the provider or key env var:
 ## MCP Servers
 
 MCP tools are discovered at startup from pre-configured endpoints under
-`Agents:Tools:McpServers`. Phase 18 rollout is Webwright MCP-first.
+`Agents:Tools:McpServers`. Phase 18 ships Webwright MCP-first browser tooling through the
+gateway tool runtime.
+
+The current implementation uses the official `ModelContextProtocol` SDK, registers discovered
+tools as LeanKernel-owned adapters, and invokes each browser tool through a fresh MCP client
+per call.
 
 ```json
 {
@@ -126,3 +131,4 @@ error.
 | `web_search` returns error | Brave API key missing/invalid | Set `BRAVE_API_KEY` env var or verify key |
 | Tool execution returns "Access denied" | File path outside `Files:RootPath` | Ensure target files are within the allowed root |
 | MCP tools missing at startup | MCP endpoint unreachable or discovery failed | Verify `Agents:Tools:McpServers:*` config and MCP server health |
+| Webwright browser tool calls fail with cancellation | Gateway was built before the fresh-client MCP invocation fix or the container is stale | Rebuild and restart gateway, then retry the request |

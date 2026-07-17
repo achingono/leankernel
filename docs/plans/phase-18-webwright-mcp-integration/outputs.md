@@ -21,13 +21,21 @@
 - Ongoing governance checklist for the community-maintained Webwright package
 - Future-phase direct Playwright evaluation plan
 
+## Delivered State
+
+- Official MCP SDK package `ModelContextProtocol` is referenced in `src/Common/LeanKernel.Logic/LeanKernel.Logic.csproj`.
+- Webwright MCP tools are registered in `LeanKernel.Logic.Mcp` and exposed through the gateway tool runtime.
+- The gateway invokes Webwright tools through a fresh MCP client per call, preventing stale discovery-client reuse.
+- Gateway-level and Webwright-specific E2E tests are in `test/LeanKernel.Tests.Playwright`.
+- Documentation now reflects the Webwright MCP-first implementation.
+
 ## Output Quality Checklist
-- [ ] All mandatory outputs produced
-- [ ] All outputs reviewed before gate
-- [ ] Official MCP SDK package usage is evident in project/package references
-- [ ] No custom MCP protocol/transport implementation exists beyond justified adapter extensions
-- [ ] No stdio server hosting or ad-hoc runtime server registration is introduced in this phase
-- [ ] Webwright-only exposure decision is documented with reassessment triggers
-- [ ] Evidence log updated with output references
-- [ ] Code coverage meets 80% threshold
-- [ ] All quality gates pass
+- [x] All mandatory outputs produced
+- [x] All outputs reviewed before gate
+- [x] Official MCP SDK package usage is evident in project/package references
+- [x] No custom MCP protocol/transport implementation exists beyond justified adapter extensions
+- [x] No stdio server hosting or ad-hoc runtime server registration is introduced in this phase
+- [x] Webwright-only exposure decision is documented with reassessment triggers
+- [x] Evidence log updated with output references
+- [x] Code coverage meets 80% threshold
+- [x] All quality gates pass

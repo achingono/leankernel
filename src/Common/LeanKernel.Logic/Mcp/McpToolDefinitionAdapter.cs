@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
@@ -17,12 +18,13 @@ public static class McpToolDefinitionAdapter
     /// Creates a LeanKernel <see cref="ToolDefinition"/> from an MCP tool discovered via the SDK.
     /// </summary>
     /// <param name="mcpTool">The MCP tool to adapt.</param>
-    /// <param name="category">The server name, used as the tool category.</param>
+    /// <param name="server">The server settings where the tool is hosted.</param>
     /// <returns>A LeanKernel tool definition wrapping the MCP tool.</returns>
-    public static ToolDefinition CreateToolDefinition(McpClientTool mcpTool, string category)
+    public static ToolDefinition CreateToolDefinition(McpClientTool mcpTool, McpServerSettings server)
     {
         ArgumentNullException.ThrowIfNull(mcpTool);
-        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentException.ThrowIfNullOrWhiteSpace(server.Name);
 
         var schema = mcpTool.ProtocolTool.InputSchema;
         var hasSchema = schema.ValueKind != JsonValueKind.Undefined;
@@ -34,25 +36,41 @@ public static class McpToolDefinitionAdapter
         {
             Name = mcpTool.Name,
             Description = mcpTool.Description ?? $"MCP tool: {mcpTool.Name}",
-            Category = category,
+            Category = server.Name,
             Parameters = parameters,
-            Handler = (args, ct) => InvokeMcpToolAsync(mcpTool, args, ct)
+            Handler = (args, ct) => InvokeMcpToolAsync(server, mcpTool.Name, args, ct)
         };
     }
 
     private static async Task<ToolResult> InvokeMcpToolAsync(
-        McpClientTool mcpTool,
+        McpServerSettings server,
+        string toolName,
         IReadOnlyDictionary<string, object?> args,
         CancellationToken ct)
     {
         try
         {
+            var transport = McpTransportFactory.Create(server);
+            await using var client = await McpClient.CreateAsync(transport, null, null, ct).ConfigureAwait(false);
+            var tools = await client.ListToolsAsync(cancellationToken: ct).ConfigureAwait(false);
+
+            var mcpTool = tools.FirstOrDefault(t => string.Equals(t.Name, toolName, StringComparison.Ordinal));
+            if (mcpTool is null)
+            {
+                return new ToolResult
+                {
+                    ToolName = toolName,
+                    Success = false,
+                    Error = $"MCP tool '{toolName}' was not found on server '{server.Name}'."
+                };
+            }
+
             var result = await mcpTool.CallAsync(args, cancellationToken: ct).ConfigureAwait(false);
             var output = FormatToolResult(result);
 
             return new ToolResult
             {
-                ToolName = mcpTool.Name,
+                ToolName = toolName,
                 Success = true,
                 Output = output
             };
@@ -61,7 +79,7 @@ public static class McpToolDefinitionAdapter
         {
             return new ToolResult
             {
-                ToolName = mcpTool.Name,
+                ToolName = toolName,
                 Success = false,
                 Error = $"MCP error: {ex.Message}"
             };
@@ -70,7 +88,7 @@ public static class McpToolDefinitionAdapter
         {
             return new ToolResult
             {
-                ToolName = mcpTool.Name,
+                ToolName = toolName,
                 Success = false,
                 Error = $"MCP tool invocation failed: {ex.Message}"
             };

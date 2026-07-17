@@ -20,6 +20,7 @@ flowchart LR
     Permit --> Agent[Named AIAgent]
     Agent --> History[DbChatHistoryProvider]
     Agent --> Context[MemoryProvider]
+    Agent --> Tools[Tool runtime / Webwright MCP]
     Agent --> SessionStore[DbAgentStateStore]
     History --> Db[(EntityContext)]
     SessionStore --> Db

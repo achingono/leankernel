@@ -38,7 +38,7 @@ public sealed class McpServerHealthProbe : Tools.IProviderHealthProbe
 
         try
         {
-            var transport = CreateTransport();
+            var transport = McpTransportFactory.Create(_server);
             await using var client = await McpClient.CreateAsync(transport, null, null, ct).ConfigureAwait(false);
             var tools = await client.ListToolsAsync(cancellationToken: ct).ConfigureAwait(false);
 
@@ -53,34 +53,5 @@ public sealed class McpServerHealthProbe : Tools.IProviderHealthProbe
                 $"MCP server '{_server.Name}' probe failed: {ex.Message}",
                 ex.ToString());
         }
-    }
-
-    private HttpClientTransport CreateTransport()
-    {
-        var endpoint = new Uri(_server.Endpoint);
-        var transportMode = ParseTransportMode(_server.TransportMode);
-
-        var options = new HttpClientTransportOptions
-        {
-            Endpoint = endpoint,
-            TransportMode = transportMode,
-            ConnectionTimeout = TimeSpan.FromSeconds(Math.Max(1, _server.ConnectionTimeoutSeconds)),
-        };
-
-        if (_server.AdditionalHeaders.Count > 0)
-        {
-            options.AdditionalHeaders = new Dictionary<string, string>(_server.AdditionalHeaders);
-        }
-
-        return new HttpClientTransport(options);
-    }
-
-    private static ModelContextProtocol.Client.HttpTransportMode ParseTransportMode(string mode)
-    {
-        if (mode.Equals("Sse", StringComparison.OrdinalIgnoreCase))
-            return ModelContextProtocol.Client.HttpTransportMode.Sse;
-        if (mode.Equals("StreamableHttp", StringComparison.OrdinalIgnoreCase))
-            return ModelContextProtocol.Client.HttpTransportMode.StreamableHttp;
-        return ModelContextProtocol.Client.HttpTransportMode.AutoDetect;
     }
 }

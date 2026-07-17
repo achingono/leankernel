@@ -4,12 +4,12 @@
 
 | Input | Source | Owner |
 |---|---|---|
-| Official MCP C# SDK package and docs | `ModelContextProtocol` NuGet + SDK documentation | Development Team |
-| MCP package selection decision | ADR/plan note documenting `ModelContextProtocol` vs `ModelContextProtocol.Core` rationale | Architecture Review |
-| Community Webwright MCP package details | Package registry + repository docs + pinned version | Development Team |
+| Official MCP C# SDK package and docs | `ModelContextProtocol` NuGet 1.4.0 + SDK documentation | Development Team |
+| MCP package selection decision | `ModelContextProtocol` chosen; `ModelContextProtocol.Core` not required | Architecture Review |
+| Community Webwright MCP package details | Webwright MCP service/container in `docker-compose.yml` and runtime config | Development Team |
 | Current GBrain MCP client implementation | `src/Services/LeanKernel.Gateway/Memory/GBrainMcpClient.cs` | Gateway Team |
 | LeanKernel tool registry interface | `src/Common/LeanKernel.Logic/Tools/IToolRegistry.cs` | Logic Team |
-| Current browser-specific Playwright tool implementations | `src/Common/LeanKernel.Logic/Tools/BuiltIn/Browser/` | Logic Team |
+| Current browser-specific Playwright tool implementations | Replaced by Webwright MCP adapters under `src/Common/LeanKernel.Logic/Mcp/` | Logic Team |
 | Docker compose configuration | `docker-compose.yml` | DevOps Team |
 | Tool registration patterns | `src/Common/LeanKernel.Logic/Extensions/IServiceProviderExtensions.cs` | Logic Team |
 | Approved list of MCP server endpoints | Pre-configured HTTP/SSE endpoints and rollout ownership | Architecture Review |
@@ -22,11 +22,11 @@
 - Future-phase benchmark scenarios for Webwright vs direct Playwright
 
 ## Input Validation Checklist
-- [ ] All required inputs are current (not from a superseded version)
-- [ ] No required input is missing or in draft state
-- [ ] Official MCP SDK package/version is selected and documented
-- [ ] SDK package-selection rationale is approved (`ModelContextProtocol` default, `Core` only if justified)
-- [ ] Community Webwright MCP package is version pinned and governance risk is acknowledged
-- [ ] Approved MCP server list is limited to pre-configured HTTP/SSE endpoints
-- [ ] Webwright-only rollout policy and reassessment triggers are approved
-- [ ] Current browser-specific Playwright tool implementations are documented for replacement
+- [x] All required inputs are current (not from a superseded version)
+- [x] No required input is missing or in draft state
+- [x] Official MCP SDK package/version is selected and documented
+- [x] SDK package-selection rationale is approved (`ModelContextProtocol` default, `Core` only if justified)
+- [x] Community Webwright MCP package is version pinned and governance risk is acknowledged
+- [x] Approved MCP server list is limited to pre-configured HTTP/SSE endpoints
+- [x] Webwright-only rollout policy and reassessment triggers are approved
+- [x] Current browser-specific Playwright tool implementations are documented for replacement

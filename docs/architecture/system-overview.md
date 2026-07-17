@@ -1,6 +1,6 @@
 # System Overview
 
-The current LeanKernel rebuild is a .NET 10 modular monolith built around Microsoft Agent Framework (MAF) extension points.
+The current LeanKernel rebuild is a .NET 10 gateway-centered microservice architecture built around Microsoft Agent Framework (MAF) extension points.
 
 ## Core Topology
 
@@ -21,6 +21,7 @@ The composition root is [`../../src/Services/LeanKernel.Gateway/Programs.cs`](..
 | Chat history provider | Persist and retrieve transcript turns through EF Core | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs` |
 | Memory provider | Retrieve memory context and persist normalized facts | `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` |
 | Memory backend | GBrain-backed `IMemoryClient` implementation | `src/Services/LeanKernel.Gateway/Providers/GBrainMemoryClient.cs` |
+| MCP browser tools | Webwright MCP discovery, tool adapter registration, and per-call invocation | `src/Common/LeanKernel.Logic/Mcp/` |
 
 ## Major Design Choices
 
@@ -28,5 +29,7 @@ The composition root is [`../../src/Services/LeanKernel.Gateway/Programs.cs`](..
 - persisted identity partitioning by tenant, user, and channel
 - separate transcript session persistence and agent state persistence
 - deterministic-first memory shaping with bounded model-assisted refinement
+- browser automation is provided by pre-configured Webwright MCP tools, not a custom Playwright sidecar
+- MCP tool adapters use LeanKernel-owned registration and invocation boundaries instead of reusing stale discovery clients
 
 Those decisions are also captured in the repo ADRs under [`../decisions/index.md`](../decisions/index.md).

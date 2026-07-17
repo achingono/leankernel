@@ -128,7 +128,10 @@ services:
     shm_size: 1gb
     restart: unless-stopped
 
-  # ── Webwright (Community MCP Package) ─────────────────────────
+  # ── Webwright (Python MCP Server) ─────────────────────────────
+  # Single Python container: FastMCP server on port 8000 serves the
+  # browser automation tools.  Each run spawns run_cli.py which
+  # connects to the shared Playwright service via WebSocket.
   webwright:
     build:
       context: .
@@ -137,10 +140,15 @@ services:
     user: "0:0"
     environment:
       - TZ=${TZ:-America/Toronto}
-      - OUTPUT_ROOT=/home/pwuser/outputs
+      - OUTPUT_ROOT=/home/webwright/outputs
       - WEBWRIGHT_RUN_TIMEOUT_MS=${WEBWRIGHT_RUN_TIMEOUT_MS:-120000}
+      - RUN_WALL_CLOCK_SECONDS=${RUN_WALL_CLOCK_SECONDS:-120}
+      - PLAYWRIGHT_WS_ENDPOINT=ws://playwright:6000/
+      - LITELLM_BASE_URL=${LITELLM_BASE_URL:-http://litellm:4000}
+      - LITELLM_API_KEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
+      - WEBWRIGHT_MODEL=${LEANKERNEL_DEFAULT_MODEL:-medium}
     volumes:
-      - browserdata:/home/pwuser/outputs
+      - browserdata:/home/webwright/outputs
     ports:
       - "${WEBWRIGHT_PORT:-8000}:8000"
     depends_on:
@@ -148,7 +156,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/ping"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/ping || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
