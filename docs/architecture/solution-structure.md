@@ -11,6 +11,7 @@ Projects in the solution:
 | Project | Role |
 |---|---|
 | `src/Common/LeanKernel.Core` | Shared entities and cross-project interfaces/contracts |
+| `src/Common/LeanKernel.Channels.Common` | Shared terminal/gateway helpers (health response writer, gateway health probe, connection-string resolver, channel binding token resolver) |
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, design-time factory |
 | `src/Common/LeanKernel.Logic` | Chat history provider, memory pipeline, identity resolution, MAF-facing logic services |
 | `src/Services/LeanKernel.Gateway` | Web host, endpoint mapping, auth/session middleware, GBrain wiring, agent session store |
@@ -25,8 +26,8 @@ Test projects:
 
 ## Dependency Direction
 
-- `Gateway` depends on `Logic`, `Data`, and `Core`
+- `Gateway` depends on `Logic`, `Data`, `Core`, and `Channels.Common`
 - `Logic` depends on `Data` and `Core`
 - `Data` depends on `Core`
-- Channel terminals are edge processes and do not participate in `Gateway`/`Logic`/`Data` assembly dependency direction
+- Channel terminals are edge processes; they depend on `Data`, `Core`, and `Channels.Common`, and do not depend on `Gateway`/`Logic`
 - `Core` is the bottom layer

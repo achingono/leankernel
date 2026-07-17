@@ -1,6 +1,11 @@
 using LeanKernel.Channels.Teams;
+using LeanKernel.Channels.Teams.HealthChecks;
+using LeanKernel.Channels.Common.Configuration;
+using LeanKernel.Channels.Common.HealthChecks;
+using LeanKernel.Channels.Common.Settings;
 using LeanKernel.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -10,7 +15,9 @@ builder.Services.Configure<BotSettings>(builder.Configuration.GetSection("Bot"))
 
 var gatewaySettings = builder.Configuration.GetSection("Gateway").Get<GatewaySettings>() ?? new GatewaySettings();
 var botSettings = builder.Configuration.GetSection("Bot").Get<BotSettings>() ?? new BotSettings();
-var (connectionStringName, connectionStringValue) = ResolveConnectionString(builder.Configuration);
+var (connectionStringName, connectionStringValue) = builder.Configuration.ResolveConnectionString(["Postgres", "Sqlite"]);
+if (string.IsNullOrWhiteSpace(connectionStringName) || string.IsNullOrWhiteSpace(connectionStringValue))
+    throw new InvalidOperationException("A database connection string is required. Configure ConnectionStrings:Postgres or ConnectionStrings:Sqlite.");
 
 builder.Services.AddHttpClient<GatewayClient>(client =>
 {
@@ -21,6 +28,12 @@ builder.Services.AddHttpClient("teams-auth", client =>
     client.BaseAddress = new Uri(botSettings.Authority);
 });
 builder.Services.AddHttpClient("teams-connector");
+
+var probeTimeout = TimeSpan.FromSeconds(5);
+builder.Services.AddHttpClient(GatewayHealthCheck.HttpClientName)
+    .ConfigureHttpClient(client => client.Timeout = probeTimeout);
+builder.Services.AddHttpClient(BotFrameworkOpenIdHealthCheck.HttpClientName)
+    .ConfigureHttpClient(client => client.Timeout = probeTimeout);
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -60,13 +73,22 @@ builder.Services.AddSingleton<IChannelCredentialProvider, DatabaseChannelCredent
 builder.Services.AddSingleton<BotFrameworkTransportClient>();
 builder.Services.AddSingleton<ITransportClient>(provider => provider.GetRequiredService<BotFrameworkTransportClient>());
 builder.Services.AddHostedService<TerminalService>();
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<EntityContext>("database", tags: ["database"])
+    .AddCheck<GatewayHealthCheck>("gateway", tags: ["gateway"])
+    .AddCheck<BotFrameworkOpenIdHealthCheck>("bot-openid", tags: ["botframework"]);
 
 var app = builder.Build();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/live", () => Results.Ok(new { status = "alive" }));
+
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync
+});
 
 app.MapPost("/api/messages", async (
     IncomingActivityDto activity,
@@ -102,15 +124,3 @@ app.MapPost("/api/messages", async (
 }).RequireAuthorization();
 
 await app.RunAsync();
-
-static (string Name, string Value) ResolveConnectionString(IConfiguration configuration)
-{
-    foreach (var name in new[] { "Postgres", "Sqlite" })
-    {
-        var value = configuration.GetConnectionString(name);
-        if (!string.IsNullOrWhiteSpace(value))
-            return (name, value);
-    }
-
-    throw new InvalidOperationException("A database connection string is required. Configure ConnectionStrings:Postgres or ConnectionStrings:Sqlite.");
-}

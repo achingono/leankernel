@@ -4,6 +4,8 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using LeanKernel.Channels.Common.Credentials;
+using LeanKernel.Channels.Common.Settings;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using Microsoft.Extensions.Options;
@@ -678,7 +680,13 @@ public sealed class SocketTransportClient(
     private async Task EnqueueInboundIfValidAsync(JsonElement item, string account, CancellationToken ct)
     {
         if (!TryParseSignalMessage(item, out var sender, out var text, out var attachments, logger))
+        {
+            logger.LogTrace(
+                "Rejected Signal payload for account {Account}: {Payload}",
+                account,
+                BuildTracePayload(item));
             return;
+        }
 
         var token = await credentials.ResolveBearerTokenAsync(sender, ct);
         if (string.IsNullOrWhiteSpace(token))
@@ -918,6 +926,17 @@ public sealed class SocketTransportClient(
             _ => string.Empty
         };
 
+    private static string BuildTracePayload(JsonElement item)
+    {
+        const int maxChars = 4000;
+
+        var raw = item.GetRawText();
+        if (raw.Length <= maxChars)
+            return raw;
+
+        return $"{raw[..maxChars]}...(truncated)";
+    }
+
     private async Task<IReadOnlyList<InboundAttachment>> EnrichAttachmentsAsync(
         IReadOnlyList<InboundAttachment> attachments,
         CancellationToken ct)
@@ -1028,29 +1047,19 @@ public sealed class DatabaseChannelCredentialProvider(
 {
     public async Task<string> ResolveBearerTokenAsync(string senderId, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(senderId))
-            return string.Empty;
+        var (token, matchCount) = await ChannelSenderBindingTokenResolver.ResolveAsync(
+            dbContextFactory,
+            senderId,
+            ChannelEntity.SignalName,
+            ChannelEntity.SignalName,
+            ct);
 
-        await using var context = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var matches = await context.ChannelSenderBindings
-            .AsNoTracking()
-            .Where(binding => binding.IsActive
-                              && binding.Issuer == ChannelEntity.SignalName
-                              && binding.Subject == senderId
-                              && binding.Channel.Name == "signal"
-                              && !string.IsNullOrWhiteSpace(binding.BearerToken))
-            .Select(binding => binding.BearerToken)
-            .Take(2)
-            .ToListAsync(ct);
-
-        if (matches.Count > 1)
+        if (matchCount > 1)
         {
             logger.LogWarning("Multiple active Signal bindings found for sender {SenderId}; refusing to select a token.", senderId);
             return string.Empty;
         }
 
-        var token = matches.FirstOrDefault() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(token))
         {
             logger.LogWarning("No Signal JWT token found for sender {SenderId} in ChannelSenderBindings.", senderId);

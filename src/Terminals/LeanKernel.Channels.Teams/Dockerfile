@@ -5,12 +5,14 @@ WORKDIR /src
 
 COPY src/Directory.Build.props src/
 COPY src/Common/LeanKernel.Core/LeanKernel.Core.csproj src/Common/LeanKernel.Core/
+COPY src/Common/LeanKernel.Channels.Common/LeanKernel.Channels.Common.csproj src/Common/LeanKernel.Channels.Common/
 COPY src/Common/LeanKernel.Data/LeanKernel.Data.csproj src/Common/LeanKernel.Data/
 COPY src/Terminals/LeanKernel.Channels.Teams/LeanKernel.Channels.Teams.csproj src/Terminals/LeanKernel.Channels.Teams/
 
 RUN dotnet restore src/Terminals/LeanKernel.Channels.Teams/LeanKernel.Channels.Teams.csproj
 
 COPY src/Terminals/LeanKernel.Channels.Teams/ src/Terminals/LeanKernel.Channels.Teams/
+COPY src/Common/LeanKernel.Channels.Common/ src/Common/LeanKernel.Channels.Common/
 COPY src/Common/LeanKernel.Core/ src/Common/LeanKernel.Core/
 COPY src/Common/LeanKernel.Data/ src/Common/LeanKernel.Data/
 
@@ -32,6 +34,6 @@ USER leankernel
 ENV ASPNETCORE_URLS=http://+:3978
 EXPOSE 3978
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD curl -f http://localhost:3978/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD curl -f http://localhost:3978/live || exit 1
 
 ENTRYPOINT ["dotnet", "LeanKernel.Channels.Teams.dll"]

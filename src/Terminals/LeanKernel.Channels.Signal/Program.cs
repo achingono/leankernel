@@ -1,14 +1,21 @@
 using LeanKernel.Channels.Signal;
+using LeanKernel.Channels.Signal.HealthChecks;
+using LeanKernel.Channels.Common.Configuration;
+using LeanKernel.Channels.Common.HealthChecks;
+using LeanKernel.Channels.Common.Settings;
 using LeanKernel.Data;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<GatewaySettings>(builder.Configuration.GetSection("Gateway"));
 builder.Services.Configure<SignalSettings>(builder.Configuration.GetSection("Signal"));
 
 var gatewaySettings = builder.Configuration.GetSection("Gateway").Get<GatewaySettings>() ?? new GatewaySettings();
 var signalSettings = builder.Configuration.GetSection("Signal").Get<SignalSettings>() ?? new SignalSettings();
-var (connectionStringName, connectionStringValue) = ResolveConnectionString(builder.Configuration);
+var (connectionStringName, connectionStringValue) = builder.Configuration.ResolveConnectionString(["Postgres", "Sqlite"]);
+if (string.IsNullOrWhiteSpace(connectionStringName) || string.IsNullOrWhiteSpace(connectionStringValue))
+    throw new InvalidOperationException("A database connection string is required. Configure ConnectionStrings:Postgres or ConnectionStrings:Sqlite.");
 
 builder.Services.AddHttpClient<GatewayChannelClient>(client =>
 {
@@ -18,6 +25,12 @@ builder.Services.AddHttpClient("signal-api", client =>
 {
     client.BaseAddress = new Uri($"http://{signalSettings.Host}:{signalSettings.Port}");
 });
+
+var probeTimeout = TimeSpan.FromSeconds(5);
+builder.Services.AddHttpClient(GatewayHealthCheck.HttpClientName)
+    .ConfigureHttpClient(client => client.Timeout = probeTimeout);
+builder.Services.AddHttpClient(SignalApiHealthCheck.HttpClientName)
+    .ConfigureHttpClient(client => client.Timeout = probeTimeout);
 builder.Services.AddDbContextFactory<EntityContext>(options =>
 {
     if (string.Equals(connectionStringName, "Postgres", StringComparison.OrdinalIgnoreCase))
@@ -38,17 +51,16 @@ builder.Services.AddSingleton<ITransportClient, SocketTransportClient>();
 builder.Services.AddSingleton<IChannelCredentialProvider, DatabaseChannelCredentialProvider>();
 builder.Services.AddHostedService<TerminalService>();
 
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<EntityContext>("database", tags: ["database"])
+    .AddCheck<GatewayHealthCheck>("gateway", tags: ["gateway"])
+    .AddCheck<SignalApiHealthCheck>("signal-api", tags: ["signal-api"]);
+
 var app = builder.Build();
-await app.RunAsync();
-
-static (string Name, string Value) ResolveConnectionString(IConfiguration configuration)
+app.MapGet("/live", () => Results.Ok(new { status = "alive" }));
+app.MapHealthChecks("/health", new HealthCheckOptions
 {
-    foreach (var name in new[] { "Postgres", "Sqlite" })
-    {
-        var value = configuration.GetConnectionString(name);
-        if (!string.IsNullOrWhiteSpace(value))
-            return (name, value);
-    }
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync
+});
 
-    throw new InvalidOperationException("A database connection string is required. Configure ConnectionStrings:Postgres or ConnectionStrings:Sqlite.");
-}
+await app.RunAsync();

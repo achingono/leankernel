@@ -203,7 +203,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:${TEAMS_TERMINAL_PORT:-3978}/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${TEAMS_TERMINAL_PORT:-3978}/live || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5

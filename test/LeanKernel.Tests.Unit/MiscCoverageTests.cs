@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Principal;
 using FluentAssertions;
+using LeanKernel.Channels.Common.Configuration;
 using LeanKernel.Gateway;
 using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.Memory;
@@ -107,7 +108,7 @@ public class MiscCoverageTests
             })
             .Build();
 
-        var (name, value) = config.ResolveConnectionString();
+        var (name, value) = config.ResolveConnectionString(["Postgres", "SqlServer", "Sqlite"]);
 
         name.Should().Be("Sqlite");
         value.Should().Be("Data Source=test.db");
@@ -118,7 +119,7 @@ public class MiscCoverageTests
     {
         var config = new ConfigurationBuilder().Build();
 
-        var (name, value) = config.ResolveConnectionString();
+        var (name, value) = config.ResolveConnectionString(["Postgres", "SqlServer", "Sqlite"]);
 
         name.Should().BeNull();
         value.Should().BeNull();

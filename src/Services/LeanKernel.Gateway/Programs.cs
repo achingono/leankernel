@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Principal;
 using LeanKernel;
+using LeanKernel.Channels.Common.Configuration;
+using LeanKernel.Channels.Common.HealthChecks;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Gateway;
@@ -172,7 +174,11 @@ public partial class Program
 
         builder.Services.AddEntityContext(options =>
         {
-            var (connectionStringName, connectionString) = builder.Configuration.ResolveConnectionString();
+            var (connectionStringName, connectionString) = builder.Configuration.ResolveConnectionString([
+                "Postgres",
+                "SqlServer",
+                "Sqlite"
+            ]);
 
             options.ConfigureOptions(connectionStringName, connectionString,
                 builder.Environment.EnvironmentName.Equals("Testing", StringComparison.OrdinalIgnoreCase),

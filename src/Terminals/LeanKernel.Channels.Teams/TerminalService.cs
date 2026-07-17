@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
+using LeanKernel.Channels.Common.Credentials;
+using LeanKernel.Channels.Common.Settings;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using Microsoft.Extensions.Options;
@@ -272,29 +274,19 @@ public sealed class DatabaseChannelCredentialProvider(
 {
     public async Task<string> ResolveBearerTokenAsync(string senderId, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(senderId))
-            return string.Empty;
+        var (token, matchCount) = await ChannelSenderBindingTokenResolver.ResolveAsync(
+            dbContextFactory,
+            senderId,
+            ChannelEntity.TeamsName,
+            ChannelEntity.TeamsName,
+            ct);
 
-        await using var context = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var matches = await context.ChannelSenderBindings
-            .AsNoTracking()
-            .Where(binding => binding.IsActive
-                              && binding.Issuer == ChannelEntity.TeamsName
-                              && binding.Subject == senderId
-                              && binding.Channel.Name == "teams"
-                              && !string.IsNullOrWhiteSpace(binding.BearerToken))
-            .Select(binding => binding.BearerToken)
-            .Take(2)
-            .ToListAsync(ct);
-
-        if (matches.Count > 1)
+        if (matchCount > 1)
         {
             logger.LogWarning("Multiple active Teams bindings found for sender {SenderId}; refusing to select a token.", senderId);
             return string.Empty;
         }
 
-        var token = matches.FirstOrDefault() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(token))
         {
             logger.LogWarning("No Teams JWT token found for sender {SenderId} in ChannelSenderBindings.", senderId);
