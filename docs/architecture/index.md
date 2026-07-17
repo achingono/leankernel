@@ -15,18 +15,29 @@ System design and ownership boundaries for the current runtime.
 
 ```mermaid
 flowchart LR
-    Client[API Client] --> Gateway[LeanKernel.Gateway]
+    Client[API client] --> Gateway[LeanKernel.Gateway]
+    Gateway --> Agent[MAF-hosted leankernel agent]
     Gateway --> Permit[RequestContextPermit]
-    Permit --> Agent[Named AIAgent]
     Agent --> History[DbChatHistoryProvider]
-    Agent --> Context[MemoryProvider]
-    Agent --> Tools[Tool runtime / Webwright MCP]
+    Agent --> Memory[MemoryProvider]
+    Agent --> Tools[Tool runtime and MCP adapters]
     Agent --> SessionStore[DbAgentStateStore]
     History --> Db[(EntityContext)]
     SessionStore --> Db
-    Context --> GBrain[GBrain]
-    Agent --> LiteLLM[LiteLLM]
+    Memory --> GBrain[(GBrain memory)]
+    Agent --> Model[OpenAI-compatible model]
+    Signal[Signal terminal] --> Shared[Channels.Common]
+    Teams[Teams terminal] --> Shared
+    Signal --> Gateway
+    Teams --> Gateway
+    Shared --> Db
 ```
+
+Detailed diagrams live on the architecture detail pages:
+
+- [system-overview.md](system-overview.md) for runtime topology
+- [solution-structure.md](solution-structure.md) for direct project dependencies
+- [runtime-flows.md](runtime-flows.md) for request and persistence flow
 
 ## Related Pages
 

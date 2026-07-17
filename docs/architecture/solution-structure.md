@@ -4,9 +4,11 @@ This page documents the projects that actually exist in the current rebuild.
 
 ## Current Solution
 
-The active solution file is [`../../src/LeanKernel.sln`](../../src/LeanKernel.sln).
+The app-only solution file is [`../../src/LeanKernel.sln`](../../src/LeanKernel.sln).
 
-Projects in the solution:
+The full repo solution, which also includes the test projects, is [`../../LeanKernel.sln`](../../LeanKernel.sln).
+
+Projects in the app-only solution:
 
 | Project | Role |
 |---|---|
@@ -26,8 +28,34 @@ Test projects:
 
 ## Dependency Direction
 
+The current direct project references are:
+
+```mermaid
+flowchart BT
+    Gateway[LeanKernel.Gateway] --> Logic[LeanKernel.Logic]
+    Gateway --> Data[LeanKernel.Data]
+    Gateway --> Core[LeanKernel.Core]
+    Gateway --> ChannelsCommon[LeanKernel.Channels.Common]
+
+    Logic --> Data
+    Logic --> Core
+
+    Signal[LeanKernel.Channels.Signal] --> Data
+    Signal --> ChannelsCommon
+
+    Teams[LeanKernel.Channels.Teams] --> Data
+    Teams --> ChannelsCommon
+
+    ChannelsCommon --> Data
+    Data --> Core
+```
+
+These arrows reflect the current `.csproj` references in `src/` rather than a conceptual layering sketch.
+
 - `Gateway` depends on `Logic`, `Data`, `Core`, and `Channels.Common`
 - `Logic` depends on `Data` and `Core`
 - `Data` depends on `Core`
-- Channel terminals are edge processes; they depend on `Data`, `Core`, and `Channels.Common`, and do not depend on `Gateway`/`Logic`
+- `Channels.Common` depends on `Data`
+- Channel terminals are edge processes; they depend on `Data` and `Channels.Common` directly and do not depend on `Gateway` or `Logic`
+- Channel terminals only reach `Core` transitively through `Data`; they do not reference `Core` directly in the current solution
 - `Core` is the bottom layer

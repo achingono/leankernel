@@ -11,6 +11,99 @@ The current LeanKernel rebuild is a .NET 10 gateway-centered microservice archit
 
 The composition root is [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs).
 
+## Runtime Topology
+
+```mermaid
+flowchart LR
+    Client[API client] --> Gateway[LeanKernel.Gateway\nHTTP host and OpenAI surface]
+
+    subgraph GatewayRuntime[Gateway-scoped runtime]
+        Middleware[TenantResolutionMiddleware\nand RequestContextPermit]
+        AgentHost[MAF-hosted leankernel agent]
+        SessionStore[DbAgentStateStore\nplus IdentityIsolationKeyProvider]
+        GBrainClient[GBrainMemoryClient]
+    end
+
+    subgraph LogicRuntime[LeanKernel.Logic]
+        History[DbChatHistoryProvider]
+        Memory[MemoryProvider]
+        Tooling[Tool registry and MCP adapters]
+    end
+
+    subgraph Persistence[LeanKernel.Data / EntityContext]
+        IdentityData[(Tenants, Users, Channels, Policies)]
+        TranscriptData[(Sessions, Turns, TurnTelemetry)]
+        AgentStateData[(AgentStates)]
+    end
+
+    subgraph RuntimeServices[Compose-backed runtime services]
+        Db[(PostgreSQL)]
+        LiteLLM[LiteLLM model proxy]
+        GBrain[(GBrain MCP memory)]
+        Webwright[Webwright MCP server]
+        Playwright[Playwright run-server]
+        SignalCli[signal-cli sidecar]
+    end
+
+    subgraph EdgeHosts[Terminal edge processes]
+        Signal[LeanKernel.Channels.Signal]
+        Teams[LeanKernel.Channels.Teams]
+        Shared[LeanKernel.Channels.Common]
+    end
+
+    Gateway --> Middleware
+    Gateway --> AgentHost
+    AgentHost --> History
+    AgentHost --> Memory
+    AgentHost --> Tooling
+    AgentHost --> SessionStore
+    Middleware --> IdentityData
+    History --> TranscriptData
+    SessionStore --> AgentStateData
+    Memory --> GBrainClient
+    GBrainClient --> GBrain
+    AgentHost --> LiteLLM
+    Tooling --> Webwright
+    Webwright --> Playwright
+    Persistence --> Db
+    Signal --> Shared
+    Teams --> Shared
+    Shared --> Persistence
+    Signal --> Gateway
+    Teams --> Gateway
+    Signal --> SignalCli
+```
+
+This diagram reflects the current runtime host, provider, persistence, and external integration boundaries. The service relationships are cross-checked against `docker-compose.yml`, which currently wires Gateway to PostgreSQL, LiteLLM, GBrain, and optional Webwright MCP services, with Webwright using the shared Playwright run-server and the Signal terminal using a dedicated `signal-cli` sidecar. The Signal and Teams projects remain separate edge processes rather than alternate hosts for `LeanKernel.Gateway`.
+
+## Compose Deployment Topology
+
+```mermaid
+flowchart TB
+    Client[API client] --> Gateway[gateway]
+    TeamsUser[Teams / Bot Framework] --> TeamsTerminal[teams-terminal]
+    SignalUser[Signal user] --> SignalTerminal[signal-terminal]
+
+    Gateway --> Database[(database)]
+    Gateway --> LiteLLM[litellm]
+    Gateway --> GBrain[gbrain]
+    Gateway --> Webwright[webwright]
+
+    GBrain --> Database
+    GBrain --> LiteLLM
+
+    Webwright --> Playwright[playwright]
+
+    SignalTerminal --> Gateway
+    SignalTerminal --> Database
+    SignalTerminal --> SignalCli[signal-cli]
+
+    TeamsTerminal --> Gateway
+    TeamsTerminal --> Database
+```
+
+This deployment view is derived directly from `docker-compose.yml` and shows the active service-to-service wiring used by local and containerized development. It complements the runtime topology above by focusing on deployed containers instead of in-process boundaries.
+
 ## Main Runtime Components
 
 | Component | Responsibility | Code anchor |
@@ -20,7 +113,7 @@ The composition root is [`../../src/Services/LeanKernel.Gateway/Programs.cs`](..
 | Agent session store | Persist MAF session state blobs | `src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs` |
 | Chat history provider | Persist and retrieve transcript turns through EF Core | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs` |
 | Memory provider | Retrieve memory context and persist normalized facts | `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` |
-| Memory backend | GBrain-backed `IMemoryClient` implementation | `src/Services/LeanKernel.Gateway/Providers/GBrainMemoryClient.cs` |
+| Memory backend | GBrain-backed `IMemoryClient` implementation | `src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs` |
 | MCP browser tools | Webwright MCP discovery, tool adapter registration, and per-call invocation | `src/Common/LeanKernel.Logic/Mcp/` |
 
 ## Major Design Choices

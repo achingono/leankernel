@@ -7,8 +7,10 @@ This page summarizes the main request and persistence flows in the current runti
 1. `LeanKernel.Gateway` starts the ASP.NET pipeline.
 2. Forwarded headers are applied.
 3. Session middleware runs for anonymous isolation support.
-4. Authentication and authorization middleware run.
-5. OpenAI-compatible endpoints are mapped through MAF hosting.
+4. Authentication middleware runs.
+5. `TenantResolutionMiddleware` resolves tenant, user, person, and channel identity.
+6. Authorization middleware runs.
+7. OpenAI-compatible endpoints are mapped through MAF hosting.
 
 Reference: [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs)
 
@@ -18,6 +20,7 @@ Reference: [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Servi
 2. `IIdentityResolver` resolves or creates:
    - tenant from host
    - user from claims or guest fallback
+   - person from the resolved user record
    - OpenAI HTTP channel
 3. The resolved `IPermit` supplies tenant/user/channel IDs to downstream runtime components.
 
@@ -25,6 +28,62 @@ References:
 
 - [`../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs`](../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs)
 - [`../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs`](../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs)
+
+## End-To-End Runtime Data Flow
+
+```mermaid
+sequenceDiagram
+    actor Client as API client
+    participant Gateway as LeanKernel.Gateway
+    participant Identity as TenantResolutionMiddleware + RequestContextPermit
+    participant SessionKey as IdentityIsolationKeyProvider
+    participant AgentState as DbAgentStateStore
+    participant History as DbChatHistoryProvider
+    participant Memory as MemoryProvider
+    participant GBrain as GBrainMemoryClient / GBrain
+    participant Model as LiteLLM / configured model backend
+    participant Tools as Tool runtime / MCP adapters
+    participant Webwright as Webwright MCP / Playwright
+    participant Db as EntityContext
+
+    Client->>Gateway: POST /v1/responses or /v1/conversations
+    Gateway->>Identity: Run session, auth, and tenant/user/channel resolution
+    Identity->>Db: Resolve tenant, user, person, channel, and binding state
+    Identity-->>Gateway: Store resolved permit values in HttpContext.Items
+
+    Gateway->>SessionKey: Build scoped conversation key
+    SessionKey->>AgentState: Load or create agent session
+    AgentState->>Db: Read AgentStates
+
+    Gateway->>History: Load transcript context
+    History->>Db: Verify SessionEntity ownership and read Turns
+
+    Gateway->>Memory: Search scoped memory context
+    Memory->>GBrain: Search tenant/person/channel memory pages
+    GBrain-->>Memory: Return scored matches
+    Memory-->>Gateway: Inject compact memory summaries
+
+    Gateway->>Model: Invoke named agent with history, memory, and tools
+    opt Tool call requested by model
+        Model->>Tools: Invoke registered tool
+        Tools->>Webwright: Call configured MCP server when needed
+        Webwright-->>Tools: Return browser tool result
+        Tools-->>Model: Return tool result
+    end
+    Model-->>Gateway: Assistant response
+
+    Gateway->>History: Persist request and assistant turns
+    History->>Db: Upsert Sessions, Turns, and TurnTelemetry
+
+    Gateway->>Memory: Extract, normalize, and store new facts
+    Memory->>GBrain: Save scope-relative memory pages
+
+    Gateway->>AgentState: Persist updated MAF session state
+    AgentState->>Db: Upsert AgentStates
+    Gateway-->>Client: OpenAI-compatible response
+```
+
+This diagram combines the request, transcript, session-state, memory, and tool execution paths that are otherwise described separately below.
 
 ## Chat History Flow
 
