@@ -181,6 +181,7 @@ public partial class Program
         });
 
         builder.Services.AddContextProviders();
+        builder.Services.AddTelemetry(builder.Configuration);
 
         var gbrainSettings = builder.Configuration.GetSection("GBrain").Get<GBrainSettings>() ?? new GBrainSettings();
         builder.Services.AddGBrainMemory(gbrainSettings);

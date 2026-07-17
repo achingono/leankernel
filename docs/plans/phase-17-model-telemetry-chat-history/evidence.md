@@ -11,3 +11,22 @@
 | Provider normalization | `config/litellm/leankernel_litellm_callbacks.py:333-337` | `normalize_provider` / `PROVIDER_ALIASES` to reuse for consistency |
 | Model configuration | `src/Common/LeanKernel.Logic/Configuration/OpenAISettings.cs:21,26` | DefaultModel / ToolModel aliases requested from LiteLLM |
 | Consumers | `docs/plans/phase-04-model-intelligence/index.md`, `phase-07-learning-scheduler/index.md`, `phase-08-diagnostics-ops/index.md` | Routing/cost profiles, learning, spend guard |
+| Chat client registration | `src/Common/LeanKernel.Logic/Extensions/IServiceProviderExtensions.cs` | `AddLeanKernelChatClient` wraps OpenAI client; decorator insertion point |
+| IChatClient usage in agent | `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs` | Agent created via `AddAIAgent` with `ChatClientAgent`; wraps `IChatClient` |
+| LiteLLM response headers | `config/litellm/litellm_config.generated.yaml` | `x-litellm-response-cost` header available on response |
+
+## Implemented Output Targets
+
+- `src/Common/LeanKernel.Logic/Telemetry/TurnTelemetry.cs`
+- `src/Common/LeanKernel.Core/Entities/TurnTelemetryEntity.cs`
+- `src/Common/LeanKernel.Logic/Telemetry/ITurnTelemetryCollector.cs`
+- `src/Common/LeanKernel.Logic/Telemetry/TelemetryCapturingChatClient.cs`
+- `src/Common/LeanKernel.Logic/Telemetry/TelemetryAggregationService.cs`
+- `src/Common/LeanKernel.Logic/Telemetry/TelemetryExportService.cs`
+- `src/Common/LeanKernel.Logic/Configuration/TelemetrySettings.cs`
+- `src/Common/LeanKernel.Data/Migrations/20260716223823_AddTurnTelemetry.cs`
+- `test/LeanKernel.Tests.Unit/Telemetry/`
+
+## Verification
+
+- `dotnet test test/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj`

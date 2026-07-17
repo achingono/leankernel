@@ -57,6 +57,11 @@ public class EntityContext : DbContext
     public DbSet<AgentStateEntity> AgentStates => Set<AgentStateEntity>();
 
     /// <summary>
+    /// Gets the persisted assistant turn telemetry records.
+    /// </summary>
+    public DbSet<TurnTelemetryEntity> TurnTelemetry => Set<TurnTelemetryEntity>();
+
+    /// <summary>
     /// Configures the entity mappings, indexes, relationships, and query filters.
     /// </summary>
     /// <param name="modelBuilder">The model builder used to configure the EF Core model.</param>
@@ -196,6 +201,25 @@ public class EntityContext : DbContext
                 .WithMany(c => c.MemoryPolicies)
                 .HasForeignKey(e => e.ChannelId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // TurnTelemetryEntity
+        modelBuilder.Entity<TurnTelemetryEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasMaxLength(50);
+            entity.Property(e => e.TurnId).HasMaxLength(50);
+            entity.Property(e => e.SchemaVersion).HasMaxLength(10);
+            entity.Property(e => e.Currency).HasMaxLength(10);
+            entity.HasIndex(e => e.TurnId).IsUnique();
+            entity.HasIndex(e => e.ServedModel);
+            entity.HasIndex(e => e.Provider);
+            entity.HasIndex(e => e.CapturedAt);
+            entity.HasOne(e => e.Turn)
+                .WithMany()
+                .HasForeignKey(e => e.TurnId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(e => !e.IsDeleted && !e.Turn.IsDeleted);
         });
     }
 

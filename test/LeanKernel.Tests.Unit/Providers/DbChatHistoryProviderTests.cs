@@ -4,6 +4,7 @@ using FluentAssertions;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Logic.Telemetry;
 using Microsoft.Agents.AI;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -452,7 +453,63 @@ public class DbChatHistoryProviderTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    private (TestableDbChatHistoryProvider provider, EntityContext context) CreateSut()
+    [Fact]
+    public async Task StoreChatHistoryAsync_WithAssistantTelemetry_PersistsTurnTelemetry()
+    {
+        var collector = new TurnTelemetryCollector();
+        collector.Capture(new TurnTelemetry
+        {
+            RequestedModel = "tool",
+            ServedModel = "gpt-4o-mini",
+            Provider = "openai",
+            ModelId = "gpt-4o-mini",
+            PromptTokens = 12,
+            CompletionTokens = 8,
+            TotalTokens = 20,
+            ResponseCost = 0.001m,
+            Currency = "USD",
+            CostIsEstimated = false,
+            CapturedAt = DateTimeOffset.UtcNow
+        });
+
+        var (provider, dbContext) = CreateSut(collector);
+        var session = CreateSession(new Dictionary<string, string?>());
+        var responseMessages = new List<ChatMessage>
+        {
+            new(ChatRole.Assistant, "Telemetry response")
+        };
+
+        await provider.InvokeStoreChatHistoryAsync(
+            CreateInvokedContext(session: session, responseMessages: responseMessages),
+            CancellationToken.None);
+
+        dbContext.TurnTelemetry.Should().ContainSingle();
+        var telemetry = dbContext.TurnTelemetry.Single();
+        telemetry.ServedModel.Should().Be("gpt-4o-mini");
+        telemetry.PromptTokens.Should().Be(12);
+        telemetry.TotalTokens.Should().Be(20);
+    }
+
+    [Fact]
+    public async Task StoreChatHistoryAsync_WithoutCapturedTelemetry_DoesNotPersistTurnTelemetry()
+    {
+        var collector = new TurnTelemetryCollector();
+        var (provider, dbContext) = CreateSut(collector);
+        var session = CreateSession(new Dictionary<string, string?>());
+        var responseMessages = new List<ChatMessage>
+        {
+            new(ChatRole.Assistant, "No telemetry available")
+        };
+
+        await provider.InvokeStoreChatHistoryAsync(
+            CreateInvokedContext(session: session, responseMessages: responseMessages),
+            CancellationToken.None);
+
+        dbContext.Turns.Should().ContainSingle();
+        dbContext.TurnTelemetry.Should().BeEmpty();
+    }
+
+    private (TestableDbChatHistoryProvider provider, EntityContext context) CreateSut(ITurnTelemetryCollector? collector = null)
     {
         var options = new DbContextOptionsBuilder<EntityContext>()
             .UseSqlite(_connection)
@@ -475,7 +532,7 @@ public class DbChatHistoryProviderTests : IDisposable
         factory.Setup(f => f.CreateDbContextAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => new EntityContext(options));
 
-        return (new TestableDbChatHistoryProvider(factory.Object, permit.Object), context);
+        return (new TestableDbChatHistoryProvider(factory.Object, permit.Object, collector), context);
     }
 
     private static void SeedIdentityGraph(EntityContext context, Guid tenantId, Guid userId, Guid channelId)
@@ -584,8 +641,11 @@ internal sealed class TestableDbChatHistoryProvider : DbChatHistoryProvider
 {
     private readonly IPermit _permit;
 
-    public TestableDbChatHistoryProvider(IDbContextFactory<EntityContext> dbContextFactory, IPermit permit)
-        : base(dbContextFactory, permit)
+    public TestableDbChatHistoryProvider(
+        IDbContextFactory<EntityContext> dbContextFactory,
+        IPermit permit,
+        ITurnTelemetryCollector? telemetryCollector = null)
+        : base(dbContextFactory, permit, telemetryCollector)
     {
         _permit = permit;
     }

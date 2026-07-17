@@ -28,7 +28,8 @@ These are used by the logic-layer memory pipeline.
 
 ## Agents Subsections
 
-`Agents` currently includes the tool runtime branch under `Agents:Tools`.
+`Agents` currently includes tool runtime under `Agents:Tools` and model telemetry under
+`Agents:Telemetry`.
 
 | Key | Purpose | Default |
 |-----|---------|---------|
@@ -56,6 +57,12 @@ These are used by the logic-layer memory pipeline.
 | `Agents:Tools:Webwright:MaxArtifactBytes` | Model-facing maximum artifact bytes | `2000000` |
 | `Agents:Tools:Webwright:DefaultModel` | Default model alias sent with browser tasks | `tool` |
 | `Agents:Tools:DocumentIngestion:Enabled` | Enables document ingestion queue/hosted services | `false` |
+| `Agents:Telemetry:Enabled` | Enables capture and persistence of model/token/cost telemetry | `true` |
+| `Agents:Telemetry:Currency` | Currency code for reported/estimated cost | `USD` |
+| `Agents:Telemetry:RetainRawMetadata` | Keeps room for retaining source metadata fields alongside structured values | `true` |
+| `Agents:Telemetry:UseCostEstimate` | Falls back to token-based estimates when provider cost is missing | `true` |
+| `Agents:Telemetry:CostEstimate:CostPer1kInputTokens` | Model-to-rate map for input token estimates | see `appsettings.json` |
+| `Agents:Telemetry:CostEstimate:CostPer1kOutputTokens` | Model-to-rate map for output token estimates | see `appsettings.json` |
 
 The current implementation does not use a top-level `LeanKernel` configuration root. New runtime settings should extend the existing top-level sections rather than introducing `LeanKernel:*` duplicates.
 

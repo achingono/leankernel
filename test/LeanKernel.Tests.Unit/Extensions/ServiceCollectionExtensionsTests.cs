@@ -2,7 +2,9 @@ using FluentAssertions;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Logic.Telemetry;
 using LeanKernel.Logic.Tools.BuiltIn.Browser;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -50,6 +52,8 @@ public class ServiceCollectionExtensionsTests
             o.Enabled = false;
             o.ModelId = "gpt-4o-mini";
         });
+        services.Configure<TelemetrySettings>(o => o.Enabled = false);
+        services.Configure<CostEstimateTable>(_ => { });
         services.Configure<FactExtractionSettings>(o =>
         {
             o.ModelId = "gpt-4o-mini";
@@ -102,8 +106,11 @@ public class ServiceCollectionExtensionsTests
         services.Configure<AgentSettings>(o =>
         {
             o.Tools = new ToolSettings { Enabled = true };
+            o.Telemetry = new TelemetrySettings { Enabled = false };
         });
         services.Configure<MemorySettings>(o => { o.Enabled = false; o.ModelId = "m"; });
+        services.Configure<TelemetrySettings>(o => o.Enabled = false);
+        services.Configure<CostEstimateTable>(_ => { });
         services.Configure<FactExtractionSettings>(o => { o.ModelId = "m"; });
 
         services.AddLeanKernelChatClient();
@@ -139,5 +146,23 @@ public class ServiceCollectionExtensionsTests
         client.DefaultRequestHeaders.Authorization.Should().NotBeNull();
         client.DefaultRequestHeaders.Authorization!.Scheme.Should().Be("Bearer");
         client.DefaultRequestHeaders.Authorization.Parameter.Should().Be("token-value");
+    }
+
+    [Fact]
+    public void AddTelemetry_RegistersCollectorAggregationAndExportServices()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Agents:Telemetry:Enabled"] = "true"
+            })
+            .Build();
+
+        services.AddTelemetry(configuration);
+
+        services.Should().Contain(d => d.ServiceType == typeof(ITurnTelemetryCollector));
+        services.Should().Contain(d => d.ServiceType == typeof(ITelemetryAggregationService));
+        services.Should().Contain(d => d.ServiceType == typeof(ITelemetryExportService));
     }
 }

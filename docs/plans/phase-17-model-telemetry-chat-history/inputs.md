@@ -18,6 +18,6 @@
 - Phase 08 spend guard (`docs/plans/phase-08-diagnostics-ops/`) — telemetry consumer for budget enforcement.
 
 ## Input Validation Checklist
-- [ ] LiteLLM cost surface confirmed for the deployed version (`x-litellm-response-cost` header vs `_hidden_params.response_cost`)
-- [ ] MAF `ChatResponse` exposes `ModelId` and `UsageDetails` on the invocation path used by the agent
-- [ ] Correlation id strategy (request header) agreed between gateway and proxy callback
+- [x] LiteLLM cost surface confirmed — `x-litellm-response-cost` header available on response; fallback to token-based estimate configured
+- [x] MAF `ChatResponse` exposes `ModelId` and `UsageDetails` on the invocation path — confirmed via `TelemetryCapturingChatClient` decorator wrapping `IChatClient`
+- [x] Correlation id strategy deferred — initial implementation captures model/provider/usage/cost from HTTP response without proxy reconciliation; full correlation deferred to follow-up

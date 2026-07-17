@@ -34,4 +34,9 @@ public class AgentSettings
     /// Gets or sets the channel terminal and policy configuration nested under <c>Agents:Channels</c>.
     /// </summary>
     public ChannelSettings Channels { get; set; } = new ChannelSettings();
+
+    /// <summary>
+    /// Gets or sets the model telemetry configuration nested under <c>Agents:Telemetry</c>.
+    /// </summary>
+    public TelemetrySettings Telemetry { get; set; } = new TelemetrySettings();
 }

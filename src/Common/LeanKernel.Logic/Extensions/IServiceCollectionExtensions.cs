@@ -3,6 +3,7 @@ using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Logic.Telemetry;
 using LeanKernel.Logic.Tools;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
@@ -30,6 +31,22 @@ public static class IServiceCollectionExtensions
         services.AddScoped<AIContextProvider, MemoryProvider>();
         services.AddScoped<IChannelMemoryPolicyResolver, ChannelMemoryPolicyResolver>();
         services.AddMemoryPageServices();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers telemetry capture, collector, cost estimation table, and configuration.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddTelemetry(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<TelemetrySettings>(configuration.GetSection("Agents:Telemetry"));
+        services.Configure<CostEstimateTable>(configuration.GetSection("Agents:Telemetry:CostEstimate"));
+        services.AddScoped<ITurnTelemetryCollector, TurnTelemetryCollector>();
+        services.AddScoped<ITelemetryAggregationService, TelemetryAggregationService>();
+        services.AddScoped<ITelemetryExportService, TelemetryExportService>();
         return services;
     }
 
@@ -65,6 +82,7 @@ public static class IServiceCollectionExtensions
     /// <summary>
     /// Registers the OpenAI-compatible chat client from configuration.
     /// Uses the ToolModel alias for the primary chat client when configured.
+    /// Optionally wraps with telemetry capture when enabled.
     /// </summary>
     /// <param name="services">The service collection to update.</param>
     /// <returns>The updated service collection.</returns>
@@ -83,7 +101,20 @@ public static class IServiceCollectionExtensions
             var client = new OpenAIClient(
                 new ApiKeyCredential(cfg.ApiKey),
                 new OpenAIClientOptions { Endpoint = new Uri(cfg.BaseUrl) });
-            return client.GetChatClient(modelId).AsIChatClient();
+            IChatClient chatClient = client.GetChatClient(modelId).AsIChatClient();
+
+            // Wrap with telemetry capture when enabled
+            var telemetrySettings = sp.GetRequiredService<IOptions<TelemetrySettings>>().Value;
+            if (telemetrySettings.Enabled)
+            {
+                var collector = sp.GetRequiredService<ITurnTelemetryCollector>();
+                var costTable = sp.GetRequiredService<IOptions<CostEstimateTable>>().Value;
+                var logger = sp.GetRequiredService<ILogger<TelemetryCapturingChatClient>>();
+                chatClient = new TelemetryCapturingChatClient(chatClient, collector, costTable,
+                    sp.GetRequiredService<IOptions<TelemetrySettings>>(), logger);
+            }
+
+            return chatClient;
         })
         .UseFunctionInvocation()
         .UseLogging();

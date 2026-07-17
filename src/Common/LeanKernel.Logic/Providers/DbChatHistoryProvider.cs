@@ -1,5 +1,6 @@
 using LeanKernel.Data;
 using LeanKernel.Entities;
+using LeanKernel.Logic.Telemetry;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -14,6 +15,7 @@ namespace LeanKernel.Logic.Providers;
 public class DbChatHistoryProvider(
     IDbContextFactory<EntityContext> dbContextFactory,
     IPermit permit,
+    ITurnTelemetryCollector? telemetryCollector = null,
     ILogger<DbChatHistoryProvider>? logger = null) : ChatHistoryProvider
 {
     internal const string ChatSessionIdKey = "chatSessionId";
@@ -106,12 +108,47 @@ public class DbChatHistoryProvider(
                 .ToListAsync(cancellationToken),
             StringComparer.OrdinalIgnoreCase);
 
+        // Consume telemetry captured for the assistant turn (if any).
+        var telemetry = telemetryCollector?.Consume();
+
         foreach (var turn in allCandidateTurns)
         {
             if (!existingKeys.Contains(turn.Metadata!))
             {
                 scope.Turns.Add(turn);
                 existingKeys.Add(turn.Metadata!);
+
+                // Persist telemetry for assistant turns when available.
+                if (telemetry is not null && turn.Role == "assistant")
+                {
+                    scope.TurnTelemetry.Add(new TurnTelemetryEntity
+                    {
+                        TurnId = turn.Id,
+                        RequestedModel = telemetry.RequestedModel,
+                        ServedModel = telemetry.ServedModel,
+                        Provider = telemetry.Provider,
+                        ModelId = telemetry.ModelId,
+                        ApiBase = telemetry.ApiBase,
+                        PromptTokens = telemetry.PromptTokens,
+                        CompletionTokens = telemetry.CompletionTokens,
+                        TotalTokens = telemetry.TotalTokens,
+                        ResponseCost = telemetry.ResponseCost,
+                        Currency = telemetry.Currency,
+                        CostIsEstimated = telemetry.CostIsEstimated,
+                        LatencyMs = telemetry.Latency.HasValue
+                            ? (long)telemetry.Latency.Value.TotalMilliseconds
+                            : null,
+                        CapturedAt = telemetry.CapturedAt,
+                        SchemaVersion = telemetry.SchemaVersion,
+                        CreatedOn = DateTime.UtcNow,
+                        CreatedBy = new Badge
+                        {
+                            Id = Guid.Empty,
+                            FullName = "System",
+                            Email = string.Empty
+                        }
+                    });
+                }
             }
         }
 
