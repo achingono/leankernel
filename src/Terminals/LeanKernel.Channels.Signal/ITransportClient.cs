@@ -20,6 +20,7 @@ public interface ITransportClient
     /// <param name="text">The message text.</param>
     /// <param name="textStyles">The text styles to apply.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     Task SendAsync(string account, string recipient, string text, IReadOnlyList<SignalTextStyle> textStyles, CancellationToken ct);
 
     /// <summary>
@@ -28,6 +29,7 @@ public interface ITransportClient
     /// <param name="account">The sending account identifier.</param>
     /// <param name="recipient">The recipient identifier.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     Task StartTypingAsync(string account, string recipient, CancellationToken ct);
 
     /// <summary>
@@ -36,5 +38,6 @@ public interface ITransportClient
     /// <param name="account">The sending account identifier.</param>
     /// <param name="recipient">The recipient identifier.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     Task StopTypingAsync(string account, string recipient, CancellationToken ct);
 }

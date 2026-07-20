@@ -91,6 +91,7 @@ public sealed class TurnEntity : IAuditable, IRecyclable
     /// The key is derived from session, role, content, and a time-bucket to allow legitimate
     /// repeated content while rejecting logical duplicates within a short window.
     /// </summary>
+    /// <returns>A deterministic idempotency key string.</returns>
     public string ComputeIdempotencyKey()
     {
         // Bucket timestamp to 5-minute windows so retries within the same window are deduped

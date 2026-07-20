@@ -89,6 +89,7 @@ public interface IMemoryClient
     /// <param name="key">The scope-relative memory key.</param>
     /// <param name="content">The memory content to persist.</param>
     /// <param name="ct">The token used to cancel the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     Task SaveMemoryAsync(
         MemoryScope scope,
         string key,

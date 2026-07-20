@@ -13,6 +13,7 @@ public interface IIdentityResolver
     /// </summary>
     /// <param name="hostName">The normalized request host name.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching <see cref="TenantEntity"/>, or null if not found.</returns>
     Task<TenantEntity?> ResolveTenantAsync(string hostName, CancellationToken ct = default);
 
     /// <summary>
@@ -21,6 +22,7 @@ public interface IIdentityResolver
     /// </summary>
     /// <param name="tenantId">The tenant identifier.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching <see cref="TenantEntity"/>, or null if not found or inactive.</returns>
     Task<TenantEntity?> ResolveTenantByIdAsync(Guid tenantId, CancellationToken ct = default);
 
     /// <summary>
@@ -29,6 +31,7 @@ public interface IIdentityResolver
     /// </summary>
     /// <param name="principal">The authenticated claims principal.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The resolved or newly created <see cref="UserEntity"/>.</returns>
     Task<UserEntity> ResolveOrCreateUserAsync(ClaimsPrincipal principal, CancellationToken ct = default);
 
     /// <summary>
@@ -37,6 +40,7 @@ public interface IIdentityResolver
     /// </summary>
     /// <param name="principal">The authenticated claims principal.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching <see cref="UserEntity"/>, or null if not found.</returns>
     Task<UserEntity?> ResolveUserAsync(ClaimsPrincipal principal, CancellationToken ct = default);
 
     /// <summary>
@@ -48,6 +52,7 @@ public interface IIdentityResolver
     /// <param name="anonymousUserName">The anonymous user name.</param>
     /// <param name="sessionId">The ASP.NET anonymous session identifier.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The resolved or newly created guest <see cref="UserEntity"/>.</returns>
     Task<UserEntity> ResolveGuestUserAsync(Guid tenantId, string anonymousUserName, string sessionId, CancellationToken ct = default);
 
     /// <summary>
@@ -55,6 +60,7 @@ public interface IIdentityResolver
     /// </summary>
     /// <param name="channelName">The channel name.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The resolved or newly created <see cref="ChannelEntity"/>.</returns>
     Task<ChannelEntity> ResolveOrCreateChannelAsync(string channelName, CancellationToken ct = default);
 
     /// <summary>
@@ -63,6 +69,7 @@ public interface IIdentityResolver
     /// </summary>
     /// <param name="channelName">The channel name.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching <see cref="ChannelEntity"/>, or null if not found.</returns>
     Task<ChannelEntity?> ResolveChannelAsync(string channelName, CancellationToken ct = default);
 
     /// <summary>
@@ -74,6 +81,7 @@ public interface IIdentityResolver
     /// <param name="issuer">The token issuer.</param>
     /// <param name="subject">The token subject.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>True when the binding is active; false otherwise.</returns>
     Task<bool> IsChannelSenderBindingActiveAsync(
         Guid tenantId,
         Guid userId,
@@ -87,6 +95,7 @@ public interface IIdentityResolver
     /// </summary>
     /// <param name="userId">The user identifier.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The canonical person <see cref="Guid"/>.</returns>
     Task<Guid> ResolvePersonIdAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
@@ -96,6 +105,7 @@ public interface IIdentityResolver
     /// <param name="sourceUserId">The source user identifier.</param>
     /// <param name="targetUserId">The target user identifier.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The canonical person <see cref="Guid"/> for the linked users.</returns>
     Task<Guid> LinkUsersAsync(Guid tenantId, Guid sourceUserId, Guid targetUserId, CancellationToken ct = default);
 
     /// <summary>
@@ -104,5 +114,6 @@ public interface IIdentityResolver
     /// <param name="tenantId">The tenant identifier.</param>
     /// <param name="userId">The user identifier.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     Task UnlinkUserAsync(Guid tenantId, Guid userId, CancellationToken ct = default);
 }

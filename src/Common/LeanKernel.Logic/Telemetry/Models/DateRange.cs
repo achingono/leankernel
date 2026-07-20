@@ -13,16 +13,19 @@ public readonly record struct DateRange(DateTimeOffset From, DateTimeOffset To)
     /// <summary>
     /// Returns the last 7 days in UTC.
     /// </summary>
+    /// <returns>A date range spanning the last 7 days.</returns>
     public static DateRange Last7Days() => new(DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow);
 
     /// <summary>
     /// Returns the last 30 days in UTC.
     /// </summary>
+    /// <returns>A date range spanning the last 30 days.</returns>
     public static DateRange Last30Days() => new(DateTimeOffset.UtcNow.AddDays(-30), DateTimeOffset.UtcNow);
 
     /// <summary>
     /// Returns the current UTC month range.
     /// </summary>
+    /// <returns>A date range spanning the current month.</returns>
     public static DateRange CurrentMonth()
     {
         var now = DateTimeOffset.UtcNow;

@@ -14,6 +14,7 @@ public interface IProviderHealthProbe
     /// Proves the health of the external provider.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A <see cref="ProviderProbeResult"/> indicating health status.</returns>
     Task<ProviderProbeResult> ProbeAsync(CancellationToken ct = default);
 }
 

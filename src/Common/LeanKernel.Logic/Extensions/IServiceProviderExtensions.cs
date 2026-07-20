@@ -25,6 +25,7 @@ public static class IServiceProviderExtensions
     /// </summary>
     /// <param name="services">The service provider.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public static async Task RegisterToolsAsync(
         this IServiceProvider services,
         CancellationToken ct = default)

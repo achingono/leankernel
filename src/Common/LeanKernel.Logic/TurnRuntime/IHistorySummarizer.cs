@@ -13,6 +13,7 @@ public interface IHistorySummarizer
     /// </summary>
     /// <param name="messages">The chat messages to summarize.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The summary text, or null if no summary can be produced.</returns>
     Task<string?> SummarizeAsync(
         IReadOnlyList<ChatMessage> messages,
         CancellationToken cancellationToken = default);

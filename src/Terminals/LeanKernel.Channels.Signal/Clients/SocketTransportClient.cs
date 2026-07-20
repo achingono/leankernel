@@ -88,6 +88,7 @@ public sealed class SocketTransportClient(
     /// <param name="text">The message text.</param>
     /// <param name="textStyles">The text styles to apply to the message.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task SendAsync(string account, string recipient, string text, IReadOnlyList<SignalTextStyle> textStyles, CancellationToken ct)
     {
         var httpClient = httpClientFactory.CreateClient("signal-api");
@@ -115,6 +116,7 @@ public sealed class SocketTransportClient(
     /// <param name="account">The Signal account number.</param>
     /// <param name="recipient">The recipient Signal number.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public Task StartTypingAsync(string account, string recipient, CancellationToken ct) =>
         SendTypingIndicatorAsync(account, recipient, stop: false, ct);
 
@@ -124,6 +126,7 @@ public sealed class SocketTransportClient(
     /// <param name="account">The Signal account number.</param>
     /// <param name="recipient">The recipient Signal number.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public Task StopTypingAsync(string account, string recipient, CancellationToken ct) =>
         SendTypingIndicatorAsync(account, recipient, stop: true, ct);
 

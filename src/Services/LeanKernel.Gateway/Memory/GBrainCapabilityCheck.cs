@@ -26,6 +26,7 @@ public sealed class GBrainCapabilityCheck : IMemoryCapabilityCheck
     /// Runs the capability probe and returns the result.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The <see cref="MemoryCapabilityResult"/> from the probe.</returns>
     public async Task<MemoryCapabilityResult> ProbeAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("GBrain capability pre-check started.");

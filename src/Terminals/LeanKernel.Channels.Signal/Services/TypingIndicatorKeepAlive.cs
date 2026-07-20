@@ -66,6 +66,7 @@ public sealed class TypingIndicatorKeepAlive : IAsyncDisposable
     /// <summary>
     /// Stops the keep-alive loop and sends a typing indicator stop notification.
     /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task StopAsync()
     {
         if (Interlocked.Exchange(ref _stopped, 1) != 0)
@@ -105,6 +106,7 @@ public sealed class TypingIndicatorKeepAlive : IAsyncDisposable
     /// <summary>
     /// Disposes the keep-alive by stopping the typing indicator loop.
     /// </summary>
+    /// <returns>A <see cref="ValueTask"/> representing the disposal operation.</returns>
     public ValueTask DisposeAsync() => new(StopAsync());
 
     private async Task RunLoopAsync(CancellationToken ct)

@@ -24,6 +24,7 @@ public sealed class ToolGovernancePolicy
     /// Returns true when the given tool definition passes the governance policy.
     /// </summary>
     /// <param name="tool">The tool definition to evaluate.</param>
+    /// <returns>True when the tool is allowed; false otherwise.</returns>
     public bool IsAllowed(ToolDefinition tool)
     {
         ArgumentNullException.ThrowIfNull(tool);
@@ -50,6 +51,7 @@ public sealed class ToolGovernancePolicy
     /// Filters a list of tool definitions to only those permitted by the governance policy.
     /// </summary>
     /// <param name="tools">The tool definitions to filter.</param>
+    /// <returns>The filtered tool definitions.</returns>
     public IEnumerable<ToolDefinition> Filter(IEnumerable<ToolDefinition> tools)
     {
         ArgumentNullException.ThrowIfNull(tools);

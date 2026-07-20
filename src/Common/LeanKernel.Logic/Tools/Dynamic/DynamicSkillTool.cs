@@ -24,6 +24,7 @@ public static class DynamicSkillTool
     /// <param name="skill">The skill definition.</param>
     /// <param name="operation">The operation to bind.</param>
     /// <param name="scopeFactory">The service scope factory for creating scoped dependencies.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the given skill operation.</returns>
     public static ToolDefinition Create(
         SkillDefinition skill,
         SkillOperation operation,

@@ -17,6 +17,7 @@ public sealed class TerminalService(
     /// Executes the main message processing loop.
     /// </summary>
     /// <param name="stoppingToken">Cancellation token that signals service shutdown.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)

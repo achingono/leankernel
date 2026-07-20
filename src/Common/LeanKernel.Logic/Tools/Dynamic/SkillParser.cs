@@ -23,6 +23,7 @@ public sealed partial class SkillParser
     /// Returns null when the file does not exist or is invalid.
     /// </summary>
     /// <param name="filePath">The path to the SKILL.md file.</param>
+    /// <returns>The parsed <see cref="SkillDefinition"/>, or null if parsing fails.</returns>
     public SkillDefinition? Parse(string filePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
@@ -41,6 +42,7 @@ public sealed partial class SkillParser
     /// </summary>
     /// <param name="content">The raw content of the SKILL.md file.</param>
     /// <param name="sourcePath">Optional source path for diagnostics.</param>
+    /// <returns>The parsed <see cref="SkillDefinition"/>, or null if parsing fails.</returns>
     public SkillDefinition? ParseContent(string content, string? sourcePath = null)
     {
         ArgumentNullException.ThrowIfNull(content);

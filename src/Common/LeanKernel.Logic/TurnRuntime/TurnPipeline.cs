@@ -20,6 +20,7 @@ public sealed class TurnPipeline(
     /// </summary>
     /// <param name="context">The turn context to execute against.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The <see cref="TurnPipelineResult"/> from the completed execution.</returns>
     public async Task<TurnPipelineResult> ExecuteAsync(
         TurnContext context,
         CancellationToken cancellationToken = default)

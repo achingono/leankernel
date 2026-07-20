@@ -15,6 +15,7 @@ public sealed class TurnProgressBroker
     /// </summary>
     /// <param name="conversationId">The conversation identifier.</param>
     /// <param name="handler">The handler to invoke on progress updates.</param>
+    /// <returns>A disposable that unsubscribes when disposed.</returns>
     public IDisposable Subscribe(string conversationId, Func<TurnProgressUpdate, Task> handler)
     {
         var subscriptionId = Guid.NewGuid();
@@ -39,6 +40,7 @@ public sealed class TurnProgressBroker
     /// </summary>
     /// <param name="conversationId">The conversation identifier.</param>
     /// <param name="update">The progress update to publish.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task PublishAsync(string conversationId, TurnProgressUpdate update)
     {
         Func<TurnProgressUpdate, Task>[] handlers;

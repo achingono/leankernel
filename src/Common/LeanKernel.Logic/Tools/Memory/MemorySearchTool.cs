@@ -18,6 +18,7 @@ public static class MemorySearchTool
     /// Creates the memory_search tool definition.
     /// </summary>
     /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for memory_search.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

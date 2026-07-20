@@ -62,6 +62,7 @@ public static class IServiceCollectionExtensions
     /// Registers the shared tool registry as a singleton.
     /// </summary>
     /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated <see cref="IServiceCollection"/>.</returns>
     public static IServiceCollection AddToolRegistry(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -80,6 +81,7 @@ public static class IServiceCollectionExtensions
     /// Registers the LiteLLM-backed embedding client for compaction sentence scoring.
     /// </summary>
     /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated <see cref="IServiceCollection"/>.</returns>
     public static IServiceCollection AddEmbeddingClient(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);

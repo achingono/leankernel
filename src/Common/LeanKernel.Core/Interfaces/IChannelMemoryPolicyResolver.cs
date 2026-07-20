@@ -11,5 +11,6 @@ public interface IChannelMemoryPolicyResolver
     /// <param name="tenantId">The tenant identifier.</param>
     /// <param name="channelId">The source channel identifier.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The effective channel memory policy resolution for the source channel.</returns>
     Task<ChannelMemoryPolicyResolution> ResolveAsync(Guid tenantId, Guid channelId, CancellationToken ct = default);
 }

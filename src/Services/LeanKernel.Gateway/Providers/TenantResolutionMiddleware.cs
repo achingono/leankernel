@@ -52,6 +52,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
     /// <param name="context">The HTTP context.</param>
     /// <param name="resolver">The identity resolver.</param>
     /// <param name="identitySettings">The identity configuration options.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     [SuppressMessage("Critical Code Smell", "S3776", Justification = "Request identity resolution keeps channel and anonymous flows explicit to preserve security checks.")]
     public async Task InvokeAsync(
         HttpContext context,

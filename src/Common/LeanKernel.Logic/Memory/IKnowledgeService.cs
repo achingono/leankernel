@@ -11,6 +11,7 @@ public interface IMemoryService
     /// <param name="query">The search query.</param>
     /// <param name="maxResults">Maximum number of results to return.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching knowledge pages.</returns>
     Task<IReadOnlyList<MemorySearchResult>> SearchAsync(
         string query,
         int maxResults = 10,
@@ -21,6 +22,7 @@ public interface IMemoryService
     /// </summary>
     /// <param name="key">The page key.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching <see cref="MemoryPage"/>, or null if not found.</returns>
     Task<MemoryPage?> GetPageAsync(string key, CancellationToken ct = default);
 
     /// <summary>
@@ -29,5 +31,6 @@ public interface IMemoryService
     /// <param name="key">The page key.</param>
     /// <param name="content">The page content.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     Task PutPageAsync(string key, string content, CancellationToken ct = default);
 }
