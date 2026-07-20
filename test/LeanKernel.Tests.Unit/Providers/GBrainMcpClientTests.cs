@@ -19,7 +19,7 @@ public class GBrainMcpClientTests
     /// <summary>
     /// Verifies JSON RPC success payloads are returned as structured results.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task CallToolAsync_ReturnsStructuredResult_ForJsonResponse()
     {
@@ -37,7 +37,7 @@ public class GBrainMcpClientTests
     /// <summary>
     /// Verifies MCP errors are surfaced as client exceptions.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task CallToolAsync_Throws_OnMcpError()
     {
@@ -53,7 +53,7 @@ public class GBrainMcpClientTests
     /// <summary>
     /// Verifies server-sent event payloads are parsed correctly.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task CallToolAsync_ParsesSseTransport()
     {
@@ -69,7 +69,7 @@ public class GBrainMcpClientTests
     /// <summary>
     /// Verifies tool envelopes containing JSON text are unwrapped.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task CallToolAsync_UnwrapsToolEnvelopeAndParsesTextJson()
     {
@@ -94,7 +94,7 @@ public class GBrainMcpClientTests
     /// <summary>
     /// Verifies error tool envelopes are surfaced as client exceptions.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task CallToolAsync_Throws_WhenToolEnvelopeIsError()
     {

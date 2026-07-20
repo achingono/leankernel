@@ -143,7 +143,7 @@ public class DbChatHistoryProviderTests : IDisposable
     /// <summary>
     /// C5: A "tool" turn must rehydrate as <see cref="ChatRole.Tool"/>, not be promoted to User.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task ProvideChatHistoryAsync_ToolRole_RehydratesAsChatRoleTool()
     {
@@ -187,7 +187,7 @@ public class DbChatHistoryProviderTests : IDisposable
     /// <summary>
     /// C5: Unknown roles are skipped (not promoted to User) to preserve message provenance.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task ProvideChatHistoryAsync_UnknownRole_IsSkippedNotPromotedToUser()
     {
@@ -229,7 +229,7 @@ public class DbChatHistoryProviderTests : IDisposable
     /// <summary>
     /// M3: A session with more turns than the window limit returns only the most recent turns.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task ProvideChatHistoryAsync_ExceedsTurnWindow_ReturnsBoundedCount()
     {
@@ -278,7 +278,7 @@ public class DbChatHistoryProviderTests : IDisposable
     /// <summary>
     /// Integration: user, assistant, and tool turns all round-trip with correct roles.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task ProvideChatHistoryAsync_ToolCallScenario_AllRolesRoundTrip()
     {

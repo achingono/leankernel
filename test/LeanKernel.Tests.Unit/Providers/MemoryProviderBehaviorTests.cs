@@ -27,7 +27,7 @@ public class MemoryProviderBehaviorTests
     /// <summary>
     /// Verifies no context is added when the request contains no query text.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task ProvideContext_ReturnsEmpty_WhenNoQueryText()
     {
@@ -45,7 +45,7 @@ public class MemoryProviderBehaviorTests
     /// <summary>
     /// Verifies compact memory summaries are returned when matches exist.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task ProvideContext_ReturnsCompactSummaries_WhenMemoriesExist()
     {
@@ -175,7 +175,7 @@ Remote channel answer
     /// <summary>
     /// Verifies normalized facts are persisted after invocation.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task StoreContext_PersistsNormalizedFacts()
     {
@@ -199,7 +199,7 @@ Remote channel answer
     /// <summary>
     /// Verifies raw fact pages are saved when normalization fails.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task StoreContext_FallsBackToRawSave_OnPipelineFailure()
     {

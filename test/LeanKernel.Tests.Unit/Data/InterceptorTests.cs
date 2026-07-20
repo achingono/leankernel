@@ -48,7 +48,7 @@ public class InterceptorTests
     /// <summary>
     /// Verifies the auditable interceptor stamps creation metadata on insert.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task AuditableInterceptor_SetsCreatedOnAndCreatedBy_OnAdd()
     {
@@ -75,7 +75,7 @@ public class InterceptorTests
     /// <summary>
     /// Verifies the auditable interceptor stamps update metadata on modification.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task AuditableInterceptor_SetsUpdatedOnAndUpdated_OnModify()
     {
@@ -105,7 +105,7 @@ public class InterceptorTests
     /// <summary>
     /// Verifies the recyclable interceptor soft-deletes tracked entities.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task RecyclableInterceptor_SoftDeletes_OnDelete()
     {

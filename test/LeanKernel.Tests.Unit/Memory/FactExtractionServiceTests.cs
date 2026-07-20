@@ -50,7 +50,7 @@ public class FactExtractionServiceTests
     /// <summary>
     /// Verifies extracted facts are parsed from the chat client response.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task ExtractFactsAsync_UsesChatClientAndParsesArray()
     {

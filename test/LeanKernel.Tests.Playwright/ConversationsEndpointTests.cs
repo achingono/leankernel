@@ -19,7 +19,7 @@ public class ConversationsEndpointTests : IClassFixture<PlaywrightFixture>
     /// <summary>
     /// Verifies the conversations endpoint returns an expected status without full auth setup.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task GetConversations_ReturnsOkOrUnauthorized()
     {

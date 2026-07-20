@@ -27,7 +27,7 @@ public class Phase02BoundaryTests : IClassFixture<GatewayTestApplicationFactory>
     /// <summary>
     /// C2: A request to a known host resolves a tenant and is accepted (not 401).
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task KnownHost_DoesNotReturn401()
     {
@@ -45,7 +45,7 @@ public class Phase02BoundaryTests : IClassFixture<GatewayTestApplicationFactory>
     /// <summary>
     /// C2: Health checks bypass tenant resolution and always return 200.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task HealthEndpoint_BypassesTenantResolutionAndReturnsOk()
     {
@@ -59,7 +59,7 @@ public class Phase02BoundaryTests : IClassFixture<GatewayTestApplicationFactory>
     /// C4: A valid anonymous request (no token) is accepted when JWT validation
     /// is not configured (no SecretKey in test settings).
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task AnonymousRequest_WithoutToken_IsAcceptedWhenNoSigningKeyConfigured()
     {
@@ -79,7 +79,7 @@ public class Phase02BoundaryTests : IClassFixture<GatewayTestApplicationFactory>
     /// JWT signing key validation is enabled (the token claims should not be trusted).
     /// When no key is configured the test verifies the endpoint is reachable regardless.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task MalformedToken_DoesNotGrantAccessToAdminClaims()
     {

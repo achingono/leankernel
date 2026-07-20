@@ -25,7 +25,7 @@ public class ConversationsEndpointTests : IClassFixture<GatewayTestApplicationFa
     /// <summary>
     /// Verifies listing conversations requires an agent identifier.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task GetConversations_WithoutAgentId_ReturnsBadRequest()
     {
@@ -37,7 +37,7 @@ public class ConversationsEndpointTests : IClassFixture<GatewayTestApplicationFa
     /// <summary>
     /// Verifies listing conversations reaches the endpoint for a valid query.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task GetConversations_WithAgentId_ReturnsOkOrNotFound()
     {
@@ -49,7 +49,7 @@ public class ConversationsEndpointTests : IClassFixture<GatewayTestApplicationFa
     /// <summary>
     /// Verifies fetching an unknown conversation returns an error status.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task GetConversation_ByNonexistentId_ReturnsNotFound()
     {

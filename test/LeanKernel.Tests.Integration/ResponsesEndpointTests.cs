@@ -26,7 +26,7 @@ public class ResponsesEndpointTests : IClassFixture<GatewayTestApplicationFactor
     /// <summary>
     /// Verifies a valid responses payload reaches the endpoint.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task PostResponses_WithValidPayload_ReturnsOkOrError()
     {
@@ -50,7 +50,7 @@ public class ResponsesEndpointTests : IClassFixture<GatewayTestApplicationFactor
     /// <summary>
     /// Verifies an empty responses payload is rejected or handled.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task PostResponses_WithEmptyBody_ReturnsBadRequest()
     {
@@ -70,7 +70,7 @@ public class ResponsesEndpointTests : IClassFixture<GatewayTestApplicationFactor
     /// <summary>
     /// Verifies GET is not supported on the responses route.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task GetResponses_Returns404Or405()
     {

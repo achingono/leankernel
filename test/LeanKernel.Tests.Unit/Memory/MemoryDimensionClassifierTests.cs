@@ -14,7 +14,7 @@ public class MemoryDimensionClassifierTests
     /// <summary>
     /// Verifies action-heavy facts default to the what dimension.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task ActionCentricFact_DefaultsToWhatPrimary()
     {
@@ -68,7 +68,7 @@ public class MemoryDimensionClassifierTests
     /// <summary>
     /// Verifies valid LLM refinements override ambiguous deterministic output.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task AmbiguousPage_UsesLlmRefinement_WhenValidJsonReturned()
     {
@@ -103,7 +103,7 @@ public class MemoryDimensionClassifierTests
     /// <summary>
     /// Verifies invalid LLM output falls back to deterministic classification.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task AmbiguousPage_InvalidJson_FallsBackToDeterministic()
     {
@@ -128,7 +128,7 @@ public class MemoryDimensionClassifierTests
     /// <summary>
     /// Verifies the LLM is skipped when the page is not ambiguous.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task NonAmbiguousPage_DoesNotInvokeLlm()
     {

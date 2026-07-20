@@ -25,7 +25,7 @@ public class HealthEndpointTests : IClassFixture<GatewayTestApplicationFactory>
     /// <summary>
     /// Verifies the health endpoint returns success.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task GetHealth_ReturnsOk()
     {
@@ -37,7 +37,7 @@ public class HealthEndpointTests : IClassFixture<GatewayTestApplicationFactory>
     /// <summary>
     /// Verifies the health payload reports a healthy state.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task GetHealth_ReturnsHealthyStatus()
     {

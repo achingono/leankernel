@@ -81,7 +81,7 @@ public class GBrainMemoryClientTests
     /// <summary>
     /// Verifies search failures are handled by returning no memories.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task SearchMemoriesAsync_WhenClientThrows_ReturnsEmpty()
     {
@@ -101,7 +101,7 @@ public class GBrainMemoryClientTests
     /// <summary>
     /// Verifies null search results are treated as empty.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task SearchMemoriesAsync_NullResult_ReturnsEmpty()
     {
@@ -121,7 +121,7 @@ public class GBrainMemoryClientTests
     /// <summary>
     /// Verifies save failures are propagated to callers.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task SaveMemoryAsync_WhenClientThrows_PropagatesException()
     {
@@ -141,7 +141,7 @@ public class GBrainMemoryClientTests
     /// <summary>
     /// Verifies successful saves invoke the put page tool.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task SaveMemoryAsync_Success_CallsPutPage()
     {
@@ -165,7 +165,7 @@ public class GBrainMemoryClientTests
     /// <summary>
     /// Verifies successful searches invoke the search tool.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task SearchMemoriesAsync_Success_CallsSearch()
     {
@@ -189,7 +189,7 @@ public class GBrainMemoryClientTests
     /// <summary>
     /// Verifies saved memory keys include the expected scoped slug.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task SaveMemoryAsync_CallsPutPageWithCorrectSlug()
     {
@@ -284,7 +284,7 @@ public class GBrainMemoryClientTests
     /// C3: Search must use a namespace derived from TenantId/PersonId/ChannelId.
     /// Ensures search and save use the same identity-scoped namespace for correct recall.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task SearchMemoriesAsync_UsesNamespaceDerivedFromScopeIdentity()
     {
@@ -318,7 +318,7 @@ public class GBrainMemoryClientTests
     /// <summary>
     /// C3: Memory saved under scope A must use a different namespace than memory searched under scope B.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task SearchMemoriesAsync_DifferentScopes_UseDifferentNamespaces()
     {

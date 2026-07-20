@@ -27,7 +27,7 @@ public class TenantResolutionMiddlewareTests
     /// <summary>
     /// C2: Requests from hosts with no matching tenant must be rejected with 401.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task InvokeAsync_UnknownTenant_Returns401()
     {
@@ -58,7 +58,7 @@ public class TenantResolutionMiddlewareTests
     /// <summary>
     /// C2: Inactive tenants must also be rejected with 401.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task InvokeAsync_InactiveTenant_Returns401()
     {
@@ -92,7 +92,7 @@ public class TenantResolutionMiddlewareTests
     /// <summary>
     /// C2: Health check path must bypass tenant resolution and always reach next.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task InvokeAsync_HealthPath_BypassesTenantResolution()
     {
@@ -122,7 +122,7 @@ public class TenantResolutionMiddlewareTests
     /// C2/M6: For authenticated users, tenant and user IDs must be stored in HttpContext.Items
     /// so that RequestContextPermit can read them without blocking.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task InvokeAsync_AuthenticatedUser_StoresIdentityInItems()
     {
@@ -164,7 +164,7 @@ public class TenantResolutionMiddlewareTests
     /// <summary>
     /// C2/M6: For anonymous users, tenant and guest user IDs must be stored in HttpContext.Items.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task InvokeAsync_AnonymousUser_StoresGuestIdentityInItems()
     {
