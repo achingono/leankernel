@@ -1,69 +1,6 @@
 namespace LeanKernel.Logic.Providers;
 
 /// <summary>
-/// Represents the scope within which memories are stored and retrieved.
-/// </summary>
-public sealed class MemoryScope
-{
-    /// <summary>
-    /// Gets the tenant identifier.
-    /// </summary>
-    public Guid TenantId { get; init; }
-
-    /// <summary>
-    /// Gets the canonical person identifier.
-    /// </summary>
-    public Guid PersonId { get; init; }
-
-    /// <summary>
-    /// Gets the channel identifier.
-    /// </summary>
-    public Guid ChannelId { get; init; }
-
-    /// <summary>
-    /// Gets the optional explicit channel set used for read fan-out.
-    /// When null, the memory client resolves the readable set from policy.
-    /// </summary>
-    public IReadOnlyCollection<Guid>? SearchChannelIds { get; init; }
-}
-
-/// <summary>
-/// Represents a single memory item retrieved from the memory store.
-/// </summary>
-public sealed class MemoryItem
-{
-    /// <summary>
-    /// Gets the unique key for this memory.
-    /// </summary>
-    public string Key { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Gets the textual content of the memory.
-    /// </summary>
-    public string Text { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Gets the relevance score.
-    /// </summary>
-    public double Score { get; init; }
-
-    /// <summary>
-    /// Gets the source or origin of the memory.
-    /// </summary>
-    public string? Source { get; init; }
-
-    /// <summary>
-    /// Gets the channel identifier parsed from the scoped memory key when available.
-    /// </summary>
-    public Guid? ChannelId { get; init; }
-
-    /// <summary>
-    /// Gets the scope-relative key when available.
-    /// </summary>
-    public string? ScopeRelativeKey { get; init; }
-}
-
-/// <summary>
 /// Provides memory search and persistence capabilities backed by Memory or an in-memory stub.
 /// </summary>
 public interface IMemoryClient
@@ -95,30 +32,4 @@ public interface IMemoryClient
         string key,
         string content,
         CancellationToken ct = default);
-}
-
-/// <summary>
-/// A no-op / stub memory client for environments where Memory is not available.
-/// </summary>
-public sealed class StubMemoryClient : IMemoryClient
-{
-    /// <inheritdoc />
-    public Task<IReadOnlyList<MemoryItem>> SearchMemoriesAsync(
-        MemoryScope scope,
-        string query,
-        int maxResults = 10,
-        CancellationToken ct = default)
-    {
-        return Task.FromResult<IReadOnlyList<MemoryItem>>(Array.Empty<MemoryItem>());
-    }
-
-    /// <inheritdoc />
-    public Task SaveMemoryAsync(
-        MemoryScope scope,
-        string key,
-        string content,
-        CancellationToken ct = default)
-    {
-        return Task.CompletedTask;
-    }
 }

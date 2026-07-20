@@ -15,6 +15,14 @@
       "elementOrder": [
         "accessibility"
       ]
+    },
+    "maintainabilityRules": {
+      "topLevelTypes": [
+        "class",
+        "interface",
+        "struct",
+        "enum"
+      ]
     }
   }
 }

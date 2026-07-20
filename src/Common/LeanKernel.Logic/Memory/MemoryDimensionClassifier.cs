@@ -254,12 +254,3 @@ public sealed class MemoryDimensionClassifier
         return false;
     }
 }
-
-/// <summary>
-/// Represents the outcome of classifying a memory page into 5W1H dimensions.
-/// </summary>
-public sealed record DimensionClassificationResult(
-    string PrimaryDimension,
-    IReadOnlyList<string> SecondaryDimensions,
-    IReadOnlyList<MemoryDimensionScore> DimensionScores,
-    string Source);
