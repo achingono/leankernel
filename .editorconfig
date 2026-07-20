@@ -123,7 +123,7 @@ dotnet_diagnostic.CS1591.severity = error
 dotnet_diagnostic.CS1572.severity = error
 dotnet_diagnostic.CS1573.severity = error
 dotnet_diagnostic.CS1574.severity = error
-dotnet_diagnostic.SA1611.severity = silent
+dotnet_diagnostic.SA1611.severity = error
 dotnet_diagnostic.SA1615.severity = silent
 
 # Logic project - relaxed style rules for tool-generated and compact patterns

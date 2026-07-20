@@ -18,6 +18,8 @@ public sealed class TurnPipeline(
     /// <summary>
     /// Executes all stages in order against the turn context.
     /// </summary>
+    /// <param name="context">The turn context to execute against.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<TurnPipelineResult> ExecuteAsync(
         TurnContext context,
         CancellationToken cancellationToken = default)

@@ -17,6 +17,7 @@ public static class MemoryReadTool
     /// <summary>
     /// Creates the memory_read tool definition.
     /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

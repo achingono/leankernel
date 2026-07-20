@@ -11,6 +11,7 @@ public static class TurnPipelineServiceExtensions
     /// <summary>
     /// Registers the turn pipeline and its default stages.
     /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection"/> to add services to.</param>
     public static IServiceCollection AddTurnPipeline(this IServiceCollection services)
     {
         services

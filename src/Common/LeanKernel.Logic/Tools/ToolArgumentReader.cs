@@ -10,6 +10,8 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns a string value from the argument dictionary, or null when missing.
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
     public static string? GetString(IReadOnlyDictionary<string, object?> args, string key)
     {
         if (!args.TryGetValue(key, out var raw))
@@ -29,6 +31,8 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns an integer value from the argument dictionary, or null when missing or unparseable.
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
     public static int? GetInt(IReadOnlyDictionary<string, object?> args, string key)
     {
         if (!args.TryGetValue(key, out var raw))
@@ -50,6 +54,8 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns a boolean value from the argument dictionary, or null when missing or unparseable.
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
     public static bool? GetBool(IReadOnlyDictionary<string, object?> args, string key)
     {
         if (!args.TryGetValue(key, out var raw))
@@ -70,6 +76,8 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns a double value from the argument dictionary, or null when missing or unparseable.
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
     public static double? GetDouble(IReadOnlyDictionary<string, object?> args, string key)
     {
         if (!args.TryGetValue(key, out var raw))
@@ -93,6 +101,8 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns a JSON array or object string value for structured inputs, or null when missing.
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
     public static string? GetJson(IReadOnlyDictionary<string, object?> args, string key)
     {
         if (!args.TryGetValue(key, out var raw))
@@ -112,6 +122,8 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns a string value or empty string when missing (source-compatible).
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
     public static string GetStringOrEmpty(IReadOnlyDictionary<string, object?> args, string key)
     {
         return GetString(args, key) ?? string.Empty;
@@ -120,6 +132,9 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns an integer value with a default fallback (source-compatible).
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
+    /// <param name="defaultValue">The default value.</param>
     public static int GetInt32OrDefault(IReadOnlyDictionary<string, object?> args, string key, int defaultValue)
     {
         return GetInt(args, key) ?? defaultValue;
@@ -128,6 +143,9 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns a boolean value with a default fallback (source-compatible).
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
+    /// <param name="defaultValue">The default value.</param>
     public static bool GetBoolOrDefault(IReadOnlyDictionary<string, object?> args, string key, bool defaultValue)
     {
         return GetBool(args, key) ?? defaultValue;
@@ -136,6 +154,8 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns a string map from the argument dictionary, or an empty dictionary when missing.
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
     public static IReadOnlyDictionary<string, string> GetStringDictionary(IReadOnlyDictionary<string, object?> args, string key)
     {
         if (!args.TryGetValue(key, out var raw) || raw is null)
@@ -175,6 +195,8 @@ public static class ToolArgumentReader
     /// <summary>
     /// Returns an object dictionary from the argument dictionary, or an empty dictionary when missing.
     /// </summary>
+    /// <param name="args">The tool argument dictionary.</param>
+    /// <param name="key">The argument key.</param>
     public static Dictionary<string, object?> GetObjectDictionary(IReadOnlyDictionary<string, object?> args, string key)
     {
         if (!args.TryGetValue(key, out var raw) || raw is null)

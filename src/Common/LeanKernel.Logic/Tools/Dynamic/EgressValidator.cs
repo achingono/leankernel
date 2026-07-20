@@ -11,6 +11,7 @@ public static class EgressValidator
     /// <summary>
     /// Returns true when <paramref name="host"/> is a loopback, private, or link-local address.
     /// </summary>
+    /// <param name="host">The request host (without port).</param>
     public static bool IsPrivateOrLoopbackHost(string host)
     {
         if (string.IsNullOrWhiteSpace(host))
@@ -78,6 +79,9 @@ public static class EgressValidator
     /// Attempts to validate an absolute URI target against the egress policy.
     /// Returns null when valid, or an error message when rejected.
     /// </summary>
+    /// <param name="url">The absolute URI to validate.</param>
+    /// <param name="skillAllowedHosts">Per-skill allowlist from <c>egress.allowHosts</c>.</param>
+    /// <param name="globalAllowHosts">Global ceiling from <c>Agents:Tools:DynamicHttp:AllowHosts</c>.</param>
     public static string? TryValidateEgressTarget(
         string url,
         IReadOnlyList<string> skillAllowedHosts,

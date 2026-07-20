@@ -11,6 +11,8 @@ public interface IHistorySummarizer
     /// Produces a summary for the provided history messages.
     /// Returns null when no summary can be produced.
     /// </summary>
+    /// <param name="messages">The chat messages to summarize.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     Task<string?> SummarizeAsync(
         IReadOnlyList<ChatMessage> messages,
         CancellationToken cancellationToken = default);

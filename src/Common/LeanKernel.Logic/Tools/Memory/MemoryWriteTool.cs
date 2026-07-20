@@ -14,6 +14,7 @@ public static class MemoryWriteTool
     /// <summary>
     /// Creates the memory_write tool definition.
     /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

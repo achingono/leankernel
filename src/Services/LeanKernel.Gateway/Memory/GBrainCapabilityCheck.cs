@@ -14,6 +14,8 @@ public sealed class GBrainCapabilityCheck : IMemoryCapabilityCheck
     /// <summary>
     /// Initializes a new instance of <see cref="GBrainCapabilityCheck"/>.
     /// </summary>
+    /// <param name="client">The GBrain MCP client.</param>
+    /// <param name="logger">The logger instance.</param>
     public GBrainCapabilityCheck(IGBrainMcpClient client, ILogger<GBrainCapabilityCheck> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
@@ -23,6 +25,7 @@ public sealed class GBrainCapabilityCheck : IMemoryCapabilityCheck
     /// <summary>
     /// Runs the capability probe and returns the result.
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<MemoryCapabilityResult> ProbeAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("GBrain capability pre-check started.");

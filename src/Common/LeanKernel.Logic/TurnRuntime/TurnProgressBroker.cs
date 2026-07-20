@@ -13,6 +13,8 @@ public sealed class TurnProgressBroker
     /// Subscribes to progress updates for a specific conversation.
     /// Returns a disposable that unsubscribes when disposed.
     /// </summary>
+    /// <param name="conversationId">The conversation identifier.</param>
+    /// <param name="handler">The handler to invoke on progress updates.</param>
     public IDisposable Subscribe(string conversationId, Func<TurnProgressUpdate, Task> handler)
     {
         var subscriptionId = Guid.NewGuid();
@@ -35,6 +37,8 @@ public sealed class TurnProgressBroker
     /// Publishes a progress update to all subscribers of the given conversation.
     /// Exceptions in handlers are isolated and do not affect other subscribers.
     /// </summary>
+    /// <param name="conversationId">The conversation identifier.</param>
+    /// <param name="update">The progress update to publish.</param>
     public async Task PublishAsync(string conversationId, TurnProgressUpdate update)
     {
         Func<TurnProgressUpdate, Task>[] handlers;

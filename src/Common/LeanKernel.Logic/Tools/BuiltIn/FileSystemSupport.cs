@@ -14,6 +14,8 @@ public static class FileSystemSupport
     /// Resolves a candidate path within the allowed root, returning null when the
     /// resolved path would escape the root boundary.
     /// </summary>
+    /// <param name="rootPath">The allowed root path.</param>
+    /// <param name="subPath">The relative sub-path to resolve.</param>
     public static string? ResolveWithinRoot(string rootPath, string? subPath)
     {
         if (string.IsNullOrWhiteSpace(rootPath))
@@ -49,6 +51,8 @@ public static class FileSystemSupport
     /// <summary>
     /// Returns true when <paramref name="candidate"/> is at or beneath <paramref name="root"/>.
     /// </summary>
+    /// <param name="root">The allowed root path.</param>
+    /// <param name="candidate">The candidate path to check.</param>
     public static bool IsWithinRoot(string root, string candidate)
     {
         var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -60,6 +64,7 @@ public static class FileSystemSupport
     /// <summary>
     /// Returns true when the path has a text-like extension suitable for direct reading.
     /// </summary>
+    /// <param name="path">The file path to inspect.</param>
     public static bool IsTextLikeExtension(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -76,6 +81,7 @@ public static class FileSystemSupport
     /// <summary>
     /// Returns true when the file is a candidate for OCR extraction.
     /// </summary>
+    /// <param name="path">The file path to inspect.</param>
     public static bool IsOcrCandidate(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -90,6 +96,7 @@ public static class FileSystemSupport
     /// <summary>
     /// Returns true when the file is an EPUB candidate.
     /// </summary>
+    /// <param name="path">The file path to inspect.</param>
     public static bool IsEpubCandidate(string? path)
     {
         return !string.IsNullOrWhiteSpace(path)
@@ -99,6 +106,7 @@ public static class FileSystemSupport
     /// <summary>
     /// Returns true when the file is a DOCX candidate.
     /// </summary>
+    /// <param name="path">The file path to inspect.</param>
     public static bool IsDocxCandidate(string? path)
     {
         return !string.IsNullOrWhiteSpace(path)
@@ -108,6 +116,7 @@ public static class FileSystemSupport
     /// <summary>
     /// Returns true when the file is a PPTX candidate.
     /// </summary>
+    /// <param name="path">The file path to inspect.</param>
     public static bool IsPptxCandidate(string? path)
     {
         return !string.IsNullOrWhiteSpace(path)
@@ -117,6 +126,8 @@ public static class FileSystemSupport
     /// <summary>
     /// Creates a scratch file path in the configured scratch directory.
     /// </summary>
+    /// <param name="scratchRoot">The scratch directory root path.</param>
+    /// <param name="extension">The file extension (e.g. ".pdf").</param>
     public static string EnsureScratchPath(string scratchRoot, string extension)
     {
         var root = Path.GetFullPath(scratchRoot);
@@ -127,6 +138,10 @@ public static class FileSystemSupport
     /// <summary>
     /// Runs a Python script with arguments and returns stdout.
     /// </summary>
+    /// <param name="pythonExecutable">The path to the Python interpreter.</param>
+    /// <param name="script">The Python script content.</param>
+    /// <param name="arguments">The script arguments.</param>
+    /// <param name="ct">Cancellation token.</param>
     public static async Task<string> RunPythonAsync(
         string pythonExecutable,
         string script,

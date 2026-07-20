@@ -22,6 +22,7 @@ public sealed partial class SkillParser
     /// Parses a SKILL.md file from the specified path.
     /// Returns null when the file does not exist or is invalid.
     /// </summary>
+    /// <param name="filePath">The path to the SKILL.md file.</param>
     public SkillDefinition? Parse(string filePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
@@ -38,6 +39,8 @@ public sealed partial class SkillParser
     /// <summary>
     /// Parses a SKILL.md from raw content string.
     /// </summary>
+    /// <param name="content">The raw content of the SKILL.md file.</param>
+    /// <param name="sourcePath">Optional source path for diagnostics.</param>
     public SkillDefinition? ParseContent(string content, string? sourcePath = null)
     {
         ArgumentNullException.ThrowIfNull(content);

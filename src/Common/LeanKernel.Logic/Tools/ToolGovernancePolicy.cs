@@ -13,8 +13,8 @@ public sealed class ToolGovernancePolicy
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ToolGovernancePolicy"/> class.
-    /// Initializes a new instance of <see cref="ToolGovernancePolicy"/>.
     /// </summary>
+    /// <param name="settings">The tool settings from configuration.</param>
     public ToolGovernancePolicy(ToolSettings settings)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -23,6 +23,7 @@ public sealed class ToolGovernancePolicy
     /// <summary>
     /// Returns true when the given tool definition passes the governance policy.
     /// </summary>
+    /// <param name="tool">The tool definition to evaluate.</param>
     public bool IsAllowed(ToolDefinition tool)
     {
         ArgumentNullException.ThrowIfNull(tool);
@@ -48,6 +49,7 @@ public sealed class ToolGovernancePolicy
     /// <summary>
     /// Filters a list of tool definitions to only those permitted by the governance policy.
     /// </summary>
+    /// <param name="tools">The tool definitions to filter.</param>
     public IEnumerable<ToolDefinition> Filter(IEnumerable<ToolDefinition> tools)
     {
         ArgumentNullException.ThrowIfNull(tools);

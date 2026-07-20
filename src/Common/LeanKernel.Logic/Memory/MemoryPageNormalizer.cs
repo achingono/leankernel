@@ -21,6 +21,12 @@ public sealed class MemoryPageNormalizer
     /// <summary>
     /// Initializes a new instance of the <see cref="MemoryPageNormalizer"/> class.
     /// </summary>
+    /// <param name="dimensionClassifier">The dimension classifier.</param>
+    /// <param name="linker">The memory page linker.</param>
+    /// <param name="graphReasoner">The memory graph reasoner.</param>
+    /// <param name="repairService">The memory field repair service.</param>
+    /// <param name="renderer">The memory page renderer.</param>
+    /// <param name="keyBuilder">The memory page key builder.</param>
     public MemoryPageNormalizer(
         MemoryDimensionClassifier dimensionClassifier,
         MemoryPageLinker linker,

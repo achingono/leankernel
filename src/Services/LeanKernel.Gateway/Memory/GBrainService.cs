@@ -19,6 +19,8 @@ public sealed class GBrainService : IMemoryService
     /// <summary>
     /// Initializes a new instance of <see cref="GBrainService"/>.
     /// </summary>
+    /// <param name="client">The GBrain MCP client.</param>
+    /// <param name="logger">The logger instance.</param>
     public GBrainService(IGBrainMcpClient client, ILogger<GBrainService> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
