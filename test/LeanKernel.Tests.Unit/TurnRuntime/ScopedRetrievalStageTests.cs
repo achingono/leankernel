@@ -1,10 +1,14 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.TurnRuntime;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.TurnRuntime;
@@ -44,7 +48,7 @@ public class ScopedRetrievalStageTests
     public async Task ExecuteAsync_EmptyUserMessage_SkipsRetrieval()
     {
         var memoryClient = new Mock<IMemoryClient>();
-        var ctx = CreateContext(userMessage: "");
+        var ctx = CreateContext(userMessage: string.Empty);
         var stage = new ScopedRetrievalStage(
             memoryClient.Object,
             CreateSettings(),
@@ -245,7 +249,7 @@ public class ScopedRetrievalStageTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<MemoryItem>
             {
-                new() { Key = "facts/what/only-key", Text = "", Score = 0.6 },
+                new() { Key = "facts/what/only-key", Text = string.Empty, Score = 0.6 },
             });
 
         var ctx = CreateContext();

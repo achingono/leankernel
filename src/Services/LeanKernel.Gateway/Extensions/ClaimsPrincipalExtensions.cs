@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.RegularExpressions;
+
 using LeanKernel.Entities;
 
 namespace LeanKernel.Gateway;

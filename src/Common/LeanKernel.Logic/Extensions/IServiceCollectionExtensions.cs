@@ -1,16 +1,19 @@
 using System.ClientModel;
+
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.Telemetry;
 using LeanKernel.Logic.Tools;
+
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using OpenAI;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -202,5 +205,4 @@ public static class IServiceCollectionExtensions
 
         return services;
     }
-
 }

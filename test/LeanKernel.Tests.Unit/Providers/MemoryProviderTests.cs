@@ -1,12 +1,16 @@
 using FluentAssertions;
+
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
+
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Providers;

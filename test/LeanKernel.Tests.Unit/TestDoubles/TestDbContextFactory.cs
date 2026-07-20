@@ -1,4 +1,5 @@
 using LeanKernel.Data;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace LeanKernel.Tests.Unit.TestDoubles;

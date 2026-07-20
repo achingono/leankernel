@@ -1,6 +1,4 @@
-using Microsoft.Extensions.Configuration;
-
-namespace LeanKernel.Channels.Common.Configuration;
+namespace Microsoft.Extensions.Configuration;
 
 public static class ConnectionStringResolverExtensions
 {
@@ -15,7 +13,9 @@ public static class ConnectionStringResolverExtensions
         {
             var connectionString = configuration.GetConnectionString(connectionStringName);
             if (!string.IsNullOrWhiteSpace(connectionString))
+            {
                 return (connectionStringName, connectionString);
+            }
         }
 
         return (null, null);

@@ -1,8 +1,11 @@
 using FluentAssertions;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
+
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Data;
@@ -102,7 +105,7 @@ public class EntityContextTests : IDisposable
             FullName = "A",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         };
         var channel = new ChannelEntity { Id = channelId, Name = "test-channel" };
         var tenant = new TenantEntity
@@ -112,7 +115,7 @@ public class EntityContextTests : IDisposable
             HostName = "test.local",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         };
 
         ctx.Users.Add(user);
@@ -129,7 +132,7 @@ public class EntityContextTests : IDisposable
             Channel = channel,
             Tenant = tenant,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         };
         ctx.Sessions.Add(session);
         await ctx.SaveChangesAsync();

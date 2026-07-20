@@ -1,6 +1,8 @@
 using System.Text.Json;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools;
+
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;

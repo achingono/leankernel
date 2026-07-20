@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
+
 using LeanKernel.Gateway.Configuration;
-using Microsoft.Extensions.Logging;
+
 using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Gateway.Memory;

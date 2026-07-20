@@ -1,8 +1,12 @@
 using System.Net;
 using System.Text;
+
 using FluentAssertions;
+
 using LeanKernel.Gateway.Memory;
+
 using Microsoft.Extensions.Logging.Abstractions;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Providers;

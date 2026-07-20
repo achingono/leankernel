@@ -1,11 +1,12 @@
-using LeanKernel.Channels.Signal;
-using LeanKernel.Channels.Signal.HealthChecks;
 using LeanKernel.Channels.Common.Configuration;
 using LeanKernel.Channels.Common.HealthChecks;
-using LeanKernel.Channels.Common.Settings;
+using LeanKernel.Channels.Signal;
+using LeanKernel.Channels.Signal.HealthChecks;
 using LeanKernel.Data;
+
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<GatewaySettings>(builder.Configuration.GetSection("Gateway"));
@@ -15,7 +16,9 @@ var gatewaySettings = builder.Configuration.GetSection("Gateway").Get<GatewaySet
 var signalSettings = builder.Configuration.GetSection("Signal").Get<SignalSettings>() ?? new SignalSettings();
 var (connectionStringName, connectionStringValue) = builder.Configuration.ResolveConnectionString(["Postgres", "Sqlite"]);
 if (string.IsNullOrWhiteSpace(connectionStringName) || string.IsNullOrWhiteSpace(connectionStringValue))
+{
     throw new InvalidOperationException("A database connection string is required. Configure ConnectionStrings:Postgres or ConnectionStrings:Sqlite.");
+}
 
 builder.Services.AddHttpClient<GatewayChannelClient>(client =>
 {
@@ -60,7 +63,11 @@ var app = builder.Build();
 app.MapGet("/live", () => Results.Ok(new { status = "alive" }));
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
-    ResponseWriter = HealthCheckResponseWriter.WriteAsync
+    ResponseWriter = (context, report) =>
+    {
+        context.Response.ContentType = "application/json; charset=utf-8";
+        return context.Response.WriteAsync(report.ToJson());
+    }
 });
 
 await app.RunAsync();

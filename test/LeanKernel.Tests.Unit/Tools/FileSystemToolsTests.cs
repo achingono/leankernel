@@ -1,7 +1,10 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools.BuiltIn.FileSystem;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;
@@ -186,6 +189,7 @@ public class FileSystemToolsTests
         {
             File.SetUnixFileMode(scriptPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
+
         return scriptPath;
     }
 }

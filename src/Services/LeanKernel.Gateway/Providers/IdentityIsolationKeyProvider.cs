@@ -1,4 +1,3 @@
-using LeanKernel;
 using Microsoft.Agents.AI.Hosting;
 
 namespace LeanKernel.Gateway.Providers;

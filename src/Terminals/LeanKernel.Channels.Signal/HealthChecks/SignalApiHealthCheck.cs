@@ -10,7 +10,9 @@ public sealed class SignalApiHealthCheck(IHttpClientFactory httpClientFactory, I
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(settings.Value.Host) || settings.Value.Port <= 0)
+        {
             return HealthCheckResult.Unhealthy("Signal Host/Port is not configured.");
+        }
 
         try
         {

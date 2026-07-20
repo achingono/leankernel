@@ -1,5 +1,7 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.TurnRuntime;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.TurnRuntime;

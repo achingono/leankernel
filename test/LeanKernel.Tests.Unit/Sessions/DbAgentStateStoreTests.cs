@@ -1,12 +1,14 @@
 using FluentAssertions;
-using LeanKernel;
+
 using LeanKernel.Data;
 using LeanKernel.Gateway.Sessions;
+
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging.Abstractions;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Sessions;

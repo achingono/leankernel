@@ -165,6 +165,7 @@ public static class ToolArgumentReader
                     _ => property.Value.ToString() ?? string.Empty
                 };
             }
+
             return result;
         }
 
@@ -198,6 +199,7 @@ public static class ToolArgumentReader
             {
                 result[property.Name] = ConvertJsonValue(property.Value);
             }
+
             return result;
         }
 

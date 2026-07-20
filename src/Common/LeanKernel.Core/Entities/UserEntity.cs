@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using LeanKernel.Entities;
 
 namespace LeanKernel.Entities;
 
@@ -18,6 +17,7 @@ public class UserEntity : IAuditable, IRecyclable
     public bool IsActive { get; set; }
     public bool IsLockedOut { get; set; }
     public DateTime? LastActivity { get; set; }
+
     /// <summary>
     /// Date and time when the tenant was created.
     /// </summary>

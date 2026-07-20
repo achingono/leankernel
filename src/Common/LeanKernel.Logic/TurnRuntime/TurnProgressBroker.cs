@@ -41,7 +41,9 @@ public sealed class TurnProgressBroker
         lock (_lock)
         {
             if (!_subscribers.TryGetValue(conversationId, out var subs) || subs.Count == 0)
+            {
                 return;
+            }
 
             handlers = [.. subs.Values];
         }
@@ -67,7 +69,9 @@ public sealed class TurnProgressBroker
             {
                 subs.Remove(subscriptionId);
                 if (subs.Count == 0)
+                {
                     _subscribers.Remove(conversationId);
+                }
             }
         }
     }

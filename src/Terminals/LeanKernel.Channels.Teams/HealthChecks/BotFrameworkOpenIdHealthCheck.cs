@@ -10,7 +10,9 @@ public sealed class BotFrameworkOpenIdHealthCheck(IHttpClientFactory httpClientF
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         if (!Uri.TryCreate(settings.Value.OpenIdMetadataUrl, UriKind.Absolute, out var metadataUri))
+        {
             return HealthCheckResult.Unhealthy("Bot OpenIdMetadataUrl is not configured.");
+        }
 
         try
         {

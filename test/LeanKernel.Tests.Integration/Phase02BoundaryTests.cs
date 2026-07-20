@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+
 using FluentAssertions;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Integration;
@@ -14,6 +16,7 @@ public class Phase02BoundaryTests : IClassFixture<GatewayTestApplicationFactory>
     private readonly HttpClient _client;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="Phase02BoundaryTests"/> class.
     /// Creates a test instance backed by the shared gateway factory.
     /// </summary>
     public Phase02BoundaryTests(GatewayTestApplicationFactory factory)

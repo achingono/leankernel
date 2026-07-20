@@ -1,5 +1,7 @@
 using System.Diagnostics;
+
 using LeanKernel.Logic.Configuration;
+
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -76,7 +78,9 @@ internal sealed class TelemetryCapturingChatClient(
         sw.Stop();
 
         if (finalResponse is not null)
+        {
             CaptureTelemetry(finalResponse, requestedModel, sw.Elapsed);
+        }
     }
 
     private void CaptureTelemetry(ChatResponse response, string? requestedModel, TimeSpan latency)
@@ -131,7 +135,9 @@ internal sealed class TelemetryCapturingChatClient(
     private static decimal? TryExtractCost(AdditionalPropertiesDictionary? properties)
     {
         if (properties is null)
+        {
             return null;
+        }
 
         if (properties.TryGetValue("x-litellm-response-cost", out var costObj)
             && costObj is string costStr
@@ -147,14 +153,19 @@ internal sealed class TelemetryCapturingChatClient(
     private static string? TryGetAdditionalProperty(AdditionalPropertiesDictionary? properties, string key)
     {
         if (properties is not null && properties.TryGetValue(key, out var value))
+        {
             return value?.ToString();
+        }
+
         return null;
     }
 
     private static string? ExtractProvider(string? model)
     {
         if (string.IsNullOrEmpty(model))
+        {
             return null;
+        }
 
         return model.ToLowerInvariant() switch
         {

@@ -1,6 +1,5 @@
 namespace LeanKernel;
 
-using System.ComponentModel.DataAnnotations;
 using LeanKernel.Entities;
 
 /// <summary>

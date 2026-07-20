@@ -1,13 +1,17 @@
 using System.Text.Json;
+
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
-using Xunit;
 using LeanKernel.Logic.Tools;
 using LeanKernel.Logic.Tools.BuiltIn.Data;
+
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+
 using Moq;
+
+using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;
 
@@ -30,14 +34,44 @@ public class DatabaseQueryToolTests : IDisposable
     {
         foreach (var conn in _connections)
         {
-            try { conn.Close(); } catch { /* ignore */ }
-            try { conn.Dispose(); } catch { /* ignore */ }
+            try
+            {
+                conn.Close();
+            }
+            catch
+            { /* ignore */
+            }
+
+            try
+            {
+                conn.Dispose();
+            }
+            catch
+            { /* ignore */
+            }
         }
+
         foreach (var file in _cleanupFiles)
         {
-            try { if (File.Exists(file)) File.Delete(file); } catch { /* ignore */ }
+            try
+            {
+                if (File.Exists(file))
+                {
+                    File.Delete(file);
+                }
+            }
+            catch
+            { /* ignore */
+            }
         }
-        try { Directory.Delete(_rootDir, true); } catch { /* ignore */ }
+
+        try
+        {
+            Directory.Delete(_rootDir, true);
+        }
+        catch
+        { /* ignore */
+        }
     }
 
     private SqliteConnection CreateInMemoryConnection(string? dbName = null)
@@ -52,7 +86,10 @@ public class DatabaseQueryToolTests : IDisposable
     private void SeedTable(SqliteConnection conn, string table = "users", int rowCount = 3)
     {
         if (conn.State != System.Data.ConnectionState.Open)
+        {
             conn.Open();
+        }
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = $"CREATE TABLE {table} (id INTEGER PRIMARY KEY, name TEXT, email TEXT, score REAL)";
         cmd.ExecuteNonQuery();
@@ -147,7 +184,7 @@ public class DatabaseQueryToolTests : IDisposable
     {
         var result = await InvokeAsync(new Dictionary<string, object?>
         {
-            ["connection"] = "",
+            ["connection"] = string.Empty,
             ["query"] = "SELECT 1"
         });
         result.Success.Should().BeFalse();
@@ -160,7 +197,7 @@ public class DatabaseQueryToolTests : IDisposable
         var result = await InvokeAsync(new Dictionary<string, object?>
         {
             ["connection"] = "sqlite-main",
-            ["query"] = ""
+            ["query"] = string.Empty
         });
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("Query is required");
@@ -499,12 +536,16 @@ public class DatabaseQueryToolTests : IDisposable
     {
         var conn = CreateInMemoryConnection();
         if (conn.State != System.Data.ConnectionState.Open)
+        {
             conn.Open();
+        }
+
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = "CREATE TABLE tnull (id INTEGER, val TEXT)";
             cmd.ExecuteNonQuery();
         }
+
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = "INSERT INTO tnull VALUES (1, NULL)";
@@ -529,7 +570,10 @@ public class DatabaseQueryToolTests : IDisposable
     {
         var conn = CreateInMemoryConnection();
         if (conn.State != System.Data.ConnectionState.Open)
+        {
             conn.Open();
+        }
+
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = "CREATE TABLE empty_t (id INTEGER)";
@@ -757,12 +801,16 @@ public class DatabaseQueryToolTests : IDisposable
     {
         var conn = CreateInMemoryConnection();
         if (conn.State != System.Data.ConnectionState.Open)
+        {
             conn.Open();
+        }
+
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = "CREATE TABLE tbool (id INTEGER, active INTEGER)";
             cmd.ExecuteNonQuery();
         }
+
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = "INSERT INTO tbool VALUES (1, 1)";
@@ -786,12 +834,16 @@ public class DatabaseQueryToolTests : IDisposable
     {
         var conn = CreateInMemoryConnection();
         if (conn.State != System.Data.ConnectionState.Open)
+        {
             conn.Open();
+        }
+
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = "CREATE TABLE tnull (id INTEGER, val TEXT)";
             cmd.ExecuteNonQuery();
         }
+
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = "INSERT INTO tnull VALUES (1, NULL)";

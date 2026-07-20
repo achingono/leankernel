@@ -1,10 +1,15 @@
 using System.Text.Json;
+
 using FluentAssertions;
+
 using LeanKernel.Logic.Tools;
-using Xunit;
 using LeanKernel.Logic.Tools.BuiltIn.Data;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Moq;
+
+using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;
 

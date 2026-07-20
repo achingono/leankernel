@@ -15,7 +15,7 @@ namespace LeanKernel.Data.Migrations
                 table: "ChannelSenderBindings",
                 type: "text",
                 nullable: false,
-                defaultValue: "");
+                defaultValue: string.Empty);
         }
 
         /// <inheritdoc />

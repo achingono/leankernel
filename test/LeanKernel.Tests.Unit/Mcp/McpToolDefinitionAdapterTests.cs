@@ -1,8 +1,11 @@
 using System.Text.Json;
+
 using FluentAssertions;
+
 using LeanKernel.Logic.Mcp;
-using LeanKernel.Logic.Tools;
+
 using ModelContextProtocol.Protocol;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Mcp;
@@ -12,7 +15,7 @@ public class McpToolDefinitionAdapterTests
     [Fact]
     public void ExtractParameters_WithEmptySchema_ReturnsEmpty()
     {
-        var schema = new JsonElement();
+        var schema = default(JsonElement);
         var result = McpToolDefinitionAdapter.ExtractParameters(schema);
         result.Should().BeEmpty();
     }

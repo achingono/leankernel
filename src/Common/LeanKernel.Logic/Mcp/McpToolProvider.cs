@@ -1,7 +1,9 @@
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using ModelContextProtocol.Client;
 
 namespace LeanKernel.Logic.Mcp;

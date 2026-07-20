@@ -1,12 +1,16 @@
 using System.Text.Json;
+
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
-using Xunit;
 using LeanKernel.Logic.Tools;
 using LeanKernel.Logic.Tools.BuiltIn.Data;
+
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+
 using Moq;
+
+using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;
 
@@ -22,7 +26,13 @@ public class CsvXlsxReadWriteToolTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_rootDir, true); } catch { /* ignore */ }
+        try
+        {
+            Directory.Delete(_rootDir, true);
+        }
+        catch
+        { /* ignore */
+        }
     }
 
     private IServiceScopeFactory BuildScopeFactory(string? rootPath = null)
@@ -76,10 +86,18 @@ public class CsvXlsxReadWriteToolTests : IDisposable
         using var workbook = new ClosedXML.Excel.XLWorkbook();
         var ws = workbook.Worksheets.Add(sheetName);
         for (var c = 0; c < headers.Count; c++)
+        {
             ws.Cell(1, c + 1).Value = headers[c];
+        }
+
         for (var r = 0; r < rows.Count; r++)
+        {
             for (var c = 0; c < rows[r].Count; c++)
+            {
                 ws.Cell(r + 2, c + 1).Value = rows[r][c];
+            }
+        }
+
         workbook.SaveAs(fullPath);
         return fullPath;
     }
@@ -96,7 +114,6 @@ public class CsvXlsxReadWriteToolTests : IDisposable
     }
 
     // ── CSV Read ──────────────────────────────────────────────────────────
-
     [Fact]
     public async Task ReadCsv_WithHeader_ReturnsColumnsAndRows()
     {
@@ -155,7 +172,7 @@ public class CsvXlsxReadWriteToolTests : IDisposable
     [Fact]
     public async Task ReadCsv_EmptyFile_ReturnsZeroRows()
     {
-        WriteCsvFile("empty.csv", "");
+        WriteCsvFile("empty.csv", string.Empty);
         var result = await InvokeAsync(new Dictionary<string, object?>
         {
             ["operation"] = "read",
@@ -211,7 +228,6 @@ public class CsvXlsxReadWriteToolTests : IDisposable
     }
 
     // ── CSV Write ─────────────────────────────────────────────────────────
-
     [Fact]
     public async Task WriteCsv_NewFile_CreatesFile()
     {
@@ -307,7 +323,6 @@ public class CsvXlsxReadWriteToolTests : IDisposable
     }
 
     // ── XLSX Read ─────────────────────────────────────────────────────────
-
     [Fact]
     public async Task ReadXlsx_WithHeader_ReturnsColumnsAndRows()
     {
@@ -364,6 +379,7 @@ public class CsvXlsxReadWriteToolTests : IDisposable
             ws2.Cell(2, 1).Value = "100";
             wb.SaveAs(fullPath);
         }
+
         var result = await InvokeAsync(new Dictionary<string, object?>
         {
             ["operation"] = "read",
@@ -395,7 +411,6 @@ public class CsvXlsxReadWriteToolTests : IDisposable
     }
 
     // ── XLSX Write ────────────────────────────────────────────────────────
-
     [Fact]
     public async Task WriteXlsx_NewFile_CreatesFile()
     {
@@ -472,7 +487,6 @@ public class CsvXlsxReadWriteToolTests : IDisposable
     }
 
     // ── Path validation ───────────────────────────────────────────────────
-
     [Fact]
     public async Task Read_PathTraversal_ReturnsError()
     {
@@ -512,7 +526,6 @@ public class CsvXlsxReadWriteToolTests : IDisposable
     }
 
     // ── Missing/invalid arguments ─────────────────────────────────────────
-
     [Fact]
     public async Task MissingOperation_ReturnsError()
     {
@@ -663,6 +676,7 @@ public class CsvXlsxReadWriteToolTests : IDisposable
             wb.Worksheets.Add("Empty");
             wb.SaveAs(fullPath);
         }
+
         var result = await InvokeAsync(new Dictionary<string, object?>
         {
             ["operation"] = "read",

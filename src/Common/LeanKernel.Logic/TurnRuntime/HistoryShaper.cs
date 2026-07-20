@@ -1,4 +1,5 @@
 using LeanKernel.Logic.Configuration;
+
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -28,7 +29,6 @@ public sealed class HistoryShaper(
         // This stage shapes the loaded history into tiers.
         // The actual history loading is handled by the wiring stage (HistoryLoaderStage).
         // Here we only apply windowing logic to whatever is in ShapedHistory.
-
         if (context.ShapedHistory.Count == 0)
         {
             logger.LogDebug("No history to shape for conversation {ConversationId}.", context.ConversationId);
@@ -116,6 +116,5 @@ public sealed class HistoryShaper(
         logger.LogDebug(
             "History shaped: {Total} total, {Verbatim} verbatim, {Compacted} compacted, {Summarized} summarized.",
             totalTurns, verbatim.Count, compactedRange.Count, summarizedRange.Count);
-
     }
 }

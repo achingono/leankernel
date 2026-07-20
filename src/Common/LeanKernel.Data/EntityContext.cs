@@ -1,4 +1,5 @@
 ﻿using LeanKernel.Entities;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace LeanKernel.Data;
@@ -12,7 +13,8 @@ public class EntityContext : DbContext
     /// Initializes a new instance of the <see cref="EntityContext"/> class.
     /// </summary>
     /// <param name="options">The configured EF Core options for this context.</param>
-    public EntityContext(DbContextOptions<EntityContext> options) : base(options)
+    public EntityContext(DbContextOptions<EntityContext> options)
+        : base(options)
     {
     }
 
@@ -60,6 +62,26 @@ public class EntityContext : DbContext
     /// Gets the persisted assistant turn telemetry records.
     /// </summary>
     public DbSet<TurnTelemetryEntity> TurnTelemetry => Set<TurnTelemetryEntity>();
+
+    /// <summary>
+    /// Applies pending migrations and ensures the default tenant and OpenAI channel records exist.
+    /// </summary>
+    /// <param name="hostName">The host name to seed for the default tenant if needed.</param>
+    /// <returns>A task that completes when migrations and seed data have been applied.</returns>
+    public async Task ApplyMigrationsAndSeedAsync(string hostName)
+    {
+        if (Database.IsRelational())
+        {
+            await Database.MigrateAsync();
+        }
+        else
+        {
+            await Database.EnsureCreatedAsync();
+        }
+
+        await EnsureDefaultTenantAsync(hostName);
+        await EnsureKnownChannelsAsync();
+    }
 
     /// <summary>
     /// Configures the entity mappings, indexes, relationships, and query filters.
@@ -130,6 +152,7 @@ public class EntityContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
             entity.OwnsOne(e => e.CreatedBy);
             entity.OwnsOne(e => e.UpdatedBy);
+
             // Ignore the Sessions collection navigation to prevent EF from inferring a duplicate
             // shadow FK alongside the explicitly mapped TenantId FK on SessionEntity (M2).
             entity.Ignore(e => e.Sessions);
@@ -221,26 +244,6 @@ public class EntityContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasQueryFilter(e => !e.IsDeleted && !e.Turn.IsDeleted);
         });
-    }
-
-    /// <summary>
-    /// Applies pending migrations and ensures the default tenant and OpenAI channel records exist.
-    /// </summary>
-    /// <param name="hostName">The host name to seed for the default tenant if needed.</param>
-    /// <returns>A task that completes when migrations and seed data have been applied.</returns>
-    public async Task ApplyMigrationsAndSeedAsync(string hostName)
-    {
-        if (Database.IsRelational())
-        {
-            await Database.MigrateAsync();
-        }
-        else
-        {
-            await Database.EnsureCreatedAsync();
-        }
-
-        await EnsureDefaultTenantAsync(hostName);
-        await EnsureKnownChannelsAsync();
     }
 
     /// <summary>

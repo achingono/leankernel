@@ -1,4 +1,5 @@
 using LeanKernel.Logic.Configuration;
+
 using ModelContextProtocol.Client;
 
 namespace LeanKernel.Logic.Mcp;
@@ -27,9 +28,15 @@ internal static class McpTransportFactory
     private static HttpTransportMode ParseTransportMode(string mode)
     {
         if (mode.Equals("Sse", StringComparison.OrdinalIgnoreCase))
+        {
             return HttpTransportMode.Sse;
+        }
+
         if (mode.Equals("StreamableHttp", StringComparison.OrdinalIgnoreCase))
+        {
             return HttpTransportMode.StreamableHttp;
+        }
+
         return HttpTransportMode.AutoDetect;
     }
 }

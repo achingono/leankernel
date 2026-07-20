@@ -1,7 +1,9 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Tools;
-using Microsoft.AspNetCore.Mvc.Testing;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Integration;

@@ -1,12 +1,16 @@
 using System.Security.Claims;
+
 using FluentAssertions;
-using LeanKernel;
+
 using LeanKernel.Entities;
 using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Identity;
@@ -39,11 +43,30 @@ public class RequestContextPermitTests
         ctx.Features.Set<ISessionFeature>(new SessionFeature { Session = new TestSession() });
 
         // Pre-populate HttpContext.Items as the middleware would (new architecture).
-        if (resolvedTenantId.HasValue) ctx.Items[TenantResolutionMiddleware.TenantKey] = resolvedTenantId.Value;
-        if (resolvedUserId.HasValue) ctx.Items[TenantResolutionMiddleware.UserIdKey] = resolvedUserId.Value;
-        if (resolvedPersonId.HasValue) ctx.Items[TenantResolutionMiddleware.PersonIdKey] = resolvedPersonId.Value;
-        if (resolvedChannelId.HasValue) ctx.Items[TenantResolutionMiddleware.ChannelIdKey] = resolvedChannelId.Value;
-        if (resolvedBadge is not null) ctx.Items[TenantResolutionMiddleware.BadgeKey] = resolvedBadge;
+        if (resolvedTenantId.HasValue)
+        {
+            ctx.Items[TenantResolutionMiddleware.TenantKey] = resolvedTenantId.Value;
+        }
+
+        if (resolvedUserId.HasValue)
+        {
+            ctx.Items[TenantResolutionMiddleware.UserIdKey] = resolvedUserId.Value;
+        }
+
+        if (resolvedPersonId.HasValue)
+        {
+            ctx.Items[TenantResolutionMiddleware.PersonIdKey] = resolvedPersonId.Value;
+        }
+
+        if (resolvedChannelId.HasValue)
+        {
+            ctx.Items[TenantResolutionMiddleware.ChannelIdKey] = resolvedChannelId.Value;
+        }
+
+        if (resolvedBadge is not null)
+        {
+            ctx.Items[TenantResolutionMiddleware.BadgeKey] = resolvedBadge;
+        }
 
         httpAccessor.Setup(a => a.HttpContext).Returns(ctx);
 
@@ -112,7 +135,7 @@ public class RequestContextPermitTests
     [Fact]
     public void Badge_WhenAnonymous_ReturnsAnonymousDefaults()
     {
-        var badge = new Badge { Id = Guid.NewGuid(), FullName = "Anonymous User", Email = "" };
+        var badge = new Badge { Id = Guid.NewGuid(), FullName = "Anonymous User", Email = string.Empty };
         var (permit, _, _) = CreateSut(principal: null, resolvedBadge: badge);
 
         permit.Badge.Should().NotBeNull();
@@ -206,11 +229,20 @@ public class RequestContextPermitTests
         public string Id => "test-session";
         public bool IsAvailable => true;
         public IEnumerable<string> Keys => [];
-        public void Clear() { }
+        public void Clear()
+        {
+        }
+
         public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public void Remove(string key) { }
-        public void Set(string key, byte[] value) { }
+        public void Remove(string key)
+        {
+        }
+
+        public void Set(string key, byte[] value)
+        {
+        }
+
         public bool TryGetValue(string key, out byte[] value)
         {
             value = [];

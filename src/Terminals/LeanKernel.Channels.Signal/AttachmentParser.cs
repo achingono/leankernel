@@ -7,7 +7,9 @@ public static class AttachmentParser
     public static IReadOnlyList<string> ParseAttachmentHints(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
+        {
             return [];
+        }
 
         return text
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -22,11 +24,15 @@ public static class AttachmentParser
         IReadOnlyList<string> attachmentHints)
     {
         if (attachments.Count == 0 && attachmentHints.Count == 0)
+        {
             return text;
+        }
 
         var builder = new StringBuilder(text);
         if (builder.Length > 0)
+        {
             builder.AppendLine();
+        }
 
         builder.AppendLine();
         builder.AppendLine("[channel_attachment_context]");
@@ -70,7 +76,9 @@ public static class AttachmentParser
         IReadOnlyList<string> attachmentHints)
     {
         if (attachments.Count == 0 && attachmentHints.Count == 0)
+        {
             return text;
+        }
 
         var content = new List<object>();
         var textWithContext = AppendAttachmentContext(text, attachments, attachmentHints);

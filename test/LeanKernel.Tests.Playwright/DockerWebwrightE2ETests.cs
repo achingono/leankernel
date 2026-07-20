@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Playwright;
@@ -437,13 +438,6 @@ public sealed class DockerWebwrightE2ETests
     {
         public const string EnabledEnvVar = "LEANKERNEL_DOCKER_E2E_ENABLED";
 
-        private DockerWebwrightE2eConfig(bool enabled, string webwrightBaseUrl, TimeSpan runTimeout)
-        {
-            Enabled = enabled;
-            WebwrightBaseUrl = webwrightBaseUrl;
-            RunTimeout = runTimeout;
-        }
-
         public bool Enabled { get; }
 
         public string WebwrightBaseUrl { get; }
@@ -500,6 +494,13 @@ public sealed class DockerWebwrightE2ETests
             }
 
             Assert.Fail($"Webwright preflight failed after retries: {lastFailure?.Message ?? "unknown error"}");
+        }
+
+        private DockerWebwrightE2eConfig(bool enabled, string webwrightBaseUrl, TimeSpan runTimeout)
+        {
+            Enabled = enabled;
+            WebwrightBaseUrl = webwrightBaseUrl;
+            RunTimeout = runTimeout;
         }
     }
 }

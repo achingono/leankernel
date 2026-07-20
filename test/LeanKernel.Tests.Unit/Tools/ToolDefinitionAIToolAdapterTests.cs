@@ -1,7 +1,9 @@
-using System.Text.Json;
 using FluentAssertions;
+
 using LeanKernel.Logic.Tools;
+
 using Microsoft.Extensions.AI;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;

@@ -1,5 +1,5 @@
 using LeanKernel.Logic.Configuration;
-using LeanKernel.Logic.Tools;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -92,9 +92,21 @@ public static class FileChmodTool
     private static UnixFileMode MapTriplet(int value, UnixFileMode read, UnixFileMode write, UnixFileMode execute)
     {
         UnixFileMode result = 0;
-        if ((value & 4) != 0) result |= read;
-        if ((value & 2) != 0) result |= write;
-        if ((value & 1) != 0) result |= execute;
+        if ((value & 4) != 0)
+        {
+            result |= read;
+        }
+
+        if ((value & 2) != 0)
+        {
+            result |= write;
+        }
+
+        if ((value & 1) != 0)
+        {
+            result |= execute;
+        }
+
         return result;
     }
 }

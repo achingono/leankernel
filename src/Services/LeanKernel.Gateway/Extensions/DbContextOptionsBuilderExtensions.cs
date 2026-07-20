@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Gateway;
 
@@ -53,7 +52,7 @@ public static class DbContextOptionsBuilderExtensions
         options.EnableDetailedErrors(enableDetailedErrors)
                    .EnableSensitiveDataLogging(enableSensitiveDataLogging)
                    .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
-        
+
         return options;
     }
 }

@@ -1,5 +1,4 @@
 using LeanKernel.Logic.Configuration;
-using LeanKernel.Logic.Tools;
 
 namespace LeanKernel.Logic.Tools;
 
@@ -13,6 +12,7 @@ public sealed class ToolGovernancePolicy
     private readonly ToolSettings _settings;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ToolGovernancePolicy"/> class.
     /// Initializes a new instance of <see cref="ToolGovernancePolicy"/>.
     /// </summary>
     public ToolGovernancePolicy(ToolSettings settings)

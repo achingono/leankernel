@@ -1,12 +1,14 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Mcp;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.Telemetry;
-using LeanKernel.Logic.Mcp;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Extensions;
@@ -108,7 +110,11 @@ public class ServiceCollectionExtensionsTests
             o.Tools = new ToolSettings { Enabled = true };
             o.Telemetry = new TelemetrySettings { Enabled = false };
         });
-        services.Configure<MemorySettings>(o => { o.Enabled = false; o.ModelId = "m"; });
+        services.Configure<MemorySettings>(o =>
+        {
+            o.Enabled = false;
+            o.ModelId = "m";
+        });
         services.Configure<TelemetrySettings>(o => o.Enabled = false);
         services.Configure<CostEstimateTable>(_ => { });
         services.Configure<FactExtractionSettings>(o => { o.ModelId = "m"; });
@@ -116,6 +122,7 @@ public class ServiceCollectionExtensionsTests
         services.AddLeanKernelChatClient();
 
         using var sp = services.BuildServiceProvider();
+
         // Just verify it resolves without throwing (model selection logic exercised via factory)
         var chatClient = sp.GetRequiredService<Microsoft.Extensions.AI.IChatClient>();
         chatClient.Should().NotBeNull();

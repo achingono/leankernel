@@ -1,4 +1,5 @@
 using System.Text.Json;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -6,9 +7,6 @@ namespace LeanKernel.Channels.Common.HealthChecks;
 
 public static class HealthCheckResponseWriter
 {
-    private static readonly JsonSerializerOptions SerializerOptions =
-        new(JsonSerializerDefaults.Web) { WriteIndented = false };
-
     public static Task WriteAsync(HttpContext context, HealthReport report)
     {
         context.Response.ContentType = "application/json; charset=utf-8";
@@ -30,4 +28,7 @@ public static class HealthCheckResponseWriter
 
         return context.Response.WriteAsync(JsonSerializer.Serialize(payload, SerializerOptions));
     }
+
+    private static readonly JsonSerializerOptions SerializerOptions =
+        new(JsonSerializerDefaults.Web) { WriteIndented = false };
 }

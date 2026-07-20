@@ -1,8 +1,11 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Telemetry;
+
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Telemetry;

@@ -1,6 +1,7 @@
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Telemetry;
+
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -35,10 +36,14 @@ public class DbChatHistoryProvider(
 
         if (!session.StateBag.TryGetValue<string>(ChatSessionIdKey, out var chatSessionId)
             || string.IsNullOrEmpty(chatSessionId))
+        {
             return [];
+        }
 
         if (!Guid.TryParse(chatSessionId, out var chatSessionGuid))
+        {
             return [];
+        }
 
         using var scope = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
@@ -52,7 +57,9 @@ public class DbChatHistoryProvider(
                 cancellationToken);
 
         if (!ownsSession)
+        {
             return [];
+        }
 
         var turns = await scope.Turns
             .Where(t => t.SessionId == chatSessionGuid)
@@ -65,7 +72,9 @@ public class DbChatHistoryProvider(
             .ToList();
 
         if (recentTurns.Count == RecentTurnWindow)
+        {
             logger?.LogDebug("Chat history truncated to {Window} turns for session {SessionId}", RecentTurnWindow, chatSessionGuid);
+        }
 
         return recentTurns.OrderBy(t => t.Timestamp)
             .Select(MapTurnToMessage)
@@ -98,7 +107,9 @@ public class DbChatHistoryProvider(
         var allCandidateTurns = requestTurns.Concat(responseTurns).ToList();
 
         if (allCandidateTurns.Count == 0)
+        {
             return;
+        }
 
         // Load existing idempotency keys for this session to detect retries.
         var existingKeys = new HashSet<string>(
@@ -228,7 +239,9 @@ public class DbChatHistoryProvider(
         bool isRequest)
     {
         if (messages is null)
+        {
             return [];
+        }
 
         var filter = isRequest
             ? (Func<ChatMessage, bool>)ShouldPersistRequestMessage
@@ -298,7 +311,9 @@ public class DbChatHistoryProvider(
         };
 
         if (role is null)
+        {
             return null;
+        }
 
         return new ChatMessage
         {

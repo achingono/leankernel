@@ -1,9 +1,12 @@
 using System.Net;
-using System.Net.Http.Headers;
+
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools.BuiltIn.Internet;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;

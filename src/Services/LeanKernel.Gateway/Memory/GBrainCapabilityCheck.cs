@@ -1,5 +1,4 @@
 using LeanKernel.Logic.Memory;
-using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Gateway.Memory;
 

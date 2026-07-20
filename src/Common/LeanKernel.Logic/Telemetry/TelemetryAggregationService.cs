@@ -1,5 +1,6 @@
 using LeanKernel.Data;
 using LeanKernel.Logic.Telemetry.Models;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace LeanKernel.Logic.Telemetry;
@@ -160,7 +161,9 @@ public sealed class TelemetryAggregationService(
     private static void ValidateRange(DateRange range)
     {
         if (!range.IsValid)
+        {
             throw new ArgumentException("Invalid date range: From must be <= To.", nameof(range));
+        }
     }
 
     private async Task<List<TelemetryRow>> LoadRowsCoreAsync(DateRange range, CancellationToken cancellationToken)

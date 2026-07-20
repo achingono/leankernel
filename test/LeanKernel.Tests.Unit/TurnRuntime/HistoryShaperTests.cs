@@ -1,10 +1,14 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.TurnRuntime;
+
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.TurnRuntime;
@@ -80,7 +84,9 @@ public class HistoryShaperTests
 
         var context = CreateContext();
         for (int i = 0; i < 5; i++)
+        {
             context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+        }
 
         await shaper.ExecuteAsync(context);
 
@@ -98,7 +104,9 @@ public class HistoryShaperTests
 
         var context = CreateContext();
         for (int i = 0; i < 20; i++)
+        {
             context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+        }
 
         await shaper.ExecuteAsync(context);
 
@@ -123,7 +131,9 @@ public class HistoryShaperTests
 
         var context = CreateContext();
         for (int i = 0; i < 20; i++)
+        {
             context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+        }
 
         await shaper.ExecuteAsync(context);
 
@@ -152,7 +162,9 @@ public class HistoryShaperTests
 
         var context = CreateContext();
         for (int i = 0; i < 5; i++)
+        {
             context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+        }
 
         await shaper.ExecuteAsync(context);
 
@@ -183,7 +195,9 @@ public class HistoryShaperTests
 
         var context = CreateContext();
         for (int i = 0; i < 5; i++)
+        {
             context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+        }
 
         await shaper.ExecuteAsync(context);
 
@@ -210,7 +224,9 @@ public class HistoryShaperTests
 
         var context = CreateContext();
         for (int i = 0; i < 6; i++)
+        {
             context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+        }
 
         await shaper.ExecuteAsync(context);
 
@@ -242,7 +258,9 @@ public class HistoryShaperTests
 
         var context = CreateContext();
         for (int i = 0; i < 6; i++)
+        {
             context.ShapedHistory.Add(new ChatMessage(ChatRole.User, $"msg-{i}"));
+        }
 
         await shaper.ExecuteAsync(context);
 

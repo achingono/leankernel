@@ -1,8 +1,10 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Mcp;
-using LeanKernel.Logic.Tools;
+
 using Microsoft.Extensions.Logging.Abstractions;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Mcp;

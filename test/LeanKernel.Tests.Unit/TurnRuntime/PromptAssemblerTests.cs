@@ -1,10 +1,14 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.TurnRuntime;
+
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.TurnRuntime;
@@ -36,7 +40,7 @@ public class PromptAssemblerTests
     public async Task ExecuteAsync_NoAdmittedNoHistory_AddsOnlyUserMessage()
     {
         var assembler = new PromptAssembler(
-            Options.Create(new AgentSettings { DefaultInstructions = "" }),
+            Options.Create(new AgentSettings { DefaultInstructions = string.Empty }),
             Mock.Of<ILogger<PromptAssembler>>());
 
         var context = CreateContext();
@@ -68,7 +72,7 @@ public class PromptAssemblerTests
     public async Task ExecuteAsync_WithAdmittedContext_AddsContextMessage()
     {
         var assembler = new PromptAssembler(
-            Options.Create(new AgentSettings { DefaultInstructions = "" }),
+            Options.Create(new AgentSettings { DefaultInstructions = string.Empty }),
             Mock.Of<ILogger<PromptAssembler>>());
 
         var context = CreateContext();
@@ -93,7 +97,7 @@ public class PromptAssemblerTests
     public async Task ExecuteAsync_WithHistory_AddsHistoryMessages()
     {
         var assembler = new PromptAssembler(
-            Options.Create(new AgentSettings { DefaultInstructions = "" }),
+            Options.Create(new AgentSettings { DefaultInstructions = string.Empty }),
             Mock.Of<ILogger<PromptAssembler>>());
 
         var context = CreateContext();
@@ -112,7 +116,7 @@ public class PromptAssemblerTests
     public async Task ExecuteAsync_MultipleAdmittedContext_SortedBySourcePriority()
     {
         var assembler = new PromptAssembler(
-            Options.Create(new AgentSettings { DefaultInstructions = "" }),
+            Options.Create(new AgentSettings { DefaultInstructions = string.Empty }),
             Mock.Of<ILogger<PromptAssembler>>());
 
         var context = CreateContext();

@@ -1,7 +1,9 @@
-using System.Security.Claims;
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Claims;
+
 using LeanKernel.Entities;
 using LeanKernel.Gateway.Configuration;
+
 using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Gateway.Providers;

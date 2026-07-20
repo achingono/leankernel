@@ -8,6 +8,7 @@ using LeanKernel.Logic.Tools.BuiltIn.FileSystem;
 using LeanKernel.Logic.Tools.BuiltIn.Internet;
 using LeanKernel.Logic.Tools.Dynamic;
 using LeanKernel.Logic.Tools.Memory;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -328,5 +329,4 @@ public static class IServiceProviderExtensions
 
         return uri.Host;
     }
-
 }

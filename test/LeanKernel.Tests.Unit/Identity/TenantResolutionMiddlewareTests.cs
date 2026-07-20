@@ -1,11 +1,15 @@
 using FluentAssertions;
+
 using LeanKernel.Entities;
 using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.Providers;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Identity;
@@ -58,9 +62,13 @@ public class TenantResolutionMiddlewareTests
     {
         var inactiveTenant = new TenantEntity
         {
-            Id = Guid.NewGuid(), Name = "Inactive", HostName = "inactive.test", IsActive = false
+            Id = Guid.NewGuid(),
+            Name = "Inactive",
+            HostName = "inactive.test",
+            IsActive = false
         };
         var resolver = new Mock<IIdentityResolver>();
+
         // ResolveTenantAsync already filters to active; returning null simulates inactive rejection
         resolver
             .Setup(r => r.ResolveTenantAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -172,6 +180,7 @@ public class TenantResolutionMiddlewareTests
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Path = "/v1/responses";
+
         // Inject a test session to avoid null reference when middleware calls Session.SetString
         ctx.Features.Set<ISessionFeature>(new TestSessionFeature());
 
@@ -284,7 +293,6 @@ public class TenantResolutionMiddlewareTests
     }
 
     // ─── Test doubles ─────────────────────────────────────────────────────────
-
     private sealed class TestSessionFeature : ISessionFeature
     {
         public ISession Session { get; set; } = new TestSession();

@@ -1,7 +1,9 @@
-using System.Security.Claims;
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Claims;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -18,7 +20,9 @@ public sealed class IdentityResolver(
     public async Task<TenantEntity?> ResolveTenantAsync(string hostName, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(hostName))
+        {
             return null;
+        }
 
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
         return await context.Tenants
@@ -30,7 +34,9 @@ public sealed class IdentityResolver(
     public async Task<TenantEntity?> ResolveTenantByIdAsync(Guid tenantId, CancellationToken ct = default)
     {
         if (tenantId == Guid.Empty)
+        {
             return null;
+        }
 
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
         return await context.Tenants
@@ -110,6 +116,7 @@ public sealed class IdentityResolver(
                     conflicting.Id, issuer, subject);
                 return conflicting;
             }
+
             throw;
         }
 
@@ -124,7 +131,9 @@ public sealed class IdentityResolver(
         var (issuer, subject) = ExtractIssuerAndSubject(principal);
 
         if (string.IsNullOrWhiteSpace(subject))
+        {
             return null;
+        }
 
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -132,7 +141,9 @@ public sealed class IdentityResolver(
             .FirstOrDefaultAsync(u => u.Issuer == issuer && u.Subject == subject && !u.IsDeleted, ct);
 
         if (existing is null)
+        {
             return null;
+        }
 
         if (existing.PersonId == Guid.Empty)
         {
@@ -193,7 +204,9 @@ public sealed class IdentityResolver(
             guest = await context.Users
                 .FirstOrDefaultAsync(u => u.Issuer == "anonymous" && u.Subject == tenantScopedSubject && !u.IsDeleted, ct);
             if (guest is null)
+            {
                 throw;
+            }
 
             if (guest.PersonId == Guid.Empty)
             {
@@ -215,7 +228,9 @@ public sealed class IdentityResolver(
             .FirstOrDefaultAsync(c => c.Name == channelName, ct);
 
         if (channel is not null)
+        {
             return channel;
+        }
 
         channel = new ChannelEntity
         {
@@ -239,6 +254,7 @@ public sealed class IdentityResolver(
                 logger.LogInformation("Created channel {ChannelId} (name={Name})", existing.Id, channelName);
                 return existing;
             }
+
             throw;
         }
 
@@ -250,7 +266,9 @@ public sealed class IdentityResolver(
     public async Task<ChannelEntity?> ResolveChannelAsync(string channelName, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(channelName))
+        {
             return null;
+        }
 
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
         return await context.Channels
@@ -268,10 +286,14 @@ public sealed class IdentityResolver(
         CancellationToken ct = default)
     {
         if (tenantId == Guid.Empty || userId == Guid.Empty || channelId == Guid.Empty)
+        {
             return false;
+        }
 
         if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(subject))
+        {
             return false;
+        }
 
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
         return await context.ChannelSenderBindings.AnyAsync(binding =>
@@ -288,12 +310,16 @@ public sealed class IdentityResolver(
     public async Task<Guid> ResolvePersonIdAsync(Guid userId, CancellationToken ct = default)
     {
         if (userId == Guid.Empty)
+        {
             return Guid.Empty;
+        }
 
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
         var user = await context.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, ct);
         if (user is null)
+        {
             return Guid.Empty;
+        }
 
         if (user.PersonId == Guid.Empty)
         {
@@ -309,7 +335,9 @@ public sealed class IdentityResolver(
     public async Task<Guid> LinkUsersAsync(Guid tenantId, Guid sourceUserId, Guid targetUserId, CancellationToken ct = default)
     {
         if (tenantId == Guid.Empty || sourceUserId == Guid.Empty || targetUserId == Guid.Empty)
+        {
             throw new InvalidOperationException("Tenant and user identifiers are required for linking.");
+        }
 
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -317,7 +345,9 @@ public sealed class IdentityResolver(
             .AnyAsync(t => t.Id == tenantId && t.IsActive, ct);
 
         if (!tenantExists)
+        {
             throw new InvalidOperationException("Cannot link users for an unknown tenant.");
+        }
 
         var source = await context.Users.FirstOrDefaultAsync(u => u.Id == sourceUserId && !u.IsDeleted, ct)
                      ?? throw new InvalidOperationException("Source user does not exist.");
@@ -327,12 +357,19 @@ public sealed class IdentityResolver(
         var sourceInTenant = await UserBelongsToTenantAsync(context, source.Id, tenantId, ct);
         var targetInTenant = await UserBelongsToTenantAsync(context, target.Id, tenantId, ct);
         if (!sourceInTenant || !targetInTenant)
+        {
             throw new InvalidOperationException("Cannot link users across tenant boundaries.");
+        }
 
         if (source.PersonId == Guid.Empty)
+        {
             source.PersonId = source.Id;
+        }
+
         if (target.PersonId == Guid.Empty)
+        {
             target.PersonId = target.Id;
+        }
 
         var mergedPersonId = source.PersonId;
         if (target.PersonId != mergedPersonId)
@@ -359,7 +396,9 @@ public sealed class IdentityResolver(
     public async Task UnlinkUserAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
     {
         if (tenantId == Guid.Empty || userId == Guid.Empty)
+        {
             throw new InvalidOperationException("Tenant and user identifiers are required for unlinking.");
+        }
 
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -367,14 +406,18 @@ public sealed class IdentityResolver(
             .AnyAsync(t => t.Id == tenantId && t.IsActive, ct);
 
         if (!tenantExists)
+        {
             throw new InvalidOperationException("Cannot unlink users for an unknown tenant.");
+        }
 
         var user = await context.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, ct)
                    ?? throw new InvalidOperationException("User does not exist.");
 
         var userInTenant = await UserBelongsToTenantAsync(context, user.Id, tenantId, ct);
         if (!userInTenant)
+        {
             throw new InvalidOperationException("Cannot unlink users across tenant boundaries.");
+        }
 
         if (user.PersonId == Guid.Empty)
         {

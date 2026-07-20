@@ -1,5 +1,7 @@
 using FluentAssertions;
+
 using LeanKernel.Entities;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Entities;

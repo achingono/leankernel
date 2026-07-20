@@ -13,8 +13,8 @@ public interface IPermit
     Guid PersonId { get; }
 
     /// <summary>
-     /// Gets the canonical user identifier (persisted <c>UserEntity.Id</c>).
-     /// </summary>
+    /// Gets the canonical user identifier (persisted <c>UserEntity.Id</c>).
+    /// </summary>
     Guid UserId { get; }
 
     /// <summary>

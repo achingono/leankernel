@@ -1,10 +1,14 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.TurnRuntime;
+
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.TurnRuntime;
@@ -37,6 +41,7 @@ public class EmbeddingHistoryCompactorTests
                             .ToArray();
                     embeddings.Add(data.AsMemory());
                 }
+
                 return embeddings;
             });
 
@@ -99,6 +104,7 @@ public class EmbeddingHistoryCompactorTests
             CreateEmbeddingClient(4, _ =>
             {
                 callCount++;
+
                 // Simulate: first 3 sentences low similarity, last 2 high
                 return callCount <= 3
                     ? new[] { 0.1f, 0.0f, 0.0f, 0.0f }

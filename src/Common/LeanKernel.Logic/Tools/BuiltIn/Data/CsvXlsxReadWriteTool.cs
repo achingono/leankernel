@@ -1,12 +1,15 @@
-using System.Globalization;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
+
 using ClosedXML.Excel;
+
 using CsvHelper;
 using CsvHelper.Configuration;
+
 using LeanKernel.Logic.Configuration;
-using LeanKernel.Logic.Tools;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -48,21 +51,37 @@ public static class CsvXlsxReadWriteTool
             {
                 var operation = ToolArgumentReader.GetString(args, "operation");
                 var path = ToolArgumentReader.GetString(args, "path");
-                if (string.IsNullOrWhiteSpace(operation)) return Err("Operation is required (read or write)");
-                if (string.IsNullOrWhiteSpace(path)) return Err("Path is required");
+                if (string.IsNullOrWhiteSpace(operation))
+                {
+                    return Err("Operation is required (read or write)");
+                }
+
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    return Err("Path is required");
+                }
 
                 using var scope = scopeFactory.CreateScope();
                 var fileSettings = scope.ServiceProvider.GetRequiredService<IOptions<FileSettings>>().Value;
                 var fullPath = FileSystemSupport.ResolveWithinRoot(fileSettings.RootPath, path);
-                if (fullPath is null) return Err("Access denied: path is outside the allowed directory");
+                if (fullPath is null)
+                {
+                    return Err("Access denied: path is outside the allowed directory");
+                }
 
                 var format = ToolArgumentReader.GetString(args, "format");
                 if (string.IsNullOrWhiteSpace(format))
+                {
                     format = Path.GetExtension(fullPath).ToLowerInvariant() is ".xlsx" or ".xlsm" ? "xlsx" : "csv";
+                }
 
                 if (string.Equals(operation, "read", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!File.Exists(fullPath)) return Err($"File not found: {path}");
+                    if (!File.Exists(fullPath))
+                    {
+                        return Err($"File not found: {path}");
+                    }
+
                     return format == "xlsx" ? ReadXlsx(fullPath, args) : await ReadCsvAsync(fullPath, args);
                 }
 
@@ -71,15 +90,23 @@ public static class CsvXlsxReadWriteTool
                     var columnsRaw = ToolArgumentReader.GetJson(args, "columns");
                     var rowsRaw = ToolArgumentReader.GetJson(args, "rows");
                     if (string.IsNullOrWhiteSpace(columnsRaw) || string.IsNullOrWhiteSpace(rowsRaw))
+                    {
                         return Err("Columns and rows are required for write operation");
+                    }
 
                     var columns = JsonSerializer.Deserialize<List<string>>(columnsRaw) ?? [];
                     var rowsElement = JsonDocument.Parse(rowsRaw);
                     var (normOk, normError, normColumns, normRows) = NormalizeRows(rowsElement.RootElement);
-                    if (!normOk) return Err(normError!);
+                    if (!normOk)
+                    {
+                        return Err(normError!);
+                    }
 
                     var dir = Path.GetDirectoryName(fullPath);
-                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    if (!string.IsNullOrEmpty(dir))
+                    {
+                        Directory.CreateDirectory(dir);
+                    }
 
                     var append = ToolArgumentReader.GetBoolOrDefault(args, "append", false);
                     var sheet = ToolArgumentReader.GetString(args, "sheet") ?? DefaultSheetName;
@@ -115,13 +142,20 @@ public static class CsvXlsxReadWriteTool
         if (hasHeader)
         {
             if (!await csv.ReadAsync())
+            {
                 return Ok(JsonSerializer.Serialize(new { columns = new List<string>(), rows = new List<Dictionary<string, string>>(), rowCount = 0, truncated = false }));
+            }
+
             csv.ReadHeader();
             var headers = csv.HeaderRecord ?? [];
             while (await csv.ReadAsync() && rowCount < maxRows)
             {
                 var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var header in headers) row[header] = csv.GetField(header) ?? string.Empty;
+                foreach (var header in headers)
+                {
+                    row[header] = csv.GetField(header) ?? string.Empty;
+                }
+
                 records.Add(row);
                 rowCount++;
             }
@@ -134,9 +168,14 @@ public static class CsvXlsxReadWriteTool
                 for (var i = 0; i < 100; i++)
                 {
                     var val = csv.GetField(i);
-                    if (val is null) break;
+                    if (val is null)
+                    {
+                        break;
+                    }
+
                     row[$"c{i + 1}"] = val;
                 }
+
                 records.Add(row);
                 rowCount++;
             }
@@ -162,7 +201,11 @@ public static class CsvXlsxReadWriteTool
         {
             return Err($"Sheet not found: {sheetName}");
         }
-        if (ws is null) return Err($"Sheet not found: {sheetName}");
+
+        if (ws is null)
+        {
+            return Err($"Sheet not found: {sheetName}");
+        }
 
         var lastRow = ws.LastRowUsed()?.RowNumber() ?? 0;
         var lastCol = ws.LastColumnUsed()?.ColumnNumber() ?? 0;
@@ -189,6 +232,7 @@ public static class CsvXlsxReadWriteTool
             {
                 row[columns[c]] = ws.Cell(r, c + 1).GetString();
             }
+
             rows.Add(row);
             rowCount++;
         }
@@ -208,7 +252,11 @@ public static class CsvXlsxReadWriteTool
         }
         else
         {
-            foreach (var col in columns) csv.WriteField(col);
+            foreach (var col in columns)
+            {
+                csv.WriteField(col);
+            }
+
             csv.NextRecord();
         }
 
@@ -219,6 +267,7 @@ public static class CsvXlsxReadWriteTool
                 var idx = columns.IndexOf(col);
                 csv.WriteField(idx < row.Count ? row[idx] : string.Empty);
             }
+
             csv.NextRecord();
         }
 
@@ -230,7 +279,10 @@ public static class CsvXlsxReadWriteTool
         using var workbook = new XLWorkbook();
         var ws = workbook.Worksheets.Add(sheetName);
 
-        for (var c = 0; c < columns.Count; c++) ws.Cell(1, c + 1).Value = columns[c];
+        for (var c = 0; c < columns.Count; c++)
+        {
+            ws.Cell(1, c + 1).Value = columns[c];
+        }
 
         for (var r = 0; r < rows.Count; r++)
         {
@@ -241,7 +293,11 @@ public static class CsvXlsxReadWriteTool
             }
         }
 
-        if (columns.Count > 0) ws.Range(1, 1, 1, columns.Count).Style.Font.Bold = true;
+        if (columns.Count > 0)
+        {
+            ws.Range(1, 1, 1, columns.Count).Style.Font.Bold = true;
+        }
+
         ws.Columns().AdjustToContents();
         workbook.SaveAs(fullPath);
         return Ok($"Wrote {rows.Count} rows to {Path.GetFileName(fullPath)}");
@@ -250,7 +306,10 @@ public static class CsvXlsxReadWriteTool
     [SuppressMessage("Critical Code Smell", "S3776", Justification = "Row normalization intentionally supports both object and array row contracts.")]
     private static (bool Success, string? Error, List<string>? Columns, List<List<string>>? Rows) NormalizeRows(JsonElement rowsElement)
     {
-        if (rowsElement.ValueKind != JsonValueKind.Array) return (false, "Rows must be a JSON array", null, null);
+        if (rowsElement.ValueKind != JsonValueKind.Array)
+        {
+            return (false, "Rows must be a JSON array", null, null);
+        }
 
         var result = new List<List<string>>();
         List<string>? columns = null;
@@ -259,21 +318,34 @@ public static class CsvXlsxReadWriteTool
         {
             if (item.ValueKind == JsonValueKind.Object)
             {
-                if (columns is null) columns = [.. item.EnumerateObject().Select(p => p.Name)];
+                if (columns is null)
+                {
+                    columns = [.. item.EnumerateObject().Select(p => p.Name)];
+                }
+
                 var row = new List<string>();
                 foreach (var col in columns!)
                 {
                     if (item.TryGetProperty(col, out var val))
+                    {
                         row.Add(val.ValueKind == JsonValueKind.Null ? string.Empty : val.ToString());
+                    }
                     else
+                    {
                         row.Add(string.Empty);
+                    }
                 }
+
                 result.Add(row);
             }
             else if (item.ValueKind == JsonValueKind.Array)
             {
                 var row = item.EnumerateArray().Select(v => v.ValueKind == JsonValueKind.Null ? string.Empty : v.ToString()).ToList();
-                if (columns is null) columns = Enumerable.Range(1, row.Count).Select(i => $"c{i}").ToList();
+                if (columns is null)
+                {
+                    columns = Enumerable.Range(1, row.Count).Select(i => $"c{i}").ToList();
+                }
+
                 result.Add(row);
             }
             else

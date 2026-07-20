@@ -1,6 +1,5 @@
 namespace LeanKernel.Logic.Memory;
 
-
 /// <summary>
 /// Provides callable knowledge/wiki operations backed by memory provider.
 /// </summary>

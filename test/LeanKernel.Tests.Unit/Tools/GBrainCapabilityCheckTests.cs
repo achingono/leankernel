@@ -1,9 +1,14 @@
 using System.Text.Json;
+
 using FluentAssertions;
+
 using LeanKernel.Gateway.Memory;
 using LeanKernel.Logic.Memory;
+
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;

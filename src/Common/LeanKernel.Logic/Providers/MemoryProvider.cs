@@ -1,8 +1,9 @@
+using LeanKernel.Entities;
+using LeanKernel.Logic.Memory;
+
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using LeanKernel.Entities;
-using LeanKernel.Logic.Memory;
 
 namespace LeanKernel.Logic.Providers;
 
@@ -31,7 +32,9 @@ public class MemoryProvider(
         var queryText = string.Join("\n", context.AIContext.Messages?.Select(x => x.Text) ?? []);
 
         if (string.IsNullOrWhiteSpace(queryText))
+        {
             return new AIContext { Messages = [] };
+        }
 
         var scope = new MemoryScope
         {
@@ -46,7 +49,9 @@ public class MemoryProvider(
                 scope, queryText, MaxMemoryResults, cancellationToken);
 
             if (memories.Count == 0)
+            {
                 return new AIContext { Messages = [] };
+            }
 
             var admitted = ApplyOverlayPrecedence(memories, scope.ChannelId)
                 .OrderByDescending(m => m.Score)
@@ -110,6 +115,7 @@ public class MemoryProvider(
             sessionId ??= stateSessionId;
             turnId = stateSessionId;
         }
+
         var recordedAt = timeProvider.GetUtcNow();
 
         try

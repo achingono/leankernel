@@ -1,6 +1,8 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;
@@ -42,6 +44,7 @@ public class ToolGovernancePolicyTests
         policy.IsAllowed(MakeTool("web_search", "internet")).Should().BeTrue();
         policy.IsAllowed(MakeTool("calculate", "calculation")).Should().BeTrue();
         policy.IsAllowed(MakeTool("file_search", "filesystem")).Should().BeFalse();
+
         // Name list takes precedence over category
         policy.IsAllowed(MakeTool("unknown", "internet")).Should().BeFalse();
     }

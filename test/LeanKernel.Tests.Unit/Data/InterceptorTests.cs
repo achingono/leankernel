@@ -1,10 +1,14 @@
 using FluentAssertions;
+
 using LeanKernel.Data;
-using LeanKernel.Entities;
 using LeanKernel.Data.Interceptors;
+using LeanKernel.Entities;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Data;

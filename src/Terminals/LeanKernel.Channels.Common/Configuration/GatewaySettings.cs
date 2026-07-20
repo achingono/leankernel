@@ -1,4 +1,4 @@
-namespace LeanKernel.Channels.Common.Settings;
+namespace LeanKernel.Channels.Common.Configuration;
 
 public sealed class GatewaySettings
 {

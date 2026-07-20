@@ -1,13 +1,16 @@
 using FluentAssertions;
-using LeanKernel;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Telemetry;
 using LeanKernel.Logic.Telemetry.Models;
 using LeanKernel.Tests.Unit.TestDoubles;
+
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Telemetry;
@@ -87,7 +90,7 @@ public sealed class TelemetryExportServiceTests : IDisposable
                 userId,
                 channelId,
                 requestedModel: "   ",
-                servedModel: "",
+                servedModel: string.Empty,
                 modelId: "gpt-fallback",
                 provider: null,
                 capturedAt: DateTimeOffset.UtcNow.AddMinutes(-2));
@@ -118,7 +121,7 @@ public sealed class TelemetryExportServiceTests : IDisposable
                 channelId,
                 requestedModel: "requested-model",
                 servedModel: "  ",
-                modelId: "",
+                modelId: string.Empty,
                 provider: "openai",
                 capturedAt: DateTimeOffset.UtcNow.AddMinutes(-2));
         });

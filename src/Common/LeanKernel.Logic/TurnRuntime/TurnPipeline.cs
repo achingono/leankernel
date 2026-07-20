@@ -1,11 +1,12 @@
 using System.Diagnostics;
+
 using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Logic.TurnRuntime;
 
 /// <summary>
 /// Orchestrates the turn pipeline by executing registered <see cref="ITurnStage"/> instances
-/// in order. Each stage mutates the <see cref="TurnContext>`. The pipeline measures total
+/// in order. Each stage mutates the <see cref="TurnContext"/>. The pipeline measures total
 /// execution time and logs stage-level diagnostics.
 /// </summary>
 public sealed class TurnPipeline(

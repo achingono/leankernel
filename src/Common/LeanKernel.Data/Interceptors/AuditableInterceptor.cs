@@ -1,6 +1,7 @@
 namespace LeanKernel.Data.Interceptors;
 
 using LeanKernel;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -34,6 +35,7 @@ public class AuditableInterceptor(IPermit permit) : ISaveChangesInterceptor
                 }
             }
         }
+
         return result;
     }
 

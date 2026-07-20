@@ -1,10 +1,14 @@
 using System.Net;
 using System.Text;
+
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.TurnRuntime;
+
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.TurnRuntime;

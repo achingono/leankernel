@@ -1,15 +1,20 @@
 using System.Reflection;
 using System.Text.Json;
+
 using FluentAssertions;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.Telemetry;
+
 using Microsoft.Agents.AI;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Providers;
@@ -20,7 +25,7 @@ namespace LeanKernel.Tests.Unit.Providers;
 public class DbChatHistoryProviderTests : IDisposable
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
-    private static readonly JsonSerializerOptions s_jsonOptions = new();
+    private static readonly JsonSerializerOptions SJsonOptions = new();
 
     public DbChatHistoryProviderTests() => _connection.Open();
     public void Dispose() => _connection.Dispose();
@@ -52,7 +57,7 @@ public class DbChatHistoryProviderTests : IDisposable
     public async Task ProvideChatHistoryAsync_EmptyChatSessionId_ReturnsEmpty()
     {
         var (provider, _) = CreateSut();
-        var session = CreateSession(new Dictionary<string, string?> { ["chatSessionId"] = "" });
+        var session = CreateSession(new Dictionary<string, string?> { ["chatSessionId"] = string.Empty });
         var context = CreateInvokingContext(session: session);
 
         var result = await provider.InvokeProvideChatHistoryAsync(context, CancellationToken.None);
@@ -91,7 +96,7 @@ public class DbChatHistoryProviderTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         };
         context.Sessions.Add(sessionEntity);
         context.Turns.Add(new TurnEntity
@@ -102,7 +107,7 @@ public class DbChatHistoryProviderTests : IDisposable
             Timestamp = DateTimeOffset.UtcNow,
             AuthorName = "test-user",
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         context.Turns.Add(new TurnEntity
         {
@@ -112,7 +117,7 @@ public class DbChatHistoryProviderTests : IDisposable
             Timestamp = DateTimeOffset.UtcNow,
             AuthorName = "assistant",
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         context.Turns.Add(new TurnEntity
         {
@@ -122,7 +127,7 @@ public class DbChatHistoryProviderTests : IDisposable
             Timestamp = DateTimeOffset.UtcNow,
             AuthorName = "system",
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         await context.SaveChangesAsync();
 
@@ -148,16 +153,26 @@ public class DbChatHistoryProviderTests : IDisposable
         context.Sessions.Add(new SessionEntity
         {
             Id = sessionId,
-            TenantId = permit.TenantId, UserId = permit.UserId, ChannelId = permit.ChannelId,
-            Tenant = null!, User = null!, Channel = null!,
-            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
-            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            TenantId = permit.TenantId,
+            UserId = permit.UserId,
+            ChannelId = permit.ChannelId,
+            Tenant = null!,
+            User = null!,
+            Channel = null!,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         context.Turns.Add(new TurnEntity
         {
-            SessionId = sessionId, Role = "tool", Content = "Tool output", AuthorName = "calculator",
-            Timestamp = DateTimeOffset.UtcNow, CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            SessionId = sessionId,
+            Role = "tool",
+            Content = "Tool output",
+            AuthorName = "calculator",
+            Timestamp = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         await context.SaveChangesAsync();
 
@@ -181,16 +196,25 @@ public class DbChatHistoryProviderTests : IDisposable
         context.Sessions.Add(new SessionEntity
         {
             Id = sessionId,
-            TenantId = permit.TenantId, UserId = permit.UserId, ChannelId = permit.ChannelId,
-            Tenant = null!, User = null!, Channel = null!,
-            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
-            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            TenantId = permit.TenantId,
+            UserId = permit.UserId,
+            ChannelId = permit.ChannelId,
+            Tenant = null!,
+            User = null!,
+            Channel = null!,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         context.Turns.Add(new TurnEntity
         {
-            SessionId = sessionId, Role = "UNKNOWN_FUTURE_ROLE", Content = "some content",
-            Timestamp = DateTimeOffset.UtcNow, CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            SessionId = sessionId,
+            Role = "UNKNOWN_FUTURE_ROLE",
+            Content = "some content",
+            Timestamp = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         await context.SaveChangesAsync();
 
@@ -213,10 +237,16 @@ public class DbChatHistoryProviderTests : IDisposable
         context.Sessions.Add(new SessionEntity
         {
             Id = sessionId,
-            TenantId = permit.TenantId, UserId = permit.UserId, ChannelId = permit.ChannelId,
-            Tenant = null!, User = null!, Channel = null!,
-            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
-            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            TenantId = permit.TenantId,
+            UserId = permit.UserId,
+            ChannelId = permit.ChannelId,
+            Tenant = null!,
+            User = null!,
+            Channel = null!,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         const int turnWindow = 200; // matches DbChatHistoryProvider.RecentTurnWindow
         var overLimit = turnWindow + 20;
@@ -224,12 +254,15 @@ public class DbChatHistoryProviderTests : IDisposable
         {
             context.Turns.Add(new TurnEntity
             {
-                SessionId = sessionId, Role = "user", Content = $"msg {i}",
+                SessionId = sessionId,
+                Role = "user",
+                Content = $"msg {i}",
                 Timestamp = DateTimeOffset.UtcNow.AddSeconds(i),
                 CreatedOn = DateTime.UtcNow,
-                CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+                CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
             });
         }
+
         await context.SaveChangesAsync();
 
         var session = CreateSession(new Dictionary<string, string?> { ["chatSessionId"] = sessionId.ToString() });
@@ -252,18 +285,23 @@ public class DbChatHistoryProviderTests : IDisposable
         context.Sessions.Add(new SessionEntity
         {
             Id = sessionId,
-            TenantId = permit.TenantId, UserId = permit.UserId, ChannelId = permit.ChannelId,
-            Tenant = null!, User = null!, Channel = null!,
-            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
-            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            TenantId = permit.TenantId,
+            UserId = permit.UserId,
+            ChannelId = permit.ChannelId,
+            Tenant = null!,
+            User = null!,
+            Channel = null!,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         var ts = DateTimeOffset.UtcNow;
         context.Turns.AddRange(
-            new TurnEntity { SessionId = sessionId, Role = "user", Content = "What is 2+2?", Timestamp = ts, CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" } },
-            new TurnEntity { SessionId = sessionId, Role = "assistant", Content = "Calculating.", Timestamp = ts.AddSeconds(1), CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" } },
-            new TurnEntity { SessionId = sessionId, Role = "tool", Content = "4", AuthorName = "calc", Timestamp = ts.AddSeconds(2), CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" } },
-            new TurnEntity { SessionId = sessionId, Role = "assistant", Content = "The answer is 4.", Timestamp = ts.AddSeconds(3), CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" } }
-        );
+            new TurnEntity { SessionId = sessionId, Role = "user", Content = "What is 2+2?", Timestamp = ts, CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty } },
+            new TurnEntity { SessionId = sessionId, Role = "assistant", Content = "Calculating.", Timestamp = ts.AddSeconds(1), CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty } },
+            new TurnEntity { SessionId = sessionId, Role = "tool", Content = "4", AuthorName = "calc", Timestamp = ts.AddSeconds(2), CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty } },
+            new TurnEntity { SessionId = sessionId, Role = "assistant", Content = "The answer is 4.", Timestamp = ts.AddSeconds(3), CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty } });
         await context.SaveChangesAsync();
 
         var session = CreateSession(new Dictionary<string, string?> { ["chatSessionId"] = sessionId.ToString() });
@@ -296,7 +334,7 @@ public class DbChatHistoryProviderTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         await context.SaveChangesAsync();
 
@@ -361,7 +399,7 @@ public class DbChatHistoryProviderTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         await dbContext.SaveChangesAsync();
         dbContext.ChangeTracker.Clear();
@@ -441,7 +479,7 @@ public class DbChatHistoryProviderTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = string.Empty }
         });
         await dbContext.SaveChangesAsync();
 
@@ -579,7 +617,10 @@ public class DbChatHistoryProviderTests : IDisposable
     {
         var bag = new AgentSessionStateBag();
         foreach (var kvp in stateBag)
-            bag.SetValue(kvp.Key, kvp.Value, s_jsonOptions);
+        {
+            bag.SetValue(kvp.Key, kvp.Value, SJsonOptions);
+        }
+
         return (ChatClientAgentSession)Activator.CreateInstance(
             typeof(ChatClientAgentSession),
             BindingFlags.NonPublic | BindingFlags.Instance,

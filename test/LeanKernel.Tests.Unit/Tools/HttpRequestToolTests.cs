@@ -1,10 +1,14 @@
 using System.Net;
 using System.Text.Json;
+
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
-using Xunit;
 using LeanKernel.Logic.Tools.BuiltIn.Internet;
+
 using Microsoft.Extensions.DependencyInjection;
+
+using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;
 

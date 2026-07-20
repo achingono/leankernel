@@ -1,6 +1,7 @@
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -56,7 +57,9 @@ public sealed class ChannelMemoryPolicyResolver(
         bool IsReadable(Guid sourceChannelId, Guid candidateChannelId)
         {
             if (sourceChannelId == candidateChannelId)
+            {
                 return true;
+            }
 
             var source = channelById[sourceChannelId];
             var candidate = channelById[candidateChannelId];
@@ -99,7 +102,9 @@ public sealed class ChannelMemoryPolicyResolver(
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         if (normalized.Contains(ChannelEntity.MemoryPolicyWildcard))
+        {
             return new HashSet<string>([ChannelEntity.MemoryPolicyWildcard], StringComparer.OrdinalIgnoreCase);
+        }
 
         return normalized;
     }

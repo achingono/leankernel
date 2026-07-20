@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
 using LeanKernel.Logic.Memory;
-using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Gateway.Memory;
 

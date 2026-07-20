@@ -1,5 +1,6 @@
 using LeanKernel.Data;
 using LeanKernel.Logic.Telemetry.Models;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace LeanKernel.Logic.Telemetry;
@@ -22,7 +23,9 @@ public sealed class TelemetryExportService(
     private static void ValidateRange(DateRange range)
     {
         if (!range.IsValid)
+        {
             throw new ArgumentException("Invalid date range: From must be <= To.", nameof(range));
+        }
     }
 
     private async Task<IReadOnlyList<TelemetryExportRecord>> ExportCoreAsync(
@@ -57,7 +60,9 @@ public sealed class TelemetryExportService(
     private static string ResolveServedModel(string? servedModel, string? fallbackModel)
     {
         if (!string.IsNullOrWhiteSpace(servedModel))
+        {
             return servedModel;
+        }
 
         return string.IsNullOrWhiteSpace(fallbackModel) ? "unknown" : fallbackModel;
     }

@@ -1,5 +1,7 @@
-using LeanKernel.Logic.Configuration;
 using System.Diagnostics.CodeAnalysis;
+
+using LeanKernel.Logic.Configuration;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

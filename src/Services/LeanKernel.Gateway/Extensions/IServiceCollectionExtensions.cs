@@ -2,14 +2,13 @@ using LeanKernel.Data;
 using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.HealthChecks;
 using LeanKernel.Gateway.Memory;
-using LeanKernel.Gateway.Providers;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Mcp;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
-using LeanKernel.Logic.Mcp;
 using LeanKernel.Logic.Tools;
 using LeanKernel.Logic.TurnRuntime;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
+
 using Microsoft.Extensions.Options;
 
 namespace Microsoft.Extensions.DependencyInjection;

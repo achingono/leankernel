@@ -109,10 +109,10 @@ public static class EgressValidator
     }
 
     private static bool IsPrivateIPv4(byte[] b) =>
-        b[0] == 10                                // 10.0.0.0/8
+        b[0] == 10 // 10.0.0.0/8
         || (b[0] == 172 && b[1] >= 16 && b[1] <= 31) // 172.16.0.0/12
-        || (b[0] == 192 && b[1] == 168)           // 192.168.0.0/16
-        || b[0] == 127                             // 127.0.0.0/8 loopback
+        || (b[0] == 192 && b[1] == 168) // 192.168.0.0/16
+        || b[0] == 127 // 127.0.0.0/8 loopback
         || (b[0] == 169 && b[1] == 254);           // 169.254.0.0/16 link-local
 
     private static bool IsPrivateIPv6(byte[] b) =>

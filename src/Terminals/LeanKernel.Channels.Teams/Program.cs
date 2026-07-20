@@ -1,12 +1,16 @@
-using LeanKernel.Channels.Teams;
-using LeanKernel.Channels.Teams.HealthChecks;
 using LeanKernel.Channels.Common.Configuration;
 using LeanKernel.Channels.Common.HealthChecks;
-using LeanKernel.Channels.Common.Settings;
+using LeanKernel.Channels.Teams;
+using LeanKernel.Channels.Teams.Clients;
+using LeanKernel.Channels.Teams.HealthChecks;
+using LeanKernel.Channels.Teams.Models;
+using LeanKernel.Channels.Teams.Services;
 using LeanKernel.Data;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,7 +21,9 @@ var gatewaySettings = builder.Configuration.GetSection("Gateway").Get<GatewaySet
 var botSettings = builder.Configuration.GetSection("Bot").Get<BotSettings>() ?? new BotSettings();
 var (connectionStringName, connectionStringValue) = builder.Configuration.ResolveConnectionString(["Postgres", "Sqlite"]);
 if (string.IsNullOrWhiteSpace(connectionStringName) || string.IsNullOrWhiteSpace(connectionStringValue))
+{
     throw new InvalidOperationException("A database connection string is required. Configure ConnectionStrings:Postgres or ConnectionStrings:Sqlite.");
+}
 
 builder.Services.AddHttpClient<GatewayClient>(client =>
 {
@@ -87,17 +93,23 @@ app.MapGet("/live", () => Results.Ok(new { status = "alive" }));
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
-    ResponseWriter = HealthCheckResponseWriter.WriteAsync
+    ResponseWriter = (context, report) =>
+    {
+        context.Response.ContentType = "application/json; charset=utf-8";
+        return context.Response.WriteAsync(report.ToJson());
+    }
 });
 
 app.MapPost("/api/messages", async (
-    IncomingActivityDto activity,
+    IncomingActivity activity,
     HttpContext httpContext,
     BotFrameworkTransportClient transport,
     CancellationToken ct) =>
 {
     if (!string.Equals(activity.Type, "message", StringComparison.OrdinalIgnoreCase))
+    {
         return Results.Accepted();
+    }
 
     var tokenServiceUrl = httpContext.User.FindFirst("serviceurl")?.Value;
     if (!string.IsNullOrWhiteSpace(tokenServiceUrl)

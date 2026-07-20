@@ -1,13 +1,16 @@
 using FluentAssertions;
-using LeanKernel;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Telemetry;
 using LeanKernel.Logic.Telemetry.Models;
 using LeanKernel.Tests.Unit.TestDoubles;
+
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Telemetry;
@@ -143,7 +146,7 @@ public sealed class TelemetryAggregationServiceTests : IDisposable
 
         await SeedTelemetryAsync(tenantId, userId, channelId, extraSeed: context =>
         {
-            InsertTurnWithTelemetry(context, tenantId, userId, channelId, "", "", 12, 8, 0.001m, false, capturedAt);
+            InsertTurnWithTelemetry(context, tenantId, userId, channelId, string.Empty, string.Empty, 12, 8, 0.001m, false, capturedAt);
         });
 
         var service = CreateSut(tenantId, userId, channelId);
@@ -281,7 +284,9 @@ public sealed class TelemetryAggregationServiceTests : IDisposable
     private static void InsertTenant(EntityContext context, Guid tenantId)
     {
         if (context.Tenants.Any(t => t.Id == tenantId))
+        {
             return;
+        }
 
         context.Tenants.Add(new TenantEntity
         {
@@ -298,7 +303,9 @@ public sealed class TelemetryAggregationServiceTests : IDisposable
     private static void InsertUser(EntityContext context, Guid userId)
     {
         if (context.Users.Any(u => u.Id == userId))
+        {
             return;
+        }
 
         context.Users.Add(new UserEntity
         {
@@ -321,7 +328,9 @@ public sealed class TelemetryAggregationServiceTests : IDisposable
     private static void InsertChannel(EntityContext context, Guid channelId)
     {
         if (context.Channels.Any(c => c.Id == channelId))
+        {
             return;
+        }
 
         context.Channels.Add(new ChannelEntity
         {

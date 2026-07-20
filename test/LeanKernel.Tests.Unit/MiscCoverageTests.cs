@@ -1,17 +1,17 @@
 using System.Security.Claims;
-using System.Security.Principal;
+
 using FluentAssertions;
-using LeanKernel.Channels.Common.Configuration;
-using LeanKernel.Gateway;
-using LeanKernel.Gateway.Configuration;
+
 using LeanKernel.Gateway.Memory;
 using LeanKernel.Gateway.Requests;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
+
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit;

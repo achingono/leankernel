@@ -5,10 +5,10 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-[DisplayColumn(nameof(Name))]
 /// <summary>
 /// Represents a tenant in the system, which can manage multiple groups.
 /// </summary>
+[DisplayColumn(nameof(Name))]
 public class TenantEntity : IAuditable, IRecyclable
 {
     /// <summary>

@@ -1,9 +1,13 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.TurnRuntime;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.TurnRuntime;
@@ -189,7 +193,7 @@ public class ContextGatekeeperTests
                 Source = "memory",
                 Content = $"Fact {i}",
                 EstimatedTokens = 10,
-                Score = 0.9 - i * 0.1,
+                Score = 0.9 - (i * 0.1),
             });
         }
 

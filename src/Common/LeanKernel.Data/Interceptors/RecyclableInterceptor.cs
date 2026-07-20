@@ -2,7 +2,9 @@ namespace LeanKernel.Data.Interceptors;
 
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
+
 using LeanKernel;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -38,6 +40,7 @@ public class RecyclableInterceptor(IPermit permit) : ISaveChangesInterceptor
                 entry.State = EntityState.Unchanged;
             }
         }
+
         return result;
     }
 

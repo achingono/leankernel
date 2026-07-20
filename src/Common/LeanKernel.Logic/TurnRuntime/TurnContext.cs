@@ -1,4 +1,3 @@
-using LeanKernel.Logic.Providers;
 using Microsoft.Extensions.AI;
 
 namespace LeanKernel.Logic.TurnRuntime;
@@ -53,7 +52,7 @@ public sealed class TurnContext
 
     /// <summary>
     /// Token budget remaining after each admission decision.
-    /// Starts at <see cref="TurnPipelineSettings.MaxContextTokens"/>.
+    /// Starts at <see cref="Configuration.TurnPipelineSettings.MaxContextTokens"/>.
     /// </summary>
     public int RemainingBudget { get; set; }
 

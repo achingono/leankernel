@@ -1,11 +1,14 @@
 using System.Net;
+
 using FluentAssertions;
-using LeanKernel.Logic.Tools.BuiltIn;
+
 using LeanKernel.Logic.Configuration;
-using LeanKernel.Logic.Tools;
+using LeanKernel.Logic.Tools.BuiltIn;
+
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;

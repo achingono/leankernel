@@ -7,7 +7,7 @@ namespace LeanKernel.Entities;
 /// <summary>
 /// Represents a persisted conversation turn within a session.
 /// </summary>
-public sealed class TurnEntity: IAuditable, IRecyclable
+public sealed class TurnEntity : IAuditable, IRecyclable
 {
     /// <summary>
     /// Gets or sets the unique turn identifier.
@@ -53,7 +53,7 @@ public sealed class TurnEntity: IAuditable, IRecyclable
     /// Gets or sets optional turn metadata persisted as JSON.
     /// </summary>
     public string? Metadata { get; set; }
-    
+
     /// <summary>
     /// Date and time when the tenant was created.
     /// </summary>
@@ -95,8 +95,14 @@ public sealed class TurnEntity: IAuditable, IRecyclable
     {
         // Bucket timestamp to 5-minute windows so retries within the same window are deduped
         // but genuinely repeated content across longer intervals is preserved.
-        var bucket = new DateTimeOffset(Timestamp.Year, Timestamp.Month, Timestamp.Day,
-            Timestamp.Hour, Timestamp.Minute / 5 * 5, 0, TimeSpan.Zero);
+        var bucket = new DateTimeOffset(
+            Timestamp.Year,
+            Timestamp.Month,
+            Timestamp.Day,
+            Timestamp.Hour,
+            Timestamp.Minute / 5 * 5,
+            0,
+            TimeSpan.Zero);
         var input = $"{SessionId:N}|{Role}|{Content}|{bucket:O}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(hash).ToLowerInvariant();

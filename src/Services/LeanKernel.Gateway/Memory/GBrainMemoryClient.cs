@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
 using LeanKernel.Entities;
 using LeanKernel.Logic.Providers;
-using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Gateway.Memory;
 
@@ -20,6 +20,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
     /// Initializes a new instance of the <see cref="GBrainMemoryClient"/> class.
     /// </summary>
     /// <param name="client">The low-level MCP client used to call GBrain tools.</param>
+    /// <param name="memoryPolicyResolver">The channel memory policy resolver.</param>
     /// <param name="logger">The logger for memory operation diagnostics.</param>
     public GBrainMemoryClient(
         IGBrainMcpClient client,
@@ -112,6 +113,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
     /// Derived from the same tenant/person/channel identifiers used by <see cref="BuildScopedSlug"/>.
     /// </summary>
     /// <param name="scope">The memory scope to derive the namespace from.</param>
+    /// <param name="channelId">The channel identifier to include.</param>
     /// <returns>The scoped namespace string.</returns>
     private static string BuildScopedNamespace(MemoryScope scope, Guid channelId)
     {

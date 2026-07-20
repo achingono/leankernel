@@ -1,11 +1,15 @@
 using System.Security.Claims;
+
 using FluentAssertions;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Tests.Unit.TestDoubles;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Identity;
@@ -37,13 +41,21 @@ public class IdentityResolverTests
         var resolver = CreateResolver(out var db);
         db.Tenants.Add(new TenantEntity
         {
-            Id = Guid.NewGuid(), Name = "A", HostName = "a.test", IsActive = false,
-            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            Id = Guid.NewGuid(),
+            Name = "A",
+            HostName = "a.test",
+            IsActive = false,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.Tenants.Add(new TenantEntity
         {
-            Id = Guid.NewGuid(), Name = "B", HostName = "b.test", IsActive = true,
-            CreatedOn = DateTime.UtcNow, CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            Id = Guid.NewGuid(),
+            Name = "B",
+            HostName = "b.test",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         await db.SaveChangesAsync();
 
@@ -147,7 +159,7 @@ public class IdentityResolverTests
             HostName = "tenant.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.Channels.Add(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
         db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
@@ -205,7 +217,7 @@ public class IdentityResolverTests
             HostName = "tenant-link.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         await db.SaveChangesAsync();
 
@@ -221,7 +233,7 @@ public class IdentityResolverTests
             UserId = userA.Id,
             ChannelId = channelId,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.Sessions.Add(new SessionEntity
         {
@@ -230,7 +242,7 @@ public class IdentityResolverTests
             UserId = userB.Id,
             ChannelId = channelId,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
         {
@@ -278,7 +290,7 @@ public class IdentityResolverTests
             HostName = "a-link.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.Tenants.Add(new TenantEntity
         {
@@ -287,7 +299,7 @@ public class IdentityResolverTests
             HostName = "b-link.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
 
         var channelId = Guid.NewGuid();
@@ -304,7 +316,7 @@ public class IdentityResolverTests
             UserId = userA.Id,
             ChannelId = channelId,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.Sessions.Add(new SessionEntity
         {
@@ -313,7 +325,7 @@ public class IdentityResolverTests
             UserId = userB.Id,
             ChannelId = channelId,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
         {
@@ -353,7 +365,7 @@ public class IdentityResolverTests
             HostName = "anchor-unlink.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
 
         var channelId = Guid.NewGuid();
@@ -370,7 +382,7 @@ public class IdentityResolverTests
             UserId = userA.Id,
             ChannelId = channelId,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.Sessions.Add(new SessionEntity
         {
@@ -379,7 +391,7 @@ public class IdentityResolverTests
             UserId = userB.Id,
             ChannelId = channelId,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
         {
@@ -429,7 +441,7 @@ public class IdentityResolverTests
             HostName = "cluster-a.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.Tenants.Add(new TenantEntity
         {
@@ -438,7 +450,7 @@ public class IdentityResolverTests
             HostName = "cluster-b.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
 
         var channelId = Guid.NewGuid();
@@ -456,7 +468,7 @@ public class IdentityResolverTests
             Email = "source@a.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         };
         sourceA.PersonId = sourceA.Id;
 
@@ -471,7 +483,7 @@ public class IdentityResolverTests
             Email = "target@a.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         };
         targetA.PersonId = targetA.Id;
 
@@ -486,7 +498,7 @@ public class IdentityResolverTests
             Email = "other@b.test",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         };
         tenantBUser.PersonId = targetA.PersonId;
 
@@ -502,7 +514,7 @@ public class IdentityResolverTests
             UserId = sourceA.Id,
             ChannelId = channelId,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.Sessions.Add(new SessionEntity
         {
@@ -511,7 +523,7 @@ public class IdentityResolverTests
             UserId = targetA.Id,
             ChannelId = channelId,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.Sessions.Add(new SessionEntity
         {
@@ -520,7 +532,7 @@ public class IdentityResolverTests
             UserId = tenantBUser.Id,
             ChannelId = channelId,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = "" }
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
         db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
         {

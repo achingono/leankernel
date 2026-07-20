@@ -1,6 +1,9 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Memory;
+
 using Microsoft.Extensions.Logging.Abstractions;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Memory;

@@ -1,12 +1,12 @@
+using LeanKernel.Gateway;
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using LeanKernel.Gateway;
 
 namespace LeanKernel.Tests.Integration;
 
@@ -33,14 +33,18 @@ public class ToolsEnabledTestApplicationFactory : WebApplicationFactory<Program>
                 ["Agents:DefaultName"] = "leankernel",
                 ["Agents:DefaultDescription"] = "Test agent",
                 ["Agents:DefaultInstructions"] = "You are a test assistant.",
+
                 // Tool runtime enabled
                 ["Agents:Tools:Enabled"] = "true",
                 ["Agents:Tools:BuiltIns:Calculation:Enabled"] = "true",
                 ["Agents:Tools:BuiltIns:Calculation:MaxInputItems"] = "100",
+
                 // No skill base paths — avoid scanning non-existent dirs
                 ["Agents:Tools:SkillBasePaths:0"] = "/tmp/lk-test-skills-nonexistent",
+
                 // Files root for file_search
                 ["Files:RootPath"] = Path.GetTempPath(),
+
                 // GBrain disabled (no valid baseurl → wiki tools skipped)
                 ["GBrain:BaseUrl"] = "http://localhost:1",
                 ["GBrain:TimeoutSeconds"] = "1"

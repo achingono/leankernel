@@ -1,11 +1,14 @@
 using FluentAssertions;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Tests.Unit.TestDoubles;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Identity;
@@ -69,8 +72,8 @@ public class ChannelMemoryPolicyResolverTests
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
                 ChannelId = teams.Id,
-                ShareList = "",
-                AccessList = ""
+                ShareList = string.Empty,
+                AccessList = string.Empty
             });
         await db.SaveChangesAsync();
 

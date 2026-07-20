@@ -27,13 +27,17 @@ public sealed class CostEstimateTable
     public decimal? Estimate(string? model, int promptTokens, int completionTokens)
     {
         if (string.IsNullOrEmpty(model))
+        {
             return null;
+        }
 
         CostPer1kInputTokens.TryGetValue(model, out var inputRate);
         CostPer1kOutputTokens.TryGetValue(model, out var outputRate);
 
         if (inputRate == 0 && outputRate == 0)
+        {
             return null;
+        }
 
         var inputCost = promptTokens / 1_000m * inputRate;
         var outputCost = completionTokens / 1_000m * outputRate;

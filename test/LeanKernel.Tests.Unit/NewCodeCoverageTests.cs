@@ -1,5 +1,7 @@
 using System.Security.Claims;
+
 using FluentAssertions;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Gateway;
@@ -8,14 +10,15 @@ using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
 using LeanKernel.Gateway.Sessions;
 using LeanKernel.Logic.Configuration;
+
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit;
@@ -75,7 +78,7 @@ public class NewCodeCoverageTests
     public void ConfigureOptions_EmptyConnectionString_AllowEmptyTrue_UsesProvider()
     {
         var builder = new DbContextOptionsBuilder<EntityContext>();
-        var result = builder.ConfigureOptions("Postgres", "", allowEmptyConnectionString: true);
+        var result = builder.ConfigureOptions("Postgres", string.Empty, allowEmptyConnectionString: true);
         result.Should().BeSameAs(builder);
     }
 
@@ -165,7 +168,7 @@ public class NewCodeCoverageTests
     [Fact]
     public void ClaimsPrincipalExtensions_Id_EmptyClaimValue_ReturnsEmpty()
     {
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Sid, "")]);
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Sid, string.Empty)]);
         var principal = new ClaimsPrincipal(identity);
         principal.Id().Should().Be(Guid.Empty);
     }
@@ -362,7 +365,7 @@ public class NewCodeCoverageTests
             TenantId = permit.Object.TenantId,
             UserId = permit.Object.UserId,
             ChannelId = permit.Object.ChannelId,
-            StateJson = "",
+            StateJson = string.Empty,
             CreatedOn = DateTimeOffset.UtcNow,
             UpdatedOn = DateTimeOffset.UtcNow
         });
@@ -417,6 +420,7 @@ public class NewCodeCoverageTests
                 value = v;
                 return true;
             }
+
             value = Array.Empty<byte>();
             return false;
         }

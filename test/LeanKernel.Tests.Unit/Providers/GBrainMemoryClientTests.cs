@@ -1,9 +1,13 @@
 using FluentAssertions;
+
 using LeanKernel.Entities;
 using LeanKernel.Gateway.Memory;
 using LeanKernel.Logic.Providers;
+
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Providers;

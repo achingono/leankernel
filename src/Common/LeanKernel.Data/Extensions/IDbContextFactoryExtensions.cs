@@ -1,12 +1,11 @@
 using LeanKernel.Data;
-using Microsoft.EntityFrameworkCore;
 
-namespace LeanKernel.Channels.Common.Credentials;
+namespace Microsoft.EntityFrameworkCore;
 
-public static class ChannelSenderBindingTokenResolver
+public static class IDbContextFactoryExtensions
 {
-    public static async Task<(string Token, int MatchCount)> ResolveAsync(
-        IDbContextFactory<EntityContext> dbContextFactory,
+    public static async Task<(string Token, int MatchCount)> ResolveSenderAsync(
+        this IDbContextFactory<EntityContext> dbContextFactory,
         string senderId,
         string issuer,
         string channelName,

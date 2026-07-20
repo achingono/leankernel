@@ -5,7 +5,7 @@ namespace LeanKernel.Entities;
 /// <summary>
 /// Represents a persisted chat session for a channel and user pair.
 /// </summary>
-public class SessionEntity: IAuditable, IRecyclable
+public class SessionEntity : IAuditable, IRecyclable
 {
     /// <summary>
     /// Gets or sets the unique session identifier.
@@ -46,7 +46,7 @@ public class SessionEntity: IAuditable, IRecyclable
     /// Gets or sets optional JSON metadata for the session.
     /// </summary>
     public string? Metadata { get; set; }
-    
+
     /// <summary>
     /// Date and time when the tenant was created.
     /// </summary>

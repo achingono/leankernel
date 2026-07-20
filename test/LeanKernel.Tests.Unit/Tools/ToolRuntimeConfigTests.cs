@@ -1,6 +1,8 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;

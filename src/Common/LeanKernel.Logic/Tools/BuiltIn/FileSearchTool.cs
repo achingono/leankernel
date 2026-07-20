@@ -1,7 +1,7 @@
-using System.Text;
 using System.Text.Json;
+
 using LeanKernel.Logic.Configuration;
-using LeanKernel.Logic.Tools;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -45,11 +45,11 @@ public static class FileSearchTool
             ],
             Handler = async (args, ct) =>
             {
-                var query   = ToolArgumentReader.GetString(args, "query");
-                var name    = ToolArgumentReader.GetString(args, "name");
+                var query = ToolArgumentReader.GetString(args, "query");
+                var name = ToolArgumentReader.GetString(args, "name");
                 var content = ToolArgumentReader.GetString(args, "content");
-                var path    = ToolArgumentReader.GetString(args, "path");
-                var limit   = Math.Min(ToolArgumentReader.GetInt(args, "limit") ?? DefaultLimit, MaxLimit);
+                var path = ToolArgumentReader.GetString(args, "path");
+                var limit = Math.Min(ToolArgumentReader.GetInt(args, "limit") ?? DefaultLimit, MaxLimit);
                 var maxDepth = ToolArgumentReader.GetInt(args, "maxDepth") ?? DefaultMaxDepth;
 
                 if (string.IsNullOrWhiteSpace(query) &&

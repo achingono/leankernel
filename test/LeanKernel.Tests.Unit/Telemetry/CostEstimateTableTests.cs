@@ -1,5 +1,7 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Telemetry;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Telemetry;

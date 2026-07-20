@@ -1,6 +1,7 @@
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

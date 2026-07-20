@@ -1,4 +1,5 @@
-using LeanKernel.Channels.Common.Settings;
+using LeanKernel.Channels.Common.Configuration;
+
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
@@ -11,7 +12,9 @@ public sealed class GatewayHealthCheck(IHttpClientFactory httpClientFactory, IOp
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         if (!Uri.TryCreate(settings.Value.BaseUrl, UriKind.Absolute, out var gatewayBaseUri))
+        {
             return HealthCheckResult.Unhealthy("Gateway BaseUrl is not configured.");
+        }
 
         try
         {

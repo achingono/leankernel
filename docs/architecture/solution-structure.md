@@ -13,7 +13,7 @@ Projects in the app-only solution:
 | Project | Role |
 |---|---|
 | `src/Common/LeanKernel.Core` | Shared entities and cross-project interfaces/contracts |
-| `src/Common/LeanKernel.Channels.Common` | Shared terminal/gateway helpers (health response writer, gateway health probe, connection-string resolver, channel binding token resolver) |
+| `src/Terminals/LeanKernel.Channels.Common` | Shared terminal/gateway helpers (health response writer, gateway health probe, connection-string resolver, channel binding token resolver) |
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, design-time factory |
 | `src/Common/LeanKernel.Logic` | Chat history provider, memory pipeline, identity resolution, MAF-facing logic services |
 | `src/Services/LeanKernel.Gateway` | Web host, endpoint mapping, auth/session middleware, GBrain wiring, agent session store |

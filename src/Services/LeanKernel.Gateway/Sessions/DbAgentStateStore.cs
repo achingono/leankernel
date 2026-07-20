@@ -1,10 +1,11 @@
 using System.Text.Json;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
+
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace LeanKernel.Gateway.Sessions;
 

@@ -1,6 +1,7 @@
 using System.Net;
+
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Integration;
@@ -13,6 +14,7 @@ public class HealthEndpointTests : IClassFixture<GatewayTestApplicationFactory>
     private readonly HttpClient _client;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="HealthEndpointTests"/> class.
     /// Creates a test instance backed by the shared gateway factory.
     /// </summary>
     public HealthEndpointTests(GatewayTestApplicationFactory factory)

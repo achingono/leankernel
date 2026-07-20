@@ -5,11 +5,13 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+
 using LeanKernel.Logic.Configuration;
-using LeanKernel.Logic.Tools;
+
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+
 using Npgsql;
 
 namespace LeanKernel.Logic.Tools.BuiltIn.Data;
@@ -74,6 +76,7 @@ public static partial class DatabaseQueryTool
         {
             return new ToolResult { ToolName = ToolName, Success = false, Error = "Connection is required" };
         }
+
         if (string.IsNullOrWhiteSpace(query))
         {
             return new ToolResult { ToolName = ToolName, Success = false, Error = "Query is required" };
@@ -90,6 +93,7 @@ public static partial class DatabaseQueryTool
         {
             return new ToolResult { ToolName = ToolName, Success = false, Error = $"Unknown database connection: {connectionName}" };
         }
+
         if (!connectionConfig.ReadOnly)
         {
             return new ToolResult { ToolName = ToolName, Success = false, Error = $"Database connection '{connectionConfig.Name}' must be configured with readOnly=true" };
@@ -133,18 +137,25 @@ public static partial class DatabaseQueryTool
                 truncated = true;
                 break;
             }
+
             var row = new List<object?>(reader.FieldCount);
             for (var index = 0; index < reader.FieldCount; index++)
             {
                 row.Add(NormalizeResultValue(reader.GetValue(index)));
             }
+
             rows.Add(row);
         }
+
         stopwatch.Stop();
 
         var output = JsonSerializer.Serialize(new
         {
-            columns, rows, rowCount = rows.Count, truncated, executionMs = stopwatch.ElapsedMilliseconds
+            columns,
+            rows,
+            rowCount = rows.Count,
+            truncated,
+            executionMs = stopwatch.ElapsedMilliseconds
         });
 
         return new ToolResult { ToolName = ToolName, Success = true, Output = output };
@@ -169,6 +180,7 @@ public static partial class DatabaseQueryTool
             {
                 throw new ArgumentException($"Invalid parameter name '{pair.Key}'.");
             }
+
             var parameter = command.CreateParameter();
             parameter.ParameterName = $"@{parameterName}";
             parameter.Value = NormalizeParameterValue(pair.Value);
@@ -178,7 +190,11 @@ public static partial class DatabaseQueryTool
 
     private static object NormalizeParameterValue(object? value)
     {
-        if (value is null) return DBNull.Value;
+        if (value is null)
+        {
+            return DBNull.Value;
+        }
+
         if (value is JsonElement element)
         {
             return element.ValueKind switch
@@ -191,6 +207,7 @@ public static partial class DatabaseQueryTool
                 _ => element.GetRawText()
             };
         }
+
         return value;
     }
 
@@ -211,7 +228,11 @@ public static partial class DatabaseQueryTool
 
     private static object? NormalizeResultValue(object value)
     {
-        if (value is DBNull) return null;
+        if (value is DBNull)
+        {
+            return null;
+        }
+
         return value switch
         {
             DateTime dateTime => dateTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
@@ -227,13 +248,37 @@ public static partial class DatabaseQueryTool
         error = null;
         var stripped = StripSqlLiteralsAndComments(query);
         var normalized = NormalizeWhitespace(stripped).Trim();
-        if (string.IsNullOrWhiteSpace(normalized)) { error = "Query is required"; return false; }
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            error = "Query is required";
+            return false;
+        }
         var withoutTrailingSemicolon = normalized.EndsWith(';') ? normalized[..^1].TrimEnd() : normalized;
-        if (withoutTrailingSemicolon.Contains(';', StringComparison.Ordinal)) { error = "Only a single SQL statement is allowed"; return false; }
-        if (!StartsWithAllowedKeyword(withoutTrailingSemicolon)) { error = "Only SELECT, WITH ... SELECT, or EXPLAIN statements are allowed"; return false; }
-        if (ContainsBlockedKeyword(withoutTrailingSemicolon, out var blockedKeyword)) { error = $"Blocked SQL keyword detected: {blockedKeyword}"; return false; }
-        if (ContainsCteDml(withoutTrailingSemicolon, out var cteDmlKeyword)) { error = $"Blocked CTE-DML pattern detected: {cteDmlKeyword}"; return false; }
-        if (provider == "postgres" && allowedSchemas.Count > 0 && !AreSchemasAllowed(withoutTrailingSemicolon, allowedSchemas, out var schemaError)) { error = schemaError; return false; }
+        if (withoutTrailingSemicolon.Contains(';', StringComparison.Ordinal))
+        {
+            error = "Only a single SQL statement is allowed";
+            return false;
+        }
+        if (!StartsWithAllowedKeyword(withoutTrailingSemicolon))
+        {
+            error = "Only SELECT, WITH ... SELECT, or EXPLAIN statements are allowed";
+            return false;
+        }
+        if (ContainsBlockedKeyword(withoutTrailingSemicolon, out var blockedKeyword))
+        {
+            error = $"Blocked SQL keyword detected: {blockedKeyword}";
+            return false;
+        }
+        if (ContainsCteDml(withoutTrailingSemicolon, out var cteDmlKeyword))
+        {
+            error = $"Blocked CTE-DML pattern detected: {cteDmlKeyword}";
+            return false;
+        }
+        if (provider == "postgres" && allowedSchemas.Count > 0 && !AreSchemasAllowed(withoutTrailingSemicolon, allowedSchemas, out var schemaError))
+        {
+            error = schemaError;
+            return false;
+        }
         return true;
     }
 
@@ -257,6 +302,7 @@ public static partial class DatabaseQueryTool
                 return true;
             }
         }
+
         keyword = null;
         return false;
     }
@@ -264,7 +310,11 @@ public static partial class DatabaseQueryTool
     private static bool ContainsCteDml(string query, out string? dmlKeyword)
     {
         var match = CteDmlRegex().Match(query);
-        if (match.Success) { dmlKeyword = match.Groups["verb"].Value.ToUpperInvariant(); return true; }
+        if (match.Success)
+        {
+            dmlKeyword = match.Groups["verb"].Value.ToUpperInvariant();
+            return true;
+        }
         dmlKeyword = null;
         return false;
     }
@@ -272,17 +322,34 @@ public static partial class DatabaseQueryTool
     private static bool AreSchemasAllowed(string query, IReadOnlyCollection<string> allowedSchemas, out string? error)
     {
         var allowed = new HashSet<string>(allowedSchemas.Where(s => !string.IsNullOrWhiteSpace(s)).Select(NormalizeIdentifier), StringComparer.OrdinalIgnoreCase);
-        if (allowed.Count == 0) { error = null; return true; }
+        if (allowed.Count == 0)
+        {
+            error = null;
+            return true;
+        }
         var matches = SchemaReferenceRegex().Matches(query);
         foreach (Match match in matches)
         {
             var identifier = match.Groups["identifier"].Value;
-            if (string.IsNullOrWhiteSpace(identifier)) continue;
+            if (string.IsNullOrWhiteSpace(identifier))
+            {
+                continue;
+            }
+
             var parts = identifier.Split('.', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 2) continue;
+            if (parts.Length < 2)
+            {
+                continue;
+            }
+
             var schema = NormalizeIdentifier(parts[0]);
-            if (!allowed.Contains(schema)) { error = $"Schema '{schema}' is not allowed for this connection"; return false; }
+            if (!allowed.Contains(schema))
+            {
+                error = $"Schema '{schema}' is not allowed for this connection";
+                return false;
+            }
         }
+
         error = null;
         return true;
     }
@@ -294,6 +361,7 @@ public static partial class DatabaseQueryTool
         {
             trimmed = trimmed[1..^1];
         }
+
         return trimmed.Trim().ToLowerInvariant();
     }
 
@@ -313,19 +381,96 @@ public static partial class DatabaseQueryTool
             var current = sql[index];
             var next = index + 1 < sql.Length ? sql[index + 1] : '\0';
 
-            if (inLineComment) { if (current == '\n') { inLineComment = false; builder.Append('\n'); } else { builder.Append(' '); } }
-            else if (inBlockComment) { if (current == '*' && next == '/') { inBlockComment = false; builder.Append("  "); index++; } else { builder.Append(char.IsWhiteSpace(current) ? current : ' '); } }
-            else if (inSingleQuote) { if (current == '\'' && next == '\'') { builder.Append("  "); index++; } else if (current == '\'') { inSingleQuote = false; builder.Append(' '); } else { builder.Append(char.IsWhiteSpace(current) ? current : ' '); } }
-            else if (inDoubleQuote) { if (current == '"' && next == '"') { builder.Append("\"\""); index++; } else if (current == '"') { inDoubleQuote = false; builder.Append('"'); } else { builder.Append(current); } }
+            if (inLineComment)
+            {
+                if (current == '\n')
+                {
+                    inLineComment = false;
+                    builder.Append('\n');
+                }
+                else
+                {
+                    builder.Append(' ');
+                }
+            }
+            else if (inBlockComment)
+            {
+                if (current == '*' && next == '/')
+                {
+                    inBlockComment = false;
+                    builder.Append("  ");
+                    index++;
+                }
+                else
+                {
+                    builder.Append(char.IsWhiteSpace(current) ? current : ' ');
+                }
+            }
+            else if (inSingleQuote)
+            {
+                if (current == '\'' && next == '\'')
+                {
+                    builder.Append("  ");
+                    index++;
+                }
+                else if (current == '\'')
+                {
+                    inSingleQuote = false;
+                    builder.Append(' ');
+                }
+                else
+                {
+                    builder.Append(char.IsWhiteSpace(current) ? current : ' ');
+                }
+            }
+            else if (inDoubleQuote)
+            {
+                if (current == '"' && next == '"')
+                {
+                    builder.Append("\"\"");
+                    index++;
+                }
+                else if (current == '"')
+                {
+                    inDoubleQuote = false;
+                    builder.Append('"');
+                }
+                else
+                {
+                    builder.Append(current);
+                }
+            }
             else
             {
-                if (current == '-' && next == '-') { inLineComment = true; builder.Append("  "); index++; }
-                else if (current == '/' && next == '*') { inBlockComment = true; builder.Append("  "); index++; }
-                else if (current == '\'') { inSingleQuote = true; builder.Append(' '); }
-                else if (current == '"') { inDoubleQuote = true; builder.Append('"'); }
-                else { builder.Append(current); }
+                if (current == '-' && next == '-')
+                {
+                    inLineComment = true;
+                    builder.Append("  ");
+                    index++;
+                }
+                else if (current == '/' && next == '*')
+                {
+                    inBlockComment = true;
+                    builder.Append("  ");
+                    index++;
+                }
+                else if (current == '\'')
+                {
+                    inSingleQuote = true;
+                    builder.Append(' ');
+                }
+                else if (current == '"')
+                {
+                    inDoubleQuote = true;
+                    builder.Append('"');
+                }
+                else
+                {
+                    builder.Append(current);
+                }
             }
         }
+
         return builder.ToString();
     }
 

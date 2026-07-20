@@ -2,7 +2,9 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+
 using Npgsql;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Playwright;
@@ -365,6 +367,7 @@ public sealed class DockerLifecycleE2ETests
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
         }
+
         request.Content = JsonContent.Create(new
         {
             model,
@@ -718,24 +721,6 @@ public sealed class DockerLifecycleE2ETests
     {
         public const string EnabledEnvVar = "LEANKERNEL_DOCKER_E2E_ENABLED";
 
-        private DockerE2eConfig(
-            bool enabled,
-            string gatewayBaseUrl,
-            string gbrainBaseUrl,
-            string postgresConnectionString,
-            string model,
-            string? gbrainAuthToken,
-            bool requirePersistenceCheck)
-        {
-            Enabled = enabled;
-            GatewayBaseUrl = gatewayBaseUrl;
-            GBrainBaseUrl = gbrainBaseUrl;
-            PostgresConnectionString = postgresConnectionString;
-            Model = model;
-            GBrainAuthToken = gbrainAuthToken;
-            RequirePersistenceCheck = requirePersistenceCheck;
-        }
-
         public bool Enabled { get; }
 
         public string GatewayBaseUrl { get; }
@@ -818,6 +803,24 @@ public sealed class DockerLifecycleE2ETests
             var value = await cmd.ExecuteScalarAsync(ct);
 
             Assert.Equal(1, Convert.ToInt32(value));
+        }
+
+        private DockerE2eConfig(
+            bool enabled,
+            string gatewayBaseUrl,
+            string gbrainBaseUrl,
+            string postgresConnectionString,
+            string model,
+            string? gbrainAuthToken,
+            bool requirePersistenceCheck)
+        {
+            Enabled = enabled;
+            GatewayBaseUrl = gatewayBaseUrl;
+            GBrainBaseUrl = gbrainBaseUrl;
+            PostgresConnectionString = postgresConnectionString;
+            Model = model;
+            GBrainAuthToken = gbrainAuthToken;
+            RequirePersistenceCheck = requirePersistenceCheck;
         }
 
         private static string? ResolveGbrainAuthToken()

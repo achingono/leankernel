@@ -17,7 +17,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LeanKernel.Channels.Teams",
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{881589EE-639B-0A35-DBCE-5D94E4FC90C0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LeanKernel.Channels.Common", "Common\LeanKernel.Channels.Common\LeanKernel.Channels.Common.csproj", "{188D3F56-1B24-462D-A615-A78031A7A1E9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LeanKernel.Channels.Common", "Terminals\LeanKernel.Channels.Common\LeanKernel.Channels.Common.csproj", "{188D3F56-1B24-462D-A615-A78031A7A1E9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -118,6 +118,5 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{188D3F56-1B24-462D-A615-A78031A7A1E9} = {881589EE-639B-0A35-DBCE-5D94E4FC90C0}
 	EndGlobalSection
 EndGlobal

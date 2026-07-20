@@ -1,7 +1,5 @@
 namespace LeanKernel;
 
-using System.ComponentModel.DataAnnotations;
-
 /// <summary>
 /// Identifies entities that support soft deletion semantics.
 /// </summary>

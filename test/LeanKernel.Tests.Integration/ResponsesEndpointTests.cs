@@ -1,7 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Integration;
@@ -14,6 +15,7 @@ public class ResponsesEndpointTests : IClassFixture<GatewayTestApplicationFactor
     private readonly HttpClient _client;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ResponsesEndpointTests"/> class.
     /// Creates a test instance backed by the shared gateway factory.
     /// </summary>
     public ResponsesEndpointTests(GatewayTestApplicationFactory factory)

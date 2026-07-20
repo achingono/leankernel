@@ -1,5 +1,7 @@
 using FluentAssertions;
+
 using LeanKernel.Logic.Memory;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Memory;
@@ -18,7 +20,7 @@ public class MemoryDimensionClassifierTests
         var classifier = new MemoryDimensionClassifier(new StubReasoningModel());
         var snapshot = new MemoryPageSnapshot(
             "k",
-            "",
+            string.Empty,
             "Jane approved the Q4 budget in Seattle",
             "jane approved the q4 budget in seattle",
             DateTimeOffset.UtcNow,

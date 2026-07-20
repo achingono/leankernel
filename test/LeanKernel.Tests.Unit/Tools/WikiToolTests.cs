@@ -1,11 +1,12 @@
-using System.Text.Json;
 using FluentAssertions;
+
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Tools.Memory;
-using LeanKernel.Logic.Tools;
+
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;
@@ -31,7 +32,6 @@ public class WikiToolTests
     }
 
     // MemorySearchTool
-
     [Fact]
     public async Task WikiSearch_ReturnsResults()
     {
@@ -85,7 +85,6 @@ public class WikiToolTests
     }
 
     // MemoryReadTool
-
     [Fact]
     public async Task WikiRead_ReturnsPage()
     {
@@ -129,7 +128,6 @@ public class WikiToolTests
     }
 
     // MemoryWriteTool
-
     [Fact]
     public async Task WikiWrite_SavesPage()
     {

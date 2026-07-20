@@ -1,25 +1,21 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Principal;
-using LeanKernel;
-using LeanKernel.Channels.Common.Configuration;
-using LeanKernel.Channels.Common.HealthChecks;
+
 using LeanKernel.Data;
 using LeanKernel.Entities;
-using LeanKernel.Gateway;
 using LeanKernel.Gateway.Configuration;
-using LeanKernel.Gateway.HealthChecks;
 using LeanKernel.Gateway.Providers;
 using LeanKernel.Gateway.Requests;
 using LeanKernel.Gateway.Sessions;
-using LeanKernel.Logic;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Providers;
-using Microsoft.Agents.AI;
+
 using Microsoft.Agents.AI.DevUI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LeanKernel.Gateway;
 
@@ -180,7 +176,9 @@ public partial class Program
                 "Sqlite"
             ]);
 
-            options.ConfigureOptions(connectionStringName, connectionString,
+            options.ConfigureOptions(
+                connectionStringName,
+                connectionString,
                 builder.Environment.EnvironmentName.Equals("Testing", StringComparison.OrdinalIgnoreCase),
                 builder.Environment.IsDevelopment(),
                 builder.Environment.IsDevelopment());
@@ -257,7 +255,11 @@ public partial class Program
 
         app.MapHealthChecks("/health", new HealthCheckOptions
         {
-            ResponseWriter = HealthCheckResponseWriter.WriteAsync
+            ResponseWriter = (context, report) =>
+            {
+                context.Response.ContentType = "application/json; charset=utf-8";
+                return context.Response.WriteAsync(report.ToJson());
+            }
         });
 
         app.Run();

@@ -1,13 +1,15 @@
 using System.Net;
-using System.Net.Http;
+
 using FluentAssertions;
-using LeanKernel.Logic.Tools.Dynamic;
+
 using LeanKernel.Logic.Configuration;
-using LeanKernel.Logic.Tools;
+using LeanKernel.Logic.Tools.Dynamic;
+
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+
 using Moq;
 using Moq.Protected;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Tools;
@@ -217,6 +219,7 @@ public class DynamicSkillToolTests
     {
         var skill = MakeSkill("weather", "https://api.example.com");
         var op = MakeOperation("current");
+
         // Global list doesn't include api.example.com
         var tool = DynamicSkillTool.Create(
             skill, op,
