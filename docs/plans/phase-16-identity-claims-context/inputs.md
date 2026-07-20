@@ -16,6 +16,6 @@
 - Phase 10 person profile (`docs/plans/phase-10-cross-channel-memory/`) for later promotion.
 
 ## Input Validation Checklist
-- [ ] All required inputs are current (not from a superseded version)
-- [ ] No required input is missing or in draft state
-- [ ] Claim allowlist (which claims to persist/render) decided
+- [x] All required inputs are current (not from a superseded version)
+- [x] No required input is missing or in draft state
+- [x] Claim allowlist (which claims to persist/render) decided

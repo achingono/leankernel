@@ -33,10 +33,10 @@ public sealed class PromptAssembler(
         var orderedAdmitted = context.Admitted
             .OrderBy(c => c.Source switch
             {
-                "system" => 0,
-                "identity" => 1,
-                "memory" => 2,
-                "retrieval" => 3,
+                Constants.TurnRuntime.ContextSource.System => 0,
+                Constants.TurnRuntime.ContextSource.Identity => 1,
+                Constants.TurnRuntime.ContextSource.Memory => 2,
+                Constants.TurnRuntime.ContextSource.Retrieval => 3,
                 _ => 4
             })
             .ThenBy(c => c.Content, StringComparer.Ordinal)

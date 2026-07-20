@@ -23,6 +23,8 @@
     <ProjectReference Include="..\..\src\Common\LeanKernel.Data\LeanKernel.Data.csproj" />
     <ProjectReference Include="..\..\src\Common\LeanKernel.Logic\LeanKernel.Logic.csproj" />
     <ProjectReference Include="..\..\src\Services\LeanKernel.Gateway\LeanKernel.Gateway.csproj" />
+    <ProjectReference Include="..\..\src\Services\LeanKernel.Services.Common\LeanKernel.Services.Common.csproj" />
+    <ProjectReference Include="..\..\src\Services\LeanKernel.Services.Learning\LeanKernel.Services.Learning.csproj" />
   </ItemGroup>
 
 </Project>

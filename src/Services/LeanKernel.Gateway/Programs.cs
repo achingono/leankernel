@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security.Principal;
 using LeanKernel;
 using LeanKernel.Channels.Common.Configuration;
-using LeanKernel.Channels.Common.HealthChecks;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Gateway;
@@ -84,6 +83,15 @@ public partial class Program
         builder.Services.Configure<MemorySettings>(builder.Configuration.GetSection("OpenAI:Memory"));
         builder.Services.Configure<FactExtractionSettings>(builder.Configuration.GetSection("OpenAI:FactExtraction"));
         builder.Services.Configure<IdentitySettings>(builder.Configuration.GetSection("Identity"));
+        builder.Services
+            .AddOptions<IdentityClaimsContextSettings>()
+            .BindConfiguration("Identity:ClaimsContext")
+            .Validate(settings => settings.MaxRoles >= 0
+                                  && settings.MaxGroups >= 0
+                                  && settings.MaxCustomClaimValuesPerClaim >= 0
+                                  && settings.MaxPromptTokens > 0,
+                "Identity:ClaimsContext settings are invalid.")
+            .ValidateOnStart();
         builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("Files"));
         builder.Services.Configure<GBrainSettings>(builder.Configuration.GetSection("GBrain"));
 
@@ -174,7 +182,7 @@ public partial class Program
 
         builder.Services.AddEntityContext(options =>
         {
-            var (connectionStringName, connectionString) = builder.Configuration.ResolveConnectionString([
+            var (connectionStringName, connectionString) = LeanKernel.Channels.Common.Configuration.ConnectionStringResolverExtensions.ResolveConnectionString(builder.Configuration, [
                 "Postgres",
                 "SqlServer",
                 "Sqlite"
@@ -257,7 +265,7 @@ public partial class Program
 
         app.MapHealthChecks("/health", new HealthCheckOptions
         {
-            ResponseWriter = HealthCheckResponseWriter.WriteAsync
+            ResponseWriter = LeanKernel.Gateway.HealthChecks.HealthCheckResponseWriter.WriteAsync
         });
 
         app.Run();

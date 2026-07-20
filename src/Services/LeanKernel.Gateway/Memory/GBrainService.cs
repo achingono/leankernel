@@ -37,7 +37,7 @@ public sealed class GBrainService : IMemoryService
 
         try
         {
-            var result = await _client.CallToolAsync("search", new { query, limit = maxResults }, ct)
+            var result = await _client.CallToolAsync(Constants.GBrain.SearchTool, new { query, limit = maxResults }, ct)
                 .ConfigureAwait(false);
 
             if (result is null)
@@ -63,7 +63,7 @@ public sealed class GBrainService : IMemoryService
 
         try
         {
-            var result = await _client.CallToolAsync("get_page", new { slug = key }, ct)
+            var result = await _client.CallToolAsync(Constants.GBrain.GetPageTool, new { slug = key }, ct)
                 .ConfigureAwait(false);
 
             if (result is null)
@@ -92,7 +92,7 @@ public sealed class GBrainService : IMemoryService
     {
         _logger.LogDebug("GBrain knowledge put_page: {Key} ({Length} chars)", key, content.Length);
 
-        await _client.CallToolAsync("put_page", new { slug = key, content }, ct)
+        await _client.CallToolAsync(Constants.GBrain.PutPageTool, new { slug = key, content }, ct)
             .ConfigureAwait(false);
     }
 
@@ -105,7 +105,7 @@ public sealed class GBrainService : IMemoryService
                 .ToList();
         }
 
-        if (result.TryGetProperty("results", out var results) && results.ValueKind == JsonValueKind.Array)
+        if (result.TryGetProperty(Constants.GBrain.Results, out var results) && results.ValueKind == JsonValueKind.Array)
         {
             return results.EnumerateArray()
                 .Select(MapSearchItem)
@@ -117,26 +117,26 @@ public sealed class GBrainService : IMemoryService
 
     private static MemorySearchResult MapSearchItem(JsonElement item)
     {
-        var key = item.TryGetProperty("slug", out var s) ? s.GetString() ?? string.Empty : string.Empty;
+        var key = item.TryGetProperty(Constants.GBrain.Slug, out var s) ? s.GetString() ?? string.Empty : string.Empty;
         var content = string.Empty;
-        if (item.TryGetProperty("compiled_truth", out var compiledTruth) && !string.IsNullOrWhiteSpace(compiledTruth.GetString()))
+        if (item.TryGetProperty(Constants.GBrain.CompiledTruth, out var compiledTruth) && !string.IsNullOrWhiteSpace(compiledTruth.GetString()))
         {
             content = compiledTruth.GetString() ?? string.Empty;
         }
-        else if (item.TryGetProperty("chunk_text", out var chunkText) && !string.IsNullOrWhiteSpace(chunkText.GetString()))
+        else if (item.TryGetProperty(Constants.GBrain.ChunkText, out var chunkText) && !string.IsNullOrWhiteSpace(chunkText.GetString()))
         {
             content = chunkText.GetString() ?? string.Empty;
         }
-        else if (item.TryGetProperty("content", out var rawContent) && !string.IsNullOrWhiteSpace(rawContent.GetString()))
+        else if (item.TryGetProperty(Constants.GBrain.Content, out var rawContent) && !string.IsNullOrWhiteSpace(rawContent.GetString()))
         {
             content = rawContent.GetString() ?? string.Empty;
         }
-        else if (item.TryGetProperty("title", out var title) && !string.IsNullOrWhiteSpace(title.GetString()))
+        else if (item.TryGetProperty(Constants.GBrain.Title, out var title) && !string.IsNullOrWhiteSpace(title.GetString()))
         {
             content = title.GetString() ?? string.Empty;
         }
 
-        var score = item.TryGetProperty("score", out var sc) && sc.TryGetDouble(out var d) ? d : 0.0;
+        var score = item.TryGetProperty(Constants.GBrain.Score, out var sc) && sc.TryGetDouble(out var d) ? d : 0.0;
 
         return new MemorySearchResult { Key = key, Content = content, Score = score };
     }
@@ -164,13 +164,13 @@ public sealed class GBrainService : IMemoryService
 
     private sealed class GBrainPageDto
     {
-        [JsonPropertyName("slug")]
+        [JsonPropertyName(Constants.GBrain.Slug)]
         public string? Slug { get; set; }
 
-        [JsonPropertyName("compiled_truth")]
+        [JsonPropertyName(Constants.GBrain.CompiledTruth)]
         public string? CompiledTruth { get; set; }
 
-        [JsonPropertyName("content")]
+        [JsonPropertyName(Constants.GBrain.Content)]
         public string? Content { get; set; }
 
         [JsonPropertyName("updated_at")]

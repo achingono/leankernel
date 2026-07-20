@@ -55,7 +55,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
 
             foreach (var channelId in channelIds)
             {
-                var result = await _client.CallToolAsync("search", new
+                var result = await _client.CallToolAsync(Constants.GBrain.SearchTool, new
                 {
                     query,
                     limit = maxResults,
@@ -100,7 +100,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
 
         var slug = BuildScopedSlug(scope, key);
 
-        await _client.CallToolAsync("put_page", new
+        await _client.CallToolAsync(Constants.GBrain.PutPageTool, new
         {
             slug,
             content
@@ -115,7 +115,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
     /// <returns>The scoped namespace string.</returns>
     private static string BuildScopedNamespace(MemoryScope scope, Guid channelId)
     {
-        return $"memory/{scope.TenantId}/{scope.PersonId}/{channelId}";
+        return $"{Constants.GBrain.MemoryPrefix}/{scope.TenantId}/{scope.PersonId}/{channelId}";
     }
 
     /// <summary>
@@ -126,7 +126,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
     /// <returns>The scoped GBrain slug.</returns>
     private static string BuildScopedSlug(MemoryScope scope, string key)
     {
-        return $"memory/{scope.TenantId}/{scope.PersonId}/{scope.ChannelId}/{key}";
+        return $"{Constants.GBrain.MemoryPrefix}/{scope.TenantId}/{scope.PersonId}/{scope.ChannelId}/{key}";
     }
 
     /// <summary>
@@ -160,7 +160,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
             Key = item.Key,
             Text = item.GetBestContent(),
             Score = item.Score,
-            Source = "gbrain",
+            Source = Constants.GBrain.Source,
             ChannelId = channelId,
             ScopeRelativeKey = scopeRelativeKey
         };
@@ -174,7 +174,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
         }
 
         var parts = key.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 5 || !string.Equals(parts[0], "memory", StringComparison.OrdinalIgnoreCase))
+        if (parts.Length < 5 || !string.Equals(parts[0], Constants.GBrain.MemoryPrefix, StringComparison.OrdinalIgnoreCase))
         {
             return (null, key);
         }
@@ -194,7 +194,7 @@ public sealed class GBrainMemoryClient : IMemoryClient
 /// </summary>
 internal sealed class GBrainMemorySearchResult
 {
-    [JsonPropertyName("results")]
+    [JsonPropertyName(Constants.GBrain.Results)]
     public List<GBrainMemorySearchItem>? Results { get; set; }
 }
 
@@ -203,22 +203,22 @@ internal sealed class GBrainMemorySearchResult
 /// </summary>
 internal sealed class GBrainMemorySearchItem
 {
-    [JsonPropertyName("slug")]
+    [JsonPropertyName(Constants.GBrain.Slug)]
     public string Key { get; set; } = string.Empty;
 
-    [JsonPropertyName("compiled_truth")]
+    [JsonPropertyName(Constants.GBrain.CompiledTruth)]
     public string Content { get; set; } = string.Empty;
 
-    [JsonPropertyName("chunk_text")]
+    [JsonPropertyName(Constants.GBrain.ChunkText)]
     public string ChunkText { get; set; } = string.Empty;
 
-    [JsonPropertyName("content")]
+    [JsonPropertyName(Constants.GBrain.Content)]
     public string RawContent { get; set; } = string.Empty;
 
-    [JsonPropertyName("title")]
+    [JsonPropertyName(Constants.GBrain.Title)]
     public string Title { get; set; } = string.Empty;
 
-    [JsonPropertyName("score")]
+    [JsonPropertyName(Constants.GBrain.Score)]
     public double Score { get; set; }
 
     public string GetBestContent()
@@ -241,3 +241,4 @@ internal sealed class GBrainMemorySearchItem
         return Title;
     }
 }
+

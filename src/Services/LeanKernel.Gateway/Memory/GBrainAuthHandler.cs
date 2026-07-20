@@ -42,8 +42,8 @@ public sealed class GBrainAuthHandler : DelegatingHandler
         }
 
         request.Headers.Accept.Clear();
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Http.ApplicationJson));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Http.TextEventStream));
 
         return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
@@ -112,3 +112,4 @@ public sealed class GBrainAuthHandler : DelegatingHandler
         }
     }
 }
+

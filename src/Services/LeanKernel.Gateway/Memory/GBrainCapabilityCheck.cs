@@ -30,7 +30,7 @@ public sealed class GBrainCapabilityCheck : IMemoryCapabilityCheck
 
         bool canSearch = false, canRead = false, canWrite = false;
 
-        canSearch = await ProbeOperationAsync("search", new { query = "__lk_probe__", limit = 1 }, cancellationToken)
+        canSearch = await ProbeOperationAsync(Constants.GBrain.SearchTool, new { query = Constants.GBrain.ProbeSlug, limit = 1 }, cancellationToken)
             .ConfigureAwait(false);
 
         if (!canSearch)
@@ -43,10 +43,10 @@ public sealed class GBrainCapabilityCheck : IMemoryCapabilityCheck
             };
         }
 
-        canRead = await ProbeOperationAsync("get_page", new { slug = "__lk_probe__" }, cancellationToken)
+        canRead = await ProbeOperationAsync(Constants.GBrain.GetPageTool, new { slug = Constants.GBrain.ProbeSlug }, cancellationToken)
             .ConfigureAwait(false);
 
-        canWrite = await ProbeOperationAsync("put_page", new { slug = "__lk_probe_write__", content = "probe" }, cancellationToken)
+        canWrite = await ProbeOperationAsync(Constants.GBrain.PutPageTool, new { slug = Constants.GBrain.ProbeWriteSlug, content = Constants.GBrain.ProbeContent }, cancellationToken)
             .ConfigureAwait(false);
 
         var status = (canRead && canWrite) ? MemoryCapabilityStatus.Full : MemoryCapabilityStatus.Degraded;
@@ -93,3 +93,4 @@ public sealed class GBrainCapabilityCheck : IMemoryCapabilityCheck
         }
     }
 }
+

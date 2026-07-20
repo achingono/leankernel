@@ -67,11 +67,29 @@ These are used by the logic-layer memory pipeline.
 
 The current implementation does not use a top-level `LeanKernel` configuration root. New runtime settings should extend the existing top-level sections rather than introducing `LeanKernel:*` duplicates.
 
+## Identity Claims Context
+
+`Identity:ClaimsContext` controls how authenticated claims are persisted and rendered into per-turn AI context.
+
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `Identity:ClaimsContext:Enabled` | Enables claim-profile refresh and prompt injection | `true` |
+| `Identity:ClaimsContext:AllowedCustomClaims` | Deny-by-default allowlist of custom claim names to persist | `[]` |
+| `Identity:ClaimsContext:PromptFields` | Ordered field allowlist for identity prompt rendering | `full_name,email,preferred_username,locale,timezone,organization,roles,groups,custom_claims` |
+| `Identity:ClaimsContext:MaxRoles` | Upper bound for persisted/rendered role values | `10` |
+| `Identity:ClaimsContext:MaxGroups` | Upper bound for persisted/rendered group values | `20` |
+| `Identity:ClaimsContext:MaxCustomClaimValuesPerClaim` | Upper bound for values per allowlisted custom claim | `5` |
+| `Identity:ClaimsContext:MaxPromptTokens` | Max estimated token budget for rendered identity block | `256` |
+
+Startup validation enforces non-negative role/group/custom-claim bounds and requires `MaxPromptTokens > 0`.
+
 Code anchors:
 
 - [`../../src/Common/LeanKernel.Logic/Configuration/MemorySettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/MemorySettings.cs)
 - [`../../src/Common/LeanKernel.Logic/Configuration/FactExtractionSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/FactExtractionSettings.cs)
 - [`../../src/Common/LeanKernel.Logic/Configuration/ToolSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/ToolSettings.cs)
+- [`../../src/Common/LeanKernel.Logic/Configuration/IdentityClaimsContextSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/IdentityClaimsContextSettings.cs)
+- [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs)
 
 ## Provider Selection Notes
 
@@ -82,3 +100,4 @@ Database provider selection is not hardcoded to one backend. The gateway resolve
 3. `Sqlite`
 
 Reference: [`../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs`](../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs)
+| `Identity` | Anonymous user defaults, token/OpenID settings, and identity-claims prompt-context controls. |

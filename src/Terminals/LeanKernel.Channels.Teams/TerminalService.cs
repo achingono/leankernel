@@ -304,3 +304,4 @@ public sealed record InboundActivity(
     string Text,
     string BearerToken,
     IReadOnlyList<string> AttachmentUrls);
+        }), Encoding.UTF8, Constants.Http.ApplicationJson);

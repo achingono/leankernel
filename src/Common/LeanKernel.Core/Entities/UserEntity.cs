@@ -69,6 +69,41 @@ public class UserEntity : IAuditable, IRecyclable
     public Guid PersonId { get; set; }
 
     /// <summary>
+    /// Gets or sets the preferred username provided by the identity provider.
+    /// </summary>
+    public string PreferredUserName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the locale claim captured from the identity provider.
+    /// </summary>
+    public string Locale { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the timezone claim captured from the identity provider.
+    /// </summary>
+    public string TimeZone { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the organization claim captured from the identity provider.
+    /// </summary>
+    public string Organization { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the serialized allowlisted role values.
+    /// </summary>
+    public string RolesJson { get; set; } = "[]";
+
+    /// <summary>
+    /// Gets or sets the serialized allowlisted group values.
+    /// </summary>
+    public string GroupsJson { get; set; } = "[]";
+
+    /// <summary>
+    /// Gets or sets the serialized allowlisted custom claim map.
+    /// </summary>
+    public string CustomClaimsJson { get; set; } = "{}";
+
+    /// <summary>
     /// Gets or sets the sessions associated with this user.
     /// </summary>
     public virtual ICollection<SessionEntity> Sessions { get; set; } = new List<SessionEntity>();

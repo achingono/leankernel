@@ -87,3 +87,4 @@ public static class ClaimsPrincipalExtensions
         return email?.Value ?? string.Empty;
     }
 }
+

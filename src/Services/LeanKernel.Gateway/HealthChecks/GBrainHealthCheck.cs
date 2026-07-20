@@ -38,7 +38,7 @@ public sealed class GBrainHealthCheck : IHealthCheck
         try
         {
             var client = _httpClientFactory.CreateClient(HttpClientName);
-            var url = $"{_settings.BaseUrl.TrimEnd('/')}/health";
+            var url = $"{_settings.BaseUrl.TrimEnd('/')}{Constants.Http.HealthPath}";
             using var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
 
             return response.IsSuccessStatusCode
@@ -51,3 +51,4 @@ public sealed class GBrainHealthCheck : IHealthCheck
         }
     }
 }
+

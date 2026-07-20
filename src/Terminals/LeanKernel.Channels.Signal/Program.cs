@@ -64,3 +64,5 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 });
 
 await app.RunAsync();
+using LeanKernel;
+app.MapHealthChecks(Constants.Http.HealthPath, new HealthCheckOptions

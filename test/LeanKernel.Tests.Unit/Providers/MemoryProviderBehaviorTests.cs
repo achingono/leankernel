@@ -1,11 +1,13 @@
 using FluentAssertions;
 using LeanKernel.Entities;
+using LeanKernel.Data;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Tests.Unit.TestDoubles;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -26,6 +28,7 @@ public class MemoryProviderBehaviorTests
     [Fact]
     public async Task ProvideContext_ReturnsEmpty_WhenNoQueryText()
     {
+        var resolvedUserId = identityUser?.Id ?? Guid.NewGuid();
         var (provider, _) = CreateSut(new InMemoryMemoryClient());
         var invoking = new AIContextProvider.InvokingContext(
             new TestAIAgent(),
@@ -68,6 +71,43 @@ public class MemoryProviderBehaviorTests
 
         context.Messages.Should().HaveCount(1);
         context.Messages!.First().Text.Should().Contain("dimensions:");
+    }
+
+    [Fact]
+    public async Task ProvideContext_IncludesIdentityBlock_WhenUserProfileExists()
+    {
+        var user = new UserEntity
+        {
+            Id = Guid.NewGuid(),
+            PersonId = Guid.Empty,
+            Issuer = "issuer",
+            Subject = "subject",
+            FullName = "Jane Doe",
+            Email = "jane@example.com",
+            PreferredUserName = "jdoe",
+            Locale = "en-US",
+            TimeZone = "America/Chicago",
+            Organization = "Contoso",
+            RolesJson = "[\"admin\"]",
+            GroupsJson = "[\"engineering\"]",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
+        };
+        user.PersonId = user.Id;
+
+        var (provider, _) = CreateSut(new InMemoryMemoryClient(), identityUser: user);
+        var invoking = new AIContextProvider.InvokingContext(
+            new TestAIAgent(),
+            new TestAgentSession(),
+            new AIContext { Messages = [new ChatMessage(ChatRole.User, "hello")] });
+
+        var context = await provider.ProvideForTestAsync(invoking);
+
+        context.Messages.Should().NotBeEmpty();
+        context.Messages!.First().Text.Should().Contain("Identity profile (allowlisted)");
+        context.Messages!.First().Text.Should().Contain("full_name: Jane Doe");
+        context.Messages!.First().Text.Should().Contain("email: jane@example.com");
     }
 
     [Fact]
@@ -239,11 +279,12 @@ Remote channel answer
         InMemoryMemoryClient memoryClient,
         string? extractionResponse = "[]",
         bool extractionThrows = false,
-        Guid? channelId = null)
+        Guid? channelId = null,
+        UserEntity? identityUser = null)
     {
         var permit = new Mock<IPermit>();
         permit.SetupGet(p => p.TenantId).Returns(Guid.NewGuid());
-        permit.SetupGet(p => p.UserId).Returns(Guid.NewGuid());
+        permit.SetupGet(p => p.UserId).Returns(resolvedUserId);
         permit.SetupGet(p => p.PersonId).Returns(Guid.NewGuid());
         permit.SetupGet(p => p.ChannelId).Returns(channelId ?? Guid.NewGuid());
         permit.SetupGet(p => p.SessionId).Returns("permit-session");
@@ -274,10 +315,24 @@ Remote channel answer
 
         var extraction = new FactExtractionService(chatClient, Options.Create(new FactExtractionSettings()), renderer);
 
+        var dbOptions = new DbContextOptionsBuilder<EntityContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        using (var seedContext = new EntityContext(dbOptions))
+        {
+            if (identityUser is not null)
+            {
+                seedContext.Users.Add(identityUser);
+                seedContext.SaveChanges();
+            }
+        }
+
         return (
             new TestableMemoryProvider(
                 memoryClient,
                 permit.Object,
+                new TestDbContextFactory(dbOptions),
+                new IdentityContextAssembler(Options.Create(new IdentityClaimsContextSettings())),
                 policyResolver.Object,
                 new MemoryPageParser(),
                 renderer,
@@ -293,6 +348,8 @@ Remote channel answer
     /// </summary>
     /// <param name="memoryClient">The memory client to wrap.</param>
     /// <param name="permit">The permit used to resolve memory scope.</param>
+    /// <param name="dbContextFactory">Factory for loading persisted user identity.</param>
+    /// <param name="identityContextAssembler">Identity context renderer.</param>
     /// <param name="memoryPolicyResolver">The channel memory policy resolver.</param>
     /// <param name="parser">The memory page parser to use.</param>
     /// <param name="renderer">The memory page renderer to use.</param>
@@ -303,6 +360,8 @@ Remote channel answer
     private sealed class TestableMemoryProvider(
         IMemoryClient memoryClient,
         IPermit permit,
+        IDbContextFactory<EntityContext> dbContextFactory,
+        IdentityContextAssembler identityContextAssembler,
         IChannelMemoryPolicyResolver memoryPolicyResolver,
         MemoryPageParser parser,
         MemoryPageRenderer renderer,
@@ -310,7 +369,7 @@ Remote channel answer
         FactExtractionService factExtractionService,
         TimeProvider timeProvider,
         Microsoft.Extensions.Logging.ILogger<MemoryProvider> logger)
-        : MemoryProvider(memoryClient, permit, memoryPolicyResolver, parser, renderer, normalizer, factExtractionService, timeProvider, logger)
+        : MemoryProvider(memoryClient, permit, dbContextFactory, identityContextAssembler, memoryPolicyResolver, parser, renderer, normalizer, factExtractionService, timeProvider, logger)
     {
         /// <summary>
         /// Invokes context provisioning for tests.
@@ -414,3 +473,5 @@ Remote channel answer
 }
 
 #pragma warning restore MAAI001
+        Guid? channelId = null,
+        UserEntity? identityUser = null)

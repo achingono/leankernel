@@ -9,7 +9,7 @@
 - [Evidence](evidence.md)
 
 ## Objective
-Flow the authenticated user's identity from OIDC/OAuth claims into the agent's reasoning context so the assistant knows who it is talking to. Identity claims are first persisted to the database as a durable identity profile, and the context builder then renders that profile into the system prompt for each turn. Today `ResolveOrCreateUserAsync` captures only a fixed claim subset and only at first creation, and no identity information is injected into the prompt — this phase closes both gaps.
+Flow the authenticated user's identity from OIDC/OAuth claims into the agent's reasoning context so the assistant knows who it is talking to. Identity claims are persisted to the database as a durable identity profile, and the context builder renders that profile into the system prompt context each turn. Phase 16 closes the prior gaps where claim capture was narrow and prompt identity context was not injected.
 
 ## Scope
 This phase covers two linked steps: (1) capturing and persisting a richer identity profile from claims (refreshed on each authenticated resolution), and (2) an identity-context assembler that renders the persisted profile into the system prompt. It integrates with the Phase 03 context gatekeeper/budget when present but is functional on the current turn path. It does not add new auth providers, cross-channel person linking (Phase 10), or preference editing UI.
@@ -34,7 +34,7 @@ This phase covers two linked steps: (1) capturing and persisting a richer identi
 - `ClaimsPrincipalExtensions` provides claim-reading helpers to extend.
 
 ## Exit Criteria
-Authenticated users' identity claims are persisted to the database (and refreshed on login), and the context builder injects an allowlisted identity block into the system prompt each turn, under budget and respecting partitioning. See `exit-criteria.md`.
+Authenticated users' identity claims are persisted to the database (and refreshed on login), and the context builder injects an allowlisted identity block into the system prompt each turn, under budget and respecting partitioning. The current implementation meets this gate; see `exit-criteria.md`.
 
 ## Roles
 - Owner: Rebuild maintainer

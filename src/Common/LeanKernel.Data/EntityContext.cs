@@ -62,6 +62,11 @@ public class EntityContext : DbContext
     public DbSet<TurnTelemetryEntity> TurnTelemetry => Set<TurnTelemetryEntity>();
 
     /// <summary>
+    /// Gets the persisted scheduled learning jobs.
+    /// </summary>
+    public DbSet<ScheduledJobEntity> ScheduledJobs => Set<ScheduledJobEntity>();
+
+    /// <summary>
     /// Configures the entity mappings, indexes, relationships, and query filters.
     /// </summary>
     /// <param name="modelBuilder">The model builder used to configure the EF Core model.</param>
@@ -147,6 +152,13 @@ public class EntityContext : DbContext
             entity.Property(e => e.Issuer).HasMaxLength(500);
             entity.Property(e => e.Subject).HasMaxLength(500);
             entity.Property(e => e.PersonId);
+            entity.Property(e => e.PreferredUserName).HasMaxLength(200);
+            entity.Property(e => e.Locale).HasMaxLength(50);
+            entity.Property(e => e.TimeZone).HasMaxLength(100);
+            entity.Property(e => e.Organization).HasMaxLength(200);
+            entity.Property(e => e.RolesJson).HasColumnType("text");
+            entity.Property(e => e.GroupsJson).HasColumnType("text");
+            entity.Property(e => e.CustomClaimsJson).HasColumnType("text");
             entity.HasIndex(e => e.Email);
             entity.HasIndex(e => e.PersonId);
             entity.HasIndex(e => new { e.Issuer, e.Subject }).IsUnique();
@@ -220,6 +232,44 @@ public class EntityContext : DbContext
                 .HasForeignKey(e => e.TurnId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasQueryFilter(e => !e.IsDeleted && !e.Turn.IsDeleted);
+        });
+
+        // ScheduledJobEntity
+        modelBuilder.Entity<ScheduledJobEntity>(entity =>
+        {
+            entity.ToTable(table =>
+                table.HasCheckConstraint("CK_ScheduledJobs_Scope", "\"TenantId\" IS NOT NULL OR \"ChannelId\" IS NOT NULL"));
+
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.Cron).HasMaxLength(120);
+            entity.Property(e => e.JobType).HasMaxLength(100);
+            entity.Property(e => e.Payload).HasColumnType("text");
+
+            entity.HasIndex(e => e.Enabled);
+            entity.HasIndex(e => new { e.TenantId, e.ChannelId });
+
+            entity.HasIndex(e => new { e.TenantId, e.ChannelId, e.Name })
+                .IsUnique()
+                .HasFilter("\"TenantId\" IS NOT NULL AND \"ChannelId\" IS NOT NULL");
+
+            entity.HasIndex(e => new { e.TenantId, e.Name })
+                .IsUnique()
+                .HasFilter("\"TenantId\" IS NOT NULL AND \"ChannelId\" IS NULL");
+
+            entity.HasIndex(e => new { e.ChannelId, e.Name })
+                .IsUnique()
+                .HasFilter("\"TenantId\" IS NULL AND \"ChannelId\" IS NOT NULL");
+
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Channel)
+                .WithMany()
+                .HasForeignKey(e => e.ChannelId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -327,3 +377,8 @@ public class EntityContext : DbContext
         }
     }
 }
+using LeanKernel;
+using LeanKernel;
+using LeanKernel.Entities;
+                FullName = Constants.Identity.SystemName,
+                Email = Constants.Identity.SystemEmail

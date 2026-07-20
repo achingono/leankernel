@@ -29,6 +29,7 @@ public static class IServiceCollectionExtensions
     {
         services.AddScoped<ChatHistoryProvider, DbChatHistoryProvider>();
         services.AddScoped<AIContextProvider, MemoryProvider>();
+        services.AddScoped<IdentityContextAssembler>();
         services.AddScoped<IChannelMemoryPolicyResolver, ChannelMemoryPolicyResolver>();
         services.AddMemoryPageServices();
         return services;

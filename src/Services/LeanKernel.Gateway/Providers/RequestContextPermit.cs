@@ -55,7 +55,7 @@ public sealed class RequestContextPermit(
             : new Badge
             {
                 Id = Guid.Empty,
-                FullName = "System",
-                Email = "system@leankernel.local"
+                FullName = Constants.Identity.SystemName,
+                Email = Constants.Identity.SystemEmail
             };
 }

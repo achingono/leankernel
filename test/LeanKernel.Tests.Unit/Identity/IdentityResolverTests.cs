@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using FluentAssertions;
 using LeanKernel.Data;
 using LeanKernel.Entities;
@@ -6,6 +7,7 @@ using LeanKernel.Logic.Providers;
 using LeanKernel.Tests.Unit.TestDoubles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace LeanKernel.Tests.Unit.Identity;
@@ -68,6 +70,73 @@ public class IdentityResolverTests
         fetched.Id.Should().Be(created.Id);
         fetched.LastActivity.Should().NotBeNull();
         db.Users.Count().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ResolveOrCreateUserAsync_RefreshesIdentityProfileOnSubsequentResolution()
+    {
+        var resolver = CreateResolver(out var db);
+
+        var initialPrincipal = Principal("sub-refresh", "issuer-refresh", "Jane Doe", "jane@test",
+            additionalClaims:
+            [
+                new Claim("preferred_username", "jane"),
+                new Claim("locale", "en-US"),
+                new Claim("zoneinfo", "America/Chicago"),
+                new Claim("organization", "Contoso"),
+                new Claim(ClaimTypes.Role, "admin")
+            ]);
+
+        var created = await resolver.ResolveOrCreateUserAsync(initialPrincipal);
+        created.PreferredUserName.Should().Be("jane");
+        created.Locale.Should().Be("en-US");
+
+        var refreshedPrincipal = Principal("sub-refresh", "issuer-refresh", "Jane R", "jane.new@test",
+            additionalClaims:
+            [
+                new Claim("preferred_username", "jane.r"),
+                new Claim("locale", "fr-FR"),
+                new Claim("zoneinfo", "Europe/Paris"),
+                new Claim("organization", "Fabrikam"),
+                new Claim(ClaimTypes.Role, "reader")
+            ]);
+
+        var refreshed = await resolver.ResolveOrCreateUserAsync(refreshedPrincipal);
+
+        refreshed.Id.Should().Be(created.Id);
+        refreshed.Email.Should().Be("jane.new@test");
+        refreshed.FullName.Should().Be("Jane R");
+        refreshed.PreferredUserName.Should().Be("jane.r");
+        refreshed.Locale.Should().Be("fr-FR");
+        refreshed.TimeZone.Should().Be("Europe/Paris");
+        refreshed.Organization.Should().Be("Fabrikam");
+        refreshed.RolesJson.Should().Contain("reader");
+        db.Users.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task ResolveOrCreateUserAsync_PersistsOnlyAllowlistedCustomClaims()
+    {
+        var settings = new IdentityClaimsContextSettings
+        {
+            AllowedCustomClaims = ["employee_id"]
+        };
+        var resolver = CreateResolver(out _, settings);
+
+        var principal = Principal("sub-custom", "issuer-custom", "Jane", "jane@test",
+            additionalClaims:
+            [
+                new Claim("employee_id", "E-100"),
+                new Claim("secret_token", "should-not-persist")
+            ]);
+
+        var user = await resolver.ResolveOrCreateUserAsync(principal);
+        var customClaims = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(user.CustomClaimsJson);
+
+        customClaims.Should().NotBeNull();
+        customClaims!.Keys.Should().ContainSingle().Which.Should().Be("employee_id");
+        customClaims["employee_id"].Should().ContainSingle().Which.Should().Be("E-100");
+        customClaims.Keys.Should().NotContain("secret_token");
     }
 
     /// <summary>
@@ -571,7 +640,10 @@ public class IdentityResolverTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         db = new EntityContext(options);
-        return new IdentityResolver(new TestDbContextFactory(options), NullLogger<IdentityResolver>.Instance);
+        return new IdentityResolver(
+            new TestDbContextFactory(options),
+            Options.Create(settings ?? new IdentityClaimsContextSettings()),
+            NullLogger<IdentityResolver>.Instance);
     }
 
     /// <summary>
@@ -586,6 +658,14 @@ public class IdentityResolverTests
             new(ClaimTypes.Name, name),
             new(ClaimTypes.Email, email)
         };
+
+        if (additionalClaims is not null)
+        {
+            claims.AddRange(additionalClaims);
+        }
+
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
     }
 }
+    private static IdentityResolver CreateResolver(out EntityContext db, IdentityClaimsContextSettings? settings = null)
+    private static ClaimsPrincipal Principal(string sub, string issuer, string name, string email, IEnumerable<Claim>? additionalClaims = null)

@@ -28,7 +28,7 @@ public sealed class ContextGatekeeper(
 
         // Allocate system/identity budget first
         var systemItems = context.Candidates
-            .Where(c => c.Source is "system" or "identity")
+            .Where(c => c.Source is Constants.TurnRuntime.ContextSource.System or Constants.TurnRuntime.ContextSource.Identity)
             .OrderByDescending(c => c.Score)
             .ToList();
 
@@ -45,7 +45,7 @@ public sealed class ContextGatekeeper(
                 {
                     Source = item.Source,
                     Admitted = true,
-                    Reason = "system_context",
+                    Reason = Constants.TurnRuntime.AdmissionReason.Admitted,
                     TokenCost = item.EstimatedTokens,
                     RemainingBudget = context.RemainingBudget
                 });
@@ -53,8 +53,8 @@ public sealed class ContextGatekeeper(
             else
             {
                 var rejectionReason = item.EstimatedTokens > remainingSystemBudget
-                    ? "system_budget_exhausted"
-                    : "budget_exhausted";
+                    ? Constants.TurnRuntime.AdmissionReason.SystemBudgetExhausted
+                    : Constants.TurnRuntime.AdmissionReason.BudgetExhausted;
 
                 context.AdmissionTrace.Add(new AdmissionRecord
                 {
@@ -74,7 +74,7 @@ public sealed class ContextGatekeeper(
         // Allocate retrieval/memory budget
         var retrievalBudget = Math.Min(_settings.RetrievalTokenBudget, context.RemainingBudget);
         var retrievalItems = context.Candidates
-            .Where(c => c.Source is "memory" or "retrieval")
+            .Where(c => c.Source is Constants.TurnRuntime.ContextSource.Memory or Constants.TurnRuntime.ContextSource.Retrieval)
             .OrderByDescending(c => c.Score)
             .ToList();
 
@@ -139,7 +139,10 @@ public sealed class ContextGatekeeper(
 
         // Admit all remaining non-retrieval, non-system items if budget allows
         var remainingItems = context.Candidates
-            .Where(c => c.Source is not ("system" or "identity" or "memory" or "retrieval"))
+            .Where(c => c.Source is not (Constants.TurnRuntime.ContextSource.System
+                or Constants.TurnRuntime.ContextSource.Identity
+                or Constants.TurnRuntime.ContextSource.Memory
+                or Constants.TurnRuntime.ContextSource.Retrieval))
             .OrderByDescending(c => c.Score)
             .ToList();
 

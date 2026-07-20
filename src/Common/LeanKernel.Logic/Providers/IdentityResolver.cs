@@ -1,9 +1,12 @@
 using System.Security.Claims;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using LeanKernel.Data;
 using LeanKernel.Entities;
+using LeanKernel.Logic.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Logic.Providers;
 
@@ -12,8 +15,16 @@ namespace LeanKernel.Logic.Providers;
 /// </summary>
 public sealed class IdentityResolver(
     IDbContextFactory<EntityContext> dbContextFactory,
+    IOptions<IdentityClaimsContextSettings> identityClaimsSettings,
     ILogger<IdentityResolver> logger) : IIdentityResolver
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    private readonly IdentityClaimsContextSettings _identityClaimsSettings = identityClaimsSettings.Value;
+
     /// <inheritdoc />
     public async Task<TenantEntity?> ResolveTenantAsync(string hostName, CancellationToken ct = default)
     {
@@ -61,6 +72,7 @@ public sealed class IdentityResolver(
                 existing.PersonId = existing.Id;
             }
 
+            ApplyIdentityProfile(existing, principal, _identityClaimsSettings);
             existing.LastActivity = DateTime.UtcNow;
             await context.SaveChangesAsync(ct);
             return existing;
@@ -78,6 +90,13 @@ public sealed class IdentityResolver(
             FirstName = principal.FindFirst(ClaimTypes.GivenName)?.Value ?? string.Empty,
             LastName = principal.FindFirst(ClaimTypes.Surname)?.Value ?? string.Empty,
             FullName = principal.FindFirst(ClaimTypes.Name)?.Value ?? subject,
+            PreferredUserName = string.Empty,
+            Locale = string.Empty,
+            TimeZone = string.Empty,
+            Organization = string.Empty,
+            RolesJson = "[]",
+            GroupsJson = "[]",
+            CustomClaimsJson = "{}",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
             IsGuest = false,
@@ -85,6 +104,7 @@ public sealed class IdentityResolver(
         };
 
         user.PersonId = user.Id;
+        ApplyIdentityProfile(user, principal, _identityClaimsSettings);
 
         context.Users.Add(user);
 
@@ -104,6 +124,7 @@ public sealed class IdentityResolver(
                     conflicting.PersonId = conflicting.Id;
                 }
 
+                ApplyIdentityProfile(conflicting, principal, _identityClaimsSettings);
                 conflicting.LastActivity = DateTime.UtcNow;
                 await context.SaveChangesAsync(ct);
                 logger.LogInformation("Created new user {UserId} for issuer={Issuer}, subject={Subject}",
@@ -139,6 +160,7 @@ public sealed class IdentityResolver(
             existing.PersonId = existing.Id;
         }
 
+        ApplyIdentityProfile(existing, principal, _identityClaimsSettings);
         existing.LastActivity = DateTime.UtcNow;
         await context.SaveChangesAsync(ct);
         return existing;
@@ -446,13 +468,156 @@ public sealed class IdentityResolver(
     {
         var issuer = principal.FindFirst("lk_sender_iss")?.Value
                      ?? principal.FindFirst(ClaimTypes.AuthenticationMethod)?.Value
-                     ?? principal.FindFirst("iss")?.Value
+                     ?? principal.FindFirst(Constants.Claims.Issuer)?.Value
                      ?? string.Empty;
-        var subject = principal.FindFirst("lk_sender_sub")?.Value
+        var subject = principal.FindFirst(Constants.Claims.ChannelSenderSubject)?.Value
                       ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                      ?? principal.FindFirst("sub")?.Value
+                      ?? principal.FindFirst(Constants.Claims.Subject)?.Value
                       ?? principal.FindFirst(ClaimTypes.Sid)?.Value
                       ?? string.Empty;
         return (issuer, subject);
+    }
+
+    private static void ApplyIdentityProfile(UserEntity user, ClaimsPrincipal principal, IdentityClaimsContextSettings settings)
+    {
+        if (!settings.Enabled)
+        {
+            return;
+        }
+
+        user.Email = FindFirstNonEmpty(principal,
+                ClaimTypes.Email,
+                Constants.Claims.Email,
+                Constants.Claims.XmlEmailAddress)
+            ?? user.Email;
+
+        user.UserName = FindFirstNonEmpty(principal,
+                Constants.Claims.PreferredUsername,
+                ClaimTypes.Upn,
+                Constants.Claims.Upn,
+                ClaimTypes.Name,
+                Constants.Claims.Subject)
+            ?? user.UserName;
+
+        user.FullName = FindFirstNonEmpty(principal,
+                ClaimTypes.Name,
+                Constants.Claims.Name)
+            ?? user.FullName;
+
+        user.FirstName = FindFirstNonEmpty(principal,
+                ClaimTypes.GivenName,
+                Constants.Claims.GivenName)
+            ?? user.FirstName;
+
+        user.LastName = FindFirstNonEmpty(principal,
+                ClaimTypes.Surname,
+                Constants.Claims.FamilyName)
+            ?? user.LastName;
+
+        user.PreferredUserName = FindFirstNonEmpty(principal,
+                                     Constants.Claims.PreferredUsername,
+                                     ClaimTypes.Upn,
+                                     Constants.Claims.Upn)
+                                 ?? string.Empty;
+
+        user.Locale = FindFirstNonEmpty(principal, Constants.Claims.Locale) ?? string.Empty;
+        user.TimeZone = FindFirstNonEmpty(principal, Constants.Claims.ZoneInfo, Constants.Claims.TimeZone, Constants.Claims.TimeZoneAlt) ?? string.Empty;
+        user.Organization = FindFirstNonEmpty(principal, Constants.Claims.Organization, Constants.Claims.OrganizationAlt, Constants.Claims.Company) ?? string.Empty;
+
+        var roles = principal.Claims
+            .Where(claim => claim.Type is ClaimTypes.Role or Constants.Claims.Role or Constants.Claims.Roles)
+            .Select(claim => claim.Value)
+            .SelectMany(SplitClaimValue)
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .Take(Math.Max(0, settings.MaxRoles))
+            .ToList();
+
+        var groups = principal.Claims
+            .Where(claim => claim.Type is Constants.Claims.Groups or Constants.Claims.Group)
+            .Select(claim => claim.Value)
+            .SelectMany(SplitClaimValue)
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .Take(Math.Max(0, settings.MaxGroups))
+            .ToList();
+
+        user.RolesJson = JsonSerializer.Serialize(roles, JsonOptions);
+        user.GroupsJson = JsonSerializer.Serialize(groups, JsonOptions);
+
+        var allowlistedCustom = settings.AllowedCustomClaims
+            .Where(static claim => !string.IsNullOrWhiteSpace(claim))
+            .Select(static claim => claim.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static claim => claim, StringComparer.Ordinal)
+            .ToList();
+
+        var customClaims = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var claimName in allowlistedCustom)
+        {
+            var values = principal.Claims
+                .Where(claim => string.Equals(claim.Type, claimName, StringComparison.Ordinal))
+                .Select(claim => claim.Value)
+                .SelectMany(SplitClaimValue)
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => value.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static value => value, StringComparer.Ordinal)
+                .Take(Math.Max(0, settings.MaxCustomClaimValuesPerClaim))
+                .ToList();
+
+            if (values.Count > 0)
+            {
+                customClaims[claimName] = values;
+            }
+        }
+
+        user.CustomClaimsJson = JsonSerializer.Serialize(customClaims, JsonOptions);
+    }
+
+    private static IEnumerable<string> SplitClaimValue(string rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return [];
+        }
+
+        var trimmed = rawValue.Trim();
+        if (trimmed.StartsWith("[", StringComparison.Ordinal) && trimmed.EndsWith("]", StringComparison.Ordinal))
+        {
+            try
+            {
+                var array = JsonSerializer.Deserialize<List<string>>(trimmed, JsonOptions);
+                return array ?? [];
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        if (trimmed.Contains(',', StringComparison.Ordinal))
+        {
+            return trimmed.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
+        return [trimmed];
+    }
+
+    private static string? FindFirstNonEmpty(ClaimsPrincipal principal, params string[] claimTypes)
+    {
+        foreach (var claimType in claimTypes)
+        {
+            var value = principal.FindFirst(claimType)?.Value;
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
     }
 }

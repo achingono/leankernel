@@ -18,31 +18,27 @@ namespace LeanKernel.Gateway.Providers;
 /// </remarks>
 public sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
-    private const string ChannelNameClaimType = "lk_channel";
-    private const string ChannelTenantIdClaimType = "lk_tenant_id";
-    private const string ChannelSenderIssuerClaimType = "lk_sender_iss";
-    private const string ChannelSenderSubjectClaimType = "lk_sender_sub";
-
     /// <summary>Key used to store the resolved tenant identifier in <see cref="HttpContext.Items"/>.</summary>
-    public const string TenantKey = "LK.TenantId";
+    public const string TenantKey = Constants.HttpContextItems.TenantId;
 
     /// <summary>Key used to store the resolved user identifier in <see cref="HttpContext.Items"/>.</summary>
-    public const string UserIdKey = "LK.UserId";
+    /// <summary>Key used to store the resolved user identifier in <see cref="HttpContext.Items"/>.</summary>
+    public const string UserIdKey = Constants.HttpContextItems.UserId;
 
     /// <summary>Key used to store the resolved canonical person identifier in <see cref="HttpContext.Items"/>.</summary>
-    public const string PersonIdKey = "LK.PersonId";
+    public const string PersonIdKey = Constants.HttpContextItems.PersonId;
 
     /// <summary>Key used to store the resolved channel identifier in <see cref="HttpContext.Items"/>.</summary>
-    public const string ChannelIdKey = "LK.ChannelId";
+    public const string ChannelIdKey = Constants.HttpContextItems.ChannelId;
 
     /// <summary>Key used to store the resolved badge in <see cref="HttpContext.Items"/>.</summary>
-    public const string BadgeKey = "LK.Badge";
+    public const string BadgeKey = Constants.HttpContextItems.Badge;
 
     /// <summary>Marker written to session to force materialization and stabilize the session id.</summary>
-    private const string SessionInitMarker = "_lk_init";
+    private const string SessionInitMarker = Constants.Session.InitMarker;
 
     /// <summary>Request paths exempt from tenant resolution (e.g. health probes).</summary>
-    private static readonly string[] s_bypassPaths = ["/health"];
+    private static readonly string[] s_bypassPaths = [Constants.Http.HealthPath];
 
     /// <summary>
     /// Resolves the request-scoped identity and invokes the next middleware.
@@ -66,8 +62,8 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             && context.User is ClaimsPrincipal authenticatedPrincipal
             && HasChannelClaims(authenticatedPrincipal))
         {
-            var tenantClaim = authenticatedPrincipal.FindFirst(ChannelTenantIdClaimType)?.Value;
-            var channelClaim = authenticatedPrincipal.FindFirst(ChannelNameClaimType)?.Value;
+            var tenantClaim = authenticatedPrincipal.FindFirst(Constants.Claims.ChannelTenantId)?.Value;
+            var channelClaim = authenticatedPrincipal.FindFirst(Constants.Claims.Channel)?.Value;
 
             if (!Guid.TryParse(tenantClaim, out var tenantId) || string.IsNullOrWhiteSpace(channelClaim))
             {
@@ -85,12 +81,12 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 return;
             }
 
-            var senderIssuer = authenticatedPrincipal.FindFirst(ChannelSenderIssuerClaimType)?.Value
-                ?? authenticatedPrincipal.FindFirst("iss")?.Value
+            var senderIssuer = authenticatedPrincipal.FindFirst(Constants.Claims.ChannelSenderIssuer)?.Value
+                ?? authenticatedPrincipal.FindFirst(Constants.Claims.Issuer)?.Value
                 ?? string.Empty;
-            var senderSubject = authenticatedPrincipal.FindFirst(ChannelSenderSubjectClaimType)?.Value
+            var senderSubject = authenticatedPrincipal.FindFirst(Constants.Claims.ChannelSenderSubject)?.Value
                 ?? authenticatedPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? authenticatedPrincipal.FindFirst("sub")?.Value
+                ?? authenticatedPrincipal.FindFirst(Constants.Claims.Subject)?.Value
                 ?? string.Empty;
 
             var isActiveBinding = await resolver.IsChannelSenderBindingActiveAsync(
@@ -175,5 +171,6 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         s_bypassPaths.Any(p => path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase));
 
     private static bool HasChannelClaims(ClaimsPrincipal principal) =>
-        principal.HasClaim(claim => claim.Type == ChannelNameClaimType || claim.Type == ChannelTenantIdClaimType);
+        principal.HasClaim(claim => claim.Type == Constants.Claims.Channel || claim.Type == Constants.Claims.ChannelTenantId);
 }
+

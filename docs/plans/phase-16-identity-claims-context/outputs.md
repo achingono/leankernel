@@ -18,6 +18,6 @@
 - Promotion hook to feed the Phase 10 person-level profile.
 
 ## Output Quality Checklist
-- [ ] All mandatory outputs produced
-- [ ] All outputs reviewed before gate
-- [ ] Evidence log updated with output references
+- [x] All mandatory outputs produced
+- [x] All outputs reviewed before gate
+- [x] Evidence log updated with output references

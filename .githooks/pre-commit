@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Pre-commit hook to verify code formatting before committing.
+#
+# This hook runs `dotnet format --verify-no-changes` on the src solution.
+# To enable, run: git config core.hooksPath .githooks
+#
+
+set -e
+
+echo "Checking code formatting..."
+
+dotnet format src/LeanKernel.sln --verify-no-changes --no-restore
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "ERROR: Code formatting violations detected."
+    echo "Run 'dotnet format src/LeanKernel.sln' to auto-fix, then stage the changes and commit again."
+    exit 1
+fi

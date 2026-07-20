@@ -16,7 +16,9 @@ Projects in the app-only solution:
 | `src/Common/LeanKernel.Channels.Common` | Shared terminal/gateway helpers (health response writer, gateway health probe, connection-string resolver, channel binding token resolver) |
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, design-time factory |
 | `src/Common/LeanKernel.Logic` | Chat history provider, memory pipeline, identity resolution, MAF-facing logic services |
+| `src/Services/LeanKernel.Services.Common` | Shared learning-service contracts, queue primitives, publisher client, and scheduler helpers |
 | `src/Services/LeanKernel.Gateway` | Web host, endpoint mapping, auth/session middleware, GBrain wiring, agent session store |
+| `src/Services/LeanKernel.Services.Learning` | Phase 07 learning host (turn-event ingest API, background learning pipeline, scheduler) |
 | `src/Terminals/LeanKernel.Channels.Signal` | Signal channel terminal process (JSON-RPC socket transport to signal-cli sidecar) |
 | `src/Terminals/LeanKernel.Channels.Teams` | Teams Bot Framework terminal process (webhook ingress + connector egress) |
 
@@ -36,6 +38,10 @@ flowchart BT
     Gateway --> Data[LeanKernel.Data]
     Gateway --> Core[LeanKernel.Core]
     Gateway --> ChannelsCommon[LeanKernel.Channels.Common]
+    Gateway --> ServicesCommon[LeanKernel.Services.Common]
+
+    Learning[LeanKernel.Services.Learning] --> Logic
+    Learning --> ServicesCommon
 
     Logic --> Data
     Logic --> Core
@@ -53,6 +59,8 @@ flowchart BT
 These arrows reflect the current `.csproj` references in `src/` rather than a conceptual layering sketch.
 
 - `Gateway` depends on `Logic`, `Data`, `Core`, and `Channels.Common`
+- `Gateway` also depends on `Services.Common` for cross-service learning contracts/publisher
+- `Learning` depends on `Logic` and `Services.Common`
 - `Logic` depends on `Data` and `Core`
 - `Data` depends on `Core`
 - `Channels.Common` depends on `Data`

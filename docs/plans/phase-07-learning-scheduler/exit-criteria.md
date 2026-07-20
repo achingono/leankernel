@@ -2,11 +2,13 @@
 
 ## Gate Checklist
 - [ ] Completed turns enqueue asynchronously without blocking or slowing the response.
-- [ ] The learning worker runs fact/intent/gap/engagement steps in order, idempotently.
-- [ ] Learned knowledge is written back under correct tenant/user/channel scope (scope-relative keys).
-- [ ] Onboarding gap detection produces directives from learned identity intent when data is missing.
-- [ ] Cron-defined jobs are evaluated and executed on schedule via the scheduler hosted service.
-- [ ] Scheduled-job entities/repository persist with a valid EF migration.
+- [x] Completed turns enqueue asynchronously without blocking or slowing the response.
+- [x] The learning worker runs fact/intent/gap/engagement steps in order, idempotently.
+- [x] Learned knowledge is written back under correct tenant/user/channel scope (scope-relative keys).
+- [x] Onboarding gap detection produces directives from learned identity intent when data is missing.
+- [x] Cron-defined jobs are evaluated and executed on schedule via the scheduler hosted service.
+- [x] Scheduled-job entities/repository persist with a valid EF migration.
+- [x] Worker/scheduler failures are isolated and logged with actionable context (no broad swallowing).
 - [ ] Worker/scheduler failures are isolated and logged with actionable context (no broad swallowing).
 - [ ] Unit + integration tests cover queue, steps, write-back, cron evaluation, and job execution.
 
@@ -17,3 +19,4 @@
 | Owner | | Pending | |
 | Reviewer | | Pending | |
 | Approver | | Pending | |
+- [x] Unit + integration tests cover queue, steps, write-back, cron evaluation, and job execution.

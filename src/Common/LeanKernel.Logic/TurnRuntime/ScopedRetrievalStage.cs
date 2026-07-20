@@ -61,7 +61,7 @@ public sealed class ScopedRetrievalStage(
 
                 context.Candidates.Add(new ContextItem
                 {
-                    Source = "memory",
+                    Source = Constants.TurnRuntime.ContextSource.Memory,
                     Content = content,
                     EstimatedTokens = EstimateTokens(content),
                     Score = memory.Score,

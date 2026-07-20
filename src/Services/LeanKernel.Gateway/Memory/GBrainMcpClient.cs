@@ -96,7 +96,7 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
 
         var contentType = response.Content.Headers.ContentType?.MediaType;
 
-        if (string.Equals(contentType, "text/event-stream", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(contentType, Constants.Http.TextEventStream, StringComparison.OrdinalIgnoreCase))
         {
             return await ReadSseResponseAsync(response, ct).ConfigureAwait(false);
         }

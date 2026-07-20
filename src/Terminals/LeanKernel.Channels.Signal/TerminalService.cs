@@ -1080,3 +1080,4 @@ public sealed record InboundAttachment(string AttachmentId, string ContentType, 
 {
     public bool IsImage => ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
 }
+        }), Encoding.UTF8, Constants.Http.ApplicationJson);
