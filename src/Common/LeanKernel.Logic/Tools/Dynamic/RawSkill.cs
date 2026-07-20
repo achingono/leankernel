@@ -5,9 +5,13 @@ namespace LeanKernel.Logic.Tools.Dynamic;
 internal sealed class RawSkill
 {
     public string? Name { get; set; }
+
     public string? Description { get; set; }
+
     public Dictionary<string, object?>? Metadata { get; set; }
+
     public RawRuntime? Runtime { get; set; }
+
     public List<RawOperation>? Operations { get; set; }
 }
 #pragma warning restore CS8618

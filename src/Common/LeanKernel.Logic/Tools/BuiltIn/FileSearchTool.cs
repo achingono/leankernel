@@ -271,15 +271,20 @@ public static class FileSearchTool
     private sealed class FileSearchResponse
     {
         public List<FileSearchMatch> Matches { get; set; } = [];
+
         public int Scanned { get; set; }
+
         public bool Truncated { get; set; }
     }
 
     private sealed class FileSearchMatch
     {
         public string Path { get; set; } = string.Empty;
+
         public string Name { get; set; } = string.Empty;
+
         public string MatchType { get; set; } = string.Empty;
+
         public long SizeBytes { get; set; }
     }
 }

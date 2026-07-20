@@ -348,6 +348,7 @@ public static class JsonTransformTool
     private sealed class JsonNodeComparer : IComparer<JsonNode?>
     {
         public static readonly JsonNodeComparer Instance = new();
+
         public int Compare(JsonNode? x, JsonNode? y)
         {
             if (x is null && y is null)

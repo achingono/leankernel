@@ -334,6 +334,7 @@ public sealed class TelemetryAggregationService(
         bool CostIsEstimated)
     {
         public string Model => NormalizeKey(ServedModelName ?? RequestedModelName);
+
         public string Provider => NormalizeKey(ProviderName);
     }
 }

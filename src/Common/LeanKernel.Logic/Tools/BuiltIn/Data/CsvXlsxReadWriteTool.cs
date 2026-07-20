@@ -364,5 +364,6 @@ public static class CsvXlsxReadWriteTool
     }
 
     private static ToolResult Ok(string output) => new() { ToolName = ToolName, Success = true, Output = output };
+
     private static ToolResult Err(string error) => new() { ToolName = ToolName, Success = false, Error = error };
 }
