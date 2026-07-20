@@ -14,6 +14,7 @@ using LeanKernel.Logic.Providers;
 
 using Microsoft.Agents.AI.DevUI;
 using Microsoft.Agents.AI.Hosting;
+using Microsoft.Agents.AI.Hosting.OpenAI;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -252,6 +253,10 @@ public partial class Program
 
         app.MapOpenAIResponses();
         app.MapOpenAIConversations();
+        app.MapProxiedOpenAIChatCompletions("leankernel", "/v1/internal/completions", new OpenAIChatCompletionsMapOptions
+        {
+            RunOptionsFactory = _ => null,
+        });
 
         if (app.Environment.IsDevelopment())
         {
