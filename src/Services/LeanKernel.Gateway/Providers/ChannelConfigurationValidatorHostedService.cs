@@ -96,7 +96,9 @@ public sealed class ChannelConfigurationValidatorHostedService(
         foreach (var value in values)
         {
             if (string.Equals(value, ChannelEntity.MemoryPolicyWildcard, StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             if (!knownChannelNames.Contains(value, StringComparer.OrdinalIgnoreCase))
             {
@@ -119,7 +121,9 @@ public sealed class ChannelConfigurationValidatorHostedService(
             .ToList();
 
         if (normalized.Contains(ChannelEntity.MemoryPolicyWildcard, StringComparer.OrdinalIgnoreCase))
+        {
             return [ChannelEntity.MemoryPolicyWildcard];
+        }
 
         return normalized;
     }

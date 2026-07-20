@@ -137,6 +137,7 @@ public static class JsonTransformTool
             updated = null;
             return false;
         }
+
         var segments = path.Split('.', StringSplitOptions.RemoveEmptyEntries);
         var node = current;
         foreach (var segment in segments)
@@ -169,11 +170,13 @@ public static class JsonTransformTool
             error = "Input must be an array for project";
             return false;
         }
+
         if (!op.TryGetPropertyValue("fields", out var fieldsNode) || fieldsNode is not JsonArray fieldsArr)
         {
             error = "Missing 'fields' array";
             return false;
         }
+
         var fields = fieldsArr.Select(f => f?.ToString() ?? string.Empty).ToList();
         var result = new JsonArray();
         foreach (var item in arr)
@@ -206,16 +209,19 @@ public static class JsonTransformTool
             error = "Input must be an array for filter_equals";
             return false;
         }
+
         if (!TryReadStringProperty(op, "field", out var field))
         {
             error = "Missing 'field'";
             return false;
         }
+
         if (!op.TryGetPropertyValue("value", out var filterValue))
         {
             error = "Missing 'value'";
             return false;
         }
+
         var result = new JsonArray();
         foreach (var item in arr)
         {
@@ -238,11 +244,13 @@ public static class JsonTransformTool
             error = "Input must be an array for sort";
             return false;
         }
+
         if (!TryReadStringProperty(op, "field", out var field))
         {
             error = "Missing 'field'";
             return false;
         }
+
         var descending = op.TryGetPropertyValue("descending", out var descNode) && descNode is JsonValue descVal && descVal.GetValue<bool>();
         var sorted = arr.Select((item, index) => (Item: item, Index: index, Value: item is JsonObject obj && obj.TryGetPropertyValue(field, out var v) ? v : null))
             .OrderBy(x => x.Value, JsonNodeComparer.Instance).ThenBy(x => x.Index).ToList();
@@ -270,6 +278,7 @@ public static class JsonTransformTool
             error = "Input must be an array for slice";
             return false;
         }
+
         var start = op.TryGetPropertyValue("start", out var sn) && sn is JsonValue sv ? sv.GetValue<int>() : 0;
         var end = op.TryGetPropertyValue("end", out var en) && en is JsonValue ev ? ev.GetValue<int>() : arr.Count;
         start = Math.Max(0, Math.Min(start, arr.Count));
@@ -293,6 +302,7 @@ public static class JsonTransformTool
             error = "Input must be an array for flatten";
             return false;
         }
+
         var depth = op.TryGetPropertyValue("depth", out var dn) && dn is JsonValue dv ? dv.GetValue<int>() : 1;
         var result = new JsonArray();
         FlattenArray(arr, result, depth);
@@ -332,6 +342,7 @@ public static class JsonTransformTool
         error = msg;
         return false;
     }
+
     private static ToolResult Fail(string error) => new() { ToolName = ToolName, Success = false, Error = error };
 
     private sealed class JsonNodeComparer : IComparer<JsonNode?>

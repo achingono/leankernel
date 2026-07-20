@@ -104,7 +104,9 @@ public class DbAgentStateStore(
             // Reload the winning state from the store and retry once (last-writer-wins).
             logger.LogWarning(ex, "Concurrency conflict saving agent state for {ConversationId}; reloading and overwriting.", conversationId);
             foreach (var entry in ex.Entries)
+            {
                 await entry.ReloadAsync(cancellationToken);
+            }
 
             var conflicted = ex.Entries.FirstOrDefault()?.Entity as AgentStateEntity;
             if (conflicted is not null)

@@ -258,32 +258,38 @@ public static partial class DatabaseQueryTool
             error = "Query is required";
             return false;
         }
+
         var withoutTrailingSemicolon = normalized.EndsWith(';') ? normalized[..^1].TrimEnd() : normalized;
         if (withoutTrailingSemicolon.Contains(';', StringComparison.Ordinal))
         {
             error = "Only a single SQL statement is allowed";
             return false;
         }
+
         if (!StartsWithAllowedKeyword(withoutTrailingSemicolon))
         {
             error = "Only SELECT, WITH ... SELECT, or EXPLAIN statements are allowed";
             return false;
         }
+
         if (ContainsBlockedKeyword(withoutTrailingSemicolon, out var blockedKeyword))
         {
             error = $"Blocked SQL keyword detected: {blockedKeyword}";
             return false;
         }
+
         if (ContainsCteDml(withoutTrailingSemicolon, out var cteDmlKeyword))
         {
             error = $"Blocked CTE-DML pattern detected: {cteDmlKeyword}";
             return false;
         }
+
         if (provider == "postgres" && allowedSchemas.Count > 0 && !AreSchemasAllowed(withoutTrailingSemicolon, allowedSchemas, out var schemaError))
         {
             error = schemaError;
             return false;
         }
+
         return true;
     }
 
@@ -320,6 +326,7 @@ public static partial class DatabaseQueryTool
             dmlKeyword = match.Groups["verb"].Value.ToUpperInvariant();
             return true;
         }
+
         dmlKeyword = null;
         return false;
     }
@@ -332,6 +339,7 @@ public static partial class DatabaseQueryTool
             error = null;
             return true;
         }
+
         var matches = SchemaReferenceRegex().Matches(query);
         foreach (Match match in matches)
         {

@@ -154,7 +154,7 @@ public static class FileSearchTool
         return new FileSearchResponse { Matches = matches, Scanned = scanned, Truncated = truncated };
     }
 
-    private static async Task<(bool truncated, int scanned)> ProcessDirectoryAsync(
+    private static async Task<(bool Truncated, int Scanned)> ProcessDirectoryAsync(
         List<FileSearchMatch> matches,
         Stack<(string Path, int Depth)> stack,
         FileSearchOptions opts,
