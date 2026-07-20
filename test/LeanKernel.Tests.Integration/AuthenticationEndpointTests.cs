@@ -26,6 +26,7 @@ public class AuthenticationEndpointTests : IClassFixture<GatewayTestApplicationF
     /// <summary>
     /// Verifies the health endpoint is publicly reachable.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task HealthEndpoint_IsPublicAndReturnsOk()
     {
@@ -37,6 +38,7 @@ public class AuthenticationEndpointTests : IClassFixture<GatewayTestApplicationF
     /// <summary>
     /// Verifies the conversations route is available.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ConversationsEndpoint_IsReachable()
     {
@@ -49,6 +51,7 @@ public class AuthenticationEndpointTests : IClassFixture<GatewayTestApplicationF
     /// <summary>
     /// Verifies the responses route is available.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ResponsesEndpoint_IsReachable()
     {
@@ -66,6 +69,7 @@ public class AuthenticationEndpointTests : IClassFixture<GatewayTestApplicationF
     /// <summary>
     /// Verifies unsupported conversation verbs are rejected.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Theory]
     [InlineData("/v1/conversations", "DELETE")]
     [InlineData("/v1/conversations", "PUT")]

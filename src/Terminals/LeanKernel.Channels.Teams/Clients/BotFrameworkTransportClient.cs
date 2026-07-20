@@ -3,10 +3,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 
 using LeanKernel.Channels.Teams.Services;
-using LeanKernel.Data;
-using LeanKernel.Entities;
 
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels.Teams.Clients;

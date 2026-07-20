@@ -58,6 +58,7 @@ public class MemoryLinkerAndReasonerTests
     /// <summary>
     /// Verifies graph refinement filters invalid edges and caps model output.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task GraphReasoner_FiltersAndCapsModelEdges()
     {
@@ -98,6 +99,7 @@ public class MemoryLinkerAndReasonerTests
     /// <summary>
     /// Verifies invalid refinement output falls back to deterministic links.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task GraphReasoner_InvalidJson_FallsBackToDeterministic()
     {

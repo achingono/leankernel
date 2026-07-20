@@ -16,6 +16,7 @@ public class MemoryRepairAndNormalizerTests
     /// <summary>
     /// Verifies repair only fills fields that are currently missing.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task RepairService_FillsOnlyMissingFields()
     {
@@ -49,6 +50,7 @@ public class MemoryRepairAndNormalizerTests
     /// <summary>
     /// Verifies disabled or invalid repair output yields no repaired fields.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task RepairService_InvalidOrDisabled_ReturnsEmpty()
     {
@@ -65,6 +67,7 @@ public class MemoryRepairAndNormalizerTests
     /// <summary>
     /// Verifies normalization produces canonical content and a scope-relative key.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task Normalizer_ProducesCanonicalContentAndScopeRelativeKey()
     {

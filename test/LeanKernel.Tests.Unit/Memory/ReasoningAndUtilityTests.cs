@@ -18,6 +18,7 @@ public class ReasoningAndUtilityTests
     /// <summary>
     /// Verifies disabled reasoning returns no completion.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ReasoningModel_Disabled_ReturnsNull()
     {
@@ -33,6 +34,7 @@ public class ReasoningAndUtilityTests
     /// <summary>
     /// Verifies chat response text is mapped into the reasoning completion.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ReasoningModel_MapsChatResponseText()
     {
@@ -48,6 +50,7 @@ public class ReasoningAndUtilityTests
     /// <summary>
     /// Verifies unsupported clients and timeouts are treated as no result.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ReasoningModel_NotSupported_AndTimeout_ReturnNull()
     {

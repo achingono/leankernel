@@ -34,6 +34,7 @@ public class EntityContextTests : IDisposable
     /// <summary>
     /// Verifies agent state entities can be saved and queried.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task AgentStates_CanAddAndQuery()
     {
@@ -89,6 +90,7 @@ public class EntityContextTests : IDisposable
     /// <summary>
     /// Verifies session entities can be saved with related navigation data.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task Sessions_CanAddWithNavigationProps()
     {

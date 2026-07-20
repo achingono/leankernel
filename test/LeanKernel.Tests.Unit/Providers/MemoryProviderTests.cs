@@ -41,6 +41,7 @@ public class MemoryProviderTests
     /// <summary>
     /// Verifies the stub memory client returns no search results.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task StubMemoryClient_SearchMemories_ReturnsEmptyResults()
     {
@@ -60,6 +61,7 @@ public class MemoryProviderTests
     /// <summary>
     /// Verifies the stub memory client accepts save requests.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task StubMemoryClient_SaveMemory_Completes()
     {
@@ -159,6 +161,7 @@ public class MemoryProviderTests
     /// <summary>
     /// Verifies the stub memory client supports concurrent searches.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task StubMemoryClient_Concurrent_SearchMemories_IsThreadSafe()
     {

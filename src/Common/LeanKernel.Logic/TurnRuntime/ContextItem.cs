@@ -1,5 +1,3 @@
-using Microsoft.Extensions.AI;
-
 namespace LeanKernel.Logic.TurnRuntime;
 
 /// <summary>

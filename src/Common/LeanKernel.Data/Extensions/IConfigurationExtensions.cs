@@ -3,7 +3,7 @@ namespace Microsoft.Extensions.Configuration;
 /// <summary>
 /// Extension methods for resolving connection strings from configuration.
 /// </summary>
-public static class ConnectionStringResolverExtensions
+public static class IConfigurationExtensions
 {
     /// <summary>
     /// Resolves the first non-empty connection string from a prioritized list of names.

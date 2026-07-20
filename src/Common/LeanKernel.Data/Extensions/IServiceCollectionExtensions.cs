@@ -2,6 +2,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 using LeanKernel.Data;
 using LeanKernel.Data.Interceptors;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection.Extensions;

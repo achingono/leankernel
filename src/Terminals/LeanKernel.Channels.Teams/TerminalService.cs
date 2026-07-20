@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Options;
 using LeanKernel.Channels.Teams.Clients;
 
 namespace LeanKernel.Channels.Teams;

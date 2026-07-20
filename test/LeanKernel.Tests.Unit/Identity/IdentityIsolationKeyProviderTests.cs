@@ -35,6 +35,7 @@ public class IdentityIsolationKeyProviderTests
     /// <summary>
     /// Verifies authenticated users receive tenant, channel, and user scoping.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task GetSessionIsolationKey_Authenticated_ReturnsTenantChannelUser()
     {
@@ -52,6 +53,7 @@ public class IdentityIsolationKeyProviderTests
     /// <summary>
     /// Verifies anonymous users include the session identifier in the isolation key.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task GetSessionIsolationKey_Anonymous_ReturnsTenantChannelUserSession()
     {
@@ -70,6 +72,7 @@ public class IdentityIsolationKeyProviderTests
     /// <summary>
     /// Verifies anonymous users without a session cannot produce a key.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task GetSessionIsolationKey_Anonymous_NoSession_Throws()
     {
@@ -84,6 +87,7 @@ public class IdentityIsolationKeyProviderTests
     /// <summary>
     /// Verifies tenant changes produce different isolation keys.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task GetSessionIsolationKey_DifferentTenants_ProduceDifferentKeys()
     {
@@ -101,6 +105,7 @@ public class IdentityIsolationKeyProviderTests
     /// <summary>
     /// Verifies channel changes produce different isolation keys.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task GetSessionIsolationKey_DifferentChannels_ProduceDifferentKeys()
     {

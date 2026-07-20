@@ -22,6 +22,7 @@ public class IdentityResolverTests
     /// <summary>
     /// Verifies blank host names do not resolve a tenant.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ResolveTenantAsync_BlankHost_ReturnsNull()
     {
@@ -35,6 +36,7 @@ public class IdentityResolverTests
     /// <summary>
     /// Verifies only active tenants are returned for a host.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ResolveTenantAsync_ReturnsOnlyActiveTenant()
     {
@@ -66,6 +68,7 @@ public class IdentityResolverTests
     /// <summary>
     /// Verifies users are created once and then reused.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ResolveOrCreateUserAsync_CreatesAndFindsUser()
     {
@@ -85,6 +88,7 @@ public class IdentityResolverTests
     /// <summary>
     /// Verifies missing subject claims are rejected.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ResolveOrCreateUserAsync_WithoutSubject_Throws()
     {
@@ -98,6 +102,7 @@ public class IdentityResolverTests
     /// <summary>
     /// Verifies guest users and channels are created once and then reused.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ResolveGuestAndChannel_CreateThenReuse()
     {
@@ -185,6 +190,7 @@ public class IdentityResolverTests
     /// <summary>
     /// M5: Two tenants sharing the same anonymous session ID must resolve to different guest users.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task ResolveGuestUserAsync_DifferentTenants_SameSession_CreatesDifferentUsers()
     {

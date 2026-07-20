@@ -21,6 +21,7 @@ public class GBrainAuthHandlerTests
     /// <summary>
     /// Verifies configured tokens are added as bearer authorization headers.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task SendAsync_AddsAuthAndAcceptHeaders_WhenConfigTokenExists()
     {
@@ -44,6 +45,7 @@ public class GBrainAuthHandlerTests
     /// <summary>
     /// Verifies empty tokens leave the authorization header unset.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task SendAsync_LeavesAuthNull_WhenNoTokenFound()
     {

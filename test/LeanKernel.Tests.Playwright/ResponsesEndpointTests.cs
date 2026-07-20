@@ -21,6 +21,7 @@ public class ResponsesEndpointTests : IClassFixture<PlaywrightFixture>
     /// <summary>
     /// Verifies the responses endpoint returns an expected status without full auth setup.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task PostResponses_ReturnsOkOrUnauthorized()
     {

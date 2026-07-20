@@ -1,14 +1,8 @@
-using System.Net.Http.Headers;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-using LeanKernel.Channels.Common.Configuration;
-using LeanKernel.Data;
-using LeanKernel.Entities;
-
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels.Signal;

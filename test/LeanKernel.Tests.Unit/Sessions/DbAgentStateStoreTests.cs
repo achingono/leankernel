@@ -54,6 +54,7 @@ public class DbAgentStateStoreTests
     /// <summary>
     /// Verifies missing persisted state returns a new agent session.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task GetSessionAsync_WhenNoEntity_ReturnsNewSession()
     {
@@ -69,6 +70,7 @@ public class DbAgentStateStoreTests
     /// <summary>
     /// Verifies saved sessions can be loaded again.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task SaveSessionAsync_ThenGetSessionAsync_RoundTrips()
     {
@@ -87,6 +89,7 @@ public class DbAgentStateStoreTests
     /// <summary>
     /// Verifies saving a session creates a backing database entity.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task SaveSessionAsync_CreatesEntityInDatabase()
     {
@@ -105,6 +108,7 @@ public class DbAgentStateStoreTests
     /// <summary>
     /// Verifies different conversations persist isolated state.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task SaveSessionAsync_DifferentConversations_AreIsolated()
     {
@@ -129,6 +133,7 @@ public class DbAgentStateStoreTests
     /// <summary>
     /// Verifies ownership metadata is persisted with the saved session.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
     [Fact]
     public async Task SaveSessionAsync_PopulatesOwnershipMetadata()
     {

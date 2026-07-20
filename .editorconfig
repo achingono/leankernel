@@ -134,7 +134,6 @@ dotnet_diagnostic.SA1118.severity = silent
 dotnet_diagnostic.SA1316.severity = silent
 dotnet_diagnostic.SA1629.severity = silent
 dotnet_diagnostic.SA1503.severity = silent
-dotnet_diagnostic.SA1649.severity = silent
 dotnet_diagnostic.SA1513.severity = silent
 dotnet_diagnostic.SA1200.severity = silent
 dotnet_diagnostic.SA1101.severity = silent
@@ -146,7 +145,6 @@ dotnet_diagnostic.SA1116.severity = silent
 # Gateway project - relaxed style rules
 [src/Services/LeanKernel.Gateway/**/*.cs]
 dotnet_diagnostic.SA1202.severity = silent
-dotnet_diagnostic.SA1649.severity = silent
 dotnet_diagnostic.SA1117.severity = silent
 dotnet_diagnostic.SA1503.severity = silent
 dotnet_diagnostic.SA1210.severity = silent
@@ -165,10 +163,6 @@ dotnet_diagnostic.SA1413.severity = silent
 dotnet_diagnostic.SA1623.severity = silent
 dotnet_diagnostic.SA1516.severity = silent
 dotnet_diagnostic.SA1116.severity = silent
-
-# Data project - relaxed style rules
-[src/Common/LeanKernel.Data/**/*.cs]
-dotnet_diagnostic.SA1649.severity = silent
 
 # Terminal projects - relaxed style rules
 [src/Terminals/**/*.cs]

@@ -1,5 +1,3 @@
-using LeanKernel.Channels.Common.Configuration;
-
 using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels.Signal;
