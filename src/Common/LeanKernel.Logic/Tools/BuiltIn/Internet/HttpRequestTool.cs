@@ -262,15 +262,16 @@ public static class HttpRequestTool
         AddHeadersToDictionary(response.Headers, responseHeaders);
         AddHeadersToDictionary(response.Content?.Headers, responseHeaders);
 
-        var output = JsonSerializer.Serialize(new
-        {
-            statusCode = (int)response.StatusCode,
-            reasonPhrase = response.ReasonPhrase ?? string.Empty,
-            responseHeaders,
-            contentType = response.Content?.Headers.ContentType?.ToString() ?? string.Empty,
-            content = boundedContent,
-            truncated
-        }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var output = JsonSerializer.Serialize(
+            new
+            {
+                statusCode = (int)response.StatusCode,
+                reasonPhrase = response.ReasonPhrase ?? string.Empty,
+                responseHeaders,
+                contentType = response.Content?.Headers.ContentType?.ToString() ?? string.Empty,
+                content = boundedContent,
+                truncated
+            }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
         return (true, output, null);
     }

@@ -97,7 +97,8 @@ public sealed class SocketTransportClient(
         using var response = await httpClient.PostAsJsonAsync("/v2/send", payload, ct);
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogWarning("Signal send failed for account {Account} recipient {Recipient} with status {StatusCode}.",
+            logger.LogWarning(
+                "Signal send failed for account {Account} recipient {Recipient} with status {StatusCode}.",
                 account,
                 recipient,
                 response.StatusCode);
@@ -333,7 +334,8 @@ public sealed class SocketTransportClient(
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            logger.LogDebug(ex,
+            logger.LogDebug(
+                ex,
                 "Signal typing indicator request failed for account {Account} recipient {Recipient} (stop={Stop}).",
                 account,
                 recipient,

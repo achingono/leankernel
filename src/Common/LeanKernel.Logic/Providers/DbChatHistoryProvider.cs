@@ -49,7 +49,8 @@ public class DbChatHistoryProvider(
 
         // Verify ownership: the session must belong to the current tenant/user/channel
         var ownsSession = await scope.Sessions
-            .AnyAsync(s =>
+            .AnyAsync(
+                s =>
                 s.Id == chatSessionGuid &&
                 s.TenantId == permit.TenantId &&
                 s.UserId == permit.UserId &&
@@ -215,7 +216,8 @@ public class DbChatHistoryProvider(
     private async Task EnsureOwnershipAsync(EntityContext dbContext, Guid sessionGuid, CancellationToken cancellationToken)
     {
         var ownsSession = await dbContext.Sessions
-            .AnyAsync(s =>
+            .AnyAsync(
+                s =>
                 s.Id == sessionGuid &&
                 s.TenantId == permit.TenantId &&
                 s.UserId == permit.UserId &&

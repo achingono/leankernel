@@ -277,12 +277,13 @@ public static class CalculationTools
                     });
                 }
 
-                var output = JsonSerializer.Serialize(new
-                {
-                    min = values.Min(),
-                    max = values.Max(),
-                    count = values.Count
-                }, JsonOptions);
+                var output = JsonSerializer.Serialize(
+                    new
+                    {
+                        min = values.Min(),
+                        max = values.Max(),
+                        count = values.Count
+                    }, JsonOptions);
 
                 return Task.FromResult(new ToolResult
                 {

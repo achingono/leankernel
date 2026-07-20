@@ -38,7 +38,8 @@ public sealed class GBrainMemoryClient : IMemoryClient
         int maxResults = 10,
         CancellationToken ct = default)
     {
-        _logger.LogDebug("GBrain memory search: {Query} (max={Max}, tenant={Tenant}, person={Person})",
+        _logger.LogDebug(
+            "GBrain memory search: {Query} (max={Max}, tenant={Tenant}, person={Person})",
             query, maxResults, scope.TenantId, scope.PersonId);
 
         try
@@ -95,7 +96,8 @@ public sealed class GBrainMemoryClient : IMemoryClient
         string content,
         CancellationToken ct = default)
     {
-        _logger.LogDebug("GBrain memory save: {Key} ({Length} chars, tenant={Tenant})",
+        _logger.LogDebug(
+            "GBrain memory save: {Key} ({Length} chars, tenant={Tenant})",
             key, content.Length, scope.TenantId);
 
         var slug = BuildScopedSlug(scope, key);

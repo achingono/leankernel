@@ -82,7 +82,8 @@ public sealed class ScopedRetrievalStage(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
+            logger.LogWarning(
+                ex,
                 "Scoped retrieval failed for scope (tenant={TenantId}, person={PersonId}, channel={ChannelId}); continuing without memory context.",
                 scope.TenantId, scope.PersonId, scope.ChannelId);
         }

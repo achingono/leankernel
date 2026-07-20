@@ -64,7 +64,8 @@ public class MemoryProvider(
             {
                 Messages =
                 [
-                    new ChatMessage(ChatRole.User,
+                    new ChatMessage(
+                        ChatRole.User,
                         "Here are some memories to help answer the user question:\n```\n" + memoryText + "\n```")
                 ]
             };

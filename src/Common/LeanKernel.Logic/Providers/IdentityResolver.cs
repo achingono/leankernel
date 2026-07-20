@@ -112,7 +112,8 @@ public sealed class IdentityResolver(
 
                 conflicting.LastActivity = DateTime.UtcNow;
                 await context.SaveChangesAsync(ct);
-                logger.LogInformation("Created new user {UserId} for issuer={Issuer}, subject={Subject}",
+                logger.LogInformation(
+                    "Created new user {UserId} for issuer={Issuer}, subject={Subject}",
                     conflicting.Id, issuer, subject);
                 return conflicting;
             }
@@ -120,7 +121,8 @@ public sealed class IdentityResolver(
             throw;
         }
 
-        logger.LogInformation("Created new user {UserId} for issuer={Issuer}, subject={Subject}",
+        logger.LogInformation(
+            "Created new user {UserId} for issuer={Issuer}, subject={Subject}",
             user.Id, issuer, subject);
         return user;
     }
@@ -296,7 +298,8 @@ public sealed class IdentityResolver(
         }
 
         using var context = await dbContextFactory.CreateDbContextAsync(ct);
-        return await context.ChannelSenderBindings.AnyAsync(binding =>
+        return await context.ChannelSenderBindings.AnyAsync(
+            binding =>
             binding.IsActive
             && binding.TenantId == tenantId
             && binding.UserId == userId
@@ -458,19 +461,21 @@ public sealed class IdentityResolver(
 
     private static async Task<bool> UserBelongsToTenantAsync(EntityContext context, Guid userId, Guid tenantId, CancellationToken ct)
     {
-        if (await context.Sessions.AnyAsync(session =>
+        if (await context.Sessions.AnyAsync(
+            session =>
                 !session.IsDeleted
                 && session.UserId == userId
                 && session.TenantId == tenantId,
-                ct))
+            ct))
         {
             return true;
         }
 
-        if (await context.ChannelSenderBindings.AnyAsync(binding =>
+        if (await context.ChannelSenderBindings.AnyAsync(
+            binding =>
                 binding.UserId == userId
                 && binding.TenantId == tenantId,
-                ct))
+            ct))
         {
             return true;
         }

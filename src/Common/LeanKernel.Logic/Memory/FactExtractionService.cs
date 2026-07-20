@@ -51,7 +51,8 @@ public sealed class FactExtractionService
         var transcript = BuildConversationTranscript(userMessage, assistantResponse, recentHistory);
         var response = await _chatClient.GetResponseAsync(
             [
-                new ChatMessage(ChatRole.System,
+                new ChatMessage(
+                    ChatRole.System,
                     "Extract any new factual information from this conversation that should be remembered. Return only a JSON array of strings. Return [] when there is nothing new."),
                 new ChatMessage(ChatRole.User, transcript)
             ],

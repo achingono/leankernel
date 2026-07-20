@@ -20,15 +20,16 @@ public sealed class GatewayClient(HttpClient httpClient, IOptions<GatewaySetting
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
-        request.Content = new StringContent(JsonSerializer.Serialize(new
-        {
-            model = settings.Value.Model,
-            input,
-            agent = new
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(new
             {
-                name = settings.Value.AgentName
-            }
-        }), Encoding.UTF8, "application/json");
+                model = settings.Value.Model,
+                input,
+                agent = new
+                {
+                    name = settings.Value.AgentName
+                }
+            }), Encoding.UTF8, "application/json");
 
         using var response = await httpClient.SendAsync(request, ct);
         if (!response.IsSuccessStatusCode)

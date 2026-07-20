@@ -45,7 +45,8 @@ public sealed class ChannelConfigurationValidatorHostedService(
     {
         var invalidCount = await dbContext.ChannelSenderBindings
             .AsNoTracking()
-            .CountAsync(binding =>
+            .CountAsync(
+                binding =>
                 !dbContext.Tenants.Any(tenant => tenant.Id == binding.TenantId)
                 || !dbContext.Users.Any(user => user.Id == binding.UserId)
                 || !dbContext.Channels.Any(channel => channel.Id == binding.ChannelId)

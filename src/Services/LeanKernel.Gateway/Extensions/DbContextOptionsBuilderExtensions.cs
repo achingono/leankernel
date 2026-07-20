@@ -20,7 +20,8 @@ public static class DbContextOptionsBuilderExtensions
     /// <param name="enableDetailedErrors">Whether detailed EF Core errors are enabled.</param>
     /// <param name="enableSensitiveDataLogging">Whether sensitive data logging is enabled.</param>
     /// <returns>The configured <see cref="DbContextOptionsBuilder"/>.</returns>
-    public static DbContextOptionsBuilder ConfigureOptions(this DbContextOptionsBuilder options,
+    public static DbContextOptionsBuilder ConfigureOptions(
+        this DbContextOptionsBuilder options,
         string? connectionStringName, string? connectionString, bool allowEmptyConnectionString = false,
         bool enableDetailedErrors = false, bool enableSensitiveDataLogging = false)
     {

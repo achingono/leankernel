@@ -45,10 +45,12 @@ public sealed class PromptAssembler(
 
         if (orderedAdmitted.Count > 0)
         {
-            var contextBlock = string.Join("\n\n",
+            var contextBlock = string.Join(
+                "\n\n",
                 orderedAdmitted.Select(c => $"[{c.Source}]\n{c.Content}"));
 
-            context.Prompt.Add(new ChatMessage(ChatRole.User,
+            context.Prompt.Add(new ChatMessage(
+                ChatRole.User,
                 $"Context for this conversation:\n```\n{contextBlock}\n```"));
         }
 

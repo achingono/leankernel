@@ -58,7 +58,8 @@ public static class IServiceProviderExtensions
         // Dynamic SKILL.md tools
         RegisterDynamicTools(registry, settings, scopeFactory, logger);
 
-        logger.LogInformation("Tool runtime ready. {Count} tool(s) registered: {Names}",
+        logger.LogInformation(
+            "Tool runtime ready. {Count} tool(s) registered: {Names}",
             registry.Tools.Count,
             string.Join(", ", registry.Tools.Select(t => t.Name)));
     }

@@ -53,7 +53,8 @@ public sealed class TurnPipeline(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 stageStopwatch.Stop();
-                logger.LogError(ex,
+                logger.LogError(
+                    ex,
                     "Stage {StageName} failed after {ElapsedMs}ms.",
                     stage.Name, stageStopwatch.ElapsedMilliseconds);
 
