@@ -12,8 +12,17 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 /// <summary>
 /// Interceptor for handling recyclable entities during save operations in the DbContext.
 /// </summary>
-public class RecyclableInterceptor(IPermit permit) : ISaveChangesInterceptor
+public class RecyclableInterceptor : ISaveChangesInterceptor
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RecyclableInterceptor"/> class.
+    /// </summary>
+    /// <param name="permit">The identity permit for audit badge resolution.</param>
+    public RecyclableInterceptor(IPermit permit)
+    {
+        this.permit = permit;
+    }
+
     /// <inheritdoc />
     public InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
@@ -31,7 +40,7 @@ public class RecyclableInterceptor(IPermit permit) : ISaveChangesInterceptor
                 if (entry.Entity is IAuditable auditable)
                 {
                     auditable.UpdatedOn = DateTime.UtcNow;
-                    auditable.UpdatedBy = permit.Badge;
+                    auditable.UpdatedBy = this.permit.Badge;
                 }
             }
 
@@ -50,6 +59,8 @@ public class RecyclableInterceptor(IPermit permit) : ISaveChangesInterceptor
         InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
-        return ValueTask.FromResult(SavingChanges(eventData, result));
+        return ValueTask.FromResult(this.SavingChanges(eventData, result));
     }
+
+    private readonly IPermit permit;
 }

@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace LeanKernel.Entities;
+
+using System.ComponentModel.DataAnnotations;
 
 /// <summary>
 /// Represents a persisted user identity resolved from an external principal or anonymous session.
@@ -8,74 +8,74 @@ namespace LeanKernel.Entities;
 public class UserEntity : IAuditable, IRecyclable
 {
     /// <summary>
-    /// Unique identifier for the user.
+    /// Gets or sets the unique identifier for the user.
     /// </summary>
     public Guid Id { get; set; }
 
     /// <summary>
-    /// Email address of the user.
+    /// Gets or sets the email address of the user.
     /// </summary>
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Username for the user.
+    /// Gets or sets the username for the user.
     /// </summary>
     public string UserName { get; set; } = string.Empty;
 
     /// <summary>
-    /// First name of the user.
+    /// Gets or sets the first name of the user.
     /// </summary>
     public string FirstName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Last name of the user.
+    /// Gets or sets the last name of the user.
     /// </summary>
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Full name of the user.
+    /// Gets or sets the full name of the user.
     /// </summary>
     public string FullName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Indicates whether the user account is active.
+    /// Gets or sets a value indicating whether the user account is active.
     /// </summary>
     public bool IsActive { get; set; }
 
     /// <summary>
-    /// Indicates whether the user account is locked out.
+    /// Gets or sets a value indicating whether the user account is locked out.
     /// </summary>
     public bool IsLockedOut { get; set; }
 
     /// <summary>
-    /// Date and time of the user's last activity.
+    /// Gets or sets the date and time of the user's last activity.
     /// </summary>
     public DateTime? LastActivity { get; set; }
 
     /// <summary>
-    /// Date and time when the tenant was created.
+    /// Gets or sets the date and time when the user was created.
     /// </summary>
     [Required]
     public DateTime CreatedOn { get; set; }
 
     /// <summary>
-    /// Badge of the user who created the tenant.
+    /// Gets or sets the badge of the user who created the user.
     /// </summary>
     [Required]
     public Badge CreatedBy { get; set; } = default!;
 
     /// <summary>
-    /// Date and time when the tenant was last updated.
+    /// Gets or sets the date and time when the user was last updated.
     /// </summary>
     public DateTime? UpdatedOn { get; set; }
 
     /// <summary>
-    /// Badge of the user who last updated the tenant.
+    /// Gets or sets the badge of the user who last updated the user.
     /// </summary>
     public Badge? UpdatedBy { get; set; }
 
     /// <summary>
-    /// Indicates whether the tenant is deleted.
+    /// Gets or sets a value indicating whether the user is deleted.
     /// </summary>
     public bool IsDeleted { get; set; }
 
@@ -92,7 +92,7 @@ public class UserEntity : IAuditable, IRecyclable
     public string Subject { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets whether this is a system-created guest user for anonymous requests.
+    /// Gets or sets a value indicating whether this is a system-created guest user for anonymous requests.
     /// </summary>
     public bool IsGuest { get; set; }
 

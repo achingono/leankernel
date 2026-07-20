@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace LeanKernel.Entities;
+
+using System.ComponentModel.DataAnnotations;
 
 /// <summary>
 /// Persists structured model/provider/token-usage/cost telemetry for a single assistant turn.
@@ -96,29 +96,29 @@ public sealed class TurnTelemetryEntity : IAuditable, IRecyclable
     public TurnEntity Turn { get; set; } = null!;
 
     /// <summary>
-    /// Date and time when the telemetry record was created.
+    /// Gets or sets the date and time when the telemetry record was created.
     /// </summary>
     [Required]
     public DateTime CreatedOn { get; set; }
 
     /// <summary>
-    /// Badge of the user who created the telemetry record.
+    /// Gets or sets the badge of the user who created the telemetry record.
     /// </summary>
     [Required]
     public Badge CreatedBy { get; set; } = default!;
 
     /// <summary>
-    /// Date and time when the telemetry record was last updated.
+    /// Gets or sets the date and time when the telemetry record was last updated.
     /// </summary>
     public DateTime? UpdatedOn { get; set; }
 
     /// <summary>
-    /// Badge of the user who last updated the telemetry record.
+    /// Gets or sets the badge of the user who last updated the telemetry record.
     /// </summary>
     public Badge? UpdatedBy { get; set; }
 
     /// <summary>
-    /// Indicates whether the telemetry record is soft-deleted.
+    /// Gets or sets a value indicating whether the telemetry record is soft-deleted.
     /// </summary>
     public bool IsDeleted { get; set; }
 }

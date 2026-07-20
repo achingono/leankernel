@@ -1,6 +1,6 @@
-using System.Security.Claims;
-
 namespace LeanKernel.Entities;
+
+using System.Security.Claims;
 
 /// <summary>
 /// Resolves persisted tenant, user, and channel entities from request inputs.

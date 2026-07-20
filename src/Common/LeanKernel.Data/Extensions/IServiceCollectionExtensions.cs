@@ -1,11 +1,10 @@
+namespace Microsoft.Extensions.DependencyInjection;
+
 using LeanKernel.Data;
 using LeanKernel.Data.Interceptors;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-
-namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
 /// Provides extension methods for registering LeanKernel data services with the dependency injection container.

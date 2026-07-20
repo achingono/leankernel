@@ -1,6 +1,6 @@
-using LeanKernel.Data;
-
 namespace Microsoft.EntityFrameworkCore;
+
+using LeanKernel.Data;
 
 /// <summary>
 /// Extension methods for <see cref="IDbContextFactory{TContext}"/>.

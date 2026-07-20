@@ -1,3 +1,5 @@
+namespace LeanKernel.Gateway;
+
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Principal;
 
@@ -16,8 +18,6 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-
-namespace LeanKernel.Gateway;
 
 /// <summary>
 /// Application entry point for the LeanKernel gateway service.
@@ -264,7 +264,7 @@ public partial class Program
             {
                 context.Response.ContentType = "application/json; charset=utf-8";
                 return context.Response.WriteAsync(report.ToJson());
-            }
+            },
         });
 
         app.Run();

@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace LeanKernel.Entities;
+
+using System.ComponentModel.DataAnnotations;
 
 /// <summary>
 /// Represents a persisted chat session for a channel and user pair.
@@ -48,29 +48,29 @@ public class SessionEntity : IAuditable, IRecyclable
     public string? Metadata { get; set; }
 
     /// <summary>
-    /// Date and time when the tenant was created.
+    /// Gets or sets the date and time when the session was created.
     /// </summary>
     [Required]
     public DateTime CreatedOn { get; set; }
 
     /// <summary>
-    /// Badge of the user who created the tenant.
+    /// Gets or sets the badge of the user who created the session.
     /// </summary>
     [Required]
     public Badge CreatedBy { get; set; } = default!;
 
     /// <summary>
-    /// Date and time when the tenant was last updated.
+    /// Gets or sets the date and time when the session was last updated.
     /// </summary>
     public DateTime? UpdatedOn { get; set; }
 
     /// <summary>
-    /// Badge of the user who last updated the tenant.
+    /// Gets or sets the badge of the user who last updated the session.
     /// </summary>
     public Badge? UpdatedBy { get; set; }
 
     /// <summary>
-    /// Indicates whether the tenant is deleted.
+    /// Gets or sets a value indicating whether the session is deleted.
     /// </summary>
     public bool IsDeleted { get; set; }
 

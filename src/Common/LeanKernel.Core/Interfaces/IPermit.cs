@@ -48,7 +48,7 @@ public interface IPermit
     Badge Badge { get; }
 
     /// <summary>
-    /// Legacy identifier — returns <see cref="UserId"/>.
+    /// Gets the legacy identifier that returns <see cref="UserId"/>.
     /// </summary>
-    Guid Id => UserId;
+    Guid Id => this.UserId;
 }

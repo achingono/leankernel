@@ -1,8 +1,8 @@
+namespace LeanKernel.Entities;
+
 using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using System.Text;
-
-namespace LeanKernel.Entities;
 
 /// <summary>
 /// Represents a persisted conversation turn within a session.
@@ -55,29 +55,29 @@ public sealed class TurnEntity : IAuditable, IRecyclable
     public string? Metadata { get; set; }
 
     /// <summary>
-    /// Date and time when the tenant was created.
+    /// Gets or sets the date and time when the turn was created.
     /// </summary>
     [Required]
     public DateTime CreatedOn { get; set; }
 
     /// <summary>
-    /// Badge of the user who created the tenant.
+    /// Gets or sets the badge of the user who created the turn.
     /// </summary>
     [Required]
     public Badge CreatedBy { get; set; } = default!;
 
     /// <summary>
-    /// Date and time when the tenant was last updated.
+    /// Gets or sets the date and time when the turn was last updated.
     /// </summary>
     public DateTime? UpdatedOn { get; set; }
 
     /// <summary>
-    /// Badge of the user who last updated the tenant.
+    /// Gets or sets the badge of the user who last updated the turn.
     /// </summary>
     public Badge? UpdatedBy { get; set; }
 
     /// <summary>
-    /// Indicates whether the tenant is deleted.
+    /// Gets or sets a value indicating whether the turn is deleted.
     /// </summary>
     public bool IsDeleted { get; set; }
 
@@ -96,14 +96,14 @@ public sealed class TurnEntity : IAuditable, IRecyclable
         // Bucket timestamp to 5-minute windows so retries within the same window are deduped
         // but genuinely repeated content across longer intervals is preserved.
         var bucket = new DateTimeOffset(
-            Timestamp.Year,
-            Timestamp.Month,
-            Timestamp.Day,
-            Timestamp.Hour,
-            Timestamp.Minute / 5 * 5,
+            this.Timestamp.Year,
+            this.Timestamp.Month,
+            this.Timestamp.Day,
+            this.Timestamp.Hour,
+            this.Timestamp.Minute / 5 * 5,
             0,
             TimeSpan.Zero);
-        var input = $"{SessionId:N}|{Role}|{Content}|{bucket:O}";
+        var input = $"{this.SessionId:N}|{this.Role}|{this.Content}|{bucket:O}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(hash).ToLowerInvariant();
     }

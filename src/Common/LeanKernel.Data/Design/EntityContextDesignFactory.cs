@@ -1,7 +1,7 @@
+namespace LeanKernel.Data.Design;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-
-namespace LeanKernel.Data.Design;
 
 /// <summary>
 /// Design-time factory for <see cref="EntityContext"/> used by EF Core migrations tooling.

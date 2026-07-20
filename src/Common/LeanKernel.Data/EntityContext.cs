@@ -1,8 +1,7 @@
-﻿using LeanKernel.Entities;
+﻿namespace LeanKernel.Data;
 
+using LeanKernel.Entities;
 using Microsoft.EntityFrameworkCore;
-
-namespace LeanKernel.Data;
 
 /// <summary>
 /// EF Core database context for persisted tenants, users, channels, sessions, turns, and agent state.
@@ -21,47 +20,47 @@ public class EntityContext : DbContext
     /// <summary>
     /// Gets the persisted sessions.
     /// </summary>
-    public DbSet<SessionEntity> Sessions => Set<SessionEntity>();
+    public DbSet<SessionEntity> Sessions => this.Set<SessionEntity>();
 
     /// <summary>
     /// Gets the persisted conversation turns.
     /// </summary>
-    public DbSet<TurnEntity> Turns => Set<TurnEntity>();
+    public DbSet<TurnEntity> Turns => this.Set<TurnEntity>();
 
     /// <summary>
     /// Gets the persisted users.
     /// </summary>
-    public DbSet<UserEntity> Users => Set<UserEntity>();
+    public DbSet<UserEntity> Users => this.Set<UserEntity>();
 
     /// <summary>
     /// Gets the persisted channels.
     /// </summary>
-    public DbSet<ChannelEntity> Channels => Set<ChannelEntity>();
+    public DbSet<ChannelEntity> Channels => this.Set<ChannelEntity>();
 
     /// <summary>
     /// Gets the persisted tenants.
     /// </summary>
-    public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
+    public DbSet<TenantEntity> Tenants => this.Set<TenantEntity>();
 
     /// <summary>
     /// Gets the persisted channel sender bindings.
     /// </summary>
-    public DbSet<ChannelSenderBindingEntity> ChannelSenderBindings => Set<ChannelSenderBindingEntity>();
+    public DbSet<ChannelSenderBindingEntity> ChannelSenderBindings => this.Set<ChannelSenderBindingEntity>();
 
     /// <summary>
     /// Gets the persisted channel memory policy overrides.
     /// </summary>
-    public DbSet<ChannelMemoryPolicyEntity> ChannelMemoryPolicies => Set<ChannelMemoryPolicyEntity>();
+    public DbSet<ChannelMemoryPolicyEntity> ChannelMemoryPolicies => this.Set<ChannelMemoryPolicyEntity>();
 
     /// <summary>
     /// Gets the persisted agent session state blobs.
     /// </summary>
-    public DbSet<AgentStateEntity> AgentStates => Set<AgentStateEntity>();
+    public DbSet<AgentStateEntity> AgentStates => this.Set<AgentStateEntity>();
 
     /// <summary>
     /// Gets the persisted assistant turn telemetry records.
     /// </summary>
-    public DbSet<TurnTelemetryEntity> TurnTelemetry => Set<TurnTelemetryEntity>();
+    public DbSet<TurnTelemetryEntity> TurnTelemetry => this.Set<TurnTelemetryEntity>();
 
     /// <summary>
     /// Applies pending migrations and ensures the default tenant and OpenAI channel records exist.
@@ -70,17 +69,17 @@ public class EntityContext : DbContext
     /// <returns>A task that completes when migrations and seed data have been applied.</returns>
     public async Task ApplyMigrationsAndSeedAsync(string hostName)
     {
-        if (Database.IsRelational())
+        if (this.Database.IsRelational())
         {
-            await Database.MigrateAsync();
+            await this.Database.MigrateAsync();
         }
         else
         {
-            await Database.EnsureCreatedAsync();
+            await this.Database.EnsureCreatedAsync();
         }
 
-        await EnsureDefaultTenantAsync(hostName);
-        await EnsureKnownChannelsAsync();
+        await this.EnsureDefaultTenantAsync(hostName);
+        await this.EnsureKnownChannelsAsync();
     }
 
     /// <summary>
@@ -253,12 +252,12 @@ public class EntityContext : DbContext
     /// <returns>A task that completes when the tenant check finishes.</returns>
     private async Task EnsureDefaultTenantAsync(string hostName)
     {
-        if (await Tenants.AnyAsync(tenant => tenant.HostName == hostName))
+        if (await this.Tenants.AnyAsync(tenant => tenant.HostName == hostName))
         {
             return;
         }
 
-        Tenants.Add(new TenantEntity
+        this.Tenants.Add(new TenantEntity
         {
             Id = Guid.NewGuid(),
             Name = "Default Tenant",
@@ -270,17 +269,17 @@ public class EntityContext : DbContext
             {
                 Id = Guid.Empty,
                 FullName = "System",
-                Email = "system@leankernel.local"
-            }
+                Email = "system@leankernel.local",
+            },
         });
 
         try
         {
-            await SaveChangesAsync();
+            await this.SaveChangesAsync();
         }
         catch (DbUpdateException)
         {
-            ChangeTracker.Clear();
+            this.ChangeTracker.Clear();
         }
     }
 
@@ -294,10 +293,10 @@ public class EntityContext : DbContext
         {
             ChannelEntity.OpenAiHttpName,
             ChannelEntity.SignalName,
-            ChannelEntity.TeamsName
+            ChannelEntity.TeamsName,
         };
 
-        var existing = await Channels
+        var existing = await this.Channels
             .AsNoTracking()
             .Select(channel => channel.Name)
             .ToListAsync();
@@ -313,20 +312,20 @@ public class EntityContext : DbContext
 
         foreach (var missingName in missingNames)
         {
-            Channels.Add(new ChannelEntity
+            this.Channels.Add(new ChannelEntity
             {
                 Id = Guid.NewGuid(),
-                Name = missingName
+                Name = missingName,
             });
         }
 
         try
         {
-            await SaveChangesAsync();
+            await this.SaveChangesAsync();
         }
         catch (DbUpdateException)
         {
-            ChangeTracker.Clear();
+            this.ChangeTracker.Clear();
         }
     }
 }

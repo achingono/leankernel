@@ -23,5 +23,5 @@ public enum Operation
     /// <summary>
     /// Represents a delete operation.
     /// </summary>
-    Delete
+    Delete,
 }

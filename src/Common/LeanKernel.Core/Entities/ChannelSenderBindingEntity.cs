@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace LeanKernel.Entities;
+
+using System.ComponentModel.DataAnnotations;
 
 /// <summary>
 /// Represents a pre-provisioned sender binding for a channel identity.
@@ -45,7 +45,7 @@ public class ChannelSenderBindingEntity : IEntity
     public string BearerToken { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets whether this binding is active.
+    /// Gets or sets a value indicating whether this binding is active.
     /// </summary>
     public bool IsActive { get; set; } = true;
 

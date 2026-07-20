@@ -9,8 +9,17 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 /// <summary>
 /// Interceptor for handling auditable entities during save operations in the DbContext.
 /// </summary>
-public class AuditableInterceptor(IPermit permit) : ISaveChangesInterceptor
+public class AuditableInterceptor : ISaveChangesInterceptor
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AuditableInterceptor"/> class.
+    /// </summary>
+    /// <param name="permit">The identity permit for audit badge resolution.</param>
+    public AuditableInterceptor(IPermit permit)
+    {
+        this.permit = permit;
+    }
+
     /// <inheritdoc />
     public InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
@@ -26,11 +35,11 @@ public class AuditableInterceptor(IPermit permit) : ISaveChangesInterceptor
                 {
                     case EntityState.Added:
                         entity.CreatedOn = DateTime.UtcNow;
-                        entity.CreatedBy = permit.Badge;
+                        entity.CreatedBy = this.permit.Badge;
                         break;
                     case EntityState.Modified:
                         entity.UpdatedOn = DateTime.UtcNow;
-                        entity.UpdatedBy = permit.Badge;
+                        entity.UpdatedBy = this.permit.Badge;
                         break;
                 }
             }
@@ -45,6 +54,8 @@ public class AuditableInterceptor(IPermit permit) : ISaveChangesInterceptor
         InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
-        return ValueTask.FromResult(SavingChanges(eventData, result));
+        return ValueTask.FromResult(this.SavingChanges(eventData, result));
     }
+
+    private readonly IPermit permit;
 }

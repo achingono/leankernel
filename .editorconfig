@@ -90,21 +90,32 @@ dotnet_remove_unnecessary_suppression_exclusions = none
 
 #### C# Coding Conventions ####
 [*.cs]
+# Suppress XML doc requirement globally (enforced for src/ only below)
 dotnet_diagnostic.CS1591.severity = silent
+# Enforce single type per file as error
 dotnet_diagnostic.SA1402.severity = error
+# No file header convention
 dotnet_diagnostic.SA1633.severity = silent
+# Allow _-prefixed fields (matches naming convention)
+dotnet_diagnostic.SA1309.severity = silent
+
+# Auto-generated EF Core migration files - these are tool-generated
+# and should not trigger StyleCop violations
+[src/**/Migrations/*.cs]
+dotnet_diagnostic.CS1591.severity = silent
 dotnet_diagnostic.SA1101.severity = silent
-dotnet_diagnostic.SA1313.severity = silent
-dotnet_diagnostic.SA1413.severity = silent
 dotnet_diagnostic.SA1200.severity = silent
-dotnet_diagnostic.SA1010.severity = silent
+dotnet_diagnostic.SA1201.severity = silent
+dotnet_diagnostic.SA1206.severity = silent
+dotnet_diagnostic.SA1313.severity = silent
+dotnet_diagnostic.SA1402.severity = silent
+dotnet_diagnostic.SA1413.severity = silent
+dotnet_diagnostic.SA1516.severity = silent
 dotnet_diagnostic.SA1623.severity = silent
 dotnet_diagnostic.SA1000.severity = silent
-dotnet_diagnostic.SA1206.severity = silent
-dotnet_diagnostic.SA1516.severity = silent
+dotnet_diagnostic.SA1010.severity = silent
 dotnet_diagnostic.SA1116.severity = silent
-dotnet_diagnostic.SA1201.severity = silent
-dotnet_diagnostic.SA1309.severity = silent
+dotnet_diagnostic.SA1649.severity = silent
 
 # src projects only
 [src/**/*.cs]
@@ -126,6 +137,12 @@ dotnet_diagnostic.SA1503.severity = silent
 dotnet_diagnostic.SA1402.severity = silent
 dotnet_diagnostic.SA1649.severity = silent
 dotnet_diagnostic.SA1513.severity = silent
+dotnet_diagnostic.SA1200.severity = silent
+dotnet_diagnostic.SA1101.severity = silent
+dotnet_diagnostic.SA1413.severity = silent
+dotnet_diagnostic.SA1623.severity = silent
+dotnet_diagnostic.SA1516.severity = silent
+dotnet_diagnostic.SA1116.severity = silent
 
 # Gateway project - relaxed style rules
 [src/Services/LeanKernel.Gateway/**/*.cs]
@@ -144,6 +161,12 @@ dotnet_diagnostic.SA1311.severity = silent
 dotnet_diagnostic.SA1514.severity = silent
 dotnet_diagnostic.SA1642.severity = silent
 dotnet_diagnostic.SA1515.severity = silent
+dotnet_diagnostic.SA1200.severity = silent
+dotnet_diagnostic.SA1101.severity = silent
+dotnet_diagnostic.SA1413.severity = silent
+dotnet_diagnostic.SA1623.severity = silent
+dotnet_diagnostic.SA1516.severity = silent
+dotnet_diagnostic.SA1116.severity = silent
 
 # Data project - relaxed style rules
 [src/Common/LeanKernel.Data/**/*.cs]
@@ -157,13 +180,29 @@ dotnet_diagnostic.SA1118.severity = silent
 dotnet_diagnostic.SA1210.severity = silent
 dotnet_diagnostic.SA1514.severity = silent
 dotnet_diagnostic.SA1649.severity = silent
+dotnet_diagnostic.SA1200.severity = silent
+dotnet_diagnostic.SA1101.severity = silent
+dotnet_diagnostic.SA1413.severity = silent
+dotnet_diagnostic.SA1623.severity = silent
+dotnet_diagnostic.SA1516.severity = silent
+dotnet_diagnostic.SA1116.severity = silent
 
-# Integration tests - relaxed style rules
-[test/LeanKernel.Tests.Integration/*.cs]
+# Test projects - relaxed style rules
+[test/**/*.cs]
+dotnet_diagnostic.SA0001.severity = silent
 dotnet_diagnostic.SA1202.severity = silent
+dotnet_diagnostic.SA1200.severity = silent
+dotnet_diagnostic.SA1101.severity = silent
+dotnet_diagnostic.SA1413.severity = silent
+dotnet_diagnostic.SA1623.severity = silent
+dotnet_diagnostic.SA1516.severity = silent
+dotnet_diagnostic.SA1116.severity = silent
+dotnet_diagnostic.SA1117.severity = silent
+dotnet_diagnostic.SA1316.severity = silent
+dotnet_diagnostic.SA1402.severity = silent
+dotnet_diagnostic.SA1649.severity = silent
 dotnet_diagnostic.SA1642.severity = silent
 dotnet_diagnostic.SA1210.severity = silent
-dotnet_diagnostic.SA1402.severity = silent
 dotnet_diagnostic.SA1515.severity = silent
 
 # var preferences
@@ -223,7 +262,7 @@ csharp_style_unused_value_assignment_preference = discard_variable:suggestion
 csharp_style_unused_value_expression_statement_preference = discard_variable:silent
 
 # 'using' directive preferences
-csharp_using_directive_placement = outside_namespace:silent
+csharp_using_directive_placement = inside_namespace:silent
 
 #### C# Formatting Rules ####
 
