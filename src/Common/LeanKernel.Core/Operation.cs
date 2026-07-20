@@ -1,5 +1,8 @@
 namespace LeanKernel;
 
+/// <summary>
+/// Defines common CRUD operations.
+/// </summary>
 public enum Operation
 {
     /// <summary>

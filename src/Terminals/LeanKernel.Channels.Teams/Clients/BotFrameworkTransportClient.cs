@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels.Teams.Clients;
 
+/// <summary>Transport client that communicates with the Bot Framework connector API.</summary>
 public sealed class BotFrameworkTransportClient(
     IHttpClientFactory httpClientFactory,
     IOptions<BotSettings> settings,
@@ -22,6 +23,9 @@ public sealed class BotFrameworkTransportClient(
     private string _connectorToken = string.Empty;
     private DateTimeOffset _connectorTokenExpiresAt = DateTimeOffset.MinValue;
 
+    /// <summary>Receives the next inbound activity, resolving its bearer token.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The inbound activity with a resolved bearer token, or <c>null</c> if no activity is available.</returns>
     public async Task<InboundActivity?> ReceiveAsync(CancellationToken ct)
     {
         if (await _channel.Reader.WaitToReadAsync(ct) && _channel.Reader.TryRead(out var activity))
@@ -33,9 +37,18 @@ public sealed class BotFrameworkTransportClient(
         return null;
     }
 
+    /// <summary>Enqueues an inbound activity for processing.</summary>
+    /// <param name="activity">The activity to enqueue.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public Task EnqueueAsync(InboundActivity activity, CancellationToken ct) =>
         _channel.Writer.WriteAsync(activity, ct).AsTask();
 
+    /// <summary>Sends a reply message to the Teams conversation.</summary>
+    /// <param name="inboundActivity">The original inbound activity to reply to.</param>
+    /// <param name="text">The reply text.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task SendAsync(InboundActivity inboundActivity, string text, CancellationToken ct)
     {
         if (!IsTrustedServiceUrl(inboundActivity.ServiceUrl, settings.Value.AllowedServiceUrlHostSuffixes))

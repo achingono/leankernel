@@ -15,6 +15,11 @@ public static class FileEditTool
 {
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
 
+    /// <summary>
+    /// Creates a tool definition for editing file contents via text or regex replacement.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the file edit tool.</returns>
     [SuppressMessage("Major Code Smell", "S3776", Justification = "Replacement logic is intentionally explicit and bounded.")]
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {

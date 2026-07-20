@@ -4,12 +4,19 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels.Signal;
 
+/// <summary>
+/// Background service that continuously receives Signal messages, processes them through the gateway agent, and sends responses.
+/// </summary>
 public sealed class TerminalService(
     ILogger<TerminalService> logger,
     ITransportClient transport,
     GatewayChannelClient gatewayClient,
     IOptions<SignalSettings> signalSettings) : BackgroundService
 {
+    /// <summary>
+    /// Executes the main message processing loop.
+    /// </summary>
+    /// <param name="stoppingToken">Cancellation token that signals service shutdown.</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)

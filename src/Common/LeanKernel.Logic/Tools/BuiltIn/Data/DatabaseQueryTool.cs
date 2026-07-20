@@ -28,6 +28,11 @@ public static partial class DatabaseQueryTool
         "CREATE", "GRANT", "COPY", "DO", "CALL", "EXECUTE"
     ];
 
+    /// <summary>
+    /// Creates a tool definition for executing parameterized read-only SQL queries.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the database query tool.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

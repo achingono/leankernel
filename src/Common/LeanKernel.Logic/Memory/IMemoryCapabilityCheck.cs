@@ -1,5 +1,8 @@
 namespace LeanKernel.Logic.Memory;
 
+/// <summary>
+/// Performs the memory capability pre-check at startup to determine available memory operations.
+/// </summary>
 public interface IMemoryCapabilityCheck
 {
     /// <summary>

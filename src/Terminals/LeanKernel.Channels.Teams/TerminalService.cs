@@ -3,11 +3,15 @@ using LeanKernel.Channels.Teams.Clients;
 
 namespace LeanKernel.Channels.Teams;
 
+/// <summary>Background service that polls for Teams activities and forwards them to the LeanKernel gateway.</summary>
 public sealed class TerminalService(
     ILogger<TerminalService> logger,
     ITransportClient transport,
     GatewayClient gatewayClient) : BackgroundService
 {
+    /// <summary>Executes the background loop for processing Teams activities.</summary>
+    /// <param name="stoppingToken">Cancellation token signaled when the service is shutting down.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)

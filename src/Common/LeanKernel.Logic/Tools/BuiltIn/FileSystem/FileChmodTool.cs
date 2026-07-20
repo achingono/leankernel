@@ -10,6 +10,11 @@ namespace LeanKernel.Logic.Tools.BuiltIn.FileSystem;
 /// </summary>
 public static class FileChmodTool
 {
+    /// <summary>
+    /// Creates a tool definition for changing Unix file permissions.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the file chmod tool.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

@@ -25,6 +25,11 @@ namespace LeanKernel.Gateway;
 #pragma warning disable S1118 // Required for WebApplicationFactory in integration tests
 public partial class Program
 {
+    /// <summary>
+    /// Application entry point. Builds the service collection, configures middleware,
+    /// and starts the Kestrel host for the LeanKernel gateway.
+    /// </summary>
+    /// <param name="args">Command-line arguments forwarded to <see cref="WebApplication.CreateBuilder(string[])"/>.</param>
     [SuppressMessage("Critical Code Smell", "S3776", Justification = "Startup wiring keeps environment and security guards explicit.")]
     public static void Main(string[] args)
     {

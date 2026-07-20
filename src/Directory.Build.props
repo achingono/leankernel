@@ -7,7 +7,6 @@
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1903</WarningsNotAsErrors>
     <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,11 +16,11 @@
     <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
     <!-- Override transitive System.IO.Packaging package to avoid NU1903 vulnerability failures during restore. -->
     <PackageReference Include="System.IO.Packaging" Version="9.0.0" />
-    <!-- Include StyleCop.Analyzers for code style enforcement. 
+    <!-- Include StyleCop.Analyzers for code style enforcement. -->
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />-->
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />
   </ItemGroup>
 </Project>

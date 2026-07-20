@@ -12,42 +12,84 @@ public sealed class TelemetryAggregationService(
     IDbContextFactory<EntityContext> dbContextFactory,
     IPermit permit) : ITelemetryAggregationService
 {
+    /// <summary>
+    /// Gets cost breakdown grouped by model.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns grouped by model.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetCostByModelAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
         return BuildBreakdown(rows, "model", row => row.Model);
     }
 
+    /// <summary>
+    /// Gets cost breakdown grouped by provider.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns grouped by provider.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetCostByProviderAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
         return BuildBreakdown(rows, "provider", row => row.Provider);
     }
 
+    /// <summary>
+    /// Gets cost breakdown grouped by user.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns grouped by user.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetCostByUserAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
         return BuildBreakdown(rows, "user", row => row.UserId.ToString("D"));
     }
 
+    /// <summary>
+    /// Gets cost breakdown grouped by session.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns grouped by session.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetCostBySessionAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
         return BuildBreakdown(rows, "session", row => row.SessionId.ToString("D"));
     }
 
+    /// <summary>
+    /// Gets cost breakdown grouped by day.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns grouped by day.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetCostByDayAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
         return BuildBreakdown(rows, "day", row => row.CapturedAt.UtcDateTime.ToString("yyyy-MM-dd"));
     }
 
+    /// <summary>
+    /// Gets cost breakdown grouped by tenant.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns grouped by tenant.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetCostByTenantAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
         return BuildBreakdown(rows, "tenant", row => row.TenantId.ToString("D"));
     }
 
+    /// <summary>
+    /// Gets cost breakdown grouped by model and day.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns grouped by model and day.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetCostByModelAndDayAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
@@ -57,6 +99,12 @@ public sealed class TelemetryAggregationService(
             row => $"{row.Model}|{row.CapturedAt.UtcDateTime:yyyy-MM-dd}");
     }
 
+    /// <summary>
+    /// Gets cost breakdown grouped by provider and day.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns grouped by provider and day.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetCostByProviderAndDayAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
@@ -66,6 +114,12 @@ public sealed class TelemetryAggregationService(
             row => $"{row.Provider}|{row.CapturedAt.UtcDateTime:yyyy-MM-dd}");
     }
 
+    /// <summary>
+    /// Gets cost breakdown grouped by user and model.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns grouped by user and model.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetCostByUserAndModelAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
@@ -75,6 +129,12 @@ public sealed class TelemetryAggregationService(
             row => $"{row.UserId:D}|{row.Model}");
     }
 
+    /// <summary>
+    /// Gets a summary of costs for the given date range.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="CostSummary"/> for the range.</returns>
     public async Task<CostSummary> GetSummaryAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
@@ -100,6 +160,12 @@ public sealed class TelemetryAggregationService(
             ?? "USD");
     }
 
+    /// <summary>
+    /// Gets model efficiency metrics for the given date range.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of model efficiency metrics.</returns>
     public async Task<IReadOnlyList<ModelEfficiency>> GetModelEfficiencyAsync(DateRange range, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
@@ -136,6 +202,13 @@ public sealed class TelemetryAggregationService(
             .ToList();
     }
 
+    /// <summary>
+    /// Gets the top users by cost for the given date range.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="top">The number of top users to return (default 10).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns for top users.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetTopUsersByCostAsync(DateRange range, int top = 10, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);
@@ -144,6 +217,13 @@ public sealed class TelemetryAggregationService(
             .ToList();
     }
 
+    /// <summary>
+    /// Gets the top models by cost for the given date range.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="top">The number of top models to return (default 10).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of cost breakdowns for top models.</returns>
     public async Task<IReadOnlyList<CostBreakdown>> GetTopModelsByCostAsync(DateRange range, int top = 10, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(range, cancellationToken);

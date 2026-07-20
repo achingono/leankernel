@@ -2,8 +2,16 @@ using System.Text;
 
 namespace LeanKernel.Channels.Signal;
 
+/// <summary>
+/// Parses attachment hints from message text and builds gateway-compatible input payloads.
+/// </summary>
 public static class AttachmentParser
 {
+    /// <summary>
+    /// Extracts unique attachment hint tokens prefixed with <c>attachment://</c> from the given text.
+    /// </summary>
+    /// <param name="text">The message text to scan for attachment hints.</param>
+    /// <returns>A list of unique attachment hint URIs found in the text.</returns>
     public static IReadOnlyList<string> ParseAttachmentHints(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -18,6 +26,13 @@ public static class AttachmentParser
             .ToList();
     }
 
+    /// <summary>
+    /// Appends a structured attachment context block to the message text for downstream consumption.
+    /// </summary>
+    /// <param name="text">The original message text.</param>
+    /// <param name="attachments">The list of inbound attachments to include in the context.</param>
+    /// <param name="attachmentHints">The list of attachment hint URIs to include in the context.</param>
+    /// <returns>The original text with an appended attachment context block.</returns>
     public static string AppendAttachmentContext(
         string text,
         IReadOnlyList<InboundAttachment> attachments,
@@ -70,6 +85,13 @@ public static class AttachmentParser
         return builder.ToString();
     }
 
+    /// <summary>
+    /// Builds a gateway-compatible input payload from the message text, attachments, and attachment hints.
+    /// </summary>
+    /// <param name="text">The original message text.</param>
+    /// <param name="attachments">The list of inbound attachments to include.</param>
+    /// <param name="attachmentHints">The list of attachment hint URIs to reference.</param>
+    /// <returns>An object representing the gateway input structure.</returns>
     public static object BuildGatewayInput(
         string text,
         IReadOnlyList<InboundAttachment> attachments,

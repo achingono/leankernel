@@ -13,6 +13,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels.Signal;
 
+/// <summary>
+/// Signal transport client that communicates with the signal-cli REST API and WebSocket endpoint.
+/// </summary>
 public sealed class SocketTransportClient(
     IHttpClientFactory httpClientFactory,
     IOptions<SignalSettings> settings,
@@ -23,6 +26,11 @@ public sealed class SocketTransportClient(
     private readonly Queue<string> _accounts = new();
     private DateTimeOffset _lastAccountRefreshUtc = DateTimeOffset.MinValue;
 
+    /// <summary>
+    /// Receives the next inbound Signal message, fetching from the WebSocket if the pending queue is empty.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The next inbound message, or <c>null</c> if no message is available.</returns>
     public async Task<InboundMessage?> ReceiveAsync(CancellationToken ct)
     {
         if (_pending.Count > 0)
@@ -72,6 +80,14 @@ public sealed class SocketTransportClient(
         return _pending.Count > 0 ? _pending.Dequeue() : null;
     }
 
+    /// <summary>
+    /// Sends a text message with optional text styles to a Signal recipient.
+    /// </summary>
+    /// <param name="account">The Signal account number sending the message.</param>
+    /// <param name="recipient">The recipient Signal number.</param>
+    /// <param name="text">The message text.</param>
+    /// <param name="textStyles">The text styles to apply to the message.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task SendAsync(string account, string recipient, string text, IReadOnlyList<SignalTextStyle> textStyles, CancellationToken ct)
     {
         var httpClient = httpClientFactory.CreateClient("signal-api");
@@ -93,9 +109,21 @@ public sealed class SocketTransportClient(
         }
     }
 
+    /// <summary>
+    /// Sends a typing indicator start notification to the recipient.
+    /// </summary>
+    /// <param name="account">The Signal account number.</param>
+    /// <param name="recipient">The recipient Signal number.</param>
+    /// <param name="ct">Cancellation token.</param>
     public Task StartTypingAsync(string account, string recipient, CancellationToken ct) =>
         SendTypingIndicatorAsync(account, recipient, stop: false, ct);
 
+    /// <summary>
+    /// Sends a typing indicator stop notification to the recipient.
+    /// </summary>
+    /// <param name="account">The Signal account number.</param>
+    /// <param name="recipient">The recipient Signal number.</param>
+    /// <param name="ct">Cancellation token.</param>
     public Task StopTypingAsync(string account, string recipient, CancellationToken ct) =>
         SendTypingIndicatorAsync(account, recipient, stop: true, ct);
 

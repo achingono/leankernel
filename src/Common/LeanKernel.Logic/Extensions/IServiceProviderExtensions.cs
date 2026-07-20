@@ -14,12 +14,17 @@ using Microsoft.Extensions.Options;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+/// Extension methods for <see cref="IServiceProvider"/> to register tools at startup.
+/// </summary>
 public static class IServiceProviderExtensions
 {
     /// <summary>
     /// Discovers and registers all tools into the registry.
     /// Called once at startup from the DI registration path.
     /// </summary>
+    /// <param name="services">The service provider.</param>
+    /// <param name="ct">Cancellation token.</param>
     public static async Task RegisterToolsAsync(
         this IServiceProvider services,
         CancellationToken ct = default)

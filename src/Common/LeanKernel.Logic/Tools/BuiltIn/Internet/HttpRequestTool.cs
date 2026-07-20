@@ -26,6 +26,11 @@ public static class HttpRequestTool
         "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"
     };
 
+    /// <summary>
+    /// Creates a tool definition for performing HTTP requests.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the HTTP request tool.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

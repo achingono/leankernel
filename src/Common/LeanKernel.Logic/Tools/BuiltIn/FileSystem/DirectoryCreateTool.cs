@@ -10,6 +10,11 @@ namespace LeanKernel.Logic.Tools.BuiltIn.FileSystem;
 /// </summary>
 public static class DirectoryCreateTool
 {
+    /// <summary>
+    /// Creates a tool definition for creating a directory.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the directory create tool.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

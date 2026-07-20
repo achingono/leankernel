@@ -5,6 +5,11 @@ namespace Microsoft.Extensions.Diagnostics.HealthChecks;
 /// </summary>
 public static class HealthReportExtensions
 {
+    /// <summary>
+    /// Serializes a <see cref="HealthReport"/> to a JSON string.
+    /// </summary>
+    /// <param name="report">The health report to serialize.</param>
+    /// <returns>A JSON string representing the health report.</returns>
     public static string ToJson(this HealthReport report)
     {
         var payload = new

@@ -7,15 +7,49 @@ namespace LeanKernel.Entities;
 /// </summary>
 public class UserEntity : IAuditable, IRecyclable
 {
+    /// <summary>
+    /// Unique identifier for the user.
+    /// </summary>
     public Guid Id { get; set; }
+
+    /// <summary>
+    /// Email address of the user.
+    /// </summary>
     public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Username for the user.
+    /// </summary>
     public string UserName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// First name of the user.
+    /// </summary>
     public string FirstName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Last name of the user.
+    /// </summary>
     public string LastName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Full name of the user.
+    /// </summary>
     public string FullName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Indicates whether the user account is active.
+    /// </summary>
     public bool IsActive { get; set; }
+
+    /// <summary>
+    /// Indicates whether the user account is locked out.
+    /// </summary>
     public bool IsLockedOut { get; set; }
+
+    /// <summary>
+    /// Date and time of the user's last activity.
+    /// </summary>
     public DateTime? LastActivity { get; set; }
 
     /// <summary>

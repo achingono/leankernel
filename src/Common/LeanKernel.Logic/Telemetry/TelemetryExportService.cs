@@ -12,6 +12,12 @@ public sealed class TelemetryExportService(
     IDbContextFactory<EntityContext> dbContextFactory,
     IPermit permit) : ITelemetryExportService
 {
+    /// <summary>
+    /// Exports telemetry records for the given date range.
+    /// </summary>
+    /// <param name="range">The date range.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of telemetry export records.</returns>
     public async Task<IReadOnlyList<TelemetryExportRecord>> ExportAsync(
         DateRange range,
         CancellationToken cancellationToken = default)

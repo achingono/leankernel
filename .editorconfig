@@ -112,6 +112,8 @@ dotnet_diagnostic.CS1591.severity = error
 dotnet_diagnostic.CS1572.severity = error
 dotnet_diagnostic.CS1573.severity = error
 dotnet_diagnostic.CS1574.severity = error
+dotnet_diagnostic.SA1611.severity = silent
+dotnet_diagnostic.SA1615.severity = silent
 
 # Logic project - relaxed style rules for tool-generated and compact patterns
 [src/Common/LeanKernel.Logic/**/*.cs]
@@ -142,6 +144,19 @@ dotnet_diagnostic.SA1311.severity = silent
 dotnet_diagnostic.SA1514.severity = silent
 dotnet_diagnostic.SA1642.severity = silent
 dotnet_diagnostic.SA1515.severity = silent
+
+# Data project - relaxed style rules
+[src/Common/LeanKernel.Data/**/*.cs]
+dotnet_diagnostic.SA1649.severity = silent
+
+# Terminal projects - relaxed style rules
+[src/Terminals/**/*.cs]
+dotnet_diagnostic.SA1202.severity = silent
+dotnet_diagnostic.SA1117.severity = silent
+dotnet_diagnostic.SA1118.severity = silent
+dotnet_diagnostic.SA1210.severity = silent
+dotnet_diagnostic.SA1514.severity = silent
+dotnet_diagnostic.SA1649.severity = silent
 
 # Integration tests - relaxed style rules
 [test/LeanKernel.Tests.Integration/*.cs]

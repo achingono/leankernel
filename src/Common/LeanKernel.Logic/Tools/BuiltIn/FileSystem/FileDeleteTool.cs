@@ -10,6 +10,11 @@ namespace LeanKernel.Logic.Tools.BuiltIn.FileSystem;
 /// </summary>
 public static class FileDeleteTool
 {
+    /// <summary>
+    /// Creates a tool definition for deleting files or directories.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the file delete tool.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

@@ -25,6 +25,11 @@ public static class CsvXlsxReadWriteTool
     private const int MaxRowsLimit = 5000;
     private const string DefaultSheetName = "Sheet1";
 
+    /// <summary>
+    /// Creates a tool definition for reading and writing CSV and XLSX files.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the CSV/XLSX read-write tool.</returns>
     [SuppressMessage("Critical Code Smell", "S3776", Justification = "Tool handler remains explicit to preserve operation/path validation and format branching.")]
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {

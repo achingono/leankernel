@@ -2,6 +2,9 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels.Signal;
 
+/// <summary>
+/// Periodically sends typing indicator requests to keep the typing indicator active until stopped.
+/// </summary>
 public sealed class TypingIndicatorKeepAlive : IAsyncDisposable
 {
     private readonly ITransportClient _transport;
@@ -37,6 +40,16 @@ public sealed class TypingIndicatorKeepAlive : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Starts a new typing indicator keep-alive loop for the given transport, account, and recipient.
+    /// </summary>
+    /// <param name="transport">The transport client used to send typing indicators.</param>
+    /// <param name="account">The Signal account number.</param>
+    /// <param name="recipient">The recipient Signal number.</param>
+    /// <param name="settings">The Signal settings containing typing indicator configuration.</param>
+    /// <param name="logger">The logger instance.</param>
+    /// <param name="ct">Cancellation token for the keep-alive loop.</param>
+    /// <returns>A new <see cref="TypingIndicatorKeepAlive"/> instance that has already started the typing indicator.</returns>
     public static TypingIndicatorKeepAlive Start(
         ITransportClient transport,
         string account,
@@ -50,6 +63,9 @@ public sealed class TypingIndicatorKeepAlive : IAsyncDisposable
         return keepAlive;
     }
 
+    /// <summary>
+    /// Stops the keep-alive loop and sends a typing indicator stop notification.
+    /// </summary>
     public async Task StopAsync()
     {
         if (Interlocked.Exchange(ref _stopped, 1) != 0)
@@ -86,6 +102,9 @@ public sealed class TypingIndicatorKeepAlive : IAsyncDisposable
         _loopCts.Dispose();
     }
 
+    /// <summary>
+    /// Disposes the keep-alive by stopping the typing indicator loop.
+    /// </summary>
     public ValueTask DisposeAsync() => new(StopAsync());
 
     private async Task RunLoopAsync(CancellationToken ct)

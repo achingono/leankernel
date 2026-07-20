@@ -12,6 +12,11 @@ namespace LeanKernel.Logic.Tools.BuiltIn.FileSystem;
 /// </summary>
 public static class FileMoveTool
 {
+    /// <summary>
+    /// Creates a tool definition for moving or renaming files or directories.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the file move tool.</returns>
     [SuppressMessage("Major Code Smell", "S3776", Justification = "Tool handler stays explicit for path safety checks.")]
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {

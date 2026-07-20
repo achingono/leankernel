@@ -14,6 +14,11 @@ public static class JsonTransformTool
     private const int MaxOperations = 50;
     private const int MaxOutputCharacters = 200_000;
 
+    /// <summary>
+    /// Creates a tool definition for applying JSON transforms.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the JSON transform tool.</returns>
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
         ArgumentNullException.ThrowIfNull(scopeFactory);

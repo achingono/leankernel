@@ -8,8 +8,14 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels.Teams.Clients;
 
+/// <summary>HTTP client that forwards Teams turns to the LeanKernel gateway.</summary>
 public sealed class GatewayClient(HttpClient httpClient, IOptions<GatewaySettings> settings)
 {
+    /// <summary>Sends user input to the gateway and returns the response text.</summary>
+    /// <param name="input">The user input text.</param>
+    /// <param name="bearerToken">The bearer token for gateway authentication.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The gateway response text.</returns>
     public async Task<string> RunTurnAsync(string input, string bearerToken, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses");

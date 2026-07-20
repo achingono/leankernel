@@ -5,6 +5,15 @@ namespace LeanKernel.Logic.Tools.BuiltIn;
 /// </summary>
 public static class TextExtractionHelper
 {
+    /// <summary>
+    /// Extracts readable text from the specified file.
+    /// </summary>
+    /// <param name="path">The file path to extract text from.</param>
+    /// <param name="scratchRoot">The scratch directory root for temporary files.</param>
+    /// <param name="pythonExecutable">The Python executable path for OCR/extraction scripts.</param>
+    /// <param name="maxExtractedCharacters">The maximum number of characters to extract.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The extracted text content.</returns>
     public static async Task<string> ExtractAsync(string path, string scratchRoot, string pythonExecutable, int maxExtractedCharacters, CancellationToken ct)
     {
         if (FileSystemSupport.IsTextLikeExtension(path))

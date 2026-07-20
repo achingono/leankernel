@@ -8,8 +8,18 @@ using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Channels.Signal;
 
+/// <summary>
+/// HTTP client for invoking the LeanKernel gateway agent endpoints.
+/// </summary>
 public sealed class GatewayChannelClient(HttpClient httpClient, IOptions<GatewaySettings> settings)
 {
+    /// <summary>
+    /// Sends an input payload to the gateway agent and returns the parsed response.
+    /// </summary>
+    /// <param name="input">The gateway input payload.</param>
+    /// <param name="bearerToken">The bearer token for authentication.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The parsed turn result containing response text and text styles.</returns>
     public async Task<GatewayTurnResult> RunTurnAsync(object input, string bearerToken, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses");

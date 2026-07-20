@@ -2,8 +2,22 @@ using LeanKernel.Data;
 
 namespace Microsoft.EntityFrameworkCore;
 
+/// <summary>
+/// Extension methods for <see cref="IDbContextFactory{TContext}"/>.
+/// </summary>
 public static class IDbContextFactoryExtensions
 {
+    /// <summary>
+    /// Resolves a bearer token for a channel sender binding from the database.
+    /// </summary>
+    /// <param name="dbContextFactory">The EF Core context factory.</param>
+    /// <param name="senderId">The sender's identifier (subject).</param>
+    /// <param name="issuer">The identity provider issuer.</param>
+    /// <param name="channelName">The channel name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>
+    /// A tuple containing the first matching bearer token and the total number of matches found.
+    /// </returns>
     public static async Task<(string Token, int MatchCount)> ResolveSenderAsync(
         this IDbContextFactory<EntityContext> dbContextFactory,
         string senderId,

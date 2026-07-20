@@ -18,6 +18,11 @@ public static class WebFetchTool
     private const int DefaultMaxRedirects = 3;
     private const int MaxRedirectCeiling = 20;
 
+    /// <summary>
+    /// Creates a tool definition for fetching web content.
+    /// </summary>
+    /// <param name="scopeFactory">The service scope factory.</param>
+    /// <returns>A <see cref="ToolDefinition"/> for the web fetch tool.</returns>
     [SuppressMessage("Major Code Smell", "S3776", Justification = "Fetch handler stays explicit to preserve SSRF and download safety checks.")]
     public static ToolDefinition Create(IServiceScopeFactory scopeFactory)
     {
