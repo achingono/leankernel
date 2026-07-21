@@ -14,8 +14,6 @@ namespace LeanKernel.Logic.Mcp;
 /// </summary>
 public static class McpToolDefinitionAdapter
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
-
     /// <summary>
     /// Creates a LeanKernel <see cref="ToolDefinition"/> from an MCP tool discovered via the SDK.
     /// </summary>
@@ -115,7 +113,7 @@ public static class McpToolDefinitionAdapter
             parts.Add(FormatContentBlock(block));
         }
 
-        return JsonSerializer.Serialize(parts, SerializerOptions);
+        return JsonSerializer.Serialize(parts, Constants.Serialization.JsonOptions);
     }
 
     internal static string FormatContentBlock(ContentBlock block)
@@ -125,7 +123,7 @@ public static class McpToolDefinitionAdapter
             "text" when block is TextContentBlock text => text.Text ?? string.Empty,
             "image" when block is ImageContentBlock image => $"data:{image.MimeType};base64,{image.Data}",
             "resource" when block is EmbeddedResourceBlock resource => resource.Resource?.Uri ?? string.Empty,
-            _ => JsonSerializer.Serialize(block, SerializerOptions)
+            _ => JsonSerializer.Serialize(block, Constants.Serialization.JsonOptions)
         };
     }
 

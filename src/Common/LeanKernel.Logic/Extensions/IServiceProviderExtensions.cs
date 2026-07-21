@@ -1,3 +1,4 @@
+using LeanKernel;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Mcp;
 using LeanKernel.Logic.Memory;
@@ -291,7 +292,7 @@ public static class IServiceProviderExtensions
         }
 
         // auth.secretRef validation
-        if (skill.Runtime.Auth.Type == "bearer" &&
+        if (string.Equals(skill.Runtime.Auth.Type, Constants.Http.Headers.Bearer, StringComparison.OrdinalIgnoreCase) &&
             string.IsNullOrWhiteSpace(skill.Runtime.Auth.SecretRef))
         {
             logger.LogWarning("Skill '{Name}' uses bearer auth but has no secretRef. Skipping.", skill.Name);

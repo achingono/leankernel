@@ -265,7 +265,7 @@ public static class WebFetchTool
             return true;
         }
 
-        return mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
+        return mediaType.Equals(Constants.ContentTypes.Json, StringComparison.OrdinalIgnoreCase)
             || mediaType.Equals("application/xml", StringComparison.OrdinalIgnoreCase)
             || mediaType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase);
     }

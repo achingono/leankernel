@@ -13,7 +13,7 @@ public class AgentSettings
     /// <summary>
     /// Gets or sets the default agent name.
     /// </summary>
-    public string DefaultName { get; set; } = "leankernel";
+    public string DefaultName { get; set; } = Constants.Agent.DefaultName;
 
     /// <summary>
     /// Gets or sets the default instructions applied to registered agents.

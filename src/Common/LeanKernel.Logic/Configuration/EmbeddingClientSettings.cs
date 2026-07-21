@@ -18,5 +18,5 @@ public sealed class EmbeddingClientSettings
     /// <summary>
     /// Gets or sets the authorization scheme.
     /// </summary>
-    public string AuthScheme { get; set; } = "Bearer";
+    public string AuthScheme { get; set; } = Constants.Http.Headers.Bearer;
 }

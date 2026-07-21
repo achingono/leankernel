@@ -44,7 +44,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
     private const string SessionInitMarker = "_lk_init";
 
     /// <summary>Request paths exempt from tenant resolution (e.g. health probes).</summary>
-    private static readonly string[] s_bypassPaths = ["/health"];
+    private static readonly string[] s_bypassPaths = [Constants.Healthchecks.Path];
 
     /// <summary>
     /// Resolves the request-scoped identity and invokes the next middleware.

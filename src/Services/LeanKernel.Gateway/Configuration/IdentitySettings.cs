@@ -18,7 +18,7 @@ public class IdentitySettings
     /// <summary>
     /// The default authentication scheme, such as "Bearer".
     /// </summary>
-    public string AuthenticationScheme { get; set; } = "Bearer";
+    public string AuthenticationScheme { get; set; } = Constants.Http.Headers.Bearer;
 
     /// <summary>
     /// The type of authentication used, such as "Claims".

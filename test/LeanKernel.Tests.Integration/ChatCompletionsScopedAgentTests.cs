@@ -37,7 +37,7 @@ public class ChatCompletionsScopedAgentTests : IClassFixture<ChatCompletionsScop
     /// Confirms two independent chat-completions requests use different scoped agent instances
     /// and still return the expected OpenAI completion response shape.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous unit test.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
     [Fact]
     public async Task PostChatCompletions_SeparateRequests_UseDistinctScopedAgentsAndReturnCompletionShape()
     {

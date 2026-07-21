@@ -113,7 +113,7 @@ public static class HttpRequestTool
         }
 
         var rawContentType = ToolArgumentReader.GetString(args, "content_type");
-        var contentType = isJsonBody && string.IsNullOrWhiteSpace(rawContentType) ? "application/json" : rawContentType;
+        var contentType = isJsonBody && string.IsNullOrWhiteSpace(rawContentType) ? Constants.ContentTypes.Json : rawContentType;
 
         try
         {

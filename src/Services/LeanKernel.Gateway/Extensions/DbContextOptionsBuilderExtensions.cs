@@ -8,8 +8,6 @@ namespace LeanKernel.Gateway;
 /// </summary>
 public static class DbContextOptionsBuilderExtensions
 {
-    internal static readonly string[] ConnectionStringNames = ["Postgres", "SqlServer", "Sqlite"];
-
     /// <summary>
     /// Configures the database provider and common EF Core diagnostics options.
     /// </summary>
@@ -28,26 +26,26 @@ public static class DbContextOptionsBuilderExtensions
         if (string.IsNullOrWhiteSpace(connectionString) && !allowEmptyConnectionString)
         {
             throw new InvalidOperationException(
-                $"Connection string is missing. Specify any of '{string.Join(",", ConnectionStringNames)}'.");
+                $"Connection string is missing. Specify any of '{string.Join(",", Constants.ConnectionStrings.All)}'.");
         }
 
         switch (connectionStringName)
         {
-            case "SqlServer":
+            case Constants.ConnectionStrings.SqlServer:
                 options.UseSqlServer(connectionString, sqlOptions => sqlOptions.EnableRetryOnFailure());
                 break;
-            case "Sqlite":
+            case Constants.ConnectionStrings.Sqlite:
                 options.UseSqlite(connectionString);
                 break;
-            case "Postgres":
+            case Constants.ConnectionStrings.Postgres:
                 options.UseNpgsql(connectionString);
                 break;
             case null when !allowEmptyConnectionString:
                 throw new InvalidOperationException(
-                    $"Connection string is missing. Specify any of '{string.Join(",", ConnectionStringNames)}'.");
+                    $"Connection string is missing. Specify any of '{string.Join(",", Constants.ConnectionStrings.All)}'.");
             default:
                 throw new InvalidOperationException(
-                    $"Unsupported connection string name '{connectionStringName}'. Specify any of '{string.Join(",", ConnectionStringNames)}'.");
+                    $"Unsupported connection string name '{connectionStringName}'. Specify any of '{string.Join(",", Constants.ConnectionStrings.All)}'.");
         }
 
         options.EnableDetailedErrors(enableDetailedErrors)

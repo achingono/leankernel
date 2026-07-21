@@ -78,7 +78,7 @@ public static class IEndpointRouteBuilderExtensions
             var client = httpClientFactory.CreateClient();
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"http://localhost:8080{internalPath}")
             {
-                Content = new StringContent(rewrittenJson, System.Text.Encoding.UTF8, "application/json"),
+                Content = new StringContent(rewrittenJson, System.Text.Encoding.UTF8, Constants.ContentTypes.Json),
             };
 
             foreach (var header in context.Request.Headers)
@@ -91,7 +91,7 @@ public static class IEndpointRouteBuilderExtensions
 
             var responseMessage = await client.SendAsync(requestMessage);
             var responseStream = await responseMessage.Content.ReadAsStreamAsync();
-            var contentType = responseMessage.Content.Headers.ContentType?.ToString() ?? "application/json";
+            var contentType = responseMessage.Content.Headers.ContentType?.ToString() ?? Constants.ContentTypes.Json;
 
             if (responseMessage.IsSuccessStatusCode)
             {

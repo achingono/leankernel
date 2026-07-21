@@ -104,7 +104,6 @@ dotnet_diagnostic.SA1309.severity = silent
 [src/**/Migrations/*.cs]
 dotnet_diagnostic.CS1591.severity = silent
 dotnet_diagnostic.SA1101.severity = silent
-dotnet_diagnostic.SA1200.severity = silent
 dotnet_diagnostic.SA1201.severity = silent
 dotnet_diagnostic.SA1206.severity = silent
 dotnet_diagnostic.SA1313.severity = silent
@@ -119,6 +118,7 @@ dotnet_diagnostic.SA1649.severity = silent
 
 # src projects only
 [src/**/*.cs]
+dotnet_diagnostic.SA1200.severity = silent
 dotnet_diagnostic.CS1591.severity = error
 dotnet_diagnostic.CS1572.severity = error
 dotnet_diagnostic.CS1573.severity = error
@@ -132,7 +132,6 @@ dotnet_diagnostic.SA1202.severity = silent
 dotnet_diagnostic.SA1117.severity = silent
 dotnet_diagnostic.SA1118.severity = silent
 dotnet_diagnostic.SA1629.severity = silent
-dotnet_diagnostic.SA1200.severity = silent
 dotnet_diagnostic.SA1101.severity = silent
 dotnet_diagnostic.SA1413.severity = silent
 dotnet_diagnostic.SA1623.severity = silent
@@ -151,7 +150,6 @@ dotnet_diagnostic.SA1311.severity = silent
 dotnet_diagnostic.SA1514.severity = silent
 dotnet_diagnostic.SA1642.severity = silent
 dotnet_diagnostic.SA1515.severity = silent
-dotnet_diagnostic.SA1200.severity = silent
 dotnet_diagnostic.SA1101.severity = silent
 dotnet_diagnostic.SA1413.severity = silent
 dotnet_diagnostic.SA1623.severity = silent
@@ -164,7 +162,6 @@ dotnet_diagnostic.SA1118.severity = silent
 dotnet_diagnostic.SA1210.severity = silent
 dotnet_diagnostic.SA1514.severity = silent
 dotnet_diagnostic.SA1649.severity = silent
-dotnet_diagnostic.SA1200.severity = silent
 dotnet_diagnostic.SA1101.severity = silent
 dotnet_diagnostic.SA1413.severity = silent
 dotnet_diagnostic.SA1623.severity = silent
@@ -172,8 +169,8 @@ dotnet_diagnostic.SA1623.severity = silent
 # Test projects - relaxed style rules
 [test/**/*.cs]
 dotnet_diagnostic.SA0001.severity = silent
-dotnet_diagnostic.SA1202.severity = silent
 dotnet_diagnostic.SA1200.severity = silent
+dotnet_diagnostic.SA1202.severity = silent
 dotnet_diagnostic.SA1101.severity = silent
 dotnet_diagnostic.SA1316.severity = silent
 dotnet_diagnostic.SA1413.severity = silent

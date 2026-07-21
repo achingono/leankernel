@@ -1,3 +1,4 @@
+using LeanKernel;
 using LeanKernel.Data;
 using LeanKernel.Gateway.Configuration;
 using LeanKernel.Gateway.HealthChecks;
@@ -98,7 +99,7 @@ public static class IServiceCollectionExtensions
 
                 embedding.Endpoint = $"{baseUrl}/v1/embeddings";
                 embedding.ApiKey = cfg.ApiKey;
-                embedding.AuthScheme = "Bearer";
+                embedding.AuthScheme = Constants.Http.Headers.Bearer;
             });
 
         services.AddHttpClient<IEmbeddingClient, HttpEmbeddingClient>((_, client) =>
@@ -128,7 +129,7 @@ public static class IServiceCollectionExtensions
             .ConfigureHttpClient(c => c.Timeout = probeTimeout);
 
         return services.AddHealthChecks()
-            .AddDbContextCheck<EntityContext>("database", tags: ["database"])
+            .AddDbContextCheck<EntityContext>(Constants.Healthchecks.Database, tags: [Constants.Healthchecks.Database])
             .AddCheck<LiteLlmHealthCheck>("litellm", tags: ["litellm"])
             .AddCheck<GBrainHealthCheck>("gbrain", tags: ["gbrain"]);
     }

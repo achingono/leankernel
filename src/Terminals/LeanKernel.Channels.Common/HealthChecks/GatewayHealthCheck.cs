@@ -25,7 +25,7 @@ public sealed class GatewayHealthCheck(IHttpClientFactory httpClientFactory, IOp
         try
         {
             var client = httpClientFactory.CreateClient(HttpClientName);
-            var healthUri = new Uri(gatewayBaseUri, "/health");
+            var healthUri = new Uri(gatewayBaseUri, Constants.Healthchecks.Path);
             using var response = await client.GetAsync(healthUri, cancellationToken);
 
             return response.IsSuccessStatusCode

@@ -63,7 +63,7 @@ public sealed class BotFrameworkTransportClient(
 
         var connectorClient = httpClientFactory.CreateClient("teams-connector");
         connectorClient.BaseAddress = new Uri(inboundActivity.ServiceUrl);
-        connectorClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", connectorToken);
+        connectorClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Http.Headers.Bearer, connectorToken);
 
         var activity = new
         {

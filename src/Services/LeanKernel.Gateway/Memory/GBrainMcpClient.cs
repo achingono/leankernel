@@ -8,8 +8,6 @@ namespace LeanKernel.Gateway.Memory;
 /// </summary>
 public sealed class GBrainMcpClient : IGBrainMcpClient
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
-
     private readonly HttpClient _httpClient;
     private readonly ILogger<GBrainMcpClient> _logger;
     private int _requestId;
@@ -73,7 +71,7 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
     /// <returns>The deserialized MCP response, if one is returned.</returns>
     private async Task<McpResponse?> SendMcpRequestAsync(McpRequest request, CancellationToken ct)
     {
-        using var response = await _httpClient.PostAsJsonAsync(string.Empty, request, SerializerOptions, ct).ConfigureAwait(false);
+        using var response = await _httpClient.PostAsJsonAsync(string.Empty, request, Constants.Serialization.JsonOptions, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var contentType = response.Content.Headers.ContentType?.MediaType;
@@ -83,7 +81,7 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
             return await ReadSseResponseAsync(response, ct).ConfigureAwait(false);
         }
 
-        return await response.Content.ReadFromJsonAsync<McpResponse>(SerializerOptions, ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<McpResponse>(Constants.Serialization.JsonOptions, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -112,7 +110,7 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
                 continue;
             }
 
-            lastResponse = JsonSerializer.Deserialize<McpResponse>(json, SerializerOptions);
+            lastResponse = JsonSerializer.Deserialize<McpResponse>(json, Constants.Serialization.JsonOptions);
         }
 
         return lastResponse;
@@ -139,7 +137,7 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
             return result.Clone();
         }
 
-        var toolResult = result.Deserialize<McpToolResult>(SerializerOptions);
+        var toolResult = result.Deserialize<McpToolResult>(Constants.Serialization.JsonOptions);
         if (toolResult is null)
         {
             return null;
@@ -172,7 +170,7 @@ public sealed class GBrainMcpClient : IGBrainMcpClient
         }
         catch (JsonException)
         {
-            using var document = JsonDocument.Parse(JsonSerializer.Serialize(text, SerializerOptions));
+            using var document = JsonDocument.Parse(JsonSerializer.Serialize(text, Constants.Serialization.JsonOptions));
             return document.RootElement.Clone();
         }
     }

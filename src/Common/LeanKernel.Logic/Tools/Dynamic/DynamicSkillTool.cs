@@ -15,8 +15,6 @@ namespace LeanKernel.Logic.Tools.Dynamic;
 /// </summary>
 public static class DynamicSkillTool
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     /// <summary>
     /// Creates a tool definition from a skill definition and one of its operations.
     /// The tool name is {skill.Name}_{operation.Id}.
@@ -76,7 +74,7 @@ public static class DynamicSkillTool
 
                     // Resolve bearer token if needed
                     string? bearerToken = null;
-                    if (skill.Runtime.Auth.Type == "bearer")
+                    if (string.Equals(skill.Runtime.Auth.Type, Constants.Http.Headers.Bearer, StringComparison.OrdinalIgnoreCase))
                     {
                         bearerToken = ResolveSecret(skill.Runtime.Auth.SecretRef, out var secretError);
                         if (secretError is not null)
@@ -154,7 +152,7 @@ public static class DynamicSkillTool
         if (!string.IsNullOrWhiteSpace(bearerToken))
         {
             request.Headers.Authorization =
-                new AuthenticationHeaderValue("Bearer", bearerToken);
+                new AuthenticationHeaderValue(Constants.Http.Headers.Bearer, bearerToken);
         }
 
         // Parameters not consumed as path placeholders become query or body
@@ -165,8 +163,8 @@ public static class DynamicSkillTool
 
         if (operation.HttpMethod is "POST" or "PUT" or "PATCH")
         {
-            var body = JsonSerializer.Serialize(remainingParams, JsonOptions);
-            request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            var body = JsonSerializer.Serialize(remainingParams, Constants.Serialization.JsonOptions);
+            request.Content = new StringContent(body, Encoding.UTF8, Constants.ContentTypes.Json);
         }
         else if (remainingParams.Count > 0)
         {

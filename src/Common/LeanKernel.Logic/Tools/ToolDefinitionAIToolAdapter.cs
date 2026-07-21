@@ -10,9 +10,6 @@ namespace LeanKernel.Logic.Tools;
 /// </summary>
 public static class ToolDefinitionAIToolAdapter
 {
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
-
     /// <summary>
     /// Converts a <see cref="ToolDefinition"/> to an <see cref="AITool"/>.
     /// </summary>
@@ -47,7 +44,7 @@ public static class ToolDefinitionAIToolAdapter
             {
                 args = string.IsNullOrWhiteSpace(argsJson)
                     ? new Dictionary<string, object?>()
-                    : JsonSerializer.Deserialize<Dictionary<string, object?>>(argsJson, JsonOptions)
+                    : JsonSerializer.Deserialize<Dictionary<string, object?>>(argsJson, Constants.Serialization.JsonOptions)
                       ?? new Dictionary<string, object?>();
             }
             catch (JsonException)

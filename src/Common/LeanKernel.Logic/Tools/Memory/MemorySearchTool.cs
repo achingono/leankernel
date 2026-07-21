@@ -12,7 +12,6 @@ namespace LeanKernel.Logic.Tools.Memory;
 public static class MemorySearchTool
 {
     private const string ToolName = "memory_search";
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>
     /// Creates the memory_search tool definition.
@@ -65,7 +64,7 @@ public static class MemorySearchTool
                     {
                         ToolName = ToolName,
                         Success = true,
-                        Output = JsonSerializer.Serialize(results, JsonOptions)
+                        Output = JsonSerializer.Serialize(results, Constants.Serialization.JsonOptions)
                     };
                 }
                 catch (Exception ex)

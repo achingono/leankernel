@@ -39,11 +39,11 @@ public sealed class GBrainAuthHandler : DelegatingHandler
         var token = ResolveToken();
         if (!string.IsNullOrEmpty(token))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            request.Headers.Authorization = new AuthenticationHeaderValue(Constants.Http.Headers.Bearer, token);
         }
 
         request.Headers.Accept.Clear();
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentTypes.Json));
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
         return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);

@@ -13,8 +13,6 @@ namespace LeanKernel.Logic.Tools.BuiltIn;
 /// </summary>
 public static class CalculationTools
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     /// <summary>
     /// Creates all enabled calculation/aggregation tool definitions.
     /// </summary>
@@ -283,7 +281,7 @@ public static class CalculationTools
                         min = values.Min(),
                         max = values.Max(),
                         count = values.Count
-                    }, JsonOptions);
+                    }, Constants.Serialization.JsonOptions);
 
                 return Task.FromResult(new ToolResult
                 {
@@ -334,7 +332,7 @@ public static class CalculationTools
         {
             ToolName = "group_by",
             Success = true,
-            Output = JsonSerializer.Serialize(groups, JsonOptions)
+            Output = JsonSerializer.Serialize(groups, Constants.Serialization.JsonOptions)
         };
     }
 

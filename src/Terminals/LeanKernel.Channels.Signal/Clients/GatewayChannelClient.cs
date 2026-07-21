@@ -23,7 +23,7 @@ public sealed class GatewayChannelClient(HttpClient httpClient, IOptions<Gateway
     public async Task<GatewayTurnResult> RunTurnAsync(object input, string bearerToken, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue(Constants.Http.Headers.Bearer, bearerToken);
         request.Content = new StringContent(
             JsonSerializer.Serialize(new
             {
@@ -33,7 +33,7 @@ public sealed class GatewayChannelClient(HttpClient httpClient, IOptions<Gateway
                 {
                     name = settings.Value.AgentName
                 }
-            }), Encoding.UTF8, "application/json");
+            }), Encoding.UTF8, Constants.ContentTypes.Json);
 
         using var response = await httpClient.SendAsync(request, ct);
         if (!response.IsSuccessStatusCode)

@@ -12,7 +12,6 @@ namespace LeanKernel.Logic.Tools.Memory;
 public static class MemoryReadTool
 {
     private const string ToolName = "memory_read";
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>
     /// Creates the memory_read tool definition.
@@ -66,7 +65,7 @@ public static class MemoryReadTool
                     {
                         ToolName = ToolName,
                         Success = true,
-                        Output = JsonSerializer.Serialize(page, JsonOptions)
+                        Output = JsonSerializer.Serialize(page, Constants.Serialization.JsonOptions)
                     };
                 }
                 catch (Exception ex)

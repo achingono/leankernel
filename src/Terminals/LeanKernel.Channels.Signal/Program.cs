@@ -1,3 +1,4 @@
+using LeanKernel;
 using LeanKernel.Channels.Common.Configuration;
 using LeanKernel.Channels.Common.HealthChecks;
 using LeanKernel.Channels.Signal;
@@ -14,7 +15,7 @@ builder.Services.Configure<SignalSettings>(builder.Configuration.GetSection("Sig
 
 var gatewaySettings = builder.Configuration.GetSection("Gateway").Get<GatewaySettings>() ?? new GatewaySettings();
 var signalSettings = builder.Configuration.GetSection("Signal").Get<SignalSettings>() ?? new SignalSettings();
-var (connectionStringName, connectionStringValue) = builder.Configuration.ResolveConnectionString(["Postgres", "Sqlite"]);
+var (connectionStringName, connectionStringValue) = builder.Configuration.ResolveConnectionString(Constants.ConnectionStrings.All);
 if (string.IsNullOrWhiteSpace(connectionStringName) || string.IsNullOrWhiteSpace(connectionStringValue))
 {
     throw new InvalidOperationException("A database connection string is required. Configure ConnectionStrings:Postgres or ConnectionStrings:Sqlite.");
@@ -36,13 +37,13 @@ builder.Services.AddHttpClient(SignalApiHealthCheck.HttpClientName)
     .ConfigureHttpClient(client => client.Timeout = probeTimeout);
 builder.Services.AddDbContextFactory<EntityContext>(options =>
 {
-    if (string.Equals(connectionStringName, "Postgres", StringComparison.OrdinalIgnoreCase))
+    if (string.Equals(connectionStringName, Constants.ConnectionStrings.Postgres, StringComparison.OrdinalIgnoreCase))
     {
         options.UseNpgsql(connectionStringValue);
         return;
     }
 
-    if (string.Equals(connectionStringName, "Sqlite", StringComparison.OrdinalIgnoreCase))
+    if (string.Equals(connectionStringName, Constants.ConnectionStrings.Sqlite, StringComparison.OrdinalIgnoreCase))
     {
         options.UseSqlite(connectionStringValue);
         return;
@@ -55,13 +56,13 @@ builder.Services.AddSingleton<IChannelCredentialProvider, DatabaseChannelCredent
 builder.Services.AddHostedService<TerminalService>();
 
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<EntityContext>("database", tags: ["database"])
-    .AddCheck<GatewayHealthCheck>("gateway", tags: ["gateway"])
+    .AddDbContextCheck<EntityContext>(Constants.Healthchecks.Database, tags: [Constants.Healthchecks.Database])
+    .AddCheck<GatewayHealthCheck>(Constants.Healthchecks.Gateway, tags: [Constants.Healthchecks.Gateway])
     .AddCheck<SignalApiHealthCheck>("signal-api", tags: ["signal-api"]);
 
 var app = builder.Build();
 app.MapGet("/live", () => Results.Ok(new { status = "alive" }));
-app.MapHealthChecks("/health", new HealthCheckOptions
+app.MapHealthChecks(Constants.Healthchecks.Path, new HealthCheckOptions
 {
     ResponseWriter = (context, report) =>
     {

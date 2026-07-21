@@ -93,7 +93,7 @@ public static class WebSearchTool
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"https://api.search.brave.com/res/v1/web/search?q={encoded}&count=10");
-        request.Headers.Add("Accept", "application/json");
+        request.Headers.Add("Accept", Constants.ContentTypes.Json);
         request.Headers.Add("X-Subscription-Token", apiKey);
 
         using var response = await client.SendAsync(request, ct).ConfigureAwait(false);

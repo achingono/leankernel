@@ -104,8 +104,8 @@ public partial class Program
         builder.Services.AddDistributedMemoryCache();
         builder.Services.AddSession();
 
-        builder.Services.AddAuthentication("Bearer")
-            .AddJwtBearer("Bearer", options =>
+        builder.Services.AddAuthentication(Constants.Http.Headers.Bearer)
+            .AddJwtBearer(Constants.Http.Headers.Bearer, options =>
             {
                 options.RequireHttpsMetadata = identityConfig.OpenId.RequireHttpsMetadata;
                 options.SaveToken = true;
@@ -176,11 +176,8 @@ public partial class Program
 
         builder.Services.AddEntityContext(options =>
         {
-            var (connectionStringName, connectionString) = builder.Configuration.ResolveConnectionString([
-                "Postgres",
-                "SqlServer",
-                "Sqlite"
-            ]);
+            var (connectionStringName, connectionString) = builder.Configuration.ResolveConnectionString(
+                Constants.ConnectionStrings.All);
 
             options.ConfigureOptions(
                 connectionStringName,
@@ -214,7 +211,7 @@ public partial class Program
                 new IsolationKeyScopedAgentSessionStoreOptions { Strict = true });
         });
 
-        builder.Services.AddLeanKernelAgent("leankernel", builder.Configuration);
+        builder.Services.AddLeanKernelAgent(Constants.Agent.DefaultName, builder.Configuration);
         builder.Services.AddOpenAIResponses();
         builder.Services.AddOpenAIConversations();
 
@@ -253,7 +250,7 @@ public partial class Program
 
         app.MapOpenAIResponses();
         app.MapOpenAIConversations();
-        app.MapProxiedOpenAIChatCompletions("leankernel", "/v1/internal/completions", new OpenAIChatCompletionsMapOptions
+        app.MapProxiedOpenAIChatCompletions(Constants.Agent.DefaultName, "/v1/internal/completions", new OpenAIChatCompletionsMapOptions
         {
             RunOptionsFactory = _ => null,
         });
@@ -263,7 +260,7 @@ public partial class Program
             app.MapDevUI();
         }
 
-        app.MapHealthChecks("/health", new HealthCheckOptions
+        app.MapHealthChecks(Constants.Healthchecks.Path, new HealthCheckOptions
         {
             ResponseWriter = (context, report) =>
             {
