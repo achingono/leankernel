@@ -31,7 +31,7 @@ flowchart LR
     end
 
     subgraph Persistence[LeanKernel.Data / EntityContext]
-        IdentityData[(Tenants, Users, Channels, Policies)]
+        IdentityData[(Tenants, Users, Channels, ChannelMemoryPolicies, ChannelSenderBindings)]
         TranscriptData[(Sessions, Turns, TurnTelemetry)]
         AgentStateData[(AgentStates)]
     end

@@ -12,8 +12,8 @@ The gateway reads configuration primarily from:
 | `ConnectionStrings` | Database provider inputs. Local defaults use SQLite. |
 | `OpenAI` | Base model endpoint, API key, default model, memory model settings, fact extraction model settings. |
 | `Agents` | Default agent metadata, root path, and nested tool runtime settings. |
-| `Identity` | Anonymous user defaults plus token/OpenID settings. |
-| `Files` | Root data path. |
+| `Identity` | Anonymous user defaults, token/OpenID settings, trusted proxy networks, and identity-claims prompt-context controls. |
+| `Files` | Root data path, scratch directory, download limits, and Python executable path. |
 | `Cors` | Local policy settings. |
 | `GBrain` | MCP base URL, auth token, timeout. |
 
@@ -67,11 +67,46 @@ These are used by the logic-layer memory pipeline.
 
 The current implementation does not use a top-level `LeanKernel` configuration root. New runtime settings should extend the existing top-level sections rather than introducing `LeanKernel:*` duplicates.
 
+## Files
+
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `Files:RootPath` | Root path for gateway-managed files and filesystem tool boundary | `""` |
+| `Files:ScratchRoot` | Root directory for temporary or scratch file operations | `""` |
+| `Files:MaxDownloadBytes` | Max size in bytes for a single file download | `10000000` |
+| `Files:MaxExtractedCharacters` | Max characters to extract from a file | `20000` |
+| `Files:PythonExecutable` | Python executable path for advanced file processing | `python3` |
+
+## Identity
+
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `Identity:TrustedProxies` | Known proxy/network CIDR ranges for forwarded headers | `[]` |
+
+## Identity Claims Context
+
+`Identity:ClaimsContext` controls how authenticated claims are persisted and rendered into per-turn AI context.
+
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `Identity:ClaimsContext:Enabled` | Enables claim-profile refresh and prompt injection | `true` |
+| `Identity:ClaimsContext:AllowedCustomClaims` | Deny-by-default allowlist of custom claim names to persist | `[]` |
+| `Identity:ClaimsContext:PromptFields` | Ordered field allowlist for identity prompt rendering | `full_name,email,preferred_username,locale,timezone,organization,roles,groups,custom_claims` |
+| `Identity:ClaimsContext:MaxRoles` | Upper bound for persisted/rendered role values | `10` |
+| `Identity:ClaimsContext:MaxGroups` | Upper bound for persisted/rendered group values | `20` |
+| `Identity:ClaimsContext:MaxCustomClaimValuesPerClaim` | Upper bound for values per allowlisted custom claim | `5` |
+| `Identity:ClaimsContext:MaxPromptTokens` | Max estimated token budget for rendered identity block | `256` |
+
+Startup validation enforces non-negative role/group/custom-claim bounds and requires `MaxPromptTokens > 0`.
+
 Code anchors:
 
 - [`../../src/Common/LeanKernel.Logic/Configuration/MemorySettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/MemorySettings.cs)
 - [`../../src/Common/LeanKernel.Logic/Configuration/FactExtractionSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/FactExtractionSettings.cs)
 - [`../../src/Common/LeanKernel.Logic/Configuration/ToolSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/ToolSettings.cs)
+- [`../../src/Common/LeanKernel.Logic/Configuration/IdentityClaimsContextSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/IdentityClaimsContextSettings.cs)
+- [`../../src/Common/LeanKernel.Logic/Configuration/FileSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/FileSettings.cs)
+- [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs)
 
 ## Provider Selection Notes
 

@@ -170,6 +170,13 @@ public class EntityContext : DbContext
             entity.Property(e => e.Issuer).HasMaxLength(500);
             entity.Property(e => e.Subject).HasMaxLength(500);
             entity.Property(e => e.PersonId);
+            entity.Property(e => e.PreferredUserName).HasMaxLength(100);
+            entity.Property(e => e.Locale).HasMaxLength(20);
+            entity.Property(e => e.TimeZone).HasMaxLength(50);
+            entity.Property(e => e.Organization).HasMaxLength(200);
+            entity.Property(e => e.RolesJson).HasColumnType("text");
+            entity.Property(e => e.GroupsJson).HasColumnType("text");
+            entity.Property(e => e.CustomClaimsJson).HasColumnType("text");
             entity.HasIndex(e => e.Email);
             entity.HasIndex(e => e.PersonId);
             entity.HasIndex(e => new { e.Issuer, e.Subject }).IsUnique();

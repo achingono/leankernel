@@ -48,6 +48,21 @@ These boundaries are enforced through different runtime paths:
 - Linking/unlinking is implemented at the identity resolver layer by assigning users to a shared `PersonId`.
 - Agent-session isolation remains `tenant/channel/user` (plus session for anonymous requests); this phase does not repurpose session isolation for memory scoping.
 
+## Identity Claims Context
+
+- Authenticated identity claims are persisted as a durable profile on `UserEntity` and refreshed on each authenticated resolution.
+- The profile captures an allowlisted set of fields (name, email, preferred username, locale, timezone, organization, roles/groups) plus configured custom claims.
+- Identity context is rendered deterministically by `IdentityContextAssembler` and injected by `MemoryProvider` as an AI context message each turn.
+- Prompt rendering is bounded by `Identity:ClaimsContext:MaxPromptTokens`; oversized blocks are truncated to the configured budget.
+- Custom claims remain deny-by-default through `Identity:ClaimsContext:AllowedCustomClaims`, and only fields listed in `Identity:ClaimsContext:PromptFields` are rendered.
+
+Code anchors:
+
+- [`../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs`](../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs)
+- [`../../src/Common/LeanKernel.Logic/Providers/IdentityContextAssembler.cs`](../../src/Common/LeanKernel.Logic/Providers/IdentityContextAssembler.cs)
+- [`../../src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs`](../../src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs)
+- [`../../src/Common/LeanKernel.Core/Entities/UserEntity.cs`](../../src/Common/LeanKernel.Core/Entities/UserEntity.cs)
+
 ## Why It Matters
 
 This keeps transcript data, runtime state, and memory context isolated per tenant/person/channel boundary (with user-level isolation preserved for transcript/session paths) instead of relying on raw claims or host strings alone.

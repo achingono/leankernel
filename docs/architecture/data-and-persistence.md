@@ -15,8 +15,11 @@ Primary entity sets:
 - `Tenants`
 - `Users`
 - `Channels`
+- `ChannelSenderBindings`
+- `ChannelMemoryPolicies`
 - `Sessions`
 - `Turns`
+- `TurnTelemetry`
 - `AgentStates`
 
 ## Partitioning Model

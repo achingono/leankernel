@@ -38,6 +38,41 @@ public class UserEntity : IAuditable, IRecyclable
     public string FullName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the preferred username of the user.
+    /// </summary>
+    public string PreferredUserName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the locale of the user.
+    /// </summary>
+    public string Locale { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the IANA time zone of the user.
+    /// </summary>
+    public string TimeZone { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the organization of the user.
+    /// </summary>
+    public string Organization { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the roles JSON array.
+    /// </summary>
+    public string RolesJson { get; set; } = "[]";
+
+    /// <summary>
+    /// Gets or sets the groups JSON array.
+    /// </summary>
+    public string GroupsJson { get; set; } = "[]";
+
+    /// <summary>
+    /// Gets or sets the custom claims JSON dictionary.
+    /// </summary>
+    public string CustomClaimsJson { get; set; } = "{}";
+
+    /// <summary>
     /// Gets or sets a value indicating whether the user account is active.
     /// </summary>
     public bool IsActive { get; set; }

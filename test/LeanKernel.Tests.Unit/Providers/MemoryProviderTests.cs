@@ -1,10 +1,13 @@
 using FluentAssertions;
 
+using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Tests.Unit.TestDoubles;
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -144,9 +147,23 @@ public class MemoryProviderTests
             Options.Create(new FactExtractionSettings()),
             renderer);
 
+        var dbOptions = new DbContextOptionsBuilder<EntityContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        var dbFactory = new TestDbContextFactory(dbOptions);
+        var identitySettings = Options.Create(new IdentityClaimsContextSettings
+        {
+            Enabled = false,
+            PromptFields = [],
+            AllowedCustomClaims = []
+        });
+        var assembler = new IdentityContextAssembler(identitySettings);
+
         var act = () => new MemoryProvider(
             memoryClient.Object,
             permit,
+            dbFactory,
+            assembler,
             Mock.Of<IChannelMemoryPolicyResolver>(),
             parser,
             renderer,

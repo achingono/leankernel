@@ -46,8 +46,8 @@ model-performance analysis.
 
 Code anchors:
 
-- `src/Common/LeanKernel.Logic/Telemetry/TelemetryCapturingChatClient.cs`
-- `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs`
-- `src/Common/LeanKernel.Core/Entities/TurnTelemetryEntity.cs`
-- `src/Common/LeanKernel.Logic/Telemetry/TelemetryAggregationService.cs`
-- `src/Common/LeanKernel.Logic/Telemetry/TelemetryExportService.cs`
+- [`../../src/Common/LeanKernel.Logic/Telemetry/TelemetryCapturingChatClient.cs`](../../src/Common/LeanKernel.Logic/Telemetry/TelemetryCapturingChatClient.cs)
+- [`../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs`](../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs)
+- [`../../src/Common/LeanKernel.Core/Entities/TurnTelemetryEntity.cs`](../../src/Common/LeanKernel.Core/Entities/TurnTelemetryEntity.cs)
+- [`../../src/Common/LeanKernel.Logic/Telemetry/TelemetryAggregationService.cs`](../../src/Common/LeanKernel.Logic/Telemetry/TelemetryAggregationService.cs)
+- [`../../src/Common/LeanKernel.Logic/Telemetry/TelemetryExportService.cs`](../../src/Common/LeanKernel.Logic/Telemetry/TelemetryExportService.cs)

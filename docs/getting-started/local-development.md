@@ -34,7 +34,7 @@ Code paths:
 
 - [`../../src/Services/LeanKernel.Gateway/appsettings.json`](../../src/Services/LeanKernel.Gateway/appsettings.json)
 - [`../../src/Services/LeanKernel.Gateway/appsettings.Development.json`](../../src/Services/LeanKernel.Gateway/appsettings.Development.json)
-- [`../../src/Services/LeanKernel.Gateway/Extensions/IConfigurationExtensions.cs`](../../src/Services/LeanKernel.Gateway/Extensions/IConfigurationExtensions.cs)
+- [`../../src/Common/LeanKernel.Data/Extensions/IConfigurationExtensions.cs`](../../src/Common/LeanKernel.Data/Extensions/IConfigurationExtensions.cs)
 - [`../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs`](../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs)
 
 ## Docker Override Behavior

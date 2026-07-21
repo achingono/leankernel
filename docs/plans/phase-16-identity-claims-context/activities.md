@@ -1,20 +1,20 @@
 # Phase 16 Activities
 
-## Step-By-Step Activities
-1. Confirm the current behavior: `ResolveOrCreateUserAsync` persists Email/FirstName/LastName/FullName/UserName only on first creation and does not inject identity into the prompt.
-2. Define the identity profile representation: extend `UserEntity` and/or add a related identity-claims/profile entity for additional allowlisted claims (preferred_username, locale, timezone, organization, roles/groups, bounded custom claims); add EF migration.
-3. Define a claim allowlist configuration so only approved, non-sensitive claims are persisted and rendered (no tokens, no unbounded claim dumps).
-4. Extend claim capture in `IdentityResolver` (and `ClaimsPrincipalExtensions`) to read the allowlisted claim set provider-agnostically.
-5. Persist and refresh: update the identity profile on each authenticated resolution (not only on create) with change detection, treating the IdP as source of truth.
-6. Implement an identity-context assembler that renders the persisted profile into a concise, deterministic system-prompt block (stable field order, redaction of empty fields).
-7. Integrate the assembler at the context/prompt injection point: via `MemoryProvider` today, or as an admitted candidate under the Phase 03 gatekeeper/budget when present.
-8. Add configuration (allowlist, prompt field selection, enable/disable) and startup validation.
-9. Add tests: claim persistence + refresh + change detection, allowlist enforcement, deterministic prompt rendering, budget/admission behavior, and tenant/user partitioning safety.
-10. Document identity-to-context flow in `docs/features/identity-partitioning.md` and the runtime/context docs.
+## Completed Activities
+1. [x] Confirm the current behavior: `ResolveOrCreateUserAsync` persists Email/FirstName/LastName/FullName/UserName only on first creation and does not inject identity into the prompt.
+2. [x] Define the identity profile representation: extended `UserEntity` with `RolesJson`, `GroupsJson`, `CustomClaimsJson`, `PreferredUserName`, `Locale`, `TimeZone`, `Organization`; added EF migration `20260719163620_AddIdentityClaimsContext`.
+3. [x] Define a claim allowlist configuration: `IdentityClaimsContextSettings` with `AllowedCustomClaims` (deny-by-default).
+4. [x] Extend claim capture in `IdentityResolver.ApplyIdentityProfile` to read allowlisted claims provider-agnostically using `Constants.Claims` constants.
+5. [x] Persist and refresh: `ApplyIdentityProfile` called on each resolution path (create, re-resolve, guest refresh).
+6. [x] Implement `IdentityContextAssembler` — renders persisted profile into deterministic prompt block (stable field order, empty-field elimination, token-budget truncation).
+7. [x] Integrate assembler in `MemoryProvider.ProvideAIContextAsync` — injects identity context before memory; `ContextGatekeeper` admits under system budget via `ContextSource.Identity`.
+8. [x] Add configuration + `ValidateOnStart()` in `Programs.cs`.
+9. [x] Add tests: `IdentityResolverTests` (persistence + refresh), `IdentityContextAssemblerTests` (rendering + edge cases), `MemoryProviderBehaviorTests` (integration).
+10. [x] Document in `docs/features/identity-partitioning.md`, `docs/configuration/appsettings-reference.md`, `docs/architecture/system-overview.md`.
 
 ## Review Focus
-- Only allowlisted, non-sensitive claims are persisted and rendered (no tokens/secrets).
-- Identity refreshes on login; stale profiles do not persist indefinitely.
-- Prompt rendering is deterministic and bounded (respects budget when gated).
-- Identity context is correctly partitioned (no cross-user/tenant leakage).
-- Behavior is safe when claims are missing (graceful, no prompt corruption).
+- [x] Only allowlisted, non-sensitive claims are persisted and rendered (no tokens/secrets).
+- [x] Identity refreshes on login; stale profiles do not persist indefinitely.
+- [x] Prompt rendering is deterministic and bounded (respects budget when gated).
+- [x] Identity context is correctly partitioned (no cross-user/tenant leakage).
+- [x] Behavior is safe when claims are missing (graceful, no prompt corruption).

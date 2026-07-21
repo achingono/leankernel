@@ -1,5 +1,6 @@
 using FluentAssertions;
 
+using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
@@ -7,6 +8,7 @@ using LeanKernel.Logic.Providers;
 using LeanKernel.Tests.Unit.TestDoubles;
 
 using Microsoft.Agents.AI;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -282,10 +284,24 @@ Remote channel answer
 
         var extraction = new FactExtractionService(chatClient, Options.Create(new FactExtractionSettings()), renderer);
 
+        var dbOptions = new DbContextOptionsBuilder<EntityContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        var dbFactory = new TestDbContextFactory(dbOptions);
+        var identitySettings = Options.Create(new IdentityClaimsContextSettings
+        {
+            Enabled = false,
+            PromptFields = [],
+            AllowedCustomClaims = []
+        });
+        var assembler = new IdentityContextAssembler(identitySettings);
+
         return (
             new TestableMemoryProvider(
                 memoryClient,
                 permit.Object,
+                dbFactory,
+                assembler,
                 policyResolver.Object,
                 new MemoryPageParser(),
                 renderer,
@@ -311,6 +327,8 @@ Remote channel answer
     private sealed class TestableMemoryProvider(
         IMemoryClient memoryClient,
         IPermit permit,
+        IDbContextFactory<EntityContext> dbContextFactory,
+        IdentityContextAssembler identityContextAssembler,
         IChannelMemoryPolicyResolver memoryPolicyResolver,
         MemoryPageParser parser,
         MemoryPageRenderer renderer,
@@ -318,7 +336,7 @@ Remote channel answer
         FactExtractionService factExtractionService,
         TimeProvider timeProvider,
         Microsoft.Extensions.Logging.ILogger<MemoryProvider> logger)
-        : MemoryProvider(memoryClient, permit, memoryPolicyResolver, parser, renderer, normalizer, factExtractionService, timeProvider, logger)
+        : MemoryProvider(memoryClient, permit, dbContextFactory, identityContextAssembler, memoryPolicyResolver, parser, renderer, normalizer, factExtractionService, timeProvider, logger)
     {
         /// <summary>
         /// Invokes context provisioning for tests.

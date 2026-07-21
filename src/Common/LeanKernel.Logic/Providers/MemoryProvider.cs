@@ -1,7 +1,9 @@
+using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Memory;
 
 using Microsoft.Agents.AI;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -14,6 +16,8 @@ namespace LeanKernel.Logic.Providers;
 public class MemoryProvider(
     IMemoryClient memoryClient,
     IPermit permit,
+    IDbContextFactory<EntityContext> dbContextFactory,
+    IdentityContextAssembler identityContextAssembler,
     IChannelMemoryPolicyResolver memoryPolicyResolver,
     MemoryPageParser parser,
     MemoryPageRenderer renderer,
@@ -29,11 +33,36 @@ public class MemoryProvider(
         InvokingContext context,
         CancellationToken cancellationToken = default)
     {
+        var contextMessages = new List<ChatMessage>();
+
+        var userId = permit.UserId;
+        if (userId != Guid.Empty)
+        {
+            try
+            {
+                using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+                var user = await dbContext.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(candidate => candidate.Id == userId, cancellationToken);
+                var identityBlock = identityContextAssembler.Build(user);
+                if (!string.IsNullOrWhiteSpace(identityBlock))
+                {
+                    contextMessages.Add(new ChatMessage(
+                        ChatRole.User,
+                        "Here is the user's identity context:\n```\n" + identityBlock + "\n```"));
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Identity context assembly failed for user {UserId}; continuing without identity context.", userId);
+            }
+        }
+
         var queryText = string.Join("\n", context.AIContext.Messages?.Select(x => x.Text) ?? []);
 
         if (string.IsNullOrWhiteSpace(queryText))
         {
-            return new AIContext { Messages = [] };
+            return new AIContext { Messages = contextMessages };
         }
 
         var scope = new MemoryScope
@@ -50,7 +79,7 @@ public class MemoryProvider(
 
             if (memories.Count == 0)
             {
-                return new AIContext { Messages = [] };
+                return new AIContext { Messages = contextMessages };
             }
 
             var admitted = ApplyOverlayPrecedence(memories, scope.ChannelId)
@@ -60,22 +89,17 @@ public class MemoryProvider(
 
             var memoryText = string.Join("\n", admitted.Select(m => BuildCompactSummary(m.Key, m.Text)));
 
-            return new AIContext
-            {
-                Messages =
-                [
-                    new ChatMessage(
-                        ChatRole.User,
-                        "Here are some memories to help answer the user question:\n```\n" + memoryText + "\n```")
-                ]
-            };
+            contextMessages.Add(new ChatMessage(
+                ChatRole.User,
+                "Here are some memories to help answer the user question:\n```\n" + memoryText + "\n```"));
+            return new AIContext { Messages = contextMessages };
         }
         catch (Exception ex)
         {
             // Degrade gracefully when memory service is unavailable
             logger.LogWarning(ex, "Memory search failed for scope (tenant={TenantId}, person={PersonId}, channel={ChannelId}); continuing without memory context.",
                 scope.TenantId, scope.PersonId, scope.ChannelId);
-            return new AIContext { Messages = [] };
+            return new AIContext { Messages = contextMessages };
         }
     }
 

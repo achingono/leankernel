@@ -8,6 +8,7 @@ The composition root currently maps:
 
 - `MapOpenAIResponses()`
 - `MapOpenAIConversations()`
+- `MapProxiedOpenAIChatCompletions()` at `/v1/internal/completions`
 - `GET /health`
 - `MapDevUI()` in Development only
 

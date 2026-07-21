@@ -28,10 +28,13 @@ This phase covers two linked steps: (1) capturing and persisting a richer identi
 - Cross-channel person linking and person-scoped memory (Phase 10) — this phase persists per-user identity and can feed the person profile later.
 - Editing identity via UI (Phase 09) beyond read-through from the IdP.
 
+## Status
+**Implementation complete** — see `exit-criteria.md` for gate checklist, `evidence.md` for code references.
+
 ## Entry Criteria
-- Authenticated resolution from claims exists (`IdentityResolver.ResolveOrCreateUserAsync`) and JWT/OIDC is wired in the gateway.
-- A context/prompt injection point exists (`MemoryProvider` today; Phase 03 gatekeeper if merged).
-- `ClaimsPrincipalExtensions` provides claim-reading helpers to extend.
+- [x] Authenticated resolution from claims exists (`IdentityResolver.ResolveOrCreateUserAsync`) and JWT/OIDC is wired in the gateway.
+- [x] A context/prompt injection point exists (`MemoryProvider` today; Phase 03 gatekeeper if merged).
+- [x] `ClaimsPrincipalExtensions` provides claim-reading helpers to extend.
 
 ## Exit Criteria
 Authenticated users' identity claims are persisted to the database (and refreshed on login), and the context builder injects an allowlisted identity block into the system prompt each turn, under budget and respecting partitioning. See `exit-criteria.md`.

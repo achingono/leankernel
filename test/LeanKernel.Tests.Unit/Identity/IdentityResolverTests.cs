@@ -4,11 +4,13 @@ using FluentAssertions;
 
 using LeanKernel.Data;
 using LeanKernel.Entities;
+using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Tests.Unit.TestDoubles;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 using Xunit;
 
@@ -580,16 +582,87 @@ public class IdentityResolverTests
         tenantBPersonAfter.Should().Be(originalTenantBPersonId);
     }
 
+    [Fact]
+    public async Task ResolveOrCreateUserAsync_WithClaimsContextEnabled_PersistsProfile()
+    {
+        var resolver = CreateResolver(out var db, new IdentityClaimsContextSettings
+        {
+            Enabled = true,
+            PromptFields = ["full_name", "email", "locale", "roles"],
+            MaxRoles = 10
+        });
+        var claims = new List<Claim>
+        {
+            new("sub", "profile-sub"),
+            new("iss", "profile-iss"),
+            new(ClaimTypes.Name, "Profile User"),
+            new(ClaimTypes.Email, "profile@test.com"),
+            new("locale", "fr-FR"),
+            new(ClaimTypes.Role, "admin"),
+            new(ClaimTypes.Role, "user")
+        };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
+
+        var user = await resolver.ResolveOrCreateUserAsync(principal);
+
+        user.FullName.Should().Be("Profile User");
+        user.Email.Should().Be("profile@test.com");
+        user.Locale.Should().Be("fr-FR");
+        user.RolesJson.Should().Contain("admin");
+    }
+
+    [Fact]
+    public async Task ResolveOrCreateUserAsync_RefreshOnReResolve()
+    {
+        var resolver = CreateResolver(out var db, new IdentityClaimsContextSettings
+        {
+            Enabled = true,
+            PromptFields = ["full_name", "organization"],
+            MaxRoles = 10
+        });
+        var firstClaims = new List<Claim>
+        {
+            new("sub", "refresh-sub"),
+            new("iss", "refresh-iss"),
+            new(ClaimTypes.Name, "Original Name"),
+            new("organization", "Original Corp")
+        };
+        var firstPrincipal = new ClaimsPrincipal(new ClaimsIdentity(firstClaims, "Bearer"));
+        var user = await resolver.ResolveOrCreateUserAsync(firstPrincipal);
+
+        user.Organization.Should().Be("Original Corp");
+
+        var secondClaims = new List<Claim>
+        {
+            new("sub", "refresh-sub"),
+            new("iss", "refresh-iss"),
+            new(ClaimTypes.Name, "Updated Name"),
+            new("organization", "Updated Corp")
+        };
+        var secondPrincipal = new ClaimsPrincipal(new ClaimsIdentity(secondClaims, "Bearer"));
+        var refreshed = await resolver.ResolveOrCreateUserAsync(secondPrincipal);
+
+        refreshed.Id.Should().Be(user.Id);
+        refreshed.Organization.Should().Be("Updated Corp",
+            because: "profile should refresh on each authenticated resolution");
+    }
+
     /// <summary>
     /// Creates an identity resolver backed by an isolated in-memory context.
     /// </summary>
-    private static IdentityResolver CreateResolver(out EntityContext db)
+    private static IdentityResolver CreateResolver(out EntityContext db, IdentityClaimsContextSettings? claimsSettings = null)
     {
         var options = new DbContextOptionsBuilder<EntityContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         db = new EntityContext(options);
-        return new IdentityResolver(new TestDbContextFactory(options), NullLogger<IdentityResolver>.Instance);
+        var settings = Options.Create(claimsSettings ?? new IdentityClaimsContextSettings
+        {
+            Enabled = false,
+            PromptFields = [],
+            AllowedCustomClaims = []
+        });
+        return new IdentityResolver(new TestDbContextFactory(options), settings, NullLogger<IdentityResolver>.Instance);
     }
 
     /// <summary>

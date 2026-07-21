@@ -30,6 +30,25 @@ Reference: [`../../docker-compose.yml`](../../docker-compose.yml)
 | `GBRAIN_PORT` | Published host port for GBrain. |
 | `LITELLM_PORT` | Published host port for LiteLLM. |
 
+## Signal Terminal
+
+| Variable | Purpose |
+|---|---|
+| `SIGNAL__HOST` | Signal terminal listen address. |
+| `SIGNAL__PORT` | Signal terminal listen port. |
+| `SIGNAL_CLI_PORT` | `signal-cli` sidecar REST API port. |
+
+## Teams Terminal
+
+| Variable | Purpose |
+|---|---|
+| `TEAMS_APP_ID` | Bot Framework application (client) ID. |
+| `TEAMS_APP_PASSWORD` | Bot Framework client secret. |
+| `TEAMS_AUTHORITY` | Microsoft Entra ID authority for Bot Framework auth. |
+| `BOT__OPENIDMETADATAURL` | Bot Framework OpenID Connect metadata URL. |
+| `BOT__VALIDISSUERS__0` | Allowlisted token issuer for Bot Framework validation. |
+| `BOT__ALLOWEDSERVICEURLHOSTSUFFIXES__0` | Allowlisted service URL host suffix for Bot Framework responses. |
+
 ## Model Provider Secrets
 
 LiteLLM can also consume provider secrets such as:
