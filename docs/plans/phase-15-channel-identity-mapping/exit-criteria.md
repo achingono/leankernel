@@ -1,13 +1,13 @@
 # Phase 15 Exit Criteria
 
 ## Gate Checklist
-- [ ] A channel-identity directory maps `(tenant, channelType, normalizedIdentifier)` to a `UserEntity`.
-- [ ] An inbound Signal message from a mapped phone number resolves to the known user (not anonymous).
+- [ ] A channel-identity directory maps `(tenant, channelType, normalizedIdentifier)` to a `UserEntity` (current sender bindings key by raw `Issuer`/`Subject`; normalization remains open).
+- [x] An inbound Signal message from a mapped phone number resolves to the known user (not anonymous).
 - [ ] Identifiers are normalized consistently (E.164 phone, lowercased email) on write and lookup.
-- [ ] Channel users are represented via `Issuer`/`Subject` (e.g., `signal`/`+15551234567`).
+- [x] Channel users are represented via `Issuer`/`Subject` (e.g., `signal`/`+15551234567`).
 - [ ] The unknown-sender policy (known-only / auto-provision / guest) is enforced per channel config.
 - [ ] Provisioning (admin pre-provision) and first-contact claim/verification both work and are spoof-resistant.
-- [ ] Mappings are tenant-isolated with no cross-tenant identifier collisions.
+- [x] Mappings are tenant-isolated with no cross-tenant identifier collisions.
 - [ ] Resolved channel users map to the canonical person and share cross-channel memory once linked.
 - [ ] Unit + integration tests cover normalization, resolution, provisioning, and isolation.
 

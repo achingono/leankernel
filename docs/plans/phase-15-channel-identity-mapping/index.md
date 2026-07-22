@@ -37,6 +37,9 @@ This phase delivers the channel-identity directory, the resolution logic that tu
 ## Exit Criteria
 An inbound channel request carrying a native identifier (e.g., a Signal phone number) resolves to a known, non-anonymous `UserEntity` when a mapping exists, unmapped senders are handled per the configured policy, and the mapping is tenant-isolated and normalized. See `exit-criteria.md`.
 
+## Status
+**Partial** — sender-binding directory primitives and known-sender resolution are in place via `ChannelSenderBindings` and channel bearer tokens. Identifier normalization, configurable unknown-sender policy, and first-contact claim/verification flows remain open.
+
 ## Roles
 - Owner: Rebuild maintainer
 - Reviewer: Separate agent session / model review

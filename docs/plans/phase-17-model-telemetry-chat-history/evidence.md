@@ -4,16 +4,16 @@
 
 | Item | Reference | Notes |
 | --- | --- | --- |
-| Model/usage discarded on persist | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs:215-232` | `ToTurnEntity` keeps only role/content/author/timestamp |
-| Store path with response messages | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs:76-97` | `StoreChatHistoryAsync` has `InvokedContext.ResponseMessages` |
-| JSON metadata attachment point | `src/Common/LeanKernel.Core/Entities/TurnEntity.cs:50-53` | `Metadata` (nullable JSON) per turn |
-| Proxy route telemetry | `config/litellm/leankernel_litellm_callbacks.py:89-108` | Records requested_model, provider, model_id, api_base, response_model |
-| Provider normalization | `config/litellm/leankernel_litellm_callbacks.py:333-337` | `normalize_provider` / `PROVIDER_ALIASES` to reuse for consistency |
-| Model configuration | `src/Common/LeanKernel.Logic/Configuration/OpenAISettings.cs:21,26` | DefaultModel / ToolModel aliases requested from LiteLLM |
-| Consumers | `docs/plans/phase-04-model-intelligence/index.md`, `phase-07-learning-scheduler/index.md`, `phase-08-diagnostics-ops/index.md` | Routing/cost profiles, learning, spend guard |
-| Chat client registration | `src/Common/LeanKernel.Logic/Extensions/IServiceProviderExtensions.cs` | `AddLeanKernelChatClient` wraps OpenAI client; decorator insertion point |
-| IChatClient usage in agent | `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs` | Agent created via `AddAIAgent` with `ChatClientAgent`; wraps `IChatClient` |
-| LiteLLM response headers | `config/litellm/litellm_config.generated.yaml` | `x-litellm-response-cost` header available on response |
+| Telemetry schema and capture contract | `src/Common/LeanKernel.Logic/Telemetry/TurnTelemetry.cs`, `src/Common/LeanKernel.Logic/Telemetry/ITurnTelemetryCollector.cs` | Structured requested/served model, provider, tokens, cost, latency fields |
+| Chat client capture path | `src/Common/LeanKernel.Logic/Telemetry/TelemetryCapturingChatClient.cs` | Captures model/usage/cost and writes into scoped collector |
+| Persistence path | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs` | Consumes collector and persists `TurnTelemetryEntity` for assistant turns |
+| Telemetry storage entity | `src/Common/LeanKernel.Core/Entities/TurnTelemetryEntity.cs` | One-to-one with `TurnEntity`, unique `TurnId` |
+| Schema migration | `src/Common/LeanKernel.Data/Migrations/20260716223823_AddTurnTelemetry.cs` | Adds telemetry table and indexes |
+| Query/rollup surface | `src/Common/LeanKernel.Logic/Telemetry/TelemetryAggregationService.cs` | Cost and token rollups by model/provider/user/session/day/tenant |
+| Labeled export | `src/Common/LeanKernel.Logic/Telemetry/TelemetryExportService.cs` | Deterministic PII-aware export for Phase 07 consumers |
+| DI wiring | `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs` | Registers telemetry services and wraps `IChatClient` when enabled |
+| Configuration shape | `src/Common/LeanKernel.Logic/Configuration/TelemetrySettings.cs`, `docs/configuration/appsettings-reference.md` | `Agents:Telemetry` settings documented and bound |
+| Remaining gap | `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs` | `TelemetrySettings` currently bound without `ValidateOnStart` gate |
 
 ## Implemented Output Targets
 

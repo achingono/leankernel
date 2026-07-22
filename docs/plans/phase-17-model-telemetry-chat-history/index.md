@@ -37,6 +37,9 @@ This phase adds structured model-and-cost telemetry to persisted assistant turns
 ## Exit Criteria
 Every persisted assistant turn carries structured, accurate model/provider/usage/cost telemetry; cost can be aggregated per session/user/tenant/model/provider; and a labeled export exists for model-grouping/failover/cost-profile tuning. See `exit-criteria.md`.
 
+## Status
+**Partial (10/11 gates complete)** — telemetry capture, persistence, aggregation, and export are implemented. Remaining work is startup validation for `Agents:Telemetry` settings (enable/disable, currency, raw-metadata retention) and final closure sign-off.
+
 ## Roles
 - Owner: Rebuild maintainer
 - Reviewer: Separate agent session / model review

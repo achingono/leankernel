@@ -1,5 +1,16 @@
 # Phase 17 Model Telemetry — Implementation Plan
 
+## Plan Revision (Current Workspace State)
+
+Most originally planned implementation steps are complete in the current workspace
+(telemetry capture decorator, telemetry entity/migration, persistence path, aggregation
+service, export service, and feature/config documentation). The remaining work to close
+Phase 17 is now a hardening-and-closure slice:
+
+1. Add startup validation for `Agents:Telemetry` options (`Validate(...).ValidateOnStart()`).
+2. Add targeted tests for telemetry option validation.
+3. Mark the final exit gate complete and finalize approval/evidence tables.
+
 ## Objective
 
 Persist structured model/provider/token-usage/cost telemetry on every assistant turn so the
@@ -8,14 +19,22 @@ labeled dataset for model grouping, failover order, and cost-profile tuning.
 
 ## Current State
 
-- `TurnEntity` stores role/content/author/timestamp; model, usage, and cost are discarded.
-- `DbChatHistoryProvider.StoreChatHistoryAsync` persists `InvokedContext.ResponseMessages`
-  but does not read `ChatResponse.ModelId` or `ChatResponse.Usage`.
-- MAF's `ChatClientAgent` handles `ChatResponse` internally; the .NET code never sees it
-  on the main invocation path.
-- LiteLLM proxy callback logs route events (provider, model_id, api_base, response_model)
-  to a JSONL file but does not send this data back to the .NET application.
-- No LLM usage/cost/token tracking exists anywhere in the C# codebase.
+- Assistant turns now persist structured telemetry in a dedicated `TurnTelemetryEntity`
+  linked one-to-one with `TurnEntity`; role/content persistence remains unchanged.
+- `DbChatHistoryProvider.StoreChatHistoryAsync` consumes request-scoped telemetry from
+  `ITurnTelemetryCollector` and persists it when available, while degrading gracefully
+  when telemetry is absent.
+- `TelemetryCapturingChatClient` wraps the chat client so the .NET pipeline does capture
+  `ChatResponse.ModelId`, usage, provider metadata, latency, and cost on the main
+  invocation path.
+- Permit-scoped aggregation and deterministic export services already exist in the C# codebase
+  (`TelemetryAggregationService`, `TelemetryExportService`).
+- LiteLLM proxy route-log reconciliation remains a deferred follow-up; the current implementation
+  captures the response-side telemetry needed for persistence and reporting without that extra
+  correlation layer.
+- The main remaining implementation gap is startup validation for `Agents:Telemetry` options:
+  the settings are currently bound with `Configure<TelemetrySettings>(...)`, but do not yet use
+  `Validate(...).ValidateOnStart()`.
 
 ## Design Decisions
 

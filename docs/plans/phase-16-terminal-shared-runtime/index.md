@@ -33,6 +33,9 @@ Refactor duplicated terminal and gateway helper logic into a new common project 
 ## Exit Criteria
 Refactor compiles for impacted projects, duplicated helper code is removed from terminal and gateway projects where practical, and docs/evidence are updated. See `exit-criteria.md`.
 
+## Status
+**Partial** — shared terminal runtime project exists and is consumed by both channel terminals, with documented build evidence. Additional consolidation work and quality-gate closure remain open.
+
 ## Roles
 - Owner: Coding agent
 - Reviewer: Sub-agent plan reviewer
