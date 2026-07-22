@@ -63,7 +63,7 @@ Infrastructure improvements that enhance development experience and tool integra
 | 16 (track B) | [Terminal Shared Runtime](phase-16-terminal-shared-runtime/index.md) | Shared terminal helper runtime and de-duplication across channel terminals | **Partial** (3/8 gates) |
 | 18 | [Phase 18](phase-18-webwright-mcp-integration/index.md) | MCP SDK integration for Webwright-first browser tooling, exposing only Webwright MCP tools in the shipped rollout | **Complete** |
 | 19 | [Authorization Permits And Filters](phase-19-authorization-permits-filters/index.md) | Centralized permit/filter/repository enforcement for tenant/user/channel partitioning | **Complete** |
-| 20 | [Identity, Policy, And Event Spine](phase-20-identity-policy-event-spine/index.md) | Canonical identity model, in-process policy core, and append-only event spine | **Not started** |
+| 20 | [Identity, Policy, And Event Spine](phase-20-identity-policy-event-spine/index.md) | Canonical identity model, in-process policy core, and append-only event spine | **Complete** |
 
 ## Standalone PRDs
 

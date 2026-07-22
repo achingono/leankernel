@@ -1,4 +1,6 @@
 using LeanKernel.Entities;
+using LeanKernel.Events;
+using LeanKernel.Logic.Events;
 using LeanKernel.Logic.Interfaces;
 using LeanKernel.Logic.Telemetry;
 
@@ -20,6 +22,8 @@ public class DbChatHistoryProvider(
     IRepository<TurnTelemetryEntity> telemetryRepo,
     IPermit permit,
     ITurnTelemetryCollector? telemetryCollector = null,
+    IEventCollector? eventCollector = null,
+    IEventStore? eventStore = null,
     ILogger<DbChatHistoryProvider>? logger = null) : ChatHistoryProvider
 {
     internal const string ChatSessionIdKey = "chatSessionId";
@@ -127,10 +131,13 @@ public class DbChatHistoryProvider(
                 turnRepo.Add(turn);
                 existingKeys.Add(turn.Metadata!);
 
+                // Emit turn event alongside persistence for the event spine.
+                EmitTurnEvent(turn, sessionGuid);
+
                 // Persist telemetry for assistant turns when available.
                 if (telemetry is not null && turn.Role == "assistant")
                 {
-                    telemetryRepo.Add(new TurnTelemetryEntity
+                    var telemetryEntity = new TurnTelemetryEntity
                     {
                         TurnId = turn.Id,
                         RequestedModel = telemetry.RequestedModel,
@@ -156,12 +163,26 @@ public class DbChatHistoryProvider(
                             FullName = "System",
                             Email = string.Empty
                         }
-                    });
+                    };
+
+                    telemetryRepo.Add(telemetryEntity);
+
+                    // Emit telemetry event alongside persistence.
+                    EmitTelemetryEvent(telemetryEntity, telemetry);
                 }
             }
         }
 
         await turnRepo.SaveChangesAsync(cancellationToken);
+
+        if (eventCollector is not null && eventStore is not null)
+        {
+            var pendingEvents = eventCollector.ConsumeAll();
+            if (pendingEvents.Count > 0)
+            {
+                await eventStore.AppendBatchAsync(pendingEvents, cancellationToken);
+            }
+        }
     }
 
     /// <summary>
@@ -320,5 +341,75 @@ public class DbChatHistoryProvider(
             Role = role.Value,
             Contents = [new TextContent(t.Content)]
         };
+    }
+
+    /// <summary>
+    /// Emits a turn event to the event collector alongside current persistence.
+    /// </summary>
+    private void EmitTurnEvent(TurnEntity turn, Guid sessionGuid)
+    {
+        if (eventCollector is null)
+        {
+            return;
+        }
+
+        var envelope = new EventEnvelope
+        {
+            EventType = "turn",
+            TenantId = permit.TenantId,
+            PersonId = permit.PersonId,
+            UserId = permit.UserId,
+            ChannelId = permit.ChannelId,
+            SessionId = sessionGuid.ToString(),
+            CorrelationId = turn.Metadata,
+        };
+
+        eventCollector.EmitTurn(new TurnEvent
+        {
+            Envelope = envelope,
+            Role = turn.Role,
+            Content = turn.Content,
+            AuthorName = turn.AuthorName,
+            SessionId = sessionGuid.ToString(),
+            IdempotencyKey = turn.Metadata,
+        });
+    }
+
+    /// <summary>
+    /// Emits a telemetry event to the event collector alongside current persistence.
+    /// </summary>
+    private void EmitTelemetryEvent(TurnTelemetryEntity entity, TurnTelemetry telemetry)
+    {
+        if (eventCollector is null)
+        {
+            return;
+        }
+
+        var envelope = new EventEnvelope
+        {
+            EventType = "telemetry",
+            TenantId = permit.TenantId,
+            PersonId = permit.PersonId,
+            UserId = permit.UserId,
+            ChannelId = permit.ChannelId,
+        };
+
+        eventCollector.EmitTelemetry(new TelemetryEvent
+        {
+            Envelope = envelope,
+            RequestedModel = entity.RequestedModel,
+            ServedModel = entity.ServedModel,
+            Provider = entity.Provider,
+            ModelId = entity.ModelId,
+            ApiBase = entity.ApiBase,
+            PromptTokens = entity.PromptTokens,
+            CompletionTokens = entity.CompletionTokens,
+            TotalTokens = entity.TotalTokens,
+            ResponseCost = entity.ResponseCost,
+            Currency = entity.Currency,
+            CostIsEstimated = entity.CostIsEstimated,
+            LatencyMs = entity.LatencyMs,
+            CapturedAt = entity.CapturedAt,
+        });
     }
 }

@@ -18,11 +18,14 @@ flowchart LR
     Client[API client] --> Gateway[LeanKernel.Gateway]
     Gateway --> Agent[MAF-hosted leankernel agent]
     Gateway --> Permit[RequestContextPermit]
+    Agent --> Policy[PolicyEvaluator]
     Agent --> History[DbChatHistoryProvider]
+    Agent --> EventStore[DbEventStore]
     Agent --> Memory[MemoryProvider]
     Agent --> Tools[Tool runtime and MCP adapters]
     Agent --> SessionStore[DbAgentStateStore]
     History --> Db[(EntityContext)]
+    EventStore --> Db
     SessionStore --> Db
     Memory --> GBrain[(GBrain memory)]
     Agent --> Model[OpenAI-compatible model]
@@ -43,4 +46,5 @@ Detailed diagrams live on the architecture detail pages:
 
 - [Docs home](../index.md)
 - [Features](../features/index.md)
+- [Identity, Policy, And Event Spine](../features/identity-policy-event-spine.md)
 - [Gateway API](../api/gateway-api.md)

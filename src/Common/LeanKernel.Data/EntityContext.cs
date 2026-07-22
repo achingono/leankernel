@@ -64,6 +64,11 @@ public class EntityContext : DbContext
     public DbSet<TurnTelemetryEntity> TurnTelemetry => this.Set<TurnTelemetryEntity>();
 
     /// <summary>
+    /// Gets the append-only event spine records.
+    /// </summary>
+    public DbSet<EventEntity> Events => this.Set<EventEntity>();
+
+    /// <summary>
     /// Applies pending migrations and ensures the default tenant and OpenAI channel records exist.
     /// </summary>
     /// <param name="hostName">The host name to seed for the default tenant if needed.</param>
@@ -250,6 +255,24 @@ public class EntityContext : DbContext
                 .HasForeignKey(e => e.TurnId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasQueryFilter(e => !e.IsDeleted && !e.Turn.IsDeleted);
+        });
+
+        // EventEntity
+        modelBuilder.Entity<EventEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.EventType).HasMaxLength(100);
+            entity.Property(e => e.SchemaVersion).HasMaxLength(20);
+            entity.Property(e => e.SessionId).HasMaxLength(100);
+            entity.Property(e => e.CorrelationId).HasMaxLength(200);
+            entity.Property(e => e.CausationId).HasMaxLength(200);
+            entity.Property(e => e.RecordType).HasMaxLength(300);
+            entity.Property(e => e.PayloadJson).HasColumnType("text");
+            entity.HasIndex(e => e.EventId).IsUnique();
+            entity.HasIndex(e => new { e.TenantId, e.Timestamp });
+            entity.HasIndex(e => new { e.TenantId, e.UserId, e.ChannelId, e.Timestamp });
+            entity.HasIndex(e => e.EventType);
+            entity.HasIndex(e => e.CorrelationId);
         });
     }
 

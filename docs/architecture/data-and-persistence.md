@@ -1,10 +1,11 @@
 # Data and Persistence
 
-LeanKernel currently persists three different kinds of state:
+LeanKernel currently persists four different kinds of state:
 
 - transcript sessions and turns
 - request-partition ownership metadata
 - durable agent runtime state blobs
+- append-only runtime events in the event spine
 
 ## EntityContext
 
@@ -21,6 +22,7 @@ Primary entity sets:
 - `Turns`
 - `TurnTelemetry`
 - `AgentStates`
+- `Events`
 
 ## Partitioning Model
 
@@ -58,6 +60,16 @@ Persistence path:
 
 - `DbAgentStateStore` in Gateway serializes/deserializes MAF session state
 - `EntityContext.AgentStates` stores the blob plus tenant/user/channel ownership metadata
+
+## Event Spine Persistence
+
+`EventEntity` stores append-only runtime events emitted through the event spine.
+
+- `DbChatHistoryProvider` remains the transcript write path and emits `TurnEvent` and `TelemetryEvent`
+- `IEventCollector` accumulates request-scoped events
+- `DbEventStore` appends collected events to `EntityContext.Events`
+
+This coexists with `SessionEntity` / `TurnEntity` / `TurnTelemetryEntity` and does not replace transcript persistence.
 
 ## Database Provider Resolution
 

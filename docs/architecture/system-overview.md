@@ -25,7 +25,9 @@ flowchart LR
     end
 
     subgraph LogicRuntime[LeanKernel.Logic]
+        Policy[Policy core and evaluator]
         History[DbChatHistoryProvider]
+        EventSpine[Event collector and DbEventStore]
         Memory[MemoryProvider]
         Tooling[Tool registry and MCP adapters]
     end
@@ -34,6 +36,7 @@ flowchart LR
         IdentityData[(Tenants, Users, Channels, ChannelMemoryPolicies, ChannelSenderBindings)]
         TranscriptData[(Sessions, Turns, TurnTelemetry)]
         AgentStateData[(AgentStates)]
+        EventData[(Events)]
     end
 
     subgraph RuntimeServices[Compose-backed runtime services]
@@ -54,11 +57,14 @@ flowchart LR
     Gateway --> Middleware
     Gateway --> AgentHost
     AgentHost --> History
+    AgentHost --> Policy
+    AgentHost --> EventSpine
     AgentHost --> Memory
     AgentHost --> Tooling
     AgentHost --> SessionStore
     Middleware --> IdentityData
     History --> TranscriptData
+    EventSpine --> EventData
     SessionStore --> AgentStateData
     Memory --> GBrainClient
     GBrainClient --> GBrain
@@ -111,7 +117,9 @@ This deployment view is derived directly from `docker-compose.yml` and shows the
 | Gateway host | DI, auth, session middleware, endpoint mapping, startup migrations | `src/Services/LeanKernel.Gateway/Program.cs` |
 | Request permit | Resolve tenant, user, channel, and guest fallback for the current request | `src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs` |
 | Agent session store | Persist MAF session state blobs | `src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs` |
+| Policy core | Evaluate identity-aware domain policies that compose with permit/filter enforcement | `src/Common/LeanKernel.Logic/Policy/` |
 | Chat history provider | Persist and retrieve transcript turns through EF Core | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs` |
+| Event spine | Collect and durably append runtime events to `Events` | `src/Common/LeanKernel.Logic/Events/` |
 | Memory provider | Retrieve memory context and persist normalized facts | `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` |
 | Memory backend | GBrain-backed `IMemoryClient` implementation | `src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs` |
 | MCP browser tools | Webwright MCP discovery, tool adapter registration, and per-call invocation | `src/Common/LeanKernel.Logic/Mcp/` |
@@ -119,8 +127,10 @@ This deployment view is derived directly from `docker-compose.yml` and shows the
 ## Major Design Choices
 
 - MAF-native runtime instead of a custom agent framework
-- persisted identity partitioning by tenant, user, and channel
+- canonical identity context that preserves tenant, person, user, channel, and anonymous session boundaries
+- persisted identity partitioning by tenant, user, and channel for transcript/session ownership
 - separate transcript session persistence and agent state persistence
+- append-only event spine persistence that coexists with transcript rows
 - deterministic-first memory shaping with bounded model-assisted refinement
 - browser automation is provided by pre-configured Webwright MCP tools, not a custom Playwright sidecar
 - MCP tool adapters use LeanKernel-owned registration and invocation boundaries instead of reusing stale discovery clients

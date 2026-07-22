@@ -38,7 +38,9 @@ sequenceDiagram
     participant Identity as TenantResolutionMiddleware + RequestContextPermit
     participant SessionKey as IdentityIsolationKeyProvider
     participant AgentState as DbAgentStateStore
+    participant Policy as PolicyEvaluator
     participant History as DbChatHistoryProvider
+    participant Events as EventCollector + DbEventStore
     participant Memory as MemoryProvider
     participant GBrain as GBrainMemoryClient / GBrain
     participant Model as LiteLLM / configured model backend
@@ -54,6 +56,9 @@ sequenceDiagram
     Gateway->>SessionKey: Build scoped conversation key
     SessionKey->>AgentState: Load or create agent session
     AgentState->>Db: Read AgentStates
+
+    Gateway->>Policy: Evaluate identity-aware policy checks
+    Policy-->>Gateway: Allow or deny decision
 
     Gateway->>History: Load transcript context
     History->>Db: Verify SessionEntity ownership and read Turns
@@ -74,6 +79,8 @@ sequenceDiagram
 
     Gateway->>History: Persist request and assistant turns
     History->>Db: Upsert Sessions, Turns, and TurnTelemetry
+    History->>Events: Emit TurnEvent and TelemetryEvent
+    Events->>Db: Append Events
 
     Gateway->>Memory: Extract, normalize, and store new facts
     Memory->>GBrain: Save scope-relative memory pages
@@ -91,6 +98,7 @@ This diagram combines the request, transcript, session-state, memory, and tool e
 2. `DbChatHistoryProvider` verifies the transcript session belongs to the current permit partition.
 3. Existing turns are replayed into chat history.
 4. New request and assistant messages are persisted back as `TurnEntity` rows.
+5. Turn and telemetry events are appended to `Events` through `IEventStore`.
 
 Reference: [`../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs`](../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs)
 

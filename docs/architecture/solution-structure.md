@@ -12,11 +12,11 @@ Projects in the app-only solution:
 
 | Project | Role |
 |---|---|
-| `src/Common/LeanKernel.Core` | Shared entities and cross-project interfaces/contracts |
+| `src/Common/LeanKernel.Core` | Shared entities and cross-project interfaces/contracts, including canonical identity and event-envelope contracts |
 | `src/Terminals/LeanKernel.Channels.Common` | Shared terminal/gateway helpers (health response writer, gateway health probe, connection-string resolver, channel binding token resolver) |
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, design-time factory |
-| `src/Common/LeanKernel.Logic` | Chat history provider, memory pipeline, identity resolution, MAF-facing logic services |
-| `src/Services/LeanKernel.Gateway` | Web host, endpoint mapping, auth/session middleware, GBrain wiring, agent session store |
+| `src/Common/LeanKernel.Logic` | Chat history provider, memory pipeline, identity resolution, policy core, event spine, and MAF-facing logic services |
+| `src/Services/LeanKernel.Gateway` | Web host, endpoint mapping, auth/session middleware, GBrain wiring, and composition of logic services (including policy core and event spine) |
 | `src/Terminals/LeanKernel.Channels.Signal` | Signal channel terminal process (JSON-RPC socket transport to signal-cli sidecar) |
 | `src/Terminals/LeanKernel.Channels.Teams` | Teams Bot Framework terminal process (webhook ingress + connector egress) |
 

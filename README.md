@@ -12,7 +12,9 @@ LeanKernel is aimed at teams that want an agent runtime they can actually inspec
 
 - A MAF-based runtime with a real ASP.NET gateway instead of an isolated prototype loop.
 - Durable transcript and agent-state persistence backed by EF Core.
+- A canonical `IdentityContext` model plus shared policy-core evaluation for identity-aware runtime behavior.
 - Permit/filter-based repository access for user data (`SessionEntity`, `TurnEntity`, `TurnTelemetryEntity`) so tenant/user/channel partitioning is enforced consistently.
+- An append-only event spine (`Events`) that runs alongside transcript persistence for future read-model evolution.
 - A memory pipeline that stays provider-agnostic in logic while integrating with GBrain at the gateway boundary.
 - A local stack that can be run either directly from the gateway project or through Docker Compose with PostgreSQL, LiteLLM, and GBrain.
 
@@ -151,7 +153,9 @@ Contributor and coding-agent guidance lives in [`AGENTS.md`](AGENTS.md).
 ## Current Scope Notes
 
 - The implemented runtime is a gateway-centric service stack with terminal edge processes for Signal and Teams.
+- Identity dimensions are normalized through `IdentityContext` and preserve tenant/person/user/channel/session partition boundaries.
 - User-data reads and writes now flow through `IRepository<TEntity>` with `IPermit<TEntity>` + `IFilter<TEntity>` enforcement in `LeanKernel.Logic`.
+- Policy evaluation (`IPolicy<TEntity>`) and durable event persistence (`IEventStore`) are implemented in `LeanKernel.Logic` and composed at gateway startup.
 - `docker-compose.yml` supplies the companion runtime services used by the gateway, including PostgreSQL, LiteLLM, GBrain, Webwright, and Playwright.
 - `src/Services` currently contains `LeanKernel.Gateway`.
 - `src/Terminals` currently contains active channel projects for `LeanKernel.Channels.Common`, `LeanKernel.Channels.Signal`, and `LeanKernel.Channels.Teams`.

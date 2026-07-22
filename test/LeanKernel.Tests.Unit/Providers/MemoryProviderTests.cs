@@ -58,6 +58,7 @@ public class MemoryProviderTests
 
         var results = await client.SearchMemoriesAsync(scope, "test query");
 
+        Assert.Empty(results);
         results.Should().BeEmpty();
     }
 

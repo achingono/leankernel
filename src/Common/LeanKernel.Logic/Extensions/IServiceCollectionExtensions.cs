@@ -3,6 +3,7 @@ using System.ClientModel;
 using LeanKernel;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Events;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.Telemetry;
@@ -21,6 +22,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 using LeanKernel.Logic.Filters;
 using LeanKernel.Logic.Interfaces;
+using LeanKernel.Logic.Policy;
 using LeanKernel.Logic.Repositories;
 
 /// <summary>
@@ -120,6 +122,41 @@ public static class IServiceCollectionExtensions
         services.AddScoped<ITurnTelemetryCollector, TurnTelemetryCollector>();
         services.AddScoped<ITelemetryAggregationService, TelemetryAggregationService>();
         services.AddScoped<ITelemetryExportService, TelemetryExportService>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the event spine infrastructure: request-scoped collector and optional store.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddEventSpine(this IServiceCollection services)
+    {
+        services.AddScoped<IEventCollector, EventCollector>();
+        services.AddScoped<IEventStore, DbEventStore>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the shared policy core: policy context, evaluator, and default policies.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddPolicyCore(this IServiceCollection services)
+    {
+        services.AddScoped<IPolicyContext>(sp =>
+        {
+            var permit = sp.GetRequiredService<IPermit>();
+            return new PolicyContext(permit);
+        });
+
+        services.AddScoped<IPolicyEvaluator, PolicyEvaluator>();
+
+        // Register default domain policies
+        services.AddScoped<IPolicy<object>, BudgetCheckPolicy>();
+        services.AddScoped<IPolicy<UserEntity>, IdentityLinkingPolicy>();
+        services.AddScoped<IPolicy<ChannelMemoryPolicyEntity>, MemoryAccessPolicy>();
+
         return services;
     }
 

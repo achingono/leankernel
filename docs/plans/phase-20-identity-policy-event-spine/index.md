@@ -43,6 +43,9 @@ This phase creates a shared library-first policy core, defines canonical identit
 
 The canonical identity model, shared policy core, and event spine are defined, implemented, and adopted by at least one real consumer path. Gateway business logic remains thin, policy decisions are testable in-process, the existing permit/filter/repository enforcement remains the only authorization/data-partition gate, and the new contracts are documented for subsequent phases. See `exit-criteria.md`.
 
+## Status
+**Complete** — canonical identity contracts, shared policy core, durable append-only event spine persistence, first-adopter migration (`DbChatHistoryProvider`), Gateway guardrails, and contract tests are implemented. Unit/integration/playwright verification and SonarQube quality gate checks are passing.
+
 ## Roles
 - Owner: Rebuild maintainer
 - Reviewer: Separate agent session / model review

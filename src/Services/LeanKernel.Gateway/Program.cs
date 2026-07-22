@@ -189,6 +189,8 @@ builder.Services.AddEntityContext(options =>
 
 builder.Services.AddContextProviders();
 builder.Services.AddTelemetry(builder.Configuration);
+builder.Services.AddEventSpine();
+builder.Services.AddPolicyCore();
 
 var gbrainSettings = builder.Configuration.GetSection("GBrain").Get<GBrainSettings>() ?? new GBrainSettings();
 builder.Services.AddGBrainMemory(gbrainSettings);
