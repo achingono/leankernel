@@ -1,8 +1,8 @@
 # LeanKernel Documentation
 
-This documentation set covers the current gateway-centered LeanKernel service stack in this workspace.
+This documentation set covers the current gateway-centered LeanKernel service stack in this repository.
 
-It follows the same conventions as the reference docs in `~/source/repos/leankernel/docs`:
+It follows these conventions:
 
 - kebab-case file names
 - hierarchical folders by domain
@@ -45,13 +45,14 @@ This docs set describes the implementation that actually exists today:
 - `src/Common/LeanKernel.Data`
 - `src/Common/LeanKernel.Logic`
 - `src/Services/LeanKernel.Gateway`
+- `src/Terminals/LeanKernel.Channels.Common`
+- `src/Terminals/LeanKernel.Channels.Signal`
+- `src/Terminals/LeanKernel.Channels.Teams`
 - test projects under `test/`
-
-It does not document the larger aspirational module list in `README.md` as if it were already implemented.
 
 ## Code Anchors
 
-- Gateway composition root: [`../src/Services/LeanKernel.Gateway/Programs.cs`](../src/Services/LeanKernel.Gateway/Programs.cs)
+- Gateway composition root: [`../src/Services/LeanKernel.Gateway/Program.cs`](../src/Services/LeanKernel.Gateway/Program.cs)
 - Solution file: [`../src/LeanKernel.sln`](../src/LeanKernel.sln)
 - Local stack: [`../docker-compose.yml`](../docker-compose.yml)
 - ADRs: [`decisions/index.md`](decisions/index.md)

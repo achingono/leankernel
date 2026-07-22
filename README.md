@@ -1,8 +1,8 @@
 # LeanKernel
 
-LeanKernel is the current `.NET 10` LeanKernel rebuild: a gateway-centered microservice stack built around Microsoft Agent Framework (MAF), an ASP.NET gateway, EF-backed persistence, and companion services for LiteLLM, GBrain, and Webwright MCP tooling.
+LeanKernel is a `.NET 10` gateway-centered microservice stack built around Microsoft Agent Framework (MAF), an ASP.NET gateway, EF-backed persistence, terminal edge services, and companion runtime services for LiteLLM, GBrain, and Webwright MCP tooling.
 
-This repository currently implements the rebuild that lives in this worktree. Older LeanKernel layouts and module maps should be treated as reference material, not as the current workspace structure.
+Older LeanKernel layouts and module maps should be treated as historical reference material, not as the active repository structure.
 
 ## Why Consider LeanKernel
 
@@ -23,7 +23,7 @@ LeanKernel is aimed at teams that want an agent runtime they can actually inspec
 - You want one workspace that covers API hosting, runtime composition, persistence, and memory plumbing while still running as a service-oriented stack.
 - You prefer a rebuild that is explicit about what exists today instead of promising an unimplemented platform surface.
 
-## Current Workspace
+## Current Repository Layout
 
 - Full contributor-facing solution: [`LeanKernel.sln`](LeanKernel.sln)
 - App-only solution: [`src/LeanKernel.sln`](src/LeanKernel.sln)
@@ -37,6 +37,9 @@ LeanKernel is aimed at teams that want an agent runtime they can actually inspec
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, and design-time data access support |
 | `src/Common/LeanKernel.Logic` | Chat history, memory pipeline, identity resolution, and MAF-facing logic services |
 | `src/Services/LeanKernel.Gateway` | ASP.NET host, endpoint mapping, auth/session middleware, GBrain integration, and agent state wiring |
+| `src/Terminals/LeanKernel.Channels.Common` | Shared terminal runtime helpers for gateway communication, health responses, and sender binding resolution |
+| `src/Terminals/LeanKernel.Channels.Signal` | Signal terminal edge process using the `signal-cli` JSON-RPC sidecar |
+| `src/Terminals/LeanKernel.Channels.Teams` | Teams Bot Framework terminal edge process |
 | `test/LeanKernel.Tests.Unit` | Unit coverage for core, data, logic, and gateway components |
 | `test/LeanKernel.Tests.Integration` | ASP.NET integration tests against the gateway |
 | `test/LeanKernel.Tests.Playwright` | Playwright-based API endpoint checks for a running server |
@@ -63,7 +66,7 @@ Current architecture details: [`docs/architecture/solution-structure.md`](docs/a
 docker compose up -d --build
 ```
 
-This starts PostgreSQL with `pgvector`, LiteLLM, GBrain, and the LeanKernel gateway.
+This starts PostgreSQL with `pgvector`, LiteLLM, GBrain, Playwright, Webwright, the LeanKernel gateway, Signal terminal services (`signal-cli` + `signal-terminal`), and the Teams terminal.
 
 Reference: [`docs/getting-started/quick-start.md`](docs/getting-started/quick-start.md)
 
@@ -135,7 +138,7 @@ Current build/test guidance: [`docs/development/build-and-test.md`](docs/develop
 
 ## Contributing
 
-Use the current worktree as the source of truth. Before making non-trivial changes:
+Before making non-trivial changes:
 
 1. Copy the relevant blank templates from [`docs/templates/`](docs/templates/) into a new folder under [`docs/plans/`](docs/plans/).
 2. Draft the implementation plan in that folder.
@@ -147,9 +150,9 @@ Contributor and coding-agent guidance lives in [`AGENTS.md`](AGENTS.md).
 
 ## Current Scope Notes
 
-- The implemented runtime is a gateway-centric service stack. The .NET projects in this worktree cover the gateway plus the shared libraries described above.
+- The implemented runtime is a gateway-centric service stack with terminal edge processes for Signal and Teams.
 - User-data reads and writes now flow through `IRepository<TEntity>` with `IPermit<TEntity>` + `IFilter<TEntity>` enforcement in `LeanKernel.Logic`.
 - `docker-compose.yml` supplies the companion runtime services used by the gateway, including PostgreSQL, LiteLLM, GBrain, Webwright, and Playwright.
-- `src/Services` currently contains only `LeanKernel.Gateway`.
-- `src/Terminals` currently exists as a placeholder directory and does not contain active projects.
-- If older docs or logs mention a much larger monolith-style module map, treat that as historical or aspirational unless the matching project or container exists in this worktree.
+- `src/Services` currently contains `LeanKernel.Gateway`.
+- `src/Terminals` currently contains active channel projects for `LeanKernel.Channels.Common`, `LeanKernel.Channels.Signal`, and `LeanKernel.Channels.Teams`.
+- If older docs or logs mention a larger monolith-style module map, treat that as historical unless the matching project or container exists in this repository.

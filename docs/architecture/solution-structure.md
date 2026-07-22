@@ -1,6 +1,6 @@
 # Solution Structure
 
-This page documents the projects that actually exist in the current rebuild.
+This page documents the projects that currently exist in this repository.
 
 ## Current Solution
 
@@ -35,15 +35,16 @@ flowchart BT
     Gateway[LeanKernel.Gateway] --> Logic[LeanKernel.Logic]
     Gateway --> Data[LeanKernel.Data]
     Gateway --> Core[LeanKernel.Core]
-    Gateway --> ChannelsCommon[LeanKernel.Channels.Common]
 
     Logic --> Data
     Logic --> Core
 
     Signal[LeanKernel.Channels.Signal] --> Data
+    Signal --> Logic
     Signal --> ChannelsCommon
 
     Teams[LeanKernel.Channels.Teams] --> Data
+    Teams --> Logic
     Teams --> ChannelsCommon
 
     ChannelsCommon --> Data
@@ -52,10 +53,10 @@ flowchart BT
 
 These arrows reflect the current `.csproj` references in `src/` rather than a conceptual layering sketch.
 
-- `Gateway` depends on `Logic`, `Data`, `Core`, and `Channels.Common`
+- `Gateway` depends on `Logic`, `Data`, and `Core`
 - `Logic` depends on `Data` and `Core`
 - `Data` depends on `Core`
 - `Channels.Common` depends on `Data`
-- Channel terminals are edge processes; they depend on `Data` and `Channels.Common` directly and do not depend on `Gateway` or `Logic`
-- Channel terminals only reach `Core` transitively through `Data`; they do not reference `Core` directly in the current solution
+- Channel terminals are edge processes; each terminal depends on `Logic`, `Data`, and `Channels.Common`, and does not reference `Gateway` directly
+- Channel terminals reach `Core` transitively through `Data` and `Logic`; they do not reference `Core` directly in the current solution
 - `Core` is the bottom layer

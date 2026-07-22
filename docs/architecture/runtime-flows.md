@@ -12,7 +12,7 @@ This page summarizes the main request and persistence flows in the current runti
 6. Authorization middleware runs.
 7. OpenAI-compatible endpoints are mapped through MAF hosting.
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs)
+Reference: [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
 
 ## Identity Resolution Flow
 

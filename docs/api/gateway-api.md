@@ -12,7 +12,7 @@ The composition root currently maps:
 - `GET /health`
 - `MapDevUI()` in Development only
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs)
+Reference: [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
 
 ## Health Endpoint
 
@@ -35,7 +35,7 @@ These endpoints are exercised by integration and Playwright tests under `test/`.
 
 The gateway currently registers the `Bearer` authentication scheme and ASP.NET authorization middleware.
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs)
+Reference: [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
 
 ## CORS
 

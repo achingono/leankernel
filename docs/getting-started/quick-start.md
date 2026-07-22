@@ -21,7 +21,11 @@ This starts:
 - PostgreSQL with `pgvector`
 - LiteLLM
 - GBrain
+- Playwright run-server
+- Webwright MCP server
 - LeanKernel Gateway
+- Signal services (`signal-cli` and `signal-terminal`)
+- Teams terminal (`teams-terminal`)
 
 Reference: [`../../docker-compose.yml`](../../docker-compose.yml)
 
@@ -33,7 +37,7 @@ curl http://127.0.0.1:8080/health
 
 Expected result: HTTP 200 with a small JSON payload containing `status: healthy`.
 
-Health endpoint mapping lives in [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs).
+Health endpoint mapping lives in [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs).
 
 ## Key Local URLs
 
@@ -41,6 +45,8 @@ Health endpoint mapping lives in [`../../src/Services/LeanKernel.Gateway/Program
 - Gateway health: `http://127.0.0.1:8080/health`
 - LiteLLM: `http://127.0.0.1:4000`
 - GBrain: `http://127.0.0.1:8789`
+- Webwright: `http://127.0.0.1:8000`
+- Teams terminal health: `http://127.0.0.1:3978/live`
 
 ## Next Reads
 

@@ -9,7 +9,7 @@ The current LeanKernel rebuild is a .NET 10 gateway-centered microservice archit
 - `LeanKernel.Data` owns EF Core persistence.
 - `LeanKernel.Core` holds shared entities and contracts.
 
-The composition root is [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs).
+The composition root is [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs).
 
 ## Runtime Topology
 
@@ -108,7 +108,7 @@ This deployment view is derived directly from `docker-compose.yml` and shows the
 
 | Component | Responsibility | Code anchor |
 |---|---|---|
-| Gateway host | DI, auth, session middleware, endpoint mapping, startup migrations | `src/Services/LeanKernel.Gateway/Programs.cs` |
+| Gateway host | DI, auth, session middleware, endpoint mapping, startup migrations | `src/Services/LeanKernel.Gateway/Program.cs` |
 | Request permit | Resolve tenant, user, channel, and guest fallback for the current request | `src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs` |
 | Agent session store | Persist MAF session state blobs | `src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs` |
 | Chat history provider | Persist and retrieve transcript turns through EF Core | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs` |

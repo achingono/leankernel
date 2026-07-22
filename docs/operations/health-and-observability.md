@@ -10,7 +10,7 @@ The gateway exposes:
 
 This endpoint is used both for manual checks and for the Docker Compose health check.
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs)
+Reference: [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
 
 ## Integration Coverage
 

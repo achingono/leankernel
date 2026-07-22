@@ -106,7 +106,7 @@ Code anchors:
 - [`../../src/Common/LeanKernel.Logic/Configuration/ToolSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/ToolSettings.cs)
 - [`../../src/Common/LeanKernel.Logic/Configuration/IdentityClaimsContextSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/IdentityClaimsContextSettings.cs)
 - [`../../src/Common/LeanKernel.Logic/Configuration/FileSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/FileSettings.cs)
-- [`../../src/Services/LeanKernel.Gateway/Programs.cs`](../../src/Services/LeanKernel.Gateway/Programs.cs)
+- [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
 
 ## Provider Selection Notes
 

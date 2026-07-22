@@ -4,8 +4,9 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS source
 WORKDIR /src
 
-COPY src/LeanKernel.sln .
-COPY src/Directory.Build.props .
+COPY .editorconfig .
+COPY src/LeanKernel.sln src/
+COPY src/Directory.Build.props src/
 COPY src/Common/LeanKernel.Core/LeanKernel.Core.csproj src/Common/LeanKernel.Core/
 COPY src/Common/LeanKernel.Data/LeanKernel.Data.csproj src/Common/LeanKernel.Data/
 COPY src/Common/LeanKernel.Logic/LeanKernel.Logic.csproj src/Common/LeanKernel.Logic/
@@ -14,7 +15,7 @@ COPY src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj src/Services/Lean
 
 # ── watch: install deps and run dotnet watch ────────────────
 FROM source AS watch
-WORKDIR /src
+WORKDIR /src/src
 
 # DOTNET_USE_POLLING_FILE_WATCHER is intentionally NOT set.
 # Native file system events work reliably with modern Docker for Mac
@@ -33,10 +34,10 @@ ENTRYPOINT dotnet watch --project Services/LeanKernel.Gateway/LeanKernel.Gateway
 FROM source AS build
 WORKDIR /src
 
-COPY src/ ./
+COPY src/ ./src
 
-RUN dotnet restore LeanKernel.sln
-RUN dotnet publish Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj -c Release -o /app/publish --no-restore
+RUN dotnet restore src/LeanKernel.sln
+RUN dotnet publish src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj -c Release -o /app/publish --no-restore
 
 # ── final: runtime image ─────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
