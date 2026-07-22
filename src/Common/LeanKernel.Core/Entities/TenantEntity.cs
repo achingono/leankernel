@@ -9,7 +9,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 /// Represents a tenant in the system, which can manage multiple groups.
 /// </summary>
 [DisplayColumn(nameof(Name))]
-public class TenantEntity : IAuditable, IRecyclable
+public class TenantEntity : IAuditable, IRecyclable, IEntity
 {
     /// <summary>
     /// Gets or sets the unique identifier for the tenant.

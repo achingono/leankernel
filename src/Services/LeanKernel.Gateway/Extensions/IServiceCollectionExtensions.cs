@@ -14,11 +14,25 @@ using Microsoft.Extensions.Options;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
+using LeanKernel.Gateway.Providers;
+
 /// <summary>
 /// Provides LeanKernel gateway service registration extensions.
 /// </summary>
 public static class IServiceCollectionExtensions
 {
+    /// <summary>
+    /// Registers the generic <see cref="IPermit{TEntity}"/> open-generic service
+    /// backed by <see cref="RequestContextPermit{TEntity}"/>.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddPermits(this IServiceCollection services)
+    {
+        services.AddScoped(typeof(IPermit<>), typeof(RequestContextPermit<>));
+        return services;
+    }
+
     /// <summary>
     /// Registers the GBrain-backed memory client and its supporting services.
     /// </summary>

@@ -1,5 +1,6 @@
 using System.ClientModel;
 
+using LeanKernel;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
@@ -18,11 +19,79 @@ using OpenAI;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
+using LeanKernel.Logic.Filters;
+using LeanKernel.Logic.Interfaces;
+using LeanKernel.Logic.Repositories;
+
 /// <summary>
 /// Provides extension methods for registering LeanKernel logic services.
 /// </summary>
 public static class IServiceCollectionExtensions
 {
+    /// <summary>
+    /// Registers the scope filter infrastructure: policy provider, filter builder, and
+    /// the open-generic <see cref="IFilter{TEntity}"/> service backed by <see cref="ScopeDrivenFilter{TEntity}"/>.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddFilters(this IServiceCollection services)
+    {
+        services.PostConfigure<EntityScopePolicies>(options =>
+        {
+            EnsureDefaultPolicy<SessionEntity>(options, ScopeDimension.Tenant | ScopeDimension.User | ScopeDimension.Channel);
+            EnsureDefaultPolicy<TurnEntity>(options, ScopeDimension.Tenant | ScopeDimension.User | ScopeDimension.Channel, "Session");
+            EnsureDefaultPolicy<TurnTelemetryEntity>(options, ScopeDimension.Tenant | ScopeDimension.User | ScopeDimension.Channel, "Turn.Session");
+            EnsureDefaultPolicy<ChannelSenderBindingEntity>(options, ScopeDimension.Tenant | ScopeDimension.User | ScopeDimension.Channel);
+            EnsureDefaultPolicy<ChannelMemoryPolicyEntity>(options, ScopeDimension.Tenant | ScopeDimension.Channel);
+            EnsureDefaultPolicy<UserEntity>(options, ScopeDimension.Tenant | ScopeDimension.User);
+            EnsureDefaultPolicy<TenantEntity>(options, ScopeDimension.Tenant);
+        });
+
+        services.AddSingleton<IScopePolicyProvider, ConfigurationScopePolicyProvider>();
+        services.AddSingleton<ScopeFilterBuilder>();
+        services.AddScoped(typeof(IFilter<>), typeof(ScopeDrivenFilter<>));
+        return services;
+    }
+
+    private static void EnsureDefaultPolicy<TEntity>(
+        EntityScopePolicies options,
+        ScopeDimension dimensions,
+        string? navigationPath = null,
+        bool requireAuthentication = false)
+        where TEntity : class
+    {
+        options.Policies ??= [];
+
+        var entityType = typeof(TEntity).FullName!;
+        var existing = options.Policies.FirstOrDefault(p =>
+            string.Equals(p.EntityType, entityType, StringComparison.Ordinal)
+            || string.Equals(p.EntityType, typeof(TEntity).Name, StringComparison.Ordinal));
+
+        if (existing is not null)
+        {
+            return;
+        }
+
+        options.Policies.Add(new EntityScopePolicy
+        {
+            EntityType = entityType,
+            Dimensions = dimensions,
+            NavigationPath = navigationPath,
+            RequireAuthentication = requireAuthentication,
+        });
+    }
+
+    /// <summary>
+    /// Registers the open-generic <see cref="IRepository{TEntity}"/> service backed by <see cref="EntityRepository{TEntity}"/>.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddRepositories(this IServiceCollection services)
+    {
+        services.AddScoped(typeof(IRepository<>), typeof(EntityRepository<>));
+        return services;
+    }
+
     /// <summary>
     /// Registers chat history and memory providers scoped by identity, against base types.
     /// </summary>

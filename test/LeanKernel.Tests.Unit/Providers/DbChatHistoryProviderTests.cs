@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.Json;
 
@@ -5,7 +6,9 @@ using FluentAssertions;
 
 using LeanKernel.Data;
 using LeanKernel.Entities;
+using LeanKernel.Logic.Interfaces;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Logic.Repositories;
 using LeanKernel.Logic.Telemetry;
 
 using Microsoft.Agents.AI;
@@ -559,8 +562,6 @@ public class DbChatHistoryProviderTests : IDisposable
         var context = new EntityContext(options);
         context.Database.EnsureCreated();
 
-        var factory = new Mock<IDbContextFactory<EntityContext>>();
-
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
@@ -568,13 +569,33 @@ public class DbChatHistoryProviderTests : IDisposable
         permit.Setup(p => p.TenantId).Returns(tenantId);
         permit.Setup(p => p.UserId).Returns(userId);
         permit.Setup(p => p.ChannelId).Returns(channelId);
+        permit.Setup(p => p.Badge).Returns(new Badge { Id = userId, FullName = "System", Email = "system@local" });
 
         SeedIdentityGraph(context, tenantId, userId, channelId);
 
-        factory.Setup(f => f.CreateDbContextAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => new EntityContext(options));
+        var sessionRepo = CreateRepo<SessionEntity>(context);
+        var turnRepo = CreateRepo<TurnEntity>(context);
+        var telemetryRepo = CreateRepo<TurnTelemetryEntity>(context);
 
-        return (new TestableDbChatHistoryProvider(factory.Object, permit.Object, collector), context);
+        return (new TestableDbChatHistoryProvider(sessionRepo, turnRepo, telemetryRepo, permit.Object, collector), context);
+    }
+
+    private static IRepository<TEntity> CreateRepo<TEntity>(EntityContext context)
+        where TEntity : class, IEntity
+    {
+        var permitMock = new Mock<IPermit<TEntity>>();
+        permitMock.Setup(p => p.Can(It.IsAny<Operation>())).Returns(true);
+        permitMock.Setup(p => p.Badge).Returns(new Badge
+        {
+            Id = Guid.Empty,
+            FullName = "System",
+            Email = "system@local",
+        });
+
+        var filterMock = new Mock<IFilter<TEntity>>();
+        filterMock.Setup(f => f.Predicate).Returns((Expression<Func<TEntity, bool>>?)null);
+
+        return new EntityRepository<TEntity>(context, filterMock.Object, permitMock.Object);
     }
 
     private static void SeedIdentityGraph(EntityContext context, Guid tenantId, Guid userId, Guid channelId)
@@ -687,10 +708,12 @@ internal sealed class TestableDbChatHistoryProvider : DbChatHistoryProvider
     private readonly IPermit _permit;
 
     public TestableDbChatHistoryProvider(
-        IDbContextFactory<EntityContext> dbContextFactory,
+        IRepository<SessionEntity> sessionRepo,
+        IRepository<TurnEntity> turnRepo,
+        IRepository<TurnTelemetryEntity> telemetryRepo,
         IPermit permit,
         ITurnTelemetryCollector? telemetryCollector = null)
-        : base(dbContextFactory, permit, telemetryCollector)
+        : base(sessionRepo, turnRepo, telemetryRepo, permit, telemetryCollector)
     {
         _permit = permit;
     }

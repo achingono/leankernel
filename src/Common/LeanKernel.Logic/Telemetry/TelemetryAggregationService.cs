@@ -1,4 +1,5 @@
-using LeanKernel.Data;
+using LeanKernel.Entities;
+using LeanKernel.Logic.Interfaces;
 using LeanKernel.Logic.Telemetry.Models;
 
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +8,10 @@ namespace LeanKernel.Logic.Telemetry;
 
 /// <summary>
 /// Aggregates persisted assistant-turn telemetry for the current request partition.
+/// All queries use <see cref="IRepository{TEntity}"/> to enforce scope predicates.
 /// </summary>
 public sealed class TelemetryAggregationService(
-    IDbContextFactory<EntityContext> dbContextFactory,
-    IPermit permit) : ITelemetryAggregationService
+    IRepository<TurnTelemetryEntity> telemetryRepo) : ITelemetryAggregationService
 {
     /// <summary>
     /// Gets cost breakdown grouped by model.
@@ -248,13 +249,8 @@ public sealed class TelemetryAggregationService(
 
     private async Task<List<TelemetryRow>> LoadRowsCoreAsync(DateRange range, CancellationToken cancellationToken)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-        var rows = await dbContext.TurnTelemetry
+        var rows = await telemetryRepo.GetAll()
             .AsNoTracking()
-            .Where(row => row.Turn.Session.TenantId == permit.TenantId)
-            .Where(row => row.Turn.Session.UserId == permit.UserId)
-            .Where(row => row.Turn.Session.ChannelId == permit.ChannelId)
             .Select(row => new TelemetryRow(
                 row.TurnId,
                 row.Turn.SessionId,

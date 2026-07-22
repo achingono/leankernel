@@ -12,6 +12,7 @@ LeanKernel is aimed at teams that want an agent runtime they can actually inspec
 
 - A MAF-based runtime with a real ASP.NET gateway instead of an isolated prototype loop.
 - Durable transcript and agent-state persistence backed by EF Core.
+- Permit/filter-based repository access for user data (`SessionEntity`, `TurnEntity`, `TurnTelemetryEntity`) so tenant/user/channel partitioning is enforced consistently.
 - A memory pipeline that stays provider-agnostic in logic while integrating with GBrain at the gateway boundary.
 - A local stack that can be run either directly from the gateway project or through Docker Compose with PostgreSQL, LiteLLM, and GBrain.
 
@@ -147,6 +148,7 @@ Contributor and coding-agent guidance lives in [`AGENTS.md`](AGENTS.md).
 ## Current Scope Notes
 
 - The implemented runtime is a gateway-centric service stack. The .NET projects in this worktree cover the gateway plus the shared libraries described above.
+- User-data reads and writes now flow through `IRepository<TEntity>` with `IPermit<TEntity>` + `IFilter<TEntity>` enforcement in `LeanKernel.Logic`.
 - `docker-compose.yml` supplies the companion runtime services used by the gateway, including PostgreSQL, LiteLLM, GBrain, Webwright, and Playwright.
 - `src/Services` currently contains only `LeanKernel.Gateway`.
 - `src/Terminals` currently exists as a placeholder directory and does not contain active projects.

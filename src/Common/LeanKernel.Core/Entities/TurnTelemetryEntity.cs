@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations;
 /// Persists structured model/provider/token-usage/cost telemetry for a single assistant turn.
 /// One-to-one with <see cref="TurnEntity"/> keyed by <see cref="TurnId"/>.
 /// </summary>
-public sealed class TurnTelemetryEntity : IAuditable, IRecyclable
+public sealed class TurnTelemetryEntity : IAuditable, IRecyclable, IEntity
 {
     /// <summary>
     /// Gets or sets the unique telemetry record identifier.

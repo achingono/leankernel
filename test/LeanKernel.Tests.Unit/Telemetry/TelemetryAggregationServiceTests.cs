@@ -1,10 +1,13 @@
+using System.Linq.Expressions;
+
 using FluentAssertions;
 
 using LeanKernel.Data;
 using LeanKernel.Entities;
+using LeanKernel.Logic.Interfaces;
+using LeanKernel.Logic.Repositories;
 using LeanKernel.Logic.Telemetry;
 using LeanKernel.Logic.Telemetry.Models;
-using LeanKernel.Tests.Unit.TestDoubles;
 
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -72,7 +75,8 @@ public sealed class TelemetryAggregationServiceTests : IDisposable
             InsertTurnWithTelemetry(context, tenantId, otherUserId, channelId, "gpt-4o", "openai", 900, 500, 0.100m, false, DateTimeOffset.UtcNow.AddHours(-1));
         });
 
-        var service = CreateSut(tenantId, permitUserId, channelId);
+        var service = CreateSut(tenantId, permitUserId, channelId,
+            te => te.Turn.Session.UserId == permitUserId);
 
         var summary = await service.GetSummaryAsync(DateRange.Last7Days());
 
@@ -201,15 +205,28 @@ public sealed class TelemetryAggregationServiceTests : IDisposable
         await context.SaveChangesAsync();
     }
 
-    private ITelemetryAggregationService CreateSut(Guid tenantId, Guid userId, Guid channelId)
+    private ITelemetryAggregationService CreateSut(Guid tenantId, Guid userId, Guid channelId,
+        Expression<Func<TurnTelemetryEntity, bool>>? filterPredicate = null)
     {
-        var permit = new Mock<IPermit>();
-        permit.SetupGet(p => p.TenantId).Returns(tenantId);
-        permit.SetupGet(p => p.UserId).Returns(userId);
-        permit.SetupGet(p => p.ChannelId).Returns(channelId);
+        var options = CreateOptions();
+        var context = new EntityContext(options);
+        context.Database.EnsureCreated();
 
-        var factory = new TestDbContextFactory(CreateOptions());
-        return new TelemetryAggregationService(factory, permit.Object);
+        var telemetryRepo = CreateRepo<TurnTelemetryEntity>(context, filterPredicate);
+        return new TelemetryAggregationService(telemetryRepo);
+    }
+
+    private static IRepository<TEntity> CreateRepo<TEntity>(EntityContext context,
+        Expression<Func<TEntity, bool>>? filterPredicate = null)
+        where TEntity : class, IEntity
+    {
+        var permitMock = new Mock<IPermit<TEntity>>();
+        permitMock.Setup(p => p.Can(It.IsAny<Operation>())).Returns(true);
+
+        var filterMock = new Mock<IFilter<TEntity>>();
+        filterMock.Setup(f => f.Predicate).Returns(filterPredicate ?? (Expression<Func<TEntity, bool>>?)null);
+
+        return new EntityRepository<TEntity>(context, filterMock.Object, permitMock.Object);
     }
 
     private DbContextOptions<EntityContext> CreateOptions()

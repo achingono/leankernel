@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations;
 /// <summary>
 /// Represents a persisted user identity resolved from an external principal or anonymous session.
 /// </summary>
-public class UserEntity : IAuditable, IRecyclable
+public class UserEntity : IAuditable, IRecyclable, IEntity
 {
     /// <summary>
     /// Gets or sets the unique identifier for the user.

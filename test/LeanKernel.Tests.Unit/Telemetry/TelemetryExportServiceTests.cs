@@ -1,10 +1,13 @@
+using System.Linq.Expressions;
+
 using FluentAssertions;
 
 using LeanKernel.Data;
 using LeanKernel.Entities;
+using LeanKernel.Logic.Interfaces;
+using LeanKernel.Logic.Repositories;
 using LeanKernel.Logic.Telemetry;
 using LeanKernel.Logic.Telemetry.Models;
-using LeanKernel.Tests.Unit.TestDoubles;
 
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -201,13 +204,24 @@ public sealed class TelemetryExportServiceTests : IDisposable
 
     private ITelemetryExportService CreateSut(Guid tenantId, Guid userId, Guid channelId)
     {
-        var permit = new Mock<IPermit>();
-        permit.SetupGet(p => p.TenantId).Returns(tenantId);
-        permit.SetupGet(p => p.UserId).Returns(userId);
-        permit.SetupGet(p => p.ChannelId).Returns(channelId);
+        var options = CreateOptions();
+        var context = new EntityContext(options);
+        context.Database.EnsureCreated();
 
-        var factory = new TestDbContextFactory(CreateOptions());
-        return new TelemetryExportService(factory, permit.Object);
+        var telemetryRepo = CreateRepo<TurnTelemetryEntity>(context);
+        return new TelemetryExportService(telemetryRepo);
+    }
+
+    private static IRepository<TEntity> CreateRepo<TEntity>(EntityContext context)
+        where TEntity : class, IEntity
+    {
+        var permitMock = new Mock<IPermit<TEntity>>();
+        permitMock.Setup(p => p.Can(It.IsAny<Operation>())).Returns(true);
+
+        var filterMock = new Mock<IFilter<TEntity>>();
+        filterMock.Setup(f => f.Predicate).Returns((Expression<Func<TEntity, bool>>?)null);
+
+        return new EntityRepository<TEntity>(context, filterMock.Object, permitMock.Object);
     }
 
     private DbContextOptions<EntityContext> CreateOptions()

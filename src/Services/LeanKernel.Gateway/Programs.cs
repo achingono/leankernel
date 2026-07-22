@@ -98,6 +98,7 @@ public partial class Program
             .ValidateOnStart();
         builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("Files"));
         builder.Services.Configure<GBrainSettings>(builder.Configuration.GetSection("GBrain"));
+        builder.Services.Configure<EntityScopePolicies>(builder.Configuration.GetSection("Agents:EntityScopePolicies"));
 
         builder.Services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
         builder.Services.TryAddSingleton<IPrincipalAccessor, PrincipalAccessor>();
@@ -110,6 +111,10 @@ public partial class Program
 
         builder.Services.AddScoped<IIdentityResolver, IdentityResolver>();
         builder.Services.AddScoped<IPermit, RequestContextPermit>();
+        builder.Services.AddPermits();
+
+        builder.Services.AddFilters();
+        builder.Services.AddRepositories();
 
         builder.Services.AddDistributedMemoryCache();
         builder.Services.AddSession();

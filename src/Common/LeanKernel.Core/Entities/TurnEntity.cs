@@ -7,7 +7,7 @@ using System.Text;
 /// <summary>
 /// Represents a persisted conversation turn within a session.
 /// </summary>
-public sealed class TurnEntity : IAuditable, IRecyclable
+public sealed class TurnEntity : IAuditable, IRecyclable, IEntity
 {
     /// <summary>
     /// Gets or sets the unique turn identifier.

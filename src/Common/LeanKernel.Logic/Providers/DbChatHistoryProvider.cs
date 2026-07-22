@@ -1,5 +1,5 @@
-using LeanKernel.Data;
 using LeanKernel.Entities;
+using LeanKernel.Logic.Interfaces;
 using LeanKernel.Logic.Telemetry;
 
 using Microsoft.Agents.AI;
@@ -12,9 +12,12 @@ namespace LeanKernel.Logic.Providers;
 /// <summary>
 /// Provides chat history storage backed by EF Core, filtered by tenant/user/channel identity.
 /// Ownership is verified through <see cref="SessionEntity"/> to enforce partitioning.
+/// All user data access uses <see cref="IRepository{TEntity}"/> to enforce permits and filters.
 /// </summary>
 public class DbChatHistoryProvider(
-    IDbContextFactory<EntityContext> dbContextFactory,
+    IRepository<SessionEntity> sessionRepo,
+    IRepository<TurnEntity> turnRepo,
+    IRepository<TurnTelemetryEntity> telemetryRepo,
     IPermit permit,
     ITurnTelemetryCollector? telemetryCollector = null,
     ILogger<DbChatHistoryProvider>? logger = null) : ChatHistoryProvider
@@ -45,10 +48,7 @@ public class DbChatHistoryProvider(
             return [];
         }
 
-        using var scope = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-        // Verify ownership: the session must belong to the current tenant/user/channel
-        var ownsSession = await scope.Sessions
+        var ownsSession = await sessionRepo.GetAll()
             .AnyAsync(
                 s =>
                 s.Id == chatSessionGuid &&
@@ -62,7 +62,7 @@ public class DbChatHistoryProvider(
             return [];
         }
 
-        var turns = await scope.Turns
+        var turns = await turnRepo.GetAll()
             .Where(t => t.SessionId == chatSessionGuid)
             .ToListAsync(cancellationToken);
 
@@ -93,10 +93,7 @@ public class DbChatHistoryProvider(
         session.StateBag.TryGetValue<string>(ChatSessionIdKey, out var chatSessionId);
         session.StateBag.TryGetValue<string>(ConversationIdKey, out var conversationId);
 
-        using var scope = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-
         var sessionGuid = await EnsureOwnedSessionAsync(
-            scope,
             session,
             chatSessionId,
             conversationId,
@@ -114,7 +111,7 @@ public class DbChatHistoryProvider(
 
         // Load existing idempotency keys for this session to detect retries.
         var existingKeys = new HashSet<string>(
-            await scope.Turns
+            await turnRepo.GetAll()
                 .Where(t => t.SessionId == sessionGuid && t.Metadata != null)
                 .Select(t => t.Metadata!)
                 .ToListAsync(cancellationToken),
@@ -127,13 +124,13 @@ public class DbChatHistoryProvider(
         {
             if (!existingKeys.Contains(turn.Metadata!))
             {
-                scope.Turns.Add(turn);
+                turnRepo.Add(turn);
                 existingKeys.Add(turn.Metadata!);
 
                 // Persist telemetry for assistant turns when available.
                 if (telemetry is not null && turn.Role == "assistant")
                 {
-                    scope.TurnTelemetry.Add(new TurnTelemetryEntity
+                    telemetryRepo.Add(new TurnTelemetryEntity
                     {
                         TurnId = turn.Id,
                         RequestedModel = telemetry.RequestedModel,
@@ -164,14 +161,13 @@ public class DbChatHistoryProvider(
             }
         }
 
-        await scope.SaveChangesAsync(cancellationToken);
+        await turnRepo.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
     /// Ensures the current request owns the chat session, creating it when needed.
     /// </summary>
     private async Task<Guid> EnsureOwnedSessionAsync(
-        EntityContext dbContext,
         AgentSession session,
         string? chatSessionId,
         string? conversationId,
@@ -180,7 +176,7 @@ public class DbChatHistoryProvider(
         if (!string.IsNullOrWhiteSpace(chatSessionId)
             && Guid.TryParse(chatSessionId, out var existingSessionId))
         {
-            await EnsureOwnershipAsync(dbContext, existingSessionId, cancellationToken);
+            await EnsureOwnershipAsync(existingSessionId, cancellationToken);
             return existingSessionId;
         }
 
@@ -204,8 +200,8 @@ public class DbChatHistoryProvider(
                 Email = string.Empty
             }
         };
-        dbContext.Sessions.Add(sessionEntity);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        sessionRepo.Add(sessionEntity);
+        await sessionRepo.SaveChangesAsync(cancellationToken);
         session.StateBag.SetValue(ChatSessionIdKey, sessionEntity.Id.ToString());
         return sessionEntity.Id;
     }
@@ -213,9 +209,9 @@ public class DbChatHistoryProvider(
     /// <summary>
     /// Verifies that a session belongs to the current tenant, user, and channel partition.
     /// </summary>
-    private async Task EnsureOwnershipAsync(EntityContext dbContext, Guid sessionGuid, CancellationToken cancellationToken)
+    private async Task EnsureOwnershipAsync(Guid sessionGuid, CancellationToken cancellationToken)
     {
-        var ownsSession = await dbContext.Sessions
+        var ownsSession = await sessionRepo.GetAll()
             .AnyAsync(
                 s =>
                 s.Id == sessionGuid &&

@@ -1,4 +1,5 @@
-using LeanKernel.Data;
+using LeanKernel.Entities;
+using LeanKernel.Logic.Interfaces;
 using LeanKernel.Logic.Telemetry.Models;
 
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +8,10 @@ namespace LeanKernel.Logic.Telemetry;
 
 /// <summary>
 /// Exports deterministic, permit-scoped telemetry records without conversation content.
+/// All queries use <see cref="IRepository{TEntity}"/> to enforce scope predicates.
 /// </summary>
 public sealed class TelemetryExportService(
-    IDbContextFactory<EntityContext> dbContextFactory,
-    IPermit permit) : ITelemetryExportService
+    IRepository<TurnTelemetryEntity> telemetryRepo) : ITelemetryExportService
 {
     /// <summary>
     /// Exports telemetry records for the given date range.
@@ -38,13 +39,8 @@ public sealed class TelemetryExportService(
         DateRange range,
         CancellationToken cancellationToken)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-        var rows = await dbContext.TurnTelemetry
+        var rows = await telemetryRepo.GetAll()
             .AsNoTracking()
-            .Where(row => row.Turn.Session.TenantId == permit.TenantId)
-            .Where(row => row.Turn.Session.UserId == permit.UserId)
-            .Where(row => row.Turn.Session.ChannelId == permit.ChannelId)
             .Select(row => new TelemetryExportRecord(
                 row.CapturedAt,
                 string.IsNullOrWhiteSpace(row.RequestedModel) ? "unknown" : row.RequestedModel,

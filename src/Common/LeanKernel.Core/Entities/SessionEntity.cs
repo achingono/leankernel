@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations;
 /// <summary>
 /// Represents a persisted chat session for a channel and user pair.
 /// </summary>
-public class SessionEntity : IAuditable, IRecyclable
+public class SessionEntity : IAuditable, IRecyclable, IEntity
 {
     /// <summary>
     /// Gets or sets the unique session identifier.

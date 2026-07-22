@@ -5,6 +5,7 @@ Feature documentation is organized by implemented capability area.
 ## Capability Areas
 
 - [Agent runtime](agent-runtime.md)
+- [Authorization permits and filters](authorization-permits-filters.md)
 - [Channels](channels.md)
 - [Identity partitioning](identity-partitioning.md)
 - [Memory pipeline](memory-pipeline.md)
