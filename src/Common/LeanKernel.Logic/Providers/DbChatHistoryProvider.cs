@@ -94,95 +94,112 @@ public class DbChatHistoryProvider(
         CancellationToken cancellationToken = default)
     {
         var session = context.Session ?? throw new InvalidOperationException("Session is required.");
-        session.StateBag.TryGetValue<string>(ChatSessionIdKey, out var chatSessionId);
-        session.StateBag.TryGetValue<string>(ConversationIdKey, out var conversationId);
-
-        var sessionGuid = await EnsureOwnedSessionAsync(
-            session,
-            chatSessionId,
-            conversationId,
-            cancellationToken);
-
-        // Collect candidate turns and assign idempotency keys before checking for duplicates.
-        var requestTurns = BuildTurnEntities(context.RequestMessages, sessionGuid, isRequest: true);
-        var responseTurns = BuildTurnEntities(context.ResponseMessages, sessionGuid, isRequest: false);
-        var allCandidateTurns = requestTurns.Concat(responseTurns).ToList();
-
-        if (allCandidateTurns.Count == 0)
+        try
         {
-            return;
-        }
+            session.StateBag.TryGetValue<string>(ChatSessionIdKey, out var chatSessionId);
+            session.StateBag.TryGetValue<string>(ConversationIdKey, out var conversationId);
 
-        // Load existing idempotency keys for this session to detect retries.
-        var existingKeys = new HashSet<string>(
-            await turnRepo.GetAll()
-                .Where(t => t.SessionId == sessionGuid && t.Metadata != null)
-                .Select(t => t.Metadata!)
-                .ToListAsync(cancellationToken),
-            StringComparer.OrdinalIgnoreCase);
+            var sessionGuid = await EnsureOwnedSessionAsync(
+                session,
+                chatSessionId,
+                conversationId,
+                cancellationToken);
 
-        // Consume telemetry captured for the assistant turn (if any).
-        var telemetry = telemetryCollector?.Consume();
+            // Collect candidate turns and assign idempotency keys before checking for duplicates.
+            var requestTurns = BuildTurnEntities(context.RequestMessages, sessionGuid, isRequest: true);
+            var responseTurns = BuildTurnEntities(context.ResponseMessages, sessionGuid, isRequest: false);
+            var allCandidateTurns = requestTurns.Concat(responseTurns).ToList();
 
-        foreach (var turn in allCandidateTurns)
-        {
-            if (!existingKeys.Contains(turn.Metadata!))
+            if (allCandidateTurns.Count == 0)
             {
-                turnRepo.Add(turn);
-                existingKeys.Add(turn.Metadata!);
+                return;
+            }
 
-                // Emit turn event alongside persistence for the event spine.
-                EmitTurnEvent(turn, sessionGuid);
+            // Load existing idempotency keys for this session to detect retries.
+            var existingKeys = new HashSet<string>(
+                await turnRepo.GetAll()
+                    .Where(t => t.SessionId == sessionGuid && t.Metadata != null)
+                    .Select(t => t.Metadata!)
+                    .ToListAsync(cancellationToken),
+                StringComparer.OrdinalIgnoreCase);
 
-                // Persist telemetry for assistant turns when available.
-                if (telemetry is not null && turn.Role == "assistant")
+            // Consume telemetry captured for the assistant turn (if any).
+            var telemetry = telemetryCollector?.Consume();
+
+            foreach (var turn in allCandidateTurns)
+            {
+                if (!existingKeys.Contains(turn.Metadata!))
                 {
-                    var telemetryEntity = new TurnTelemetryEntity
+                    turnRepo.Add(turn);
+                    existingKeys.Add(turn.Metadata!);
+
+                    // Emit turn event alongside persistence for the event spine.
+                    EmitTurnEvent(turn, sessionGuid);
+
+                    // Persist telemetry for assistant turns when available.
+                    if (telemetry is not null && turn.Role == "assistant")
                     {
-                        TurnId = turn.Id,
-                        RequestedModel = telemetry.RequestedModel,
-                        ServedModel = telemetry.ServedModel,
-                        Provider = telemetry.Provider,
-                        ModelId = telemetry.ModelId,
-                        ApiBase = telemetry.ApiBase,
-                        PromptTokens = telemetry.PromptTokens,
-                        CompletionTokens = telemetry.CompletionTokens,
-                        TotalTokens = telemetry.TotalTokens,
-                        ResponseCost = telemetry.ResponseCost,
-                        Currency = telemetry.Currency,
-                        CostIsEstimated = telemetry.CostIsEstimated,
-                        LatencyMs = telemetry.Latency.HasValue
-                            ? (long)telemetry.Latency.Value.TotalMilliseconds
-                            : null,
-                        CapturedAt = telemetry.CapturedAt,
-                        SchemaVersion = telemetry.SchemaVersion,
-                        CreatedOn = DateTime.UtcNow,
-                        CreatedBy = new Badge
+                        var telemetryEntity = new TurnTelemetryEntity
                         {
-                            Id = Guid.Empty,
-                            FullName = "System",
-                            Email = string.Empty
-                        }
-                    };
+                            TurnId = turn.Id,
+                            RequestedModel = telemetry.RequestedModel,
+                            ServedModel = telemetry.ServedModel,
+                            Provider = telemetry.Provider,
+                            ModelId = telemetry.ModelId,
+                            ApiBase = telemetry.ApiBase,
+                            PromptTokens = telemetry.PromptTokens,
+                            CompletionTokens = telemetry.CompletionTokens,
+                            TotalTokens = telemetry.TotalTokens,
+                            ResponseCost = telemetry.ResponseCost,
+                            Currency = telemetry.Currency,
+                            CostIsEstimated = telemetry.CostIsEstimated,
+                            LatencyMs = telemetry.Latency.HasValue
+                                ? (long)telemetry.Latency.Value.TotalMilliseconds
+                                : null,
+                            CapturedAt = telemetry.CapturedAt,
+                            SchemaVersion = telemetry.SchemaVersion,
+                            CreatedOn = DateTime.UtcNow,
+                            CreatedBy = new Badge
+                            {
+                                Id = Guid.Empty,
+                                FullName = "System",
+                                Email = string.Empty
+                            }
+                        };
 
-                    telemetryRepo.Add(telemetryEntity);
+                        telemetryRepo.Add(telemetryEntity);
 
-                    // Emit telemetry event alongside persistence.
-                    EmitTelemetryEvent(telemetryEntity, telemetry);
+                        // Emit telemetry event alongside persistence.
+                        EmitTelemetryEvent(telemetryEntity, telemetry);
+                    }
+                }
+            }
+
+            await turnRepo.SaveChangesAsync(cancellationToken);
+
+            if (eventCollector is not null && eventStore is not null)
+            {
+                var pendingEvents = eventCollector.ConsumeAll();
+                if (pendingEvents.Count > 0)
+                {
+                    await eventStore.AppendBatchAsync(pendingEvents, cancellationToken);
                 }
             }
         }
-
-        await turnRepo.SaveChangesAsync(cancellationToken);
-
-        if (eventCollector is not null && eventStore is not null)
+        catch (InvalidOperationException ex) when (IsPermitFailure(ex))
         {
-            var pendingEvents = eventCollector.ConsumeAll();
-            if (pendingEvents.Count > 0)
-            {
-                await eventStore.AppendBatchAsync(pendingEvents, cancellationToken);
-            }
+            logger?.LogWarning(
+                ex,
+                "Chat history persistence skipped because operation was not permitted for current identity (TenantId={TenantId}, UserId={UserId}, ChannelId={ChannelId}).",
+                permit.TenantId,
+                permit.UserId,
+                permit.ChannelId);
         }
+    }
+
+    private static bool IsPermitFailure(InvalidOperationException exception)
+    {
+        return exception.Message.Contains("not permitted", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

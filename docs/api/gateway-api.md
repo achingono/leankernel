@@ -8,6 +8,8 @@ The composition root currently maps:
 
 - `MapOpenAIResponses()`
 - `MapOpenAIConversations()`
+- `GET /v1/models`
+- `GET /v1/chat/completions`
 - `MapProxiedOpenAIChatCompletions()` at `/v1/internal/completions`
 - `GET /health`
 - `MapDevUI()` in Development only
@@ -26,8 +28,10 @@ The exact route set for responses and conversations is owned by the MAF hosting 
 
 Current expectation:
 
+- `/v1/models`
 - `/v1/responses`
 - `/v1/conversations`
+- `/v1/chat/completions`
 
 These endpoints are exercised by integration and Playwright tests under `test/`.
 

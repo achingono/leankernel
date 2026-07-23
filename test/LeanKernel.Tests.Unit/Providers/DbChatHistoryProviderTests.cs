@@ -365,6 +365,26 @@ public class DbChatHistoryProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task StoreChatHistoryAsync_WhenSessionCreateNotPermitted_DoesNotThrowAndSkipsPersistence()
+    {
+        var (provider, dbContext) = CreateSut(
+            sessionCan: operation => operation != Operation.Create);
+        var session = CreateSession(new Dictionary<string, string?>());
+        var requestMessages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "hello")
+        };
+
+        var act = async () => await provider.InvokeStoreChatHistoryAsync(
+            CreateInvokedContext(session: session, requestMessages: requestMessages),
+            CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+        dbContext.Sessions.Should().BeEmpty();
+        dbContext.Turns.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task StoreChatHistoryAsync_NoSessionId_CreatesNewSession()
     {
         var (provider, dbContext) = CreateSut();
@@ -554,7 +574,11 @@ public class DbChatHistoryProviderTests : IDisposable
         dbContext.TurnTelemetry.Should().BeEmpty();
     }
 
-    private (TestableDbChatHistoryProvider provider, EntityContext context) CreateSut(ITurnTelemetryCollector? collector = null)
+    private (TestableDbChatHistoryProvider provider, EntityContext context) CreateSut(
+        ITurnTelemetryCollector? collector = null,
+        Func<Operation, bool>? sessionCan = null,
+        Func<Operation, bool>? turnCan = null,
+        Func<Operation, bool>? telemetryCan = null)
     {
         var options = new DbContextOptionsBuilder<EntityContext>()
             .UseSqlite(_connection)
@@ -573,18 +597,20 @@ public class DbChatHistoryProviderTests : IDisposable
 
         SeedIdentityGraph(context, tenantId, userId, channelId);
 
-        var sessionRepo = CreateRepo<SessionEntity>(context);
-        var turnRepo = CreateRepo<TurnEntity>(context);
-        var telemetryRepo = CreateRepo<TurnTelemetryEntity>(context);
+        var sessionRepo = CreateRepo<SessionEntity>(context, sessionCan);
+        var turnRepo = CreateRepo<TurnEntity>(context, turnCan);
+        var telemetryRepo = CreateRepo<TurnTelemetryEntity>(context, telemetryCan);
 
         return (new TestableDbChatHistoryProvider(sessionRepo, turnRepo, telemetryRepo, permit.Object, collector), context);
     }
 
-    private static IRepository<TEntity> CreateRepo<TEntity>(EntityContext context)
+    private static IRepository<TEntity> CreateRepo<TEntity>(
+        EntityContext context,
+        Func<Operation, bool>? can = null)
         where TEntity : class, IEntity
     {
         var permitMock = new Mock<IPermit<TEntity>>();
-        permitMock.Setup(p => p.Can(It.IsAny<Operation>())).Returns(true);
+        permitMock.Setup(p => p.Can(It.IsAny<Operation>())).Returns((Operation operation) => can?.Invoke(operation) ?? true);
         permitMock.Setup(p => p.Badge).Returns(new Badge
         {
             Id = Guid.Empty,

@@ -8,3 +8,4 @@ coverage-results*/
 .playwright-mcp/
 **/coverage.*.xml
 __pycache__/
+sonar-reports/

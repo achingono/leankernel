@@ -93,6 +93,46 @@ public class ChatCompletionsProxyTests
         routePatterns.Should().Contain("/v1/internal/completions/");
     }
 
+    [Fact]
+    public async Task MapOpenAIModels_ReturnsSingleConfiguredModel()
+    {
+        var builder = WebApplication.CreateBuilder();
+        var app = builder.Build();
+
+        app.MapOpenAIModels("leankernel");
+
+        var routeBuilder = (IEndpointRouteBuilder)app;
+        var routePatterns = routeBuilder.DataSources
+            .SelectMany(dataSource => dataSource.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .ToArray();
+
+        routePatterns.Should().Contain("/v1/models");
+
+        var endpoint = routeBuilder.DataSources
+            .SelectMany(dataSource => dataSource.Endpoints)
+            .OfType<RouteEndpoint>()
+            .First(routeEndpoint => routeEndpoint.RoutePattern.RawText == "/v1/models");
+
+        var context = new DefaultHttpContext();
+        context.RequestServices = new ServiceCollection().AddLogging().BuildServiceProvider();
+        context.Response.Body = new MemoryStream();
+
+        await endpoint.RequestDelegate!(context);
+
+        context.Response.Body.Position = 0;
+        using var reader = new StreamReader(context.Response.Body, leaveOpen: true);
+        var body = await reader.ReadToEndAsync();
+
+        using var document = JsonDocument.Parse(body);
+        document.RootElement.GetProperty("object").GetString().Should().Be("list");
+        var data = document.RootElement.GetProperty("data");
+        data.GetArrayLength().Should().Be(1);
+        data[0].GetProperty("id").GetString().Should().Be("leankernel");
+        data[0].GetProperty("object").GetString().Should().Be("model");
+    }
+
     private static async Task<ExecutedResult> ExecuteResultAsync(IResult result)
     {
         var context = new DefaultHttpContext();

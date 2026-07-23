@@ -50,6 +50,35 @@ public static class IEndpointRouteBuilderExtensions
     }
 
     /// <summary>
+    /// Registers the OpenAI-compatible model discovery endpoint.
+    /// </summary>
+    /// <param name="endpoints">The route builder.</param>
+    /// <param name="agentName">The configured agent name to expose as the single model.</param>
+    /// <returns>The mapped endpoint builder.</returns>
+    public static IEndpointConventionBuilder MapOpenAIModels(
+        this IEndpointRouteBuilder endpoints,
+        string agentName)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentException.ThrowIfNullOrWhiteSpace(agentName);
+
+        return endpoints.MapGet("/v1/models", () => Results.Json(new
+        {
+            @object = "list",
+            data = new[]
+            {
+                new
+                {
+                    id = agentName,
+                    @object = "model",
+                    created = 0,
+                    owned_by = agentName,
+                },
+            },
+        }));
+    }
+
+    /// <summary>
     /// Rewrites and forwards chat-completions requests to the internal MAF handler.
     /// </summary>
     /// <param name="internalPath">The internal MAF route receiving rewritten payloads.</param>

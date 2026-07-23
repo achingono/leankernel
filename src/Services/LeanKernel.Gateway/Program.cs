@@ -252,6 +252,7 @@ app.UseAuthorization();
 
 app.MapOpenAIResponses();
 app.MapOpenAIConversations();
+app.MapOpenAIModels(Constants.Agent.DefaultName);
 app.MapProxiedOpenAIChatCompletions(Constants.Agent.DefaultName, "/v1/internal/completions", new OpenAIChatCompletionsMapOptions
 {
     RunOptionsFactory = _ => null,
