@@ -29,7 +29,7 @@ flowchart LR
     Gateway --> Agent[Named AIAgent]
     Agent --> History[DbChatHistoryProvider]
     Agent --> Memory[MemoryProvider]
-    Agent --> Tools[Tool runtime / MCP Webwright]
+    Agent --> Tools[Tool runtime / MCP Webwright / Document tools]
     History --> Data[(EntityContext)]
     Memory --> GBrain[GBrain MCP]
     Agent --> State[DbAgentStateStore]
@@ -49,6 +49,13 @@ This docs set describes the implementation that actually exists today:
 - `src/Terminals/LeanKernel.Channels.Signal`
 - `src/Terminals/LeanKernel.Channels.Teams`
 - test projects under `test/`
+
+Current implementation highlights:
+
+- OpenAI-compatible runtime endpoints (`/v1/responses`, `/v1/conversations`, `/v1/models`, `/v1/chat/completions`).
+- Upload and background document ingestion (`POST /api/documents/upload`, multipart attachment staging, durable ingestion queue, watch folders).
+- Tool runtime with built-ins, MCP discovery, conditional memory tools, and document tools.
+- EF-backed transcript/event/session persistence with identity partitioning.
 
 ## Code Anchors
 

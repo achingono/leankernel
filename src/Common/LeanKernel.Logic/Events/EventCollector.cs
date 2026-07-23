@@ -13,21 +13,18 @@ public sealed class EventCollector : IEventCollector
     private readonly ConcurrentQueue<object> _events = new();
 
     /// <inheritdoc />
-    public void EmitTurn(TurnEvent turnEvent)
-    {
-        _events.Enqueue(turnEvent);
-    }
+    public void EmitTurn(TurnEvent turnEvent) => Emit(turnEvent);
 
     /// <inheritdoc />
-    public void EmitToolCall(ToolCallEvent toolCallEvent)
-    {
-        _events.Enqueue(toolCallEvent);
-    }
+    public void EmitToolCall(ToolCallEvent toolCallEvent) => Emit(toolCallEvent);
 
     /// <inheritdoc />
-    public void EmitTelemetry(TelemetryEvent telemetryEvent)
+    public void EmitTelemetry(TelemetryEvent telemetryEvent) => Emit(telemetryEvent);
+
+    /// <inheritdoc />
+    public void Emit<T>(T @event)
     {
-        _events.Enqueue(telemetryEvent);
+        _events.Enqueue(@event!);
     }
 
     /// <inheritdoc />

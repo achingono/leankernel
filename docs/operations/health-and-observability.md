@@ -1,6 +1,6 @@
 # Health and Observability
 
-The current rebuild has a small but useful operational surface.
+The current implementation has a small but useful operational surface.
 
 ## Health Endpoint
 
@@ -28,10 +28,11 @@ Operational quality scripts live under `scripts/quality/` and cover:
 - test coverage
 - SonarQube scan orchestration
 - SonarQube result summaries
+- quality-gate polling (scanner waits for gate result)
 
 ## Current Observability Boundary
 
-The rebuild does not yet expose a separate diagnostics service or rich production telemetry surface. The current observability story is centered on:
+The runtime does not yet expose a separate diagnostics service or rich production telemetry surface. The current observability story is centered on:
 
 - health checks
 - build and test workflows

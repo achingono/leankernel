@@ -23,6 +23,7 @@ flowchart LR
     Agent --> EventStore[DbEventStore]
     Agent --> Memory[MemoryProvider]
     Agent --> Tools[Tool runtime and MCP adapters]
+    Gateway --> Ingestion[Upload plus document ingestion pipeline]
     Agent --> SessionStore[DbAgentStateStore]
     History --> Db[(EntityContext)]
     EventStore --> Db

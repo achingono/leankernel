@@ -38,7 +38,7 @@ LeanKernel is aimed at teams that want an agent runtime they can actually inspec
 | `src/Common/LeanKernel.Core` | Shared interfaces, entities, and low-level contracts |
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, and design-time data access support |
 | `src/Common/LeanKernel.Logic` | Chat history, memory pipeline, identity resolution, and MAF-facing logic services |
-| `src/Services/LeanKernel.Gateway` | ASP.NET host, endpoint mapping, auth/session middleware, GBrain integration, and agent state wiring |
+| `src/Services/LeanKernel.Gateway` | ASP.NET host, OpenAI-compatible endpoint mapping, auth/session middleware, document upload/multipart ingestion, GBrain integration, and agent state wiring |
 | `src/Terminals/LeanKernel.Channels.Common` | Shared terminal runtime helpers for gateway communication, health responses, and sender binding resolution |
 | `src/Terminals/LeanKernel.Channels.Signal` | Signal terminal edge process using the `signal-cli` JSON-RPC sidecar |
 | `src/Terminals/LeanKernel.Channels.Teams` | Teams Bot Framework terminal edge process |
@@ -80,6 +80,8 @@ dotnet run --project src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj -
 
 Direct local runs use the gateway appsettings defaults, which point at SQLite unless you override connection strings.
 
+Current implementation note: the chat-completions proxy helper forwards via `http://localhost:8080`, so `/v1/chat/completions` behaves as expected when the compose-style gateway URL is available.
+
 Reference: [`docs/getting-started/local-development.md`](docs/getting-started/local-development.md)
 
 ### Useful Local URLs
@@ -87,6 +89,7 @@ Reference: [`docs/getting-started/local-development.md`](docs/getting-started/lo
 - Direct gateway run: `http://127.0.0.1:5080`
 - Compose gateway: `http://127.0.0.1:8080`
 - Gateway health: `http://127.0.0.1:8080/health`
+- Document upload API: `http://127.0.0.1:8080/api/documents/upload`
 - LiteLLM: `http://127.0.0.1:4000`
 - GBrain: `http://127.0.0.1:8789`
 
@@ -120,6 +123,12 @@ dotnet test test/LeanKernel.Tests.Integration/LeanKernel.Tests.Integration.cspro
 
 ```bash
 scripts/quality/test-coverage.sh
+```
+
+### SonarQube Scan and Quality Gate
+
+```bash
+scripts/quality/sonarqube-scan.sh
 ```
 
 ### Documentation Link Check
@@ -156,6 +165,8 @@ Contributor and coding-agent guidance lives in [`AGENTS.md`](AGENTS.md).
 - Identity dimensions are normalized through `IdentityContext` and preserve tenant/person/user/channel/session partition boundaries.
 - User-data reads and writes now flow through `IRepository<TEntity>` with `IPermit<TEntity>` + `IFilter<TEntity>` enforcement in `LeanKernel.Logic`.
 - Policy evaluation (`IPolicy<TEntity>`) and durable event persistence (`IEventStore`) are implemented in `LeanKernel.Logic` and composed at gateway startup.
+- Channel-aware document ingestion is implemented with a durable queue, hosted workers, watch-folder ingestion, and upload/multipart staging (`/api/documents/upload` + `AttachmentIngestionMiddleware`).
+- Agent-visible document tools (`document_search`, `document_list`) are registered when `Agents:Tools:DocumentIngestion:Enabled=true`.
 - `docker-compose.yml` supplies the companion runtime services used by the gateway, including PostgreSQL, LiteLLM, GBrain, Webwright, and Playwright.
 - `src/Services` currently contains `LeanKernel.Gateway`.
 - `src/Terminals` currently contains active channel projects for `LeanKernel.Channels.Common`, `LeanKernel.Channels.Signal`, and `LeanKernel.Channels.Teams`.

@@ -1,6 +1,6 @@
 # System Overview
 
-The current LeanKernel rebuild is a .NET 10 gateway-centered microservice architecture built around Microsoft Agent Framework (MAF) extension points.
+The current LeanKernel implementation is a .NET 10 gateway-centered microservice architecture built around Microsoft Agent Framework (MAF) extension points.
 
 ## Core Topology
 
@@ -82,6 +82,8 @@ flowchart LR
 
 This diagram reflects the current runtime host, provider, persistence, and external integration boundaries. The service relationships are cross-checked against `docker-compose.yml`, which currently wires Gateway to PostgreSQL, LiteLLM, GBrain, and optional Webwright MCP services, with Webwright using the shared Playwright run-server and the Signal terminal using a dedicated `signal-cli` sidecar. The Signal and Teams projects remain separate edge processes rather than alternate hosts for `LeanKernel.Gateway`.
 
+Startup note: database migration and seeding helpers in `Program.cs` are currently guarded for Development/Testing environments.
+
 ## Compose Deployment Topology
 
 ```mermaid
@@ -114,7 +116,7 @@ This deployment view is derived directly from `docker-compose.yml` and shows the
 
 | Component | Responsibility | Code anchor |
 |---|---|---|
-| Gateway host | DI, auth, session middleware, endpoint mapping, startup migrations | `src/Services/LeanKernel.Gateway/Program.cs` |
+| Gateway host | DI, auth, session middleware, endpoint mapping, startup migrations, and development/testing seed helpers | `src/Services/LeanKernel.Gateway/Program.cs` |
 | Request permit | Resolve tenant, user, channel, and guest fallback for the current request | `src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs` |
 | Agent session store | Persist MAF session state blobs | `src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs` |
 | Policy core | Evaluate identity-aware domain policies that compose with permit/filter enforcement | `src/Common/LeanKernel.Logic/Policy/` |
@@ -122,6 +124,7 @@ This deployment view is derived directly from `docker-compose.yml` and shows the
 | Event spine | Collect and durably append runtime events to `Events` | `src/Common/LeanKernel.Logic/Events/` |
 | Memory provider | Retrieve memory context and persist normalized facts | `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` |
 | Memory backend | GBrain-backed `IMemoryClient` implementation | `src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs` |
+| Document ingestion | Upload/multipart staging, durable queue, hosted workers, and watch-folder ingestion | `src/Common/LeanKernel.Logic/Tools/DocumentIngestion/` |
 | MCP browser tools | Webwright MCP discovery, tool adapter registration, and per-call invocation | `src/Common/LeanKernel.Logic/Mcp/` |
 
 ## Major Design Choices

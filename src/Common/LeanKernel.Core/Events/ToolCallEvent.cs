@@ -4,7 +4,7 @@ namespace LeanKernel.Events;
 /// Represents a tool invocation event in the append-only event spine.
 /// Captures the tool name, arguments, result, error state, and duration.
 /// </summary>
-public sealed record ToolCallEvent
+public sealed record ToolCallEvent : IHasEnvelope
 {
     /// <summary>
     /// Gets the event envelope providing partitioning and correlation metadata.

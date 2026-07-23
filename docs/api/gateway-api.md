@@ -9,8 +9,9 @@ The composition root currently maps:
 - `MapOpenAIResponses()`
 - `MapOpenAIConversations()`
 - `GET /v1/models`
-- `GET /v1/chat/completions`
+- `POST /v1/chat/completions`
 - `MapProxiedOpenAIChatCompletions()` at `/v1/internal/completions`
+- `POST /api/documents/upload`
 - `GET /health`
 - `MapDevUI()` in Development only
 
@@ -33,17 +34,29 @@ Current expectation:
 - `/v1/conversations`
 - `/v1/chat/completions`
 
+`/v1/chat/completions` and the internal `/v1/internal/completions` path are POST endpoints.
+
+Current implementation note: the chat-completions proxy path is currently forwarded to `http://localhost:8080` by the endpoint helper.
+
 These endpoints are exercised by integration and Playwright tests under `test/`.
 
 ## Authentication
 
 The gateway currently registers the `Bearer` authentication scheme and ASP.NET authorization middleware.
 
+`POST /api/documents/upload` requires authorization and accepts multipart form values:
+
+- `file` (required)
+- `channel_id` (required GUID)
+- `availability_scope` (optional: `tenant`, `user`, or `channel`; defaults to `user`)
+
+Uploads are staged and enqueued for asynchronous ingestion. The endpoint returns `202 Accepted` when a job is queued.
+
 Reference: [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
 
 ## CORS
 
-The gateway registers a permissive local policy named `AllowLocal`.
+The gateway currently applies a permissive local policy named `AllowLocal`.
 
 ## Development UI
 

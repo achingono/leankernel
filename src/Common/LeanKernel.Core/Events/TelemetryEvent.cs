@@ -4,7 +4,7 @@ namespace LeanKernel.Events;
 /// Represents model/provider telemetry captured for a single assistant turn.
 /// Aligned with the DTO from <c>LeanKernel.Logic.Telemetry</c> for migration coexistence.
 /// </summary>
-public sealed record TelemetryEvent
+public sealed record TelemetryEvent : IHasEnvelope
 {
     /// <summary>
     /// Gets the event envelope providing partitioning and correlation metadata.

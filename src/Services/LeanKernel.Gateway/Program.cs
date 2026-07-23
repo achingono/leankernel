@@ -10,6 +10,7 @@ using LeanKernel.Gateway.Requests;
 using LeanKernel.Gateway.Sessions;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Logic.Tools.DocumentIngestion;
 
 using Microsoft.Agents.AI.DevUI;
 using Microsoft.Agents.AI.Hosting;
@@ -201,6 +202,9 @@ builder.Services.AddTurnPipeline();
 builder.Services.AddLeanKernelChatClient();
 builder.Services.AddGatewayHealthChecks();
 
+builder.Services.AddDocumentStoreClient();
+builder.Services.AddDocumentIngestion(builder.Configuration);
+
 builder.Services.AddScoped<DbAgentStateStore>();
 builder.Services.AddScoped<SessionIsolationKeyProvider, IdentityIsolationKeyProvider>();
 builder.Services.AddScoped<AgentSessionStore>(sp =>
@@ -248,6 +252,7 @@ app.UseCors("AllowLocal");
 app.UseSession();
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
+app.UseMiddleware<AttachmentIngestionMiddleware>();
 app.UseAuthorization();
 
 app.MapOpenAIResponses();
@@ -257,6 +262,8 @@ app.MapProxiedOpenAIChatCompletions(Constants.Agent.DefaultName, "/v1/internal/c
 {
     RunOptionsFactory = _ => null,
 });
+
+app.MapDocumentUpload();
 
 if (app.Environment.IsDevelopment())
 {

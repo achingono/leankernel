@@ -1,6 +1,6 @@
 # Identity, Policy, And Event Spine
 
-Phase 20 establishes the architectural foundations for future phases: a canonical identity model, a shared in-process policy core, and an append-only event spine.
+LeanKernel currently includes a canonical identity model, a shared in-process policy core, and an append-only event spine.
 
 ## Canonical Identity Model
 
@@ -18,7 +18,9 @@ Constructed from `IPermit` via `IdentityContext.FromPermit()`.
 
 ## Policy Core
 
-The policy core (`src/Common/LeanKernel.Logic/Policy/`) provides domain-level policy evaluation that composes with (rather than replaces) the existing Phase 19 permit/filter/repository enforcement path.
+The policy core (`src/Common/LeanKernel.Logic/Policy/`) provides domain-level policy infrastructure that composes with (rather than replaces) the permit/filter/repository enforcement path.
+
+Current runtime state: policy core services are registered and available for use, but broad request-path enforcement is not yet wired end-to-end in gateway handlers.
 
 ### Interfaces
 
@@ -28,14 +30,15 @@ The policy core (`src/Common/LeanKernel.Logic/Policy/`) provides domain-level po
 | `IPolicy<TEntity>` | Evaluates a domain rule against an entity and context |
 | `IPolicyEvaluator` | Aggregates policies: short-circuit (first deny) or full enumeration |
 
-### Default Policies
+### Registered Default Policies
 
 | Policy | Entity | Purpose |
 |---|---|---|
 | `IdentityLinkingPolicy` | `UserEntity` | Validates guest users are not linked to a different person |
 | `MemoryAccessPolicy` | `ChannelMemoryPolicyEntity` | Validates channel is in memory share list |
-| `AuthorizationGatePolicy<TEntity>` | Any | Wraps `IPermit<TEntity>.Can(Operation)` as a domain policy |
 | `BudgetCheckPolicy` | Any | Ensures authenticated identity for budget-sensitive operations |
+
+`AuthorizationGatePolicy<TEntity>` exists in code as an extensibility policy but is not part of the default DI registration set.
 
 ### Key Design Decisions
 
@@ -76,11 +79,11 @@ The current `TurnEntity` and `TurnTelemetryEntity` persistence is preserved as t
 1. `DbChatHistoryProvider` emits `TurnEvent` + `TelemetryEvent` after each persisted turn
 2. Events are collected in the request-scoped `EventCollector`
 3. Collected events are durably appended through `DbEventStore` to `Events`
-4. Future phases can derive read models directly from the event spine table
+4. Future extensions can derive read models directly from the event spine table
 
-## First-Adopter Migration
+## Current Adoption State
 
-`DbChatHistoryProvider` is the first consumer path wired to both the event spine and the policy core.
+`DbChatHistoryProvider` is currently wired to the event spine (`TurnEvent`/`TelemetryEvent` emission + persistence). Policy core integration remains available infrastructure and can be incrementally attached to request paths.
 
 ## Gateway Guardrails
 

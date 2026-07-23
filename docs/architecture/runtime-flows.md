@@ -38,7 +38,6 @@ sequenceDiagram
     participant Identity as TenantResolutionMiddleware + RequestContextPermit
     participant SessionKey as IdentityIsolationKeyProvider
     participant AgentState as DbAgentStateStore
-    participant Policy as PolicyEvaluator
     participant History as DbChatHistoryProvider
     participant Events as EventCollector + DbEventStore
     participant Memory as MemoryProvider
@@ -56,9 +55,6 @@ sequenceDiagram
     Gateway->>SessionKey: Build scoped conversation key
     SessionKey->>AgentState: Load or create agent session
     AgentState->>Db: Read AgentStates
-
-    Gateway->>Policy: Evaluate identity-aware policy checks
-    Policy-->>Gateway: Allow or deny decision
 
     Gateway->>History: Load transcript context
     History->>Db: Verify SessionEntity ownership and read Turns
@@ -90,7 +86,7 @@ sequenceDiagram
     Gateway-->>Client: OpenAI-compatible response
 ```
 
-This diagram combines the request, transcript, session-state, memory, and tool execution paths that are otherwise described separately below.
+This diagram combines the request, transcript, session-state, memory, and tool execution paths that are otherwise described separately below. Policy-core services are registered in DI but not broadly invoked on all request paths yet.
 
 ## Chat History Flow
 
@@ -101,6 +97,21 @@ This diagram combines the request, transcript, session-state, memory, and tool e
 5. Turn and telemetry events are appended to `Events` through `IEventStore`.
 
 Reference: [`../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs`](../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs)
+
+## Document Ingestion Flow
+
+1. Client uploads a file through `POST /api/documents/upload` or includes multipart attachments in an inbound request.
+2. Gateway stages files under `Files:RootPath/documents/.../_staging`.
+3. Upload endpoint enqueues directly, while multipart middleware emits `DocumentIngestionRequestedEvent`.
+4. Event subscribers persist events and enqueue ingestion jobs.
+5. `DocumentIngestionHostedService` claims queued jobs, ingests content, and updates job status.
+6. `WatchFolderHostedService` monitors configured watch folders and enqueues new files through the same queue path.
+
+References:
+
+- [`../../src/Services/LeanKernel.Gateway/Requests/DocumentUploadEndpoint.cs`](../../src/Services/LeanKernel.Gateway/Requests/DocumentUploadEndpoint.cs)
+- [`../../src/Services/LeanKernel.Gateway/Providers/AttachmentIngestionMiddleware.cs`](../../src/Services/LeanKernel.Gateway/Providers/AttachmentIngestionMiddleware.cs)
+- [`../../src/Common/LeanKernel.Logic/Tools/DocumentIngestion/`](../../src/Common/LeanKernel.Logic/Tools/DocumentIngestion/)
 
 ## Memory Flow
 

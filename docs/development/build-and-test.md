@@ -1,10 +1,16 @@
 # Build and Test
 
-This page documents the current developer commands for the rebuild.
+This page documents the current developer commands for the implemented runtime.
 
 ## Solution Build
 
 From the repository root:
+
+```bash
+dotnet build LeanKernel.sln
+```
+
+App-only solution:
 
 ```bash
 dotnet build src/LeanKernel.sln
@@ -109,6 +115,12 @@ Supporting quality scripts live under:
 - `scripts/quality/sonarqube-scan.sh`
 - `scripts/quality/sonarqube-summary.sh`
 - `scripts/quality/sonarqube-create-user.sh`
+
+Run the local Sonar scan with quality-gate wait:
+
+```bash
+scripts/quality/sonarqube-scan.sh
+```
 
 ## Current Note About Full Solution Verification
 

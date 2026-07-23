@@ -29,4 +29,9 @@ public class FileSettings
     /// Gets or sets the name or path of the Python executable used for advanced file processing.
     /// </summary>
     public string PythonExecutable { get; set; } = "python3";
+
+    /// <summary>
+    /// Gets or sets the list of configured watch folder mappings for document library ingestion.
+    /// </summary>
+    public List<WatchFolderConfiguration> WatchFolders { get; set; } = [];
 }

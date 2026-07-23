@@ -33,7 +33,7 @@ partitioning at invocation time.
 ### MCP-Discovered Tools
 
 The runtime can discover tools from configured MCP endpoints under `Agents:Tools:McpServers`.
-Phase 18 ships Webwright MCP browser tooling through the gateway tool runtime. The gateway
+The gateway
 discovers the configured Webwright endpoint at startup, registers LeanKernel-owned adapters in
 `IToolRegistry`, and exposes the resulting browser tools to the agent through the normal
 function-invocation pipeline.
@@ -59,6 +59,17 @@ is missing), only the supported subset is registered. If GBrain is unreachable, 
 are skipped entirely and the rest of the runtime starts normally.
 
 Reference: [`../../src/Services/LeanKernel.Gateway/Memory/GBrainCapabilityCheck.cs`](../../src/Services/LeanKernel.Gateway/Memory/GBrainCapabilityCheck.cs)
+
+### Document Tools
+
+Document ingestion tools are registered when `Agents:Tools:DocumentIngestion:Enabled=true`:
+
+| Tool | Description |
+|------|-------------|
+| `document_search` | Search ingested documents with channel-policy enforcement |
+| `document_list` | List ingested documents with channel-policy enforcement |
+
+Reference: [`../../src/Common/LeanKernel.Logic/Tools/DocumentIngestion/`](../../src/Common/LeanKernel.Logic/Tools/DocumentIngestion/)
 
 ### User-Defined Dynamic Tools
 
@@ -106,7 +117,7 @@ operations:
 
 ### Rules
 
-- `runtime.type` must be `http` (Phase 01 rejects `cli`)
+- `runtime.type` must be `http` (`cli` is rejected)
 - Duplicate tool names (against built-ins or other skills) are rejected at startup
 - Bearer secrets are resolved from `auth.secretRef` mapped to `/run/secrets/<ref>` or
   `SKILL__<REF>` environment variables -- never inline in the manifest
@@ -119,7 +130,7 @@ operations:
 - **HTTP egress**: `EgressValidator` blocks loopback, private, and link-local hosts; enforces
   allowlist intersection; re-validates every redirect hop
 - **MCP servers**: external browser automation tools are discovered from pre-configured
-  `Agents:Tools:McpServers` endpoints; Phase 18 exposes Webwright MCP tools through the gateway
+  `Agents:Tools:McpServers` endpoints; Webwright MCP tools are exposed through the gateway
   tool runtime
 - **Governance**: `ToolGovernancePolicy` filters tools by `AllowedToolNames` (name allowlist,
   takes precedence) or `AllowedCategories` (category allowlist)

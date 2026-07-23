@@ -9,6 +9,7 @@ The current agent runtime is hosted through Microsoft Agent Framework inside `Le
 - EF-backed transcript history provider
 - EF-backed durable agent state store
 - GBrain-backed memory context provider
+- Document upload and attachment-ingestion integration with asynchronous queueing
 
 Key code anchors:
 
@@ -17,6 +18,6 @@ Key code anchors:
 - [`../../src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs`](../../src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs)
 - [`../../src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs`](../../src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs)
 
-## What This Runtime Is Not Yet
+## Runtime Boundary
 
-The rebuild does not yet expose the broader multi-service and UI footprint described in the older aspirational README. The implemented runtime is currently centered on the gateway plus the common libraries.
+The runtime is intentionally gateway-centric. Channel terminals (`Signal`, `Teams`) and companion services (`LiteLLM`, `GBrain`, `Webwright`) operate as external edge/infra components while core orchestration remains in `LeanKernel.Gateway` and `LeanKernel.Logic`.

@@ -5,7 +5,7 @@ namespace LeanKernel.Events;
 /// Coexists with <see cref="LeanKernel.Entities.TurnEntity"/> during migration;
 /// future consumers may read from the event spine directly.
 /// </summary>
-public sealed record TurnEvent
+public sealed record TurnEvent : IHasEnvelope
 {
     /// <summary>
     /// Gets the event envelope providing partitioning and correlation metadata.

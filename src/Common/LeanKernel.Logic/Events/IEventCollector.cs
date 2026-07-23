@@ -28,6 +28,13 @@ public interface IEventCollector
     void EmitTelemetry(TelemetryEvent telemetryEvent);
 
     /// <summary>
+    /// Emits any event type via generic method. Per-type methods delegate to this internally.
+    /// </summary>
+    /// <typeparam name="T">The event type.</typeparam>
+    /// <param name="event">The event to emit.</param>
+    void Emit<T>(T @event);
+
+    /// <summary>
     /// Returns and clears all accumulated events for batch persistence.
     /// </summary>
     /// <returns>A snapshot of all accumulated events.</returns>

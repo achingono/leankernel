@@ -19,7 +19,7 @@ This phase adds tool capabilities only; it reuses the Phase 01 registry, governa
 - Data tools: parameterized database query (read-only by default), JSON transform, and CSV/XLSX read/write.
 - Internet tools: `web_fetch` and a direct `http_request` tool, subject to the existing egress validation (no private/loopback unless allowed).
 - Browser tool: a browser-automation surface backed by an external automation service (Webwright/Playwright), gated behind a health/capability probe like the GBrain wiki tools.
-- Document ingestion: an ingestion queue, folder-monitor hosted service, backfill service, and document-library service that feed content into the knowledge/memory stores.
+- ~~Document ingestion: an ingestion queue, folder-monitor hosted service, backfill service, and document-library service that feed content into the knowledge/memory stores.~~ **Moved**: document ingestion with full channel-awareness and memory policy enforcement is now [Phase 21](../phase-21-channel-document-ingestion/index.md).
 - Configuration for filesystem boundaries, database connections, browser service endpoint, and ingestion folders under existing `Files`/`Agents`/`ConnectionStrings` sections.
 - Governance defaults, allowlisting, and per-tool tests including boundary and egress enforcement.
 

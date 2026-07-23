@@ -1,3 +1,5 @@
+using FluentAssertions;
+
 using LeanKernel.Logic.Events;
 
 using Xunit;
@@ -11,7 +13,9 @@ public class NullEventStoreTests
     {
         var store = new NullEventStore();
 
-        await store.AppendAsync(new { Kind = "turn" });
+        var act = async () => await store.AppendAsync(new { Kind = "turn" });
+
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]
@@ -19,9 +23,11 @@ public class NullEventStoreTests
     {
         var store = new NullEventStore();
 
-        await store.AppendBatchAsync([
+        var act = async () => await store.AppendBatchAsync([
             new { Kind = "turn" },
             new { Kind = "telemetry" },
         ]);
+
+        await act.Should().NotThrowAsync();
     }
 }

@@ -7,6 +7,7 @@ using LeanKernel.Logic.Tools.BuiltIn;
 using LeanKernel.Logic.Tools.BuiltIn.Data;
 using LeanKernel.Logic.Tools.BuiltIn.FileSystem;
 using LeanKernel.Logic.Tools.BuiltIn.Internet;
+using LeanKernel.Logic.Tools.DocumentIngestion;
 using LeanKernel.Logic.Tools.Dynamic;
 using LeanKernel.Logic.Tools.Memory;
 
@@ -54,6 +55,10 @@ public static class IServiceProviderExtensions
 
         // MCP server tools (SDK-based discovery)
         await RegisterMcpToolsAsync(registry, services, logger, ct)
+            .ConfigureAwait(false);
+
+        // Document ingestion tools
+        await RegisterDocumentToolsAsync(registry, services, scopeFactory, logger, ct)
             .ConfigureAwait(false);
 
         // Dynamic SKILL.md tools
@@ -314,6 +319,29 @@ public static class IServiceProviderExtensions
                 logger.LogInformation("Dynamic tool '{Name}' registered from {Path}.", toolName, filePath);
             }
         }
+    }
+
+    private static async Task RegisterDocumentToolsAsync(
+        IToolRegistry registry,
+        IServiceProvider services,
+        IServiceScopeFactory scopeFactory,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var settings = services.GetRequiredService<IOptions<AgentSettings>>().Value.Tools;
+
+        if (!settings.DocumentIngestion.Enabled)
+        {
+            logger.LogInformation("Document ingestion tools are disabled (Agents:Tools:DocumentIngestion:Enabled=false).");
+            return;
+        }
+
+        TryRegister(registry, DocumentSearchTool.Create(scopeFactory), logger);
+        TryRegister(registry, DocumentListTool.Create(scopeFactory), logger);
+
+        logger.LogInformation("Document ingestion tools registered.");
     }
 
     private static void TryRegister(IToolRegistry registry, ToolDefinition tool, ILogger logger)

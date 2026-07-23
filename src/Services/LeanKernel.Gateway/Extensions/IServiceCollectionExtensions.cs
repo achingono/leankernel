@@ -15,6 +15,7 @@ using Microsoft.Extensions.Options;
 namespace Microsoft.Extensions.DependencyInjection;
 
 using LeanKernel.Gateway.Providers;
+using LeanKernel.Logic.Tools.DocumentIngestion;
 
 /// <summary>
 /// Provides LeanKernel gateway service registration extensions.
@@ -121,6 +122,18 @@ public static class IServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(30);
         });
 
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the GBrain-backed document store client for document ingestion catalog and search.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddDocumentStoreClient(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddScoped<IDocumentStoreClient, GBrainDocumentStoreClient>();
         return services;
     }
 

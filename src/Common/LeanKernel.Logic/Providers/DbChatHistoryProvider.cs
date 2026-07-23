@@ -23,8 +23,8 @@ public class DbChatHistoryProvider(
     IPermit permit,
     ITurnTelemetryCollector? telemetryCollector = null,
     IEventCollector? eventCollector = null,
-    IEventStore? eventStore = null,
-    ILogger<DbChatHistoryProvider>? logger = null) : ChatHistoryProvider
+    ILogger<DbChatHistoryProvider>? logger = null,
+    IEnumerable<IEventSubscriber>? eventSubscribers = null) : ChatHistoryProvider
 {
     internal const string ChatSessionIdKey = "chatSessionId";
     internal const string ConversationIdKey = "conversationId";
@@ -177,12 +177,16 @@ public class DbChatHistoryProvider(
 
             await turnRepo.SaveChangesAsync(cancellationToken);
 
-            if (eventCollector is not null && eventStore is not null)
+            if (eventCollector is not null)
             {
                 var pendingEvents = eventCollector.ConsumeAll();
                 if (pendingEvents.Count > 0)
                 {
-                    await eventStore.AppendBatchAsync(pendingEvents, cancellationToken);
+                    var subscribers = eventSubscribers ?? [];
+                    foreach (var subscriber in subscribers)
+                    {
+                        await subscriber.HandleAsync(pendingEvents, cancellationToken);
+                    }
                 }
             }
         }

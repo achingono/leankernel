@@ -8,6 +8,7 @@ using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.Telemetry;
 using LeanKernel.Logic.Tools;
+using LeanKernel.Logic.Tools.DocumentIngestion;
 
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
@@ -134,6 +135,34 @@ public static class IServiceCollectionExtensions
     {
         services.AddScoped<IEventCollector, EventCollector>();
         services.AddScoped<IEventStore, DbEventStore>();
+        services.AddScoped<IEventSubscriber, PersistEventSubscriber>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers document ingestion services: durable queue, library service, hosted services, and tool support.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <param name="configuration">The application configuration for binding DocumentIngestionToolSettings.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddDocumentIngestion(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddSingleton<IDocumentIngestionQueue, DocumentIngestionQueue>();
+        services.AddScoped<IDocumentLibraryService, DocumentLibraryService>();
+        services.AddHostedService<DocumentIngestionHostedService>();
+        services.AddHostedService<WatchFolderHostedService>();
+
+        services.Configure<DocumentIngestionToolSettings>(
+            configuration.GetSection("Agents:Tools:DocumentIngestion"));
+
+        services.AddOptions<DocumentIngestionToolSettings>()
+            .Validate(settings => settings.MaxConcurrentJobs > 0, "MaxConcurrentJobs must be > 0")
+            .Validate(settings => settings.QueueCapacity > 0, "QueueCapacity must be > 0")
+            .Validate(settings => settings.WatchSettleDelaySeconds >= 0, "WatchSettleDelaySeconds must be >= 0")
+            .ValidateOnStart();
+
+        services.AddScoped<IEventSubscriber, DocumentIngestionSubscriber>();
+
         return services;
     }
 

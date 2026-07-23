@@ -1,6 +1,6 @@
 # Getting Started
 
-Use this section to get the current LeanKernel rebuild running locally and understand the shortest path into the codebase.
+Use this section to get the current LeanKernel implementation running locally and understand the shortest path into the codebase.
 
 ## Start Here
 

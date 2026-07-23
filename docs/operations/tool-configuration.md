@@ -20,7 +20,9 @@ completely disables tool registration and restores the no-tool chat path.
 ## Web Search
 
 `web_search` uses Brave Search when the `BRAVE_API_KEY` environment variable is set, and
-falls back to DuckDuckGo otherwise. Override the provider or key env var:
+falls back to DuckDuckGo otherwise. The runtime currently keys off `ApiKeyEnv` availability; `Provider` is present in config but not actively used as a strict selector.
+
+Example configuration:
 
 ```json
 {
@@ -39,7 +41,7 @@ falls back to DuckDuckGo otherwise. Override the provider or key env var:
 ## MCP Servers
 
 MCP tools are discovered at startup from pre-configured endpoints under
-`Agents:Tools:McpServers`. Phase 18 ships Webwright MCP-first browser tooling through the
+`Agents:Tools:McpServers`. Webwright MCP-first browser tooling is exposed through the
 gateway tool runtime.
 
 The current implementation uses the official `ModelContextProtocol` SDK, registers discovered
@@ -93,7 +95,7 @@ means all registered tools are visible.
 1. Create a `SKILL.md` file following the manifest schema in
    [tool-runtime](../features/tool-runtime.md)
 2. Place it in one of the directories listed in `Agents:Tools:SkillBasePaths`
-3. Restart the gateway -- tools are loaded at startup only (no hot-reload in Phase 01)
+3. Restart the gateway -- tools are loaded at startup only (no hot-reload)
 4. Confirm registration in the startup log
 
 For a working example, see [`../../samples/skills/weather.Skill.md`](../../samples/skills/weather.Skill.md).

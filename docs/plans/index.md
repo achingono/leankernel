@@ -19,7 +19,7 @@ from a gap analysis of the mature source implementation against the current rebu
 | 02 | [Runtime Boundary Remediation](phase-02-runtime-boundary-remediation/index.md) | Project/runtime boundary cleanup | **Partial** (13/15 gates — access model coverage and bounded retrieval/compaction gate remain open in this phase doc) |
 | 03 | [Turn Runtime And Context Gating](phase-03-turn-runtime/index.md) | Turn pipeline, deny-by-default context + budgets, history shaping, scoped retrieval, long-running tasks | **Complete** |
 | 04 | [Model Intelligence And Response Quality](phase-04-model-intelligence/index.md) | Model routing/escalation, shadow routing, quality gates, response enhancement, degradation, multi-agent | **Not started** |
-| 05 | [Tool Expansion](phase-05-tool-expansion/index.md) | Filesystem suite, data tools, web_fetch/http, browser tool, document ingestion | **Partial** (7/8 gates — document ingestion pending) |
+| 05 | [Tool Expansion](phase-05-tool-expansion/index.md) | Filesystem suite, data tools, web_fetch/http, browser tool, document ingestion | **Complete** (document ingestion gate moved to Phase 21) |
 | 06 | [Channels](phase-06-channels/index.md) | Channel abstraction/router, Signal adapter, fail-closed auth, keep-alive, attachments | **Partial** (13/16 gates — reconnect/retry, startup validation, terminal tests pending) |
 | 07 | [Learning And Scheduler](phase-07-learning-scheduler/index.md) | Learning pipeline, onboarding intelligence, cron scheduler | **Not started** |
 | 08 | [Diagnostics And Production Operations](phase-08-diagnostics-ops/index.md) | Diagnostics collector + API, health/spend guardrails, OpenTelemetry, gateway hardening | **Not started** |

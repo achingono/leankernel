@@ -69,6 +69,11 @@ public class EntityContext : DbContext
     public DbSet<EventEntity> Events => this.Set<EventEntity>();
 
     /// <summary>
+    /// Gets the durable document ingestion job queue.
+    /// </summary>
+    public DbSet<DocumentIngestionJobEntity> DocumentIngestionJobs => this.Set<DocumentIngestionJobEntity>();
+
+    /// <summary>
     /// Applies pending migrations and ensures the default tenant and OpenAI channel records exist.
     /// </summary>
     /// <param name="hostName">The host name to seed for the default tenant if needed.</param>
@@ -273,6 +278,23 @@ public class EntityContext : DbContext
             entity.HasIndex(e => new { e.TenantId, e.UserId, e.ChannelId, e.Timestamp });
             entity.HasIndex(e => e.EventType);
             entity.HasIndex(e => e.CorrelationId);
+        });
+
+        // DocumentIngestionJobEntity
+        modelBuilder.Entity<DocumentIngestionJobEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.AvailabilityScope).HasMaxLength(20);
+            entity.Property(e => e.Source).HasMaxLength(50);
+            entity.Property(e => e.FilePath).HasColumnType("text");
+            entity.Property(e => e.FileName).HasMaxLength(500);
+            entity.Property(e => e.ContentType).HasMaxLength(200);
+            entity.Property(e => e.Fingerprint).HasMaxLength(100);
+            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.LastError).HasColumnType("text");
+            entity.Property(e => e.LeaseOwner).HasMaxLength(200);
+            entity.HasIndex(e => new { e.TenantId, e.Status, e.NextAttemptAt, e.LeaseExpiresAt });
+            entity.HasIndex(e => new { e.TenantId, e.UserId, e.ChannelId });
         });
     }
 

@@ -6,9 +6,9 @@
 - [x] JSON transform and CSV/XLSX read/write produce correct, tested results.
 - [x] `web_fetch`/`http_request` honor egress validation and secret handling.
 - [x] Browser tool works when the automation service is up and degrades cleanly when down.
-- [ ] Monitored-folder documents are ingested idempotently into the knowledge store with dedupe.
 - [x] All new tools are registered through `IToolRegistry` and constrained by governance.
-- [x] Unit + integration tests cover boundaries, injection, egress, and degradation (ingestion tests pending with document ingestion implementation).
+- [x] Unit + integration tests cover boundaries, injection, egress, and degradation.
+- [ ] ~~Monitored-folder documents are ingested idempotently into the knowledge store with dedupe.~~ **Moved**: now part of [Phase 21](../phase-21-channel-document-ingestion/index.md) — unified channel-aware document ingestion pipeline with identity scoping and memory policy enforcement. Phase 05's folder-watcher trigger is subsumed as one of multiple ingestion sources in that phase.
 
 ## Approval Table
 

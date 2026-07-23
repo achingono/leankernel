@@ -4,10 +4,11 @@ using System.Text.Json;
 
 using LeanKernel.Data;
 using LeanKernel.Entities;
-using LeanKernel.Events;
 
 /// <summary>
 /// Persists event spine records durably in the EntityContext database.
+/// Uses <see cref="IHasEnvelope"/> marker interface for generic envelope resolution
+/// instead of a closed switch, so new event types are supported without modifying this class.
 /// </summary>
 public sealed class DbEventStore : IEventStore
 {
@@ -71,13 +72,12 @@ public sealed class DbEventStore : IEventStore
 
     private static EventEnvelope ResolveEnvelope(object eventRecord)
     {
-        return eventRecord switch
+        if (eventRecord is IHasEnvelope hasEnvelope)
         {
-            TurnEvent turn => turn.Envelope,
-            ToolCallEvent toolCall => toolCall.Envelope,
-            TelemetryEvent telemetry => telemetry.Envelope,
-            _ => throw new InvalidOperationException(
-                $"Unsupported event record type '{eventRecord.GetType().FullName}' for durable event storage."),
-        };
+            return hasEnvelope.Envelope;
+        }
+
+        throw new InvalidOperationException(
+            $"Event record type '{eventRecord.GetType().FullName}' does not implement {nameof(IHasEnvelope)}.");
     }
 }
