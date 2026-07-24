@@ -251,10 +251,16 @@ public class EntityContext : DbContext
             entity.Property(e => e.TurnId).HasMaxLength(50);
             entity.Property(e => e.SchemaVersion).HasMaxLength(10);
             entity.Property(e => e.Currency).HasMaxLength(10);
+            entity.Property(e => e.EvidenceClass);
+            entity.Property(e => e.GroundingStatus);
+            entity.Property(e => e.RetrievedMemoryKeysJson).HasColumnType("text");
+            entity.Property(e => e.RetrievedEvidenceClassesJson).HasColumnType("text");
             entity.HasIndex(e => e.TurnId).IsUnique();
             entity.HasIndex(e => e.ServedModel);
             entity.HasIndex(e => e.Provider);
             entity.HasIndex(e => e.CapturedAt);
+            entity.HasIndex(e => e.EvidenceClass);
+            entity.HasIndex(e => e.GroundingStatus);
             entity.HasOne(e => e.Turn)
                 .WithMany()
                 .HasForeignKey(e => e.TurnId)

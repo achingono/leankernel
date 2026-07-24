@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using LeanKernel.Entities;
 using LeanKernel.Events;
 using LeanKernel.Logic.Events;
@@ -158,6 +160,14 @@ public class DbChatHistoryProvider(
                                 : null,
                             CapturedAt = telemetry.CapturedAt,
                             SchemaVersion = telemetry.SchemaVersion,
+                            EvidenceClass = telemetry.EvidenceClass,
+                            GroundingStatus = telemetry.GroundingStatus,
+                            RetrievedMemoryKeysJson = telemetry.RetrievedMemoryKeys is { Count: > 0 }
+                                ? JsonSerializer.Serialize(telemetry.RetrievedMemoryKeys)
+                                : null,
+                            RetrievedEvidenceClassesJson = telemetry.RetrievedEvidenceClasses is { Count: > 0 }
+                                ? JsonSerializer.Serialize(telemetry.RetrievedEvidenceClasses)
+                                : null,
                             CreatedOn = DateTime.UtcNow,
                             CreatedBy = new Badge
                             {

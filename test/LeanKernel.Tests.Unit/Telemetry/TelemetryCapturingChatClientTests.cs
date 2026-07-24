@@ -1,5 +1,8 @@
+using System.Text.Json;
+
 using FluentAssertions;
 
+using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Telemetry;
 
@@ -95,6 +98,55 @@ public sealed class TelemetryCapturingChatClientTests
         telemetry.Should().NotBeNull();
         telemetry!.ServedModel.Should().Be("claude-3-sonnet");
         telemetry.Provider.Should().Be("anthropic");
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_CapturesEvidenceClassAndGroundingFromAdditionalProperties()
+    {
+        var collector = new TurnTelemetryCollector();
+        var keysElement = JsonDocument.Parse("[\"mem1\",\"mem2\"]").RootElement;
+        var response = new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok"))
+        {
+            ModelId = "gpt-4o-mini",
+            Usage = new UsageDetails { InputTokenCount = 10, OutputTokenCount = 5, TotalTokenCount = 15 },
+            AdditionalProperties = new AdditionalPropertiesDictionary
+            {
+                ["evidence_class"] = "SynthesizedFact",
+                ["grounding_status"] = "Grounded",
+                ["retrieved_memory_keys"] = keysElement,
+            }
+        };
+        var inner = new StubChatClient(response, []);
+        var client = CreateSut(inner, collector, new CostEstimateTable(), new TelemetrySettings { UseCostEstimate = false });
+
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
+
+        var telemetry = collector.Consume();
+        telemetry.Should().NotBeNull();
+        telemetry!.EvidenceClass.Should().Be(EvidenceClass.SynthesizedFact);
+        telemetry.GroundingStatus.Should().Be(GroundingStatus.Grounded);
+        telemetry.RetrievedMemoryKeys.Should().BeEquivalentTo(["mem1", "mem2"]);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_WhenEvidenceClassMissing_DefaultsToNone()
+    {
+        var collector = new TurnTelemetryCollector();
+        var response = new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok"))
+        {
+            ModelId = "gpt-4o-mini",
+            AdditionalProperties = new AdditionalPropertiesDictionary()
+        };
+        var inner = new StubChatClient(response, []);
+        var client = CreateSut(inner, collector, new CostEstimateTable(), new TelemetrySettings { UseCostEstimate = false });
+
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
+
+        var telemetry = collector.Consume();
+        telemetry.Should().NotBeNull();
+        telemetry!.EvidenceClass.Should().Be(EvidenceClass.None);
+        telemetry.GroundingStatus.Should().Be(GroundingStatus.Unknown);
+        telemetry.RetrievedMemoryKeys.Should().BeEmpty();
     }
 
     [Fact]

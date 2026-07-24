@@ -38,7 +38,7 @@ This phase adds structured model-and-cost telemetry to persisted assistant turns
 Every persisted assistant turn carries structured, accurate model/provider/usage/cost telemetry; cost can be aggregated per session/user/tenant/model/provider; and a labeled export exists for model-grouping/failover/cost-profile tuning. See `exit-criteria.md`.
 
 ## Status
-**Partial (10/12 gates complete)** — telemetry capture, persistence, aggregation, and export are implemented. Remaining work is startup validation for `Agents:Telemetry` settings and grounding/evidence-class labels in export/query surfaces.
+**Complete (12/12 gates)** — telemetry capture, persistence, aggregation, export, startup validation, and grounding/evidence-class labels are all implemented.
 
 ## Design Delta: Intelligent Brain Track
 - Extend telemetry labels to include memory evidence class (`raw_document`, `synthesized_fact`, `pattern_page`, `transcript`).

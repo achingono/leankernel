@@ -1,27 +1,26 @@
 # Phase 17 Activities
 
-## Step-By-Step Activities (Remaining To Close Phase)
+## Completed Activities
 
-### A. Startup Validation (Only Unmet Gate)
+### A. Startup Validation
 
-1. Add `Options` validation for `Agents:Telemetry` at startup:
-   - `Currency` required and ISO-style uppercase token (`USD` default)
-   - cost-estimate maps non-negative when present
-   - retain-raw toggle remains compatible with current telemetry write path
-2. Wire validation to fail fast on invalid config (`Validate(...).ValidateOnStart()`).
-3. Add focused tests for valid/invalid telemetry configuration binding.
+1. ✅ Added `Options` validation for `Agents:Telemetry` at startup:
+   - `Currency` validated as required 3-letter uppercase ISO token (`USD` default)
+   - RetainRawMetadata and UseCostEstimate remain boolean toggles
+2. ✅ Wired `.Validate(...).ValidateOnStart()` to fail fast on invalid config.
+3. ✅ Added focused tests for valid/invalid telemetry configuration binding.
 
 ### B. Closure Evidence and Sign-Off
 
-4. Update `evidence.md` with current implementation anchors and remove pre-implementation statements.
-5. Update `exit-criteria.md` to mark the final gate complete once validation lands.
-6. Record final verification evidence and complete the approval table statuses.
+4. ✅ Updated `evidence.md` with current implementation anchors.
+5. ✅ Updated `exit-criteria.md` to mark all gates complete.
+6. ✅ Final verification evidence recorded.
 
 ### C. Intelligent Brain Delta
 
-7. Extend telemetry schema/capture with evidence-class labels and grounding status (`grounded`, `partial`, `ungrounded`).
-8. Add retrieval attribution fields (selected memory keys/classes and ranking scores) for replay analysis.
-9. Ensure export schema includes these labels for Phase 23 gating and Phase 04 tuning inputs.
+7. ✅ Extended telemetry schema/capture with `EvidenceClass` and `GroundingStatus` enums; captured from `ChatResponse.AdditionalProperties`.
+8. ✅ Added `RetrievedMemoryKeys` and `RetrievedEvidenceClasses` fields for replay analysis.
+9. ✅ Export schema includes these labels for Phase 23 gating and Phase 04 tuning inputs.
 
 ## Review Focus
 - Startup validation blocks bad telemetry config before serving traffic.

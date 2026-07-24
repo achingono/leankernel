@@ -1,3 +1,5 @@
+using LeanKernel.Entities;
+
 namespace LeanKernel.Logic.Telemetry;
 
 /// <summary>
@@ -11,4 +13,8 @@ public sealed record TelemetryExportRecord(
     int PromptTokens,
     int CompletionTokens,
     decimal? ResponseCost,
-    bool CostIsEstimated);
+    bool CostIsEstimated,
+    EvidenceClass EvidenceClass,
+    GroundingStatus GroundingStatus,
+    string? RetrievedMemoryKeys,
+    string? RetrievedEvidenceClasses);

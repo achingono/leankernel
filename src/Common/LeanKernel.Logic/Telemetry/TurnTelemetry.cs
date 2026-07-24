@@ -1,3 +1,5 @@
+using LeanKernel.Entities;
+
 namespace LeanKernel.Logic.Telemetry;
 
 /// <summary>
@@ -75,4 +77,24 @@ public sealed class TurnTelemetry
     /// Gets or sets when this telemetry was captured.
     /// </summary>
     public DateTimeOffset CapturedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// Gets or sets the evidence class label for the memory grounding used in this turn.
+    /// </summary>
+    public EvidenceClass EvidenceClass { get; set; }
+
+    /// <summary>
+    /// Gets or sets the grounding status indicating how well the response was grounded in memory evidence.
+    /// </summary>
+    public GroundingStatus GroundingStatus { get; set; }
+
+    /// <summary>
+    /// Gets or sets the list of memory keys retrieved for this turn for replay analysis.
+    /// </summary>
+    public List<string>? RetrievedMemoryKeys { get; set; }
+
+    /// <summary>
+    /// Gets or sets the evidence class labels of the retrieved memories for this turn.
+    /// </summary>
+    public List<EvidenceClass>? RetrievedEvidenceClasses { get; set; }
 }

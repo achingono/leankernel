@@ -49,7 +49,11 @@ public sealed class TelemetryExportService(
                 row.PromptTokens ?? 0,
                 row.CompletionTokens ?? 0,
                 row.ResponseCost,
-                row.CostIsEstimated))
+                row.CostIsEstimated,
+                row.EvidenceClass,
+                row.GroundingStatus,
+                row.RetrievedMemoryKeysJson,
+                row.RetrievedEvidenceClassesJson))
             .ToListAsync(cancellationToken);
 
         return rows

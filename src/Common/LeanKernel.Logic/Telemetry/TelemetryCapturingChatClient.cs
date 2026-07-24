@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Text.Json;
 
+using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 
 using Microsoft.Extensions.AI;
@@ -102,7 +104,11 @@ internal sealed class TelemetryCapturingChatClient(
                 TotalTokens = (int?)usage?.TotalTokenCount,
                 Currency = settings.Value.Currency,
                 Latency = latency,
-                CapturedAt = DateTimeOffset.UtcNow
+                CapturedAt = DateTimeOffset.UtcNow,
+                EvidenceClass = TryExtractEvidenceClass(response.AdditionalProperties),
+                GroundingStatus = TryExtractGroundingStatus(response.AdditionalProperties),
+                RetrievedMemoryKeys = TryExtractStringList(response.AdditionalProperties, "retrieved_memory_keys"),
+                RetrievedEvidenceClasses = TryExtractEvidenceClassList(response.AdditionalProperties, "retrieved_evidence_classes"),
             };
 
             // Try to read cost from response additional properties (LiteLLM header passthrough)
@@ -158,6 +164,95 @@ internal sealed class TelemetryCapturingChatClient(
         }
 
         return null;
+    }
+
+    private static EvidenceClass TryExtractEvidenceClass(AdditionalPropertiesDictionary? properties)
+    {
+        if (properties is null)
+        {
+            return EvidenceClass.None;
+        }
+
+        if (properties.TryGetValue("evidence_class", out var value) && value is string str
+            && Enum.TryParse<EvidenceClass>(str, ignoreCase: true, out var result))
+        {
+            return result;
+        }
+
+        return EvidenceClass.None;
+    }
+
+    private static GroundingStatus TryExtractGroundingStatus(AdditionalPropertiesDictionary? properties)
+    {
+        if (properties is null)
+        {
+            return GroundingStatus.Unknown;
+        }
+
+        if (properties.TryGetValue("grounding_status", out var value) && value is string str
+            && Enum.TryParse<GroundingStatus>(str, ignoreCase: true, out var result))
+        {
+            return result;
+        }
+
+        return GroundingStatus.Unknown;
+    }
+
+    private static List<string> TryExtractStringList(AdditionalPropertiesDictionary? properties, string key)
+    {
+        if (properties is null)
+        {
+            return [];
+        }
+
+        if (properties.TryGetValue(key, out var value) && value is JsonElement jsonElement
+            && jsonElement.ValueKind == JsonValueKind.Array)
+        {
+            var items = new List<string>();
+            foreach (var item in jsonElement.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    items.Add(item.GetString()!);
+                }
+            }
+
+            return items;
+        }
+
+        if (properties.TryGetValue(key, out var strValue) && strValue is string str)
+        {
+            var items = str.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return [.. items];
+        }
+
+        return [];
+    }
+
+    private static List<EvidenceClass> TryExtractEvidenceClassList(AdditionalPropertiesDictionary? properties, string key)
+    {
+        if (properties is null)
+        {
+            return [];
+        }
+
+        if (properties.TryGetValue(key, out var value) && value is JsonElement jsonElement
+            && jsonElement.ValueKind == JsonValueKind.Array)
+        {
+            var items = new List<EvidenceClass>();
+            foreach (var item in jsonElement.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String
+                    && Enum.TryParse<EvidenceClass>(item.GetString(), ignoreCase: true, out var ec))
+                {
+                    items.Add(ec);
+                }
+            }
+
+            return items;
+        }
+
+        return [];
     }
 
     private static string? ExtractProvider(string? model)

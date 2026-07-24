@@ -118,6 +118,26 @@ public sealed class TurnTelemetryEntity : IAuditable, IRecyclable, IEntity
     public Badge? UpdatedBy { get; set; }
 
     /// <summary>
+    /// Gets or sets the evidence class label for the memory grounding used in this turn.
+    /// </summary>
+    public EvidenceClass EvidenceClass { get; set; }
+
+    /// <summary>
+    /// Gets or sets the grounding status indicating how well the response was grounded in memory evidence.
+    /// </summary>
+    public GroundingStatus GroundingStatus { get; set; }
+
+    /// <summary>
+    /// Gets or sets the serialized JSON list of memory keys retrieved for this turn.
+    /// </summary>
+    public string? RetrievedMemoryKeysJson { get; set; }
+
+    /// <summary>
+    /// Gets or sets the serialized JSON list of evidence class labels for retrieved memories.
+    /// </summary>
+    public string? RetrievedEvidenceClassesJson { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the telemetry record is soft-deleted.
     /// </summary>
     public bool IsDeleted { get; set; }

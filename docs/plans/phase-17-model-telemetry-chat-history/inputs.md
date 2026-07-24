@@ -22,4 +22,4 @@
 - [x] LiteLLM cost surface confirmed — `x-litellm-response-cost` header available on response; fallback to token-based estimate configured
 - [x] MAF `ChatResponse` exposes `ModelId` and `UsageDetails` on the invocation path — confirmed via `TelemetryCapturingChatClient` decorator wrapping `IChatClient`
 - [x] Correlation id strategy deferred — initial implementation captures model/provider/usage/cost from HTTP response without proxy reconciliation; full correlation deferred to follow-up
-- [ ] Evidence-class labels for memory grounding (`raw_document`, `synthesized_fact`, `pattern_page`, `transcript`) are specified for capture/export
+- [x] Evidence-class labels for memory grounding (`raw_document`, `synthesized_fact`, `pattern_page`, `transcript`) are specified for capture/export

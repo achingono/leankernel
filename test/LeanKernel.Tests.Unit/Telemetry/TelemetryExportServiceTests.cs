@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Text.Json;
 
 using FluentAssertions;
 
@@ -287,6 +288,8 @@ public sealed class TelemetryExportServiceTests : IDisposable
             CostIsEstimated = false,
             Currency = "USD",
             CapturedAt = capturedAt,
+            EvidenceClass = EvidenceClass.None,
+            GroundingStatus = GroundingStatus.Unknown,
             CreatedOn = DateTime.UtcNow,
             CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "system@local" }
         });
@@ -347,6 +350,8 @@ public sealed class TelemetryExportServiceTests : IDisposable
             CostIsEstimated = false,
             Currency = "USD",
             CapturedAt = capturedAt,
+            EvidenceClass = EvidenceClass.None,
+            GroundingStatus = GroundingStatus.Unknown,
             CreatedOn = DateTime.UtcNow,
             CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "system@local" }
         });

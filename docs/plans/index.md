@@ -46,13 +46,12 @@ memory is channel-scoped, so Phase 10 is foundational for the rest.
 Telemetry foundations that make budget/cost accounting accurate and produce labeled data for
 self-improvement (model grouping, failover order, cost profiles). Consumed by Phases 04, 07, and 08.
 
-**Recommended next phase** — complete and close Phase 17. The core telemetry pipeline is
-implemented; startup validation and final closure artifacts are the smallest remaining effort
-with immediate value for routing (04), learning (07), and spend guardrails (08).
+**Complete** — Phase 17 is closed. The telemetry pipeline captures grounding/evidence-class
+labels and validates configuration at startup.
 
 | Phase | Plan | Focus | Status |
 | --- | --- | --- | --- |
-| 17 | [Model Telemetry In Chat History](phase-17-model-telemetry-chat-history/index.md) | Persist LiteLLM model/provider/token-usage/cost per assistant turn for budget accounting and supervised tuning | **Partial** (10/12 gates — startup validation and grounding/evidence labels pending) |
+| 17 | [Model Telemetry In Chat History](phase-17-model-telemetry-chat-history/index.md) | Persist LiteLLM model/provider/token-usage/cost per assistant turn for budget accounting and supervised tuning | **Complete** |
 
 ## Infrastructure And Tooling
 
@@ -100,7 +99,7 @@ Phases implemented so far, in chronological order. Commit hashes reference the p
 | 06 | [Channels](phase-06-channels/index.md) | **Partial** (13/16 gates) | `3aca397` |
 | 10 | [Unified Identity And Cross-Channel Memory](phase-10-cross-channel-memory/index.md) | **Partial** | `82694d3` |
 | 16 (track B) | [Terminal Shared Runtime](phase-16-terminal-shared-runtime/index.md) | **Partial** (3/8 gates) | `7d2c52b` |
-| 17 | [Model Telemetry In Chat History](phase-17-model-telemetry-chat-history/index.md) | **Partial** (10/12 gates) | `363c109` |
+| 17 | [Model Telemetry In Chat History](phase-17-model-telemetry-chat-history/index.md) | **Complete** | `5e23432` |
 | 18 | [Webwright MCP Integration](phase-18-webwright-mcp-integration/index.md) | **Complete** | `b55123d` |
 | 19 | [Authorization Permits And Filters](phase-19-authorization-permits-filters/index.md) | **Complete** | `89d5e04` |
 | 20 | [Identity, Policy, And Event Spine](phase-20-identity-policy-event-spine/index.md) | **Complete** | `9763550` |

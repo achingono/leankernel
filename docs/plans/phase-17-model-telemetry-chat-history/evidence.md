@@ -11,9 +11,9 @@
 | Schema migration | `src/Common/LeanKernel.Data/Migrations/20260716223823_AddTurnTelemetry.cs` | Adds telemetry table and indexes |
 | Query/rollup surface | `src/Common/LeanKernel.Logic/Telemetry/TelemetryAggregationService.cs` | Cost and token rollups by model/provider/user/session/day/tenant |
 | Labeled export | `src/Common/LeanKernel.Logic/Telemetry/TelemetryExportService.cs` | Deterministic PII-aware export for Phase 07 consumers |
-| Grounding/evidence labels | `src/Common/LeanKernel.Logic/Telemetry/*` | Pending: evidence-class and groundedness capture fields |
+| Grounding/evidence labels | `src/Common/LeanKernel.Core/EvidenceClass.cs`, `src/Common/LeanKernel.Core/GroundingStatus.cs`, `src/Common/LeanKernel.Logic/Telemetry/TelemetryCapturingChatClient.cs` | Evidence-class and grounding status captured from response additional properties |
 | DI wiring | `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs` | Registers telemetry services and wraps `IChatClient` when enabled |
-| Configuration shape | `src/Common/LeanKernel.Logic/Configuration/TelemetrySettings.cs`, `docs/configuration/appsettings-reference.md` | `Agents:Telemetry` settings documented and bound |
+| Configuration shape | `src/Common/LeanKernel.Logic/Configuration/TelemetrySettings.cs`, `docs/configuration/appsettings-reference.md` | `Agents:Telemetry` settings documented and bound, validated on startup |
 
 ## Implemented Output Targets
 
@@ -25,6 +25,9 @@
 - `src/Common/LeanKernel.Logic/Telemetry/TelemetryExportService.cs`
 - `src/Common/LeanKernel.Logic/Configuration/TelemetrySettings.cs`
 - `src/Common/LeanKernel.Data/Migrations/20260716223823_AddTurnTelemetry.cs`
+- `src/Common/LeanKernel.Data/Migrations/20260724141530_AddEvidenceClassAndGroundingStatus.cs`
+- `src/Common/LeanKernel.Core/EvidenceClass.cs`
+- `src/Common/LeanKernel.Core/GroundingStatus.cs`
 - `test/LeanKernel.Tests.Unit/Telemetry/`
 
 ## Verification

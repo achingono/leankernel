@@ -293,6 +293,8 @@ public sealed class TelemetryAggregationServiceTests : IDisposable
             CostIsEstimated = estimated,
             Currency = "USD",
             CapturedAt = capturedAt,
+            EvidenceClass = EvidenceClass.None,
+            GroundingStatus = GroundingStatus.Unknown,
             CreatedOn = DateTime.UtcNow,
             CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "system@local" }
         });

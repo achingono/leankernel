@@ -120,6 +120,15 @@ public static class IServiceCollectionExtensions
     {
         services.Configure<TelemetrySettings>(configuration.GetSection("Agents:Telemetry"));
         services.Configure<CostEstimateTable>(configuration.GetSection("Agents:Telemetry:CostEstimate"));
+
+        services.AddOptions<TelemetrySettings>()
+            .Validate(
+                static settings => !string.IsNullOrWhiteSpace(settings.Currency)
+                    && settings.Currency.Length == 3
+                    && settings.Currency.All(char.IsAsciiLetterUpper),
+                "Agents:Telemetry Currency must be a 3-letter uppercase ISO currency code (e.g. USD).")
+            .ValidateOnStart();
+
         services.AddScoped<ITurnTelemetryCollector, TurnTelemetryCollector>();
         services.AddScoped<ITelemetryAggregationService, TelemetryAggregationService>();
         services.AddScoped<ITelemetryExportService, TelemetryExportService>();

@@ -1,5 +1,6 @@
 using FluentAssertions;
 
+using LeanKernel.Entities;
 using LeanKernel.Logic.Telemetry;
 using LeanKernel.Logic.Telemetry.Models;
 
@@ -21,7 +22,11 @@ public sealed class TelemetryModelContractTests
             10,
             5,
             0.001m,
-            true);
+            true,
+            EvidenceClass.SynthesizedFact,
+            GroundingStatus.Partial,
+            "[\"key1\",\"key2\"]",
+            "[1,2]");
 
         record.Timestamp.Should().Be(timestamp);
         record.RequestedModel.Should().Be("requested");
@@ -31,6 +36,10 @@ public sealed class TelemetryModelContractTests
         record.CompletionTokens.Should().Be(5);
         record.ResponseCost.Should().Be(0.001m);
         record.CostIsEstimated.Should().BeTrue();
+        record.EvidenceClass.Should().Be(EvidenceClass.SynthesizedFact);
+        record.GroundingStatus.Should().Be(GroundingStatus.Partial);
+        record.RetrievedMemoryKeys.Should().Be("[\"key1\",\"key2\"]");
+        record.RetrievedEvidenceClasses.Should().Be("[1,2]");
     }
 
     [Fact]
