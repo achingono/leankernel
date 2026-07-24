@@ -17,6 +17,9 @@ Reference: [`../../docker-compose.yml`](../../docker-compose.yml)
 | `OPENAI__MEMORY__MODELID` | Model id for memory-related model work. |
 | `OPENAI__FACTEXTRACTION__MODELID` | Model id for fact extraction work. |
 | `GBRAIN__BASEURL` | GBrain MCP service base URL. |
+| `FILES__ROOTPATH` | Gateway file root used by document ingestion and file-system tools in containers. |
+| `FILES__SCRATCHROOT` | Gateway scratch path used for temporary file extraction work in containers. |
+| `AGENTS__TOOLS__DOCUMENTINGESTION__ENABLED` | Enables document ingestion hosted services and `document_search`/`document_list` registration. |
 
 ## Shared Infrastructure
 

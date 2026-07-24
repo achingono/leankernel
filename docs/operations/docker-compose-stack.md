@@ -57,6 +57,20 @@ This means `docker compose up` is intended to bring up a fully connected runtime
 - gateway uses PostgreSQL via `ConnectionStrings__Postgres`
 - gateway points `OpenAI__BaseUrl` at LiteLLM
 - gateway points `GBrain__BaseUrl` at the GBrain service
+- gbrain points `OPENAI_BASE_URL` at LiteLLM (`/v1`) and initializes Dream defaults to LiteLLM-compatible models (`GBRAIN_DREAM_REASONING_MODEL`, `GBRAIN_DREAM_UTILITY_MODEL`)
+- gateway sets `Files__RootPath=/app/data` and `Files__ScratchRoot=/app/scratch`
+- gateway enables document ingestion tools by default via `Agents__Tools__DocumentIngestion__Enabled`
+
+Dream verification after startup:
+
+- `docker compose exec gbrain gbrain models --json`
+- `docker compose exec gbrain gbrain dream --phase synthesize --dry-run --json`
+
+## Gateway File Persistence
+
+- `gateway-data` named volume is mounted at `/app/data` so staged and ingested files survive gateway container restarts.
+- `gateway-scratch` named volume is mounted at `/app/scratch` for temporary extraction work.
+- host watch-folder input is mounted at `./data/watch -> /app/watch` for optional `Files:WatchFolders` mappings.
 
 ## Health Checks
 

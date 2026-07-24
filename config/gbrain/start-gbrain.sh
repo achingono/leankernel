@@ -18,10 +18,40 @@ if [ -z "${OPENAI_API_KEY:-}" ] && [ -n "${LITELLM_API_KEY:-}" ]; then
   export OPENAI_API_KEY
 fi
 
+set_config_if_unset() {
+  key="$1"
+  value="$2"
+
+  if gbrain config get "$key" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if gbrain config set "$key" "$value" >/dev/null 2>&1; then
+    echo "Initialized gbrain config $key=$value"
+  else
+    echo "WARN: failed to initialize gbrain config $key" >&2
+  fi
+}
+
 gbrain init \
   --url "${db_url}" \
   --embedding-model "${GBRAIN_EMBEDDING_MODEL:-openai:embedding-small}" \
   --embedding-dimensions "${GBRAIN_EMBEDDING_DIMENSIONS:-3072}"
+
+if [ -n "${LITELLM_BASE_URL:-}" ]; then
+  reasoning_model="${GBRAIN_DREAM_REASONING_MODEL:-openai:medium}"
+  utility_model="${GBRAIN_DREAM_UTILITY_MODEL:-openai:small}"
+
+  if [ -z "${GBRAIN_MODEL:-}" ]; then
+    GBRAIN_MODEL="${reasoning_model}"
+    export GBRAIN_MODEL
+  fi
+
+  set_config_if_unset "models.dream.synthesize" "$reasoning_model"
+  set_config_if_unset "models.dream.patterns" "$reasoning_model"
+  set_config_if_unset "models.dream.synthesize_verdict" "$utility_model"
+  set_config_if_unset "facts.extraction_model" "$reasoning_model"
+fi
 
 # Create a bearer token for the engine if one doesn't already exist.
 # The token is shared with the engine through a dedicated shared volume.

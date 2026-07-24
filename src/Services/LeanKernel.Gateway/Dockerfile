@@ -45,10 +45,11 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl python3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash leankernel \
+    && mkdir -p /app/data /app/scratch /app/watch \
     && chown -R leankernel:leankernel /app
 
 USER leankernel
