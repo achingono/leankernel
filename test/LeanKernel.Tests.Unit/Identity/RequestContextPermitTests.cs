@@ -3,8 +3,8 @@ using System.Security.Claims;
 using FluentAssertions;
 
 using LeanKernel.Entities;
-using LeanKernel.Gateway.Providers;
-using LeanKernel.Gateway.Requests;
+using LeanKernel.Services.Gateway.Providers;
+using LeanKernel.Services.Gateway.Requests;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;

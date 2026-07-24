@@ -16,7 +16,7 @@ Projects in the app-only solution:
 | `src/Terminals/LeanKernel.Channels.Common` | Shared terminal/gateway helpers (health response writer, gateway health probe, connection-string resolver, channel binding token resolver) |
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, design-time factory |
 | `src/Common/LeanKernel.Logic` | Chat history provider, memory pipeline, identity resolution, policy core, event spine, and MAF-facing logic services |
-| `src/Services/LeanKernel.Gateway` | Web host, endpoint mapping, auth/session middleware, GBrain wiring, and composition of logic services (including policy core and event spine) |
+| `src/Services/LeanKernel.Services.Gateway` | Web host, endpoint mapping, auth/session middleware, GBrain wiring, and composition of logic services (including policy core and event spine) |
 | `src/Terminals/LeanKernel.Channels.Signal` | Signal channel terminal process (JSON-RPC socket transport to signal-cli sidecar) |
 | `src/Terminals/LeanKernel.Channels.Teams` | Teams Bot Framework terminal process (webhook ingress + connector egress) |
 
@@ -32,7 +32,7 @@ The current direct project references are:
 
 ```mermaid
 flowchart BT
-    Gateway[LeanKernel.Gateway] --> Logic[LeanKernel.Logic]
+    Gateway[LeanKernel.Services.Gateway] --> Logic[LeanKernel.Logic]
     Gateway --> Data[LeanKernel.Data]
     Gateway --> Core[LeanKernel.Core]
 

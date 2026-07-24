@@ -2,10 +2,10 @@ using System.Security.Claims;
 
 using FluentAssertions;
 
-using LeanKernel.Gateway.Providers;
-using LeanKernel.Gateway.Requests;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Filters;
+using LeanKernel.Services.Gateway.Providers;
+using LeanKernel.Services.Gateway.Requests;
 
 using Moq;
 

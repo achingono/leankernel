@@ -137,7 +137,7 @@ dotnet_diagnostic.SA1413.severity = silent
 dotnet_diagnostic.SA1623.severity = silent
 
 # Gateway project - relaxed style rules
-[src/Services/LeanKernel.Gateway/**/*.cs]
+[src/Services/**/*.cs]
 dotnet_diagnostic.SA1202.severity = silent
 dotnet_diagnostic.SA1117.severity = silent
 dotnet_diagnostic.SA1210.severity = silent

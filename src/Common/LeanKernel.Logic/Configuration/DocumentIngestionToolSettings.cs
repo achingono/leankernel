@@ -11,6 +11,11 @@ public sealed class DocumentIngestionToolSettings
     public bool Enabled { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether post-ingestion enrichment is enabled.
+    /// </summary>
+    public bool EnrichmentEnabled { get; set; }
+
+    /// <summary>
     /// Gets or sets the maximum number of concurrent ingestion jobs.
     /// </summary>
     public int MaxConcurrentJobs { get; set; } = 3;

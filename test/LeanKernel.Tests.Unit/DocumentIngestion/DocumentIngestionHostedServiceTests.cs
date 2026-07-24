@@ -1,11 +1,9 @@
-using FluentAssertions;
-
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Events;
 using LeanKernel.Logic.Tools.DocumentIngestion;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -19,6 +17,71 @@ public sealed class DocumentIngestionHostedServiceTests
 {
     private static readonly IOptions<DocumentIngestionToolSettings> DefaultSettings =
         Options.Create(new DocumentIngestionToolSettings { EnqueueTimeoutSeconds = 300 });
+    [Fact]
+    public async Task ExecuteAsync_WhenEnrichmentEnabled_EnqueuesEnrichmentAndAppendsEvent()
+    {
+        var queueMock = new Mock<IDocumentIngestionQueue>();
+        var enrichmentQueueMock = new Mock<IEnrichmentQueue>();
+        var eventStoreMock = new Mock<IEventStore>();
+        var libraryMock = new Mock<IDocumentLibraryService>();
+        var loggerMock = new Mock<ILogger<DocumentIngestionHostedService>>();
+
+        var settings = Options.Create(new DocumentIngestionToolSettings
+        {
+            EnqueueTimeoutSeconds = 300,
+            EnrichmentEnabled = true,
+        });
+
+        var jobEntity = new DocumentIngestionJobEntity
+        {
+            Id = Guid.NewGuid(),
+            Status = "Processing",
+            FilePath = "/tmp/test.txt",
+            FileName = "test.txt",
+            ContentType = "text/plain",
+            TenantId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            PersonId = Guid.NewGuid(),
+            ChannelId = Guid.NewGuid(),
+            AvailabilityScope = "User",
+            Source = "Upload",
+            AttemptCount = 0,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        queueMock
+            .Setup(q => q.TryClaimNextAsync(It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(jobEntity);
+
+        queueMock
+            .Setup(q => q.CompleteAsync(It.IsAny<Guid>(), It.IsAny<IngestionResult>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        libraryMock
+            .Setup(l => l.IngestDocumentAsync(It.IsAny<DocumentIngestionJob>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IngestionResult("abc123", true, false));
+
+        var scopeFactory = CreateScopeFactory(queueMock, libraryMock, enrichmentQueueMock, eventStoreMock);
+        var service = new DocumentIngestionHostedService(scopeFactory, settings, loggerMock.Object);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        try
+        {
+            await service.StartAsync(cts.Token);
+            await service.ExecuteTask!;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        enrichmentQueueMock.Verify(
+            q => q.EnqueueAsync(It.Is<EnrichmentJob>(job => job.IngestionJobId == jobEntity.Id), It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
+        eventStoreMock.Verify(
+            s => s.AppendAsync(It.Is<object>(e => e is LeanKernel.Events.DocumentEnrichmentRequestedEvent), It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
+    }
+
     [Fact]
     public async Task ExecuteAsync_RecoversStaleLeasesOnStart()
     {
@@ -213,11 +276,24 @@ public sealed class DocumentIngestionHostedServiceTests
 
     private static IServiceScopeFactory CreateScopeFactory(
         Mock<IDocumentIngestionQueue> queueMock,
-        Mock<IDocumentLibraryService> libraryMock)
+        Mock<IDocumentLibraryService> libraryMock,
+        Mock<IEnrichmentQueue>? enrichmentQueueMock = null,
+        Mock<IEventStore>? eventStoreMock = null)
     {
         var services = new ServiceCollection();
         services.AddScoped(_ => queueMock.Object);
         services.AddScoped(_ => libraryMock.Object);
+
+        if (enrichmentQueueMock is not null)
+        {
+            services.AddScoped(_ => enrichmentQueueMock.Object);
+        }
+
+        if (eventStoreMock is not null)
+        {
+            services.AddScoped(_ => eventStoreMock.Object);
+        }
+
         return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
     }
 }

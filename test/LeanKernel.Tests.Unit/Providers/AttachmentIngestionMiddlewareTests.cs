@@ -2,12 +2,11 @@ using System.Text;
 
 using FluentAssertions;
 
-using LeanKernel;
 using LeanKernel.Entities;
 using LeanKernel.Events;
-using LeanKernel.Gateway.Providers;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Events;
+using LeanKernel.Services.Gateway.Providers;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;

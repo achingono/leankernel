@@ -176,6 +176,27 @@ public static class IServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Registers enrichment services: durable queue, hosted service, and settings.
+    /// </summary>
+    /// <param name="services">The service collection to update.</param>
+    /// <param name="configuration">The application configuration for binding EnrichmentSettings.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddEnrichment(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddSingleton<IEnrichmentQueue, EnrichmentQueue>();
+        services.AddHostedService<EnrichmentHostedService>();
+
+        services.Configure<EnrichmentSettings>(configuration.GetSection("Agents:Tools:DocumentIngestion:Enrichment"));
+
+        services.AddOptions<EnrichmentSettings>()
+            .Validate(settings => settings.MaxConcurrentJobs > 0, "MaxConcurrentJobs must be > 0")
+            .Validate(settings => settings.QueueCapacity > 0, "QueueCapacity must be > 0")
+            .ValidateOnStart();
+
+        return services;
+    }
+
+    /// <summary>
     /// Registers the shared policy core: policy context, evaluator, and default policies.
     /// </summary>
     /// <param name="services">The service collection to update.</param>

@@ -1,5 +1,3 @@
-using System.Text;
-
 using FluentAssertions;
 
 using LeanKernel.Logic.Configuration;

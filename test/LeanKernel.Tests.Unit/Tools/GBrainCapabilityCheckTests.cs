@@ -2,8 +2,9 @@ using System.Text.Json;
 
 using FluentAssertions;
 
-using LeanKernel.Gateway.Memory;
 using LeanKernel.Logic.Memory;
+using LeanKernel.Services.Common.Interfaces;
+using LeanKernel.Services.Common.Memory;
 
 using Microsoft.Extensions.Logging;
 

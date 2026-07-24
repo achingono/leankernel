@@ -3,7 +3,8 @@ using System.Text;
 
 using FluentAssertions;
 
-using LeanKernel.Gateway.Memory;
+using LeanKernel.Services.Common.Interfaces;
+using LeanKernel.Services.Common.Memory;
 
 using Microsoft.Extensions.Logging.Abstractions;
 

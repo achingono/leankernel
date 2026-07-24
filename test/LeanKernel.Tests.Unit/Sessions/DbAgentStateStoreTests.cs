@@ -1,7 +1,7 @@
 using FluentAssertions;
 
 using LeanKernel.Data;
-using LeanKernel.Gateway.Sessions;
+using LeanKernel.Services.Gateway.Sessions;
 
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;

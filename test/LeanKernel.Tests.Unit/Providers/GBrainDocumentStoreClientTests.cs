@@ -2,10 +2,10 @@ using System.Text.Json;
 
 using FluentAssertions;
 
-using LeanKernel;
-using LeanKernel.Gateway.Configuration;
-using LeanKernel.Gateway.Memory;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Services.Common.Configuration;
+using LeanKernel.Services.Common.Interfaces;
+using LeanKernel.Services.Common.Memory;
 
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

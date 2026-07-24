@@ -183,7 +183,7 @@ services:
   gateway:
     build:
       context: .
-      dockerfile: src/Services/LeanKernel.Gateway/Dockerfile
+      dockerfile: src/Services/LeanKernel.Services.Gateway/Dockerfile
       # Dockerfile stages are: source, watch, build, final.
       # Default to `final` so `docker compose up` works without extra env vars.
       target: ${LEANKERNEL_ENGINE_TARGET:-final}
@@ -233,11 +233,35 @@ services:
       retries: 5
       start_period: 30s
 
-  signal-terminal:
+  learning:
+    build:
+      context: .
+      dockerfile: src/Services/LeanKernel.Services.Learning/Dockerfile
+    container_name: leankernel-learning
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - CONNECTIONSTRINGS__POSTGRES=Host=database;Port=5432;Database=${POSTGRES_DB:-leankernel};Username=${POSTGRES_USER:-leankernel};Password=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - OPENAI__BASEURL=${LITELLM_BASE_URL:-http://litellm:4000}/v1
+      - OPENAI__APIKEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
+      - OPENAI__DEFAULTMODEL=${LEANKERNEL_DEFAULT_MODEL:-medium}
+      - OPENAI__MEMORY__MODELID=${LEANKERNEL_MEMORY_MODEL:-small}
+      - OPENAI__FACTEXTRACTION__MODELID=${LEANKERNEL_FACT_EXTRACTION_MODEL:-small}
+      - GBRAIN__BASEURL=http://gbrain:8789
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - gbrain-data:/app/data/gbrain:ro
+    depends_on:
+      database:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+  signal-channel:
     build:
       context: .
       dockerfile: src/Terminals/LeanKernel.Channels.Signal/Dockerfile
-    container_name: leankernel-signal-terminal
+    container_name: leankernel-signal-channel
     environment:
       - DOTNET_ENVIRONMENT=Development
       - CONNECTIONSTRINGS__POSTGRES=Host=database;Port=5432;Database=${POSTGRES_DB:-leankernel};Username=${POSTGRES_USER:-leankernel};Password=${POSTGRES_PASSWORD:-leankernel-dev-password}
@@ -267,14 +291,14 @@ services:
       - "${SIGNAL_CLI_PORT:-8081}:8080"
     restart: unless-stopped
 
-  teams-terminal:
+  teams-channel:
     build:
       context: .
       dockerfile: src/Terminals/LeanKernel.Channels.Teams/Dockerfile
-    container_name: leankernel-teams-terminal
+    container_name: leankernel-teams-channel
     environment:
       - DOTNET_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=${TEAMS_TERMINAL_PORT:-3978}
+      - ASPNETCORE_HTTP_PORTS=${TEAMS_CHANNEL_PORT:-3978}
       - CONNECTIONSTRINGS__POSTGRES=Host=database;Port=5432;Database=${POSTGRES_DB:-leankernel};Username=${POSTGRES_USER:-leankernel};Password=${POSTGRES_PASSWORD:-leankernel-dev-password}
       - GATEWAY__BASEURL=http://gateway:${LEANKERNEL_GATEWAY_PORT:-8080}
       - GATEWAY__MODEL=${LEANKERNEL_DEFAULT_MODEL:-medium}
@@ -283,7 +307,7 @@ services:
       - BOT__AUTHORITY=${TEAMS_AUTHORITY:-https://login.microsoftonline.com}
       - TZ=${TZ:-America/Toronto}
     ports:
-      - "${TEAMS_TERMINAL_PORT:-3978}:${TEAMS_TERMINAL_PORT:-3978}"
+      - "${TEAMS_CHANNEL_PORT:-3978}:${TEAMS_CHANNEL_PORT:-3978}"
     depends_on:
       database:
         condition: service_healthy
@@ -291,7 +315,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:${TEAMS_TERMINAL_PORT:-3978}/live || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${TEAMS_CHANNEL_PORT:-3978}/live || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5

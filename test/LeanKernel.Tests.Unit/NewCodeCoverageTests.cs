@@ -4,12 +4,12 @@ using FluentAssertions;
 
 using LeanKernel.Data;
 using LeanKernel.Entities;
-using LeanKernel.Gateway;
-using LeanKernel.Gateway.Configuration;
-using LeanKernel.Gateway.Providers;
-using LeanKernel.Gateway.Requests;
-using LeanKernel.Gateway.Sessions;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Services.Gateway;
+using LeanKernel.Services.Gateway.Configuration;
+using LeanKernel.Services.Gateway.Providers;
+using LeanKernel.Services.Gateway.Requests;
+using LeanKernel.Services.Gateway.Sessions;
 
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Http;
@@ -180,6 +180,62 @@ public class NewCodeCoverageTests
         var identity = new ClaimsIdentity([new Claim("sid", guid)]);
         var principal = new ClaimsPrincipal(identity);
         principal.Id().Should().Be(new Guid(guid));
+    }
+
+    [Fact]
+    public void ClaimsPrincipalExtensions_Email_ValidClaim_ReturnsEmail()
+    {
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Email, "user@example.com")]);
+        var principal = new ClaimsPrincipal(identity);
+
+        principal.Email().Should().Be("user@example.com");
+    }
+
+    [Fact]
+    public void ClaimsPrincipalExtensions_Email_InvalidClaim_ReturnsEmpty()
+    {
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Email, "not-an-email")]);
+        var principal = new ClaimsPrincipal(identity);
+
+        principal.Email().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ClaimsPrincipalExtensions_Name_UsesNameClaim()
+    {
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "Ada Lovelace")]);
+        var principal = new ClaimsPrincipal(identity);
+
+        principal.Name().Should().Be("Ada Lovelace");
+    }
+
+    [Fact]
+    public void ClaimsPrincipalExtensions_Name_UsesGivenAndSurnameFallback()
+    {
+        var identity = new ClaimsIdentity([
+            new Claim(ClaimTypes.GivenName, "Ada"),
+            new Claim(ClaimTypes.Surname, "Lovelace"),
+        ]);
+        var principal = new ClaimsPrincipal(identity);
+
+        principal.Name().Should().Be("Ada Lovelace");
+    }
+
+    [Fact]
+    public void ClaimsPrincipalExtensions_ToBadge_MapsIdNameAndEmail()
+    {
+        var id = Guid.NewGuid();
+        var identity = new ClaimsIdentity([
+            new Claim(ClaimTypes.Sid, id.ToString()),
+            new Claim(ClaimTypes.Name, "Ada Lovelace"),
+            new Claim(ClaimTypes.Email, "ada@example.com"),
+        ]);
+        var principal = new ClaimsPrincipal(identity);
+
+        var badge = principal.ToBadge();
+        badge.Id.Should().Be(id);
+        badge.FullName.Should().Be("Ada Lovelace");
+        badge.Email.Should().Be("ada@example.com");
     }
 
     [Fact]

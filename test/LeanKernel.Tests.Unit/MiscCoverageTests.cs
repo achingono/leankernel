@@ -2,10 +2,10 @@ using System.Security.Claims;
 
 using FluentAssertions;
 
-using LeanKernel.Gateway.Memory;
-using LeanKernel.Gateway.Requests;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
+using LeanKernel.Services.Common.Interfaces;
+using LeanKernel.Services.Gateway.Requests;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;

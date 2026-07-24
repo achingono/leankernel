@@ -74,6 +74,26 @@ public class EntityContext : DbContext
     public DbSet<DocumentIngestionJobEntity> DocumentIngestionJobs => this.Set<DocumentIngestionJobEntity>();
 
     /// <summary>
+    /// Gets the durable enrichment job queue.
+    /// </summary>
+    public DbSet<EnrichmentJobEntity> EnrichmentJobs => this.Set<EnrichmentJobEntity>();
+
+    /// <summary>
+    /// Gets the scheduled cron jobs.
+    /// </summary>
+    public DbSet<ScheduledJobEntity> ScheduledJobs => this.Set<ScheduledJobEntity>();
+
+    /// <summary>
+    /// Gets the Dream cycle run records.
+    /// </summary>
+    public DbSet<DreamRunRecord> DreamRunRecords => this.Set<DreamRunRecord>();
+
+    /// <summary>
+    /// Gets learning replay checkpoints.
+    /// </summary>
+    public DbSet<LearningCheckpointEntity> LearningCheckpoints => this.Set<LearningCheckpointEntity>();
+
+    /// <summary>
     /// Applies pending migrations and ensures the default tenant and OpenAI channel records exist.
     /// </summary>
     /// <param name="hostName">The host name to seed for the default tenant if needed.</param>
@@ -301,6 +321,52 @@ public class EntityContext : DbContext
             entity.Property(e => e.LeaseOwner).HasMaxLength(200);
             entity.HasIndex(e => new { e.TenantId, e.Status, e.NextAttemptAt, e.LeaseExpiresAt });
             entity.HasIndex(e => new { e.TenantId, e.UserId, e.ChannelId });
+        });
+
+        // EnrichmentJobEntity
+        modelBuilder.Entity<EnrichmentJobEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.AvailabilityScope).HasMaxLength(20);
+            entity.Property(e => e.FilePath).HasColumnType("text");
+            entity.Property(e => e.FileName).HasMaxLength(500);
+            entity.Property(e => e.Fingerprint).HasMaxLength(100);
+            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.LastError).HasColumnType("text");
+            entity.Property(e => e.LeaseOwner).HasMaxLength(200);
+            entity.HasIndex(e => new { e.TenantId, e.Status, e.NextAttemptAt, e.LeaseExpiresAt });
+            entity.HasIndex(e => new { e.TenantId, e.UserId, e.ChannelId });
+        });
+
+        // ScheduledJobEntity
+        modelBuilder.Entity<ScheduledJobEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.CronExpression).HasMaxLength(100);
+            entity.Property(e => e.JobType).HasMaxLength(100);
+            entity.Property(e => e.ConfigurationJson).HasColumnType("text");
+            entity.HasIndex(e => new { e.Enabled, e.NextRunAt });
+        });
+
+        // DreamRunRecord
+        modelBuilder.Entity<DreamRunRecord>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.SourceScope).HasMaxLength(200);
+            entity.Property(e => e.Mode).HasMaxLength(50);
+            entity.Property(e => e.PhaseStatusJson).HasColumnType("text");
+            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.HasIndex(e => e.SourceScope);
+            entity.HasIndex(e => e.Status);
+        });
+
+        // LearningCheckpointEntity
+        modelBuilder.Entity<LearningCheckpointEntity>(entity =>
+        {
+            entity.HasKey(e => e.Name);
+            entity.Property(e => e.Name).HasMaxLength(100);
+            entity.HasIndex(e => e.UpdatedAt);
         });
     }
 

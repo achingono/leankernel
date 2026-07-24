@@ -3,6 +3,7 @@ using System.Reflection;
 using FluentAssertions;
 
 using LeanKernel.Logic.Policy;
+using LeanKernel.Services.Gateway.Providers;
 
 using Xunit;
 
@@ -15,7 +16,7 @@ namespace LeanKernel.Tests.Unit.Gateway;
 /// </summary>
 public class GatewayGuardrailTests
 {
-    private static readonly Assembly GatewayAssembly = typeof(LeanKernel.Gateway.Providers.RequestContextPermit).Assembly;
+    private static readonly Assembly GatewayAssembly = typeof(RequestContextPermit).Assembly;
 
     private static readonly Assembly LogicAssembly = typeof(IPolicyEvaluator).Assembly;
 

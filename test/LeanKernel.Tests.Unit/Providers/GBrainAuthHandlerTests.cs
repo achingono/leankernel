@@ -3,8 +3,8 @@ using System.Net.Http.Headers;
 
 using FluentAssertions;
 
-using LeanKernel.Gateway.Configuration;
-using LeanKernel.Gateway.Memory;
+using LeanKernel.Services.Common.Configuration;
+using LeanKernel.Services.Common.Memory;
 
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

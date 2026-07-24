@@ -4,7 +4,7 @@ using System.Text.Json;
 
 using FluentAssertions;
 
-using LeanKernel.Gateway.Requests;
+using LeanKernel.Services.Gateway.Requests;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

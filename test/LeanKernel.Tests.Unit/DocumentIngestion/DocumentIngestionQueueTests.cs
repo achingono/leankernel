@@ -3,13 +3,11 @@ using System.Data.Common;
 using FluentAssertions;
 
 using LeanKernel.Data;
-using LeanKernel.Entities;
 using LeanKernel.Logic.Tools.DocumentIngestion;
+using LeanKernel.Tests.Unit.TestDoubles;
 
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-
-using LeanKernel.Tests.Unit.TestDoubles;
 
 using Xunit;
 

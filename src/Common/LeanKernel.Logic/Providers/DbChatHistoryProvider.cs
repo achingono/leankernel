@@ -26,7 +26,8 @@ public class DbChatHistoryProvider(
     ITurnTelemetryCollector? telemetryCollector = null,
     IEventCollector? eventCollector = null,
     ILogger<DbChatHistoryProvider>? logger = null,
-    IEnumerable<IEventSubscriber>? eventSubscribers = null) : ChatHistoryProvider
+    IEnumerable<IEventSubscriber>? eventSubscribers = null,
+    IEventStore? eventStore = null) : ChatHistoryProvider
 {
     internal const string ChatSessionIdKey = "chatSessionId";
     internal const string ConversationIdKey = "conversationId";
@@ -127,6 +128,8 @@ public class DbChatHistoryProvider(
 
             // Consume telemetry captured for the assistant turn (if any).
             var telemetry = telemetryCollector?.Consume();
+            var completedTurns = new List<TurnCompletedEvent>();
+            var userMessage = requestTurns.LastOrDefault(t => t.Role == "user")?.Content ?? string.Empty;
 
             foreach (var turn in allCandidateTurns)
             {
@@ -182,10 +185,42 @@ public class DbChatHistoryProvider(
                         // Emit telemetry event alongside persistence.
                         EmitTelemetryEvent(telemetryEntity, telemetry);
                     }
+
+                    if (eventStore is not null && turn.Role == "assistant")
+                    {
+                        var completedEnvelope = new EventEnvelope
+                        {
+                            EventType = "turn_completed",
+                            TenantId = permit.TenantId,
+                            PersonId = permit.PersonId,
+                            UserId = permit.UserId,
+                            ChannelId = permit.ChannelId,
+                            SessionId = sessionGuid.ToString(),
+                            CorrelationId = turn.Metadata,
+                        };
+
+                        completedTurns.Add(new TurnCompletedEvent
+                        {
+                            Envelope = completedEnvelope,
+                            TurnId = turn.Id,
+                            SessionId = sessionGuid,
+                            UserMessage = userMessage,
+                            AssistantResponse = turn.Content,
+                            ToolCalls = [],
+                            ElapsedMs = telemetry?.Latency is { } latency
+                                ? (long)latency.TotalMilliseconds
+                                : 0,
+                        });
+                    }
                 }
             }
 
             await turnRepo.SaveChangesAsync(cancellationToken);
+
+            if (eventStore is not null && completedTurns.Count > 0)
+            {
+                await eventStore.AppendBatchAsync(completedTurns, cancellationToken);
+            }
 
             if (eventCollector is not null)
             {

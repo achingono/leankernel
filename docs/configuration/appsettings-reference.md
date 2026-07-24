@@ -65,6 +65,11 @@ These are used by the logic-layer memory pipeline.
 | `Agents:Tools:DocumentIngestion:WatchMaxRetries` | Max stability retries per watched file before giving up | `3` |
 | `Agents:Tools:DocumentIngestion:WatchRetryBaseDelaySeconds` | Base delay used for watch-folder retry backoff | `1` |
 | `Agents:Tools:DocumentIngestion:WatchRetryMaxDelaySeconds` | Max delay used for watch-folder retry backoff | `60` |
+| `Agents:Tools:DocumentIngestion:EnrichmentEnabled` | Enables enqueue + event emission for post-ingestion enrichment | `false` |
+| `Agents:Tools:DocumentIngestion:Enrichment:Enabled` | Enables the enrichment worker loop | `false` |
+| `Agents:Tools:DocumentIngestion:Enrichment:MaxConcurrentJobs` | Max concurrent enrichment jobs | `3` |
+| `Agents:Tools:DocumentIngestion:Enrichment:QueueCapacity` | Capacity hint for enrichment queue configuration | `100` |
+| `Agents:Tools:DocumentIngestion:Enrichment:LeaseTimeoutMinutes` | Lease timeout for claimed enrichment jobs | `5` |
 | `Agents:Telemetry:Enabled` | Enables capture and persistence of model/token/cost telemetry | `true` |
 | `Agents:Telemetry:Currency` | Currency code for reported/estimated cost | `USD` |
 | `Agents:Telemetry:RetainRawMetadata` | Keeps room for retaining source metadata fields alongside structured values | `true` |
@@ -75,6 +80,21 @@ These are used by the logic-layer memory pipeline.
 The current implementation does not use a top-level `LeanKernel` configuration root. New runtime settings should extend the existing top-level sections rather than introducing `LeanKernel:*` duplicates.
 
 Document-ingestion note: `WatchSettleDelaySeconds` and `WatchMaxRetries` are actively used by watch-folder stability checks. Some other ingestion settings are currently validated/configured for future enforcement and may not affect runtime behavior yet.
+
+## Learning Service
+
+`src/Services/LeanKernel.Services.Learning/appsettings.json` configures the background
+learning and scheduler service.
+
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `Learning:Enabled` | Enables the learning worker loop | `true` |
+| `Learning:TurnQueueCapacity` | Bounded capacity for queued turn events | `1000` |
+| `Learning:MaxConcurrency` | Concurrency hint for learning execution | `1` |
+| `Scheduler:Enabled` | Enables cron scheduler hosted service | `true` |
+| `Scheduler:PollIntervalSeconds` | Scheduler polling interval | `30` |
+| `Scheduler:DreamLockTimeoutSeconds` | Per-scope Dream lock timeout | `300` |
+| `Scheduler:DefaultDreamMode` | Default Dream mode for scheduler runs | `full` |
 
 ## Files
 

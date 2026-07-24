@@ -18,7 +18,7 @@ jobs:
       matrix:
         include:
           - image: gateway
-            dockerfile: src/Services/LeanKernel.Gateway/Dockerfile
+            dockerfile: src/Services/LeanKernel.Services.Gateway/Dockerfile
             context: .
             platforms: linux/amd64,linux/arm64
           - image: gbrain

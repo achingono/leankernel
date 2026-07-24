@@ -1,6 +1,7 @@
-using LeanKernel;
 using LeanKernel.Entities;
+using LeanKernel.Events;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Events;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -81,6 +82,12 @@ public sealed class DocumentIngestionHostedService : BackgroundService
                 {
                     var result = await library.IngestDocumentAsync(job, stoppingToken);
                     await queue.CompleteAsync(claimed.Id, result, stoppingToken);
+
+                    if (_settings.Value.EnrichmentEnabled && result.Success && !result.IsDuplicate)
+                    {
+                        await EnqueueEnrichmentAsync(scope.ServiceProvider, claimed, result, stoppingToken);
+                    }
+
                     _logger.LogInformation("Ingested document {FileName} ({Fingerprint})", claimed.FileName, result.Fingerprint);
                 }
                 catch (Exception ex)
@@ -120,5 +127,67 @@ public sealed class DocumentIngestionHostedService : BackgroundService
         {
             _logger.LogWarning(ex, "Stale lease recovery failed on startup; continuing normally");
         }
+    }
+
+    private async Task EnqueueEnrichmentAsync(
+        IServiceProvider serviceProvider,
+        DocumentIngestionJobEntity claimed,
+        IngestionResult result,
+        CancellationToken ct)
+    {
+        var enrichmentQueue = serviceProvider.GetService<IEnrichmentQueue>();
+        if (enrichmentQueue is null)
+        {
+            _logger.LogDebug("Enrichment is enabled but IEnrichmentQueue is not registered. Skipping enrichment enqueue.");
+            return;
+        }
+
+        var source = Enum.Parse<DocumentIngestionSource>(claimed.Source);
+        var availabilityScope = Enum.Parse<DocumentAvailabilityScope>(claimed.AvailabilityScope);
+        var enrichmentJobId = Guid.NewGuid();
+
+        await enrichmentQueue.EnqueueAsync(
+            new EnrichmentJob(
+                enrichmentJobId,
+                claimed.Id,
+                claimed.FilePath,
+                claimed.FileName,
+                result.Fingerprint,
+                claimed.TenantId,
+                claimed.UserId,
+                claimed.PersonId,
+                claimed.ChannelId,
+                availabilityScope,
+                source),
+            ct);
+
+        var eventStore = serviceProvider.GetService<IEventStore>();
+        if (eventStore is null)
+        {
+            _logger.LogDebug("IEventStore is not registered. Skipping DocumentEnrichmentRequestedEvent append.");
+            return;
+        }
+
+        var envelope = new EventEnvelope
+        {
+            EventType = "document_enrichment_requested",
+            TenantId = claimed.TenantId,
+            PersonId = claimed.PersonId,
+            UserId = claimed.UserId,
+            ChannelId = claimed.ChannelId,
+            CorrelationId = claimed.Id.ToString("N"),
+        };
+
+        await eventStore.AppendAsync(
+            new DocumentEnrichmentRequestedEvent
+            {
+                Envelope = envelope,
+                IngestionJobId = claimed.Id,
+                TenantId = claimed.TenantId,
+                UserId = claimed.UserId,
+                PersonId = claimed.PersonId,
+                ChannelId = claimed.ChannelId,
+            },
+            ct);
     }
 }

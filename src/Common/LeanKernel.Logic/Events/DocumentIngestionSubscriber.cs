@@ -1,4 +1,3 @@
-using LeanKernel;
 using LeanKernel.Events;
 using LeanKernel.Logic.Tools.DocumentIngestion;
 

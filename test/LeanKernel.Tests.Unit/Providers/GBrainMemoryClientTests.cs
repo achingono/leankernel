@@ -1,8 +1,9 @@
 using FluentAssertions;
 
 using LeanKernel.Entities;
-using LeanKernel.Gateway.Memory;
 using LeanKernel.Logic.Providers;
+using LeanKernel.Services.Common.Interfaces;
+using LeanKernel.Services.Common.Memory;
 
 using Microsoft.Extensions.Logging;
 

@@ -6,6 +6,8 @@ using FluentAssertions;
 
 using LeanKernel.Data;
 using LeanKernel.Entities;
+using LeanKernel.Events;
+using LeanKernel.Logic.Events;
 using LeanKernel.Logic.Interfaces;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Logic.Repositories;
@@ -556,6 +558,27 @@ public class DbChatHistoryProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task StoreChatHistoryAsync_WithAssistantResponse_AppendsTurnCompletedEvent()
+    {
+        var eventStore = new Mock<IEventStore>();
+        var (provider, _) = CreateSut(eventStore: eventStore.Object);
+        var session = CreateSession(new Dictionary<string, string?>());
+
+        await provider.InvokeStoreChatHistoryAsync(
+            CreateInvokedContext(
+                session: session,
+                requestMessages: [new ChatMessage(ChatRole.User, "hello")],
+                responseMessages: [new ChatMessage(ChatRole.Assistant, "hi")]),
+            CancellationToken.None);
+
+        eventStore.Verify(
+            s => s.AppendBatchAsync(
+                It.Is<IEnumerable<object>>(events => events.OfType<TurnCompletedEvent>().Any()),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task StoreChatHistoryAsync_WithoutCapturedTelemetry_DoesNotPersistTurnTelemetry()
     {
         var collector = new TurnTelemetryCollector();
@@ -578,7 +601,8 @@ public class DbChatHistoryProviderTests : IDisposable
         ITurnTelemetryCollector? collector = null,
         Func<Operation, bool>? sessionCan = null,
         Func<Operation, bool>? turnCan = null,
-        Func<Operation, bool>? telemetryCan = null)
+        Func<Operation, bool>? telemetryCan = null,
+        IEventStore? eventStore = null)
     {
         var options = new DbContextOptionsBuilder<EntityContext>()
             .UseSqlite(_connection)
@@ -601,7 +625,7 @@ public class DbChatHistoryProviderTests : IDisposable
         var turnRepo = CreateRepo<TurnEntity>(context, turnCan);
         var telemetryRepo = CreateRepo<TurnTelemetryEntity>(context, telemetryCan);
 
-        return (new TestableDbChatHistoryProvider(sessionRepo, turnRepo, telemetryRepo, permit.Object, collector), context);
+        return (new TestableDbChatHistoryProvider(sessionRepo, turnRepo, telemetryRepo, permit.Object, collector, eventStore), context);
     }
 
     private static IRepository<TEntity> CreateRepo<TEntity>(
@@ -738,8 +762,9 @@ internal sealed class TestableDbChatHistoryProvider : DbChatHistoryProvider
         IRepository<TurnEntity> turnRepo,
         IRepository<TurnTelemetryEntity> telemetryRepo,
         IPermit permit,
-        ITurnTelemetryCollector? telemetryCollector = null)
-        : base(sessionRepo, turnRepo, telemetryRepo, permit, telemetryCollector)
+        ITurnTelemetryCollector? telemetryCollector = null,
+        IEventStore? eventStore = null)
+        : base(sessionRepo, turnRepo, telemetryRepo, permit, telemetryCollector, eventStore: eventStore)
     {
         _permit = permit;
     }

@@ -3,11 +3,10 @@ using System.Text;
 
 using FluentAssertions;
 
-using LeanKernel;
 using LeanKernel.Entities;
-using LeanKernel.Gateway.Requests;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools.DocumentIngestion;
+using LeanKernel.Services.Gateway.Requests;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;

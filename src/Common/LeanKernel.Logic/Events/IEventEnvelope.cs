@@ -1,5 +1,3 @@
-using LeanKernel;
-
 namespace LeanKernel.Logic.Events;
 
 /// <summary>

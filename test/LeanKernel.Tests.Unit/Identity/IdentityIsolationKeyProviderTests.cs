@@ -1,6 +1,6 @@
 using FluentAssertions;
 
-using LeanKernel.Gateway.Providers;
+using LeanKernel.Services.Gateway.Providers;
 
 using Moq;
 

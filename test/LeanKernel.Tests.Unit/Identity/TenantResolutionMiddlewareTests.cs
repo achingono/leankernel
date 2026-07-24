@@ -1,8 +1,8 @@
 using FluentAssertions;
 
 using LeanKernel.Entities;
-using LeanKernel.Gateway.Configuration;
-using LeanKernel.Gateway.Providers;
+using LeanKernel.Services.Gateway.Configuration;
+using LeanKernel.Services.Gateway.Providers;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
