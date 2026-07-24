@@ -35,7 +35,7 @@ LITELLM_SETTINGS_DEFAULT = {
         "port": 6379,
         "password": "os.environ/REDIS_PASSWORD",
     },
-    "callbacks": ["litellm_callbacks.proxy_handler_instance"],
+    "callbacks": ["callbacks.proxy_handler_instance"],
 }
 
 ROUTER_SETTINGS_DEFAULT = {

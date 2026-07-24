@@ -58,9 +58,9 @@ class LiteLlmRouteMonitor:
         self.drift_report_path = Path(os.getenv("LITELLM_LIMIT_DRIFT_REPORT_PATH", "/app/logs/litellm-model-limit-drift.json"))
         self.sync_lock_path = Path(os.getenv("LITELLM_LIMIT_SYNC_LOCK_PATH", "/tmp/litellm-model-limit-sync.lock"))
         self.spec_path = Path(os.getenv("LITELLM_SPEC_PATH", "/app/litellm_spec.yaml"))
-        self.render_script_path = Path(os.getenv("LITELLM_RENDER_SCRIPT_PATH", "/app/render_litellm_config.py"))
-        self.rendered_config_path = Path(os.getenv("LITELLM_RENDERED_CONFIG_PATH", "/app/config/litellm/litellm_config.generated.yaml"))
-        self.sync_script_path = Path(os.getenv("LITELLM_LIMIT_SYNC_SCRIPT_PATH", "/app/sync_litellm_model_limits.py"))
+        self.render_script_path = Path(os.getenv("LITELLM_RENDER_SCRIPT_PATH", "/app/config/render_config.py"))
+        self.rendered_config_path = Path(os.getenv("LITELLM_RENDERED_CONFIG_PATH", "/app/config/config.generated.yaml"))
+        self.sync_script_path = Path(os.getenv("LITELLM_LIMIT_SYNC_SCRIPT_PATH", "/app/config/sync_model_limits.py"))
         self.sync_interval_seconds = env_int("LITELLM_LIMIT_SYNC_INTERVAL_SECONDS", 900, 60)
         self.sync_check_seconds = env_int("LITELLM_LIMIT_SYNC_CHECK_SECONDS", 15, 5)
         self.off_hours_restart_enabled = os.getenv("LITELLM_OFF_HOURS_RESTART_ENABLED", "true").strip().lower() in {

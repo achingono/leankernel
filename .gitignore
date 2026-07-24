@@ -2,7 +2,7 @@ bin/
 obj/
 .env
 config/litellm/config.yaml
-config/litellm/litellm_config.generated.yaml
+config/litellm/config.generated.yaml
 .sonarqube/
 coverage-results*/
 .playwright-mcp/

@@ -20,6 +20,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Redis (Cache & Pub/Sub) ─────────────────────────────────
+  redis:
+    image: redis:8-alpine
+    volumes:
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./config/redis/entrypoint.sh:/run/wrapper/entrypoint.sh:ro
+      - redis-data:/data
+    command: ["/bin/sh", "/run/wrapper/entrypoint.sh"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "redis-cli -a \"$$(cat /run/secrets/redis_password | tr -d '\\r\\n')\" ping | grep -q PONG",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ── LiteLLM (Model Proxy) ─────────────────────────────────────
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
@@ -50,12 +68,11 @@ services:
       - NVIDIA_API_BASE=${NVIDIA_API_BASE:-}
       - TZ=${TZ:-America/Toronto}
     volumes:
-      - ./config/litellm:/app/config:ro
-      - ./config/litellm/leankernel_litellm_callbacks.py:/app/litellm_callbacks.py:ro
+      - ./config/litellm:/app/config:rw
     extra_hosts:
       - "host.docker.internal:host-gateway"
     entrypoint: ["sh", "-c"]
-    command: ["set -eu; ENCODED_POSTGRES_PASSWORD=$$(python3 -c \"import os, urllib.parse; print(urllib.parse.quote(os.environ['POSTGRES_PASSWORD']))\"); export DATABASE_URL=postgresql://$${POSTGRES_USER}:$${ENCODED_POSTGRES_PASSWORD}@$${POSTGRES_HOST}:$${POSTGRES_PORT}/$${POSTGRES_DB}?schema=$${LITELLM_DB_SCHEMA}; python3 /app/config/render_litellm_config.py /app/config/config.yaml /app/litellm_config.generated.yaml && exec litellm --config /app/litellm_config.generated.yaml --port 4000"]
+    command: ["set -eu; ENCODED_POSTGRES_PASSWORD=$$(python3 -c \"import os, urllib.parse; print(urllib.parse.quote(os.environ['POSTGRES_PASSWORD']))\"); export DATABASE_URL=postgresql://$${POSTGRES_USER}:$${ENCODED_POSTGRES_PASSWORD}@$${POSTGRES_HOST}:$${POSTGRES_PORT}/$${POSTGRES_DB}?schema=$${LITELLM_DB_SCHEMA}; python3 /app/config/render_config.py /app/config/config.yaml /app/config/config.generated.yaml && exec litellm --config /app/config/config.generated.yaml --port 4000"]
     ports:
       - "${LITELLM_PORT:-4000}:4000"
     depends_on:
@@ -287,3 +304,4 @@ volumes:
   gbrain-data:
   signal-data:
   browserdata:
+  redis-data:
