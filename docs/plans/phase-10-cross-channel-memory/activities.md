@@ -18,6 +18,11 @@
 15. Add tests: with wildcard default the same person shares memory + preferences across two channels; explicit `Share`/`Access` narrowing isolates or partially shares channels via directional AND; a fact updated in one channel supersedes/reconciles the same-entity 5W1H fact in every mutually shared channel (no divergence) while isolated channels diverge; asymmetric one-way sharing surfaces shared-in facts via non-destructive overlay with deterministic precedence and never writes back to the shared-from channel; conflict flagging is deterministic; unlinked identities isolated; tenant never crossed; migration and reconciliation correctness and reversibility.
 16. Update `docs/features/identity-partitioning.md` and `memory-pipeline.md` to document person-keyed, channel-retaining memory, the configurable sharing policy enforcement, cross-channel 5W1H reconciliation, asymmetric overlay handling, and linking.
 
+### Intelligent Brain Delta Activities
+17. Add explicit entity-link confidence scoring and merge/split review workflow for ambiguous cross-channel identity links.
+18. Add provenance-first alias resolution rules so identity merge decisions are auditable and reversible.
+19. Add dedicated regression suites for collision-prone identifiers (shared display names, recycled numbers/emails, stale channel bindings).
+
 ## Review Focus
 - Tenant isolation is never weakened by the person layer.
 - With the default policy, memory truly follows the person across channels; with narrowed policy, isolation is honored in both directions (directional AND).

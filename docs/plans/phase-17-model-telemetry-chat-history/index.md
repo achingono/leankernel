@@ -31,14 +31,20 @@ This phase adds structured model-and-cost telemetry to persisted assistant turns
 
 ## Entry Criteria
 - Chat history persistence exists (`DbChatHistoryProvider`) with a JSON `Metadata` field on `TurnEntity`.
-- LiteLLM proxy is the model gateway and already emits route events (`config/litellm/leankernel_litellm_callbacks.py`).
+- LiteLLM proxy is the model gateway and already emits route events (`config/litellm/callbacks.py`).
 - The OpenAI-compatible client returns model/usage; LiteLLM surfaces cost via header/hidden params.
 
 ## Exit Criteria
 Every persisted assistant turn carries structured, accurate model/provider/usage/cost telemetry; cost can be aggregated per session/user/tenant/model/provider; and a labeled export exists for model-grouping/failover/cost-profile tuning. See `exit-criteria.md`.
 
 ## Status
-**Partial (10/11 gates complete)** — telemetry capture, persistence, aggregation, and export are implemented. Remaining work is startup validation for `Agents:Telemetry` settings (enable/disable, currency, raw-metadata retention) and final closure sign-off.
+**Partial (10/12 gates complete)** — telemetry capture, persistence, aggregation, and export are implemented. Remaining work is startup validation for `Agents:Telemetry` settings and grounding/evidence-class labels in export/query surfaces.
+
+## Design Delta: Intelligent Brain Track
+- Extend telemetry labels to include memory evidence class (`raw_document`, `synthesized_fact`, `pattern_page`, `transcript`).
+- Capture whether final responses were fully grounded, partially grounded, or unguided by memory.
+- Add retrieval attribution fields for selected memory keys and ranking scores to support replay and regression analysis.
+- Expose exports consumable by quality-eval and model-routing feedback loops (Phases 04, 08, and 23).
 
 ## Roles
 - Owner: Rebuild maintainer

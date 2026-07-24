@@ -10,3 +10,5 @@
 | Source enhancement | `~/source/repos/leankernel/src/LeanKernel.Agents/Enhancement/*` | Behavioral reference |
 | Source orchestration | `~/source/repos/leankernel/src/LeanKernel.Agents/Orchestration/*` | Behavioral reference |
 | Source resilience | `~/source/repos/leankernel/src/LeanKernel.Agents/Resilience/GracefulDegradationPolicy.cs`, `Health/LiteLlmHealthProbe.cs` | Behavioral reference |
+| Truth lifecycle dependency | `docs/plans/phase-22-knowledge-integrity-truth-lifecycle/` | Contradiction and canonical-truth inputs |
+| Telemetry/eval dependency | `docs/plans/phase-17-model-telemetry-chat-history/`, `docs/plans/phase-23-memory-eval-replay-harness/` | Grounding quality measurement inputs |

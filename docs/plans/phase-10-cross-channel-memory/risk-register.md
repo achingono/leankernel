@@ -17,6 +17,7 @@
 | R11 | Reconciliation merges a fact into a channel that should not see it | Privacy/visibility breach | Merge only within the mutually visible set (directional AND); provenance retained; visibility tests | Open |
 | R12 | Deterministic conflict resolution silently discards a genuinely conflicting fact | Data/semantic loss | Flag irreconcilable conflicts instead of overwriting; keep superseded pages retired-not-deleted; reversible reconciliation | Open |
 | R13 | Asymmetric sharing merged/written back across the one-way boundary | Leak into shared-from channel; broken isolation | Never merge/supersede across non-mutual boundary; non-destructive read-time overlay only; writes confined to writer's own scope; revocation leaves no residual state | Open |
+| R14 | Confidence model for identity links overfits weak signals | Incorrect person merges | Require explicit verification for high-impact merges and maintain merge/split review workflow | Open |
 
 ## Open Decisions
 - Person model: new `PersonEntity` vs promote `UserEntity` (affects migration surface).
@@ -24,3 +25,4 @@
 - Verification channel(s) accepted for linking (email, SMS/Signal code, OIDC step-up).
 - Whether the sharing policy is configured per-tenant default, per-person override, or both (schema owned by Phase 06).
 - Conflict-resolution strategy for reconciliation (newest-wins default vs explicit-supersession-only vs manual review for flagged conflicts).
+- Minimum confidence threshold for auto-merge vs manual-review identity link path.

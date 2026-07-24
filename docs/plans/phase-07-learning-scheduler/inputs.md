@@ -15,7 +15,13 @@
 ## Optional Inputs
 - Source PRDs: `phase-3-post-turn-learning-prd.md`, `phase-3-scheduled-jobs-proactive-tasks-prd.md`, `identity-intent-extraction-pipeline-prd.md`, `identity-onboarding` feature docs.
 
+## Intelligent Brain Delta Inputs
+- Native GBrain Dream run semantics and phase controls (`gbrain dream --json --phase ...`) from upstream implementation docs.
+- GBrain/LiteLLM model routing defaults for Dream (`models.dream.*`) and runtime verification surfaces (`gbrain models`).
+- Phase 21 enrichment trigger/event contracts and queue depth telemetry for Dream scheduling triggers.
+
 ## Input Validation Checklist
 - [ ] All required inputs are current (not from a superseded version)
 - [ ] No required input is missing or in draft state
 - [ ] Turn-completion hook available to feed the learning queue
+- [ ] Dream orchestration prerequisites (source mapping, lock/retry semantics, model config defaults) are documented and testable

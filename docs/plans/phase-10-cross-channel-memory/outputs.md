@@ -7,6 +7,7 @@
 | Person identity model | Person entity + channel-identity mapping | C# + EF migration |
 | Identity resolution update | Resolves personId + channelId per request | C# source |
 | Identity linking flow | Verified link/unlink (one-time code) | C# source |
+| Entity-link confidence model | Confidence-scored link decisions with merge/split audit trail | C# source |
 | Person-keyed, channel-retaining memory | `MemoryScope` + `GBrainMemoryClient` keyed `memory/{tenantId}/{personId}/{channelId}/{key}` | C# source |
 | Policy-driven memory reads | Read fan-out across the effective readable-channel set from Phase 06 policy (directional AND) with de-duplication | C# source |
 | Cross-channel 5W1H reconciliation | Write-time supersession/merge across the mutually visible channel set + reconciliation pass on policy widening; deterministic conflict resolution, provenance retained, conflict flagging | C# source |

@@ -19,6 +19,8 @@
 | R13 | Non-admin caller uploads with `tenant` scope | Data leak | `POST /api/documents/upload` fails validation when caller badge is not admin and scope is `tenant` | Open |
 | R14 | Upload API missing `channel_id` causes ambiguous channel scope | Ingestion fails or leaks | `channel_id` is a required parameter on upload endpoint; missing `channel_id` returns 400 validation error | Open |
 | R15 | Document search scoped to current request's channel only (via `IChannelMemoryPolicyResolver`); user in Channel A cannot search documents from Channel B even if they have access to both separately | Cross-channel search blocked | Documented as a known limitation matching `GBrainMemoryClient` behavior (memory search has the same constraint). Future cross-channel search can be addressed by extending `IChannelMemoryPolicyResolver` to return aggregated readable sets across all channels the identity can access. | Open |
+| R16 | Enrichment trigger processing diverges from ingestion queue semantics | Missing or duplicated enrichment runs | Reuse durable queue patterns, correlation ids, and idempotent status transitions for enrichment jobs | Open |
+| R17 | Dream source mapping broadens visibility beyond original document scope | Cross-scope data exposure | Enforce strict mapping contract (`tenant`/`user`/`channel`) and policy tests on derived artifacts | Open |
 
 ## Open Decisions
 - D1: Channel attachment ingestion trigger source — terminal folder watcher vs flush-time event fan-out
@@ -33,3 +35,5 @@
   - **Decided**: DB-backed durable queue is the source of truth. Optional in-memory wake signal is allowed for responsiveness only.
 - D6: Generic event envelope resolution in `DbEventStore`
   - **Decided**: Use `IHasEnvelope` marker interface instead of closed switch, so any event type is supported without modifying `DbEventStore`.
+- D7: Should enrichment be immediate per-document or scheduled in bounded Dream windows?
+  - **Proposed**: Schedule bounded Dream windows via Phase 07 scheduler; avoid per-document immediate Dream invocation.

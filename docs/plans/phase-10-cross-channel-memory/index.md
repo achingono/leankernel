@@ -43,6 +43,12 @@ This phase changes the identity model (adds a canonical person and verified link
 ## Exit Criteria
 The same verified person is recognized across channels; with the default wildcard policy their memory and preferences are unified across channels, and narrowing the `Share`/`Access` policy correctly partitions or isolates channels using directional AND semantics; unlinked identities stay isolated; tenant boundaries hold; and existing memory is migrated to person-keyed, channel-retaining keys without loss. See `exit-criteria.md`.
 
+## Design Delta: Intelligent Brain Track
+- Add stronger entity-link confidence model and review workflow for cross-channel merge/split corrections.
+- Add deterministic alias resolution and provenance tracking so entity identity decisions are auditable and reversible.
+- Add reconciliation hooks for synthesized document facts so cross-channel unification preserves person/channel policy boundaries.
+- Add regression tests for high-risk identity collisions (same display name, reused phone/email identifiers, and stale bindings).
+
 ## Roles
 - Owner: Rebuild maintainer
 - Reviewer: Separate agent session / model review

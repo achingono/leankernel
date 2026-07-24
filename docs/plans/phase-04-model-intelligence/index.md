@@ -35,8 +35,14 @@ This phase builds on the explicit turn pipeline from Phase 03. It covers model s
 - LiteLLM-backed `IChatClient` routing is available and multiple model aliases are configurable.
 - Source references captured as behavioral targets: `~/source/repos/leankernel/src/LeanKernel.Agents/Routing/PolicyModelSelector.cs`, `RoutedAgentStrategy.cs`, `TaskComplexityScorer.cs`, `ShadowRoutingStrategy.cs`, `ShadowComparer.cs`; `Quality/ResponseQualityGate.cs`, `MinLengthCheck.cs`, `EmptyResponseCheck.cs`, `ConstraintCoverageCheck.cs`; `Enhancement/ResponseEnhancementPipeline.cs`, `CitationInjectionStep.cs`, `KnowledgeSynthesisStep.cs`, `RefusalInterceptionStep.cs`; `Resilience/GracefulDegradationPolicy.cs`, `Health/LiteLlmHealthProbe.cs`; `Orchestration/OrchestratedAgentStrategy.cs`, `OrchestrationDecider.cs`, `WorkerAgent.cs`, `WorkerAsToolAdapter.cs`.
 
-## Exit Criteria
-Turns select a model via policy, can shadow-compare without side effects, are quality-gated with escalation/repair, are enhanced deterministically, degrade gracefully when providers are unhealthy, and can be orchestrated across worker agents. See `exit-criteria.md`.
+## Status
+**Partial (8/11 gates complete)** — routing, shadow, and enhancement pipelines are implemented; remaining work is the intelligence brain delta focused on grounded-memory quality gates, contradiction-aware policies, and retrieval attribution.
+
+## Design Delta: Intelligent Brain Track
+- Add grounded-memory quality gates that require citation/source evidence for high-confidence responses.
+- Add contradiction-aware response policy: detect conflicting memory candidates and choose deterministic fallback behavior (clarify, hedge, or abstain).
+- Add retrieval attribution to enhancement steps so responses can label whether evidence came from raw document, synthesized facts, or pattern pages.
+- Add ranking signals from post-turn feedback and telemetry labels to improve memory candidate ordering over time.
 
 ## Roles
 - Owner: Rebuild maintainer

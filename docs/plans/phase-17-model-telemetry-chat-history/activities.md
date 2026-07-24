@@ -17,6 +17,12 @@
 5. Update `exit-criteria.md` to mark the final gate complete once validation lands.
 6. Record final verification evidence and complete the approval table statuses.
 
+### C. Intelligent Brain Delta
+
+7. Extend telemetry schema/capture with evidence-class labels and grounding status (`grounded`, `partial`, `ungrounded`).
+8. Add retrieval attribution fields (selected memory keys/classes and ranking scores) for replay analysis.
+9. Ensure export schema includes these labels for Phase 23 gating and Phase 04 tuning inputs.
+
 ## Review Focus
 - Startup validation blocks bad telemetry config before serving traffic.
 - Existing telemetry capture/persistence/reporting behavior is unchanged by validation changes.

@@ -11,6 +11,7 @@
 - [ ] Asymmetric (one-way) sharing is handled by non-destructive read-time overlay with deterministic precedence and provenance — never by cross-boundary merge/supersession — so writes in the shared-into channel never propagate back to the shared-from channel and revoking the grant leaves no residual state.
 - [ ] Unlinked and anonymous identities remain fully isolated (no accidental merges).
 - [ ] Identity linking requires verification and cannot hijack another person's memory.
+- [ ] Ambiguous cross-channel identity links are confidence-scored and reviewable (merge/split reversible with provenance).
 - [ ] Memory scope is person-keyed and channel-retaining (`memory/{tenantId}/{personId}/{channelId}/{key}`); channelId remains a governed dimension, not dropped.
 - [ ] The Phase 06 memory sharing policy is enforced here; this phase does not redefine the policy schema/config.
 - [ ] Agent-session isolation remains a separate concern; this phase does not repurpose `IdentityIsolationKeyProvider` for memory scoping.

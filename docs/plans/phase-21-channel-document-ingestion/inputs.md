@@ -25,19 +25,21 @@
 
 ## Optional Inputs
 - Phase 06 channel terminal attachment parsers (`LeanKernel.Channels.Signal/AttachmentParser.cs`, `LeanKernel.Channels.Teams/AttachmentParser.cs`)
+- GBrain Dream phase behavior and source-scope semantics for post-ingestion enrichment windows.
 
 ## Input Validation Checklist
 - [x] `DocumentIngestionToolSettings` config class exists with `Enabled`, `MaxConcurrentJobs`, `QueueCapacity`, `EnqueueTimeoutSeconds`, `WatchSettleDelaySeconds`, `WatchMaxRetries`, `WatchRetryBaseDelaySeconds`, `WatchRetryMaxDelaySeconds`
 - [x] `TextExtractionHelper` provides `ExtractAsync(path, scratchRoot, pythonExecutable, maxExtractedCharacters, ct)` for document text extraction
 - [x] Identity contracts from Phase 20 are in `main` with `IdentityContext`, `IPolicyContext`, `IPolicyEvaluator`
 - [x] `IChannelMemoryPolicyResolver.ResolveAsync` returns `ReadableChannelIds` for document search fan-out
-- [ ] `IDocumentStoreClient` contract defined in `LeanKernel.Logic` with no GBrain-specific payloads
-- [ ] `DocumentIngestionRequestedEvent` contract defined and implements `IHasEnvelope` marker for generic envelope resolution
-- [ ] `IHasEnvelope` marker interface defined in `LeanKernel.Core` for generic `DbEventStore` resolution
-- [ ] `IEventCollector.Emit<T>` generic method added for type-agnostic event emission
-- [ ] Durable ingestion job table/entity defined with status + retry + lease fields
-- [ ] Startup recovery path reclaims stale leased jobs and resumes processing
-- [ ] Availability-scope model (`tenant|user|channel`) is defined for ingestion and discovery
-- [ ] Source ingestion code is available for behavioral reference (not a hard blocker)
-- [ ] Document-library watch-folder paths are validated for gateway runtime
-- [ ] `{Files:RootPath}` directory exists or is created at startup with `documents/` subdirectory
+- [x] `IDocumentStoreClient` contract defined in `LeanKernel.Logic` with no GBrain-specific payloads
+- [x] `DocumentIngestionRequestedEvent` contract defined and implements `IHasEnvelope` marker for generic envelope resolution
+- [x] `IHasEnvelope` marker interface defined in `LeanKernel.Core` for generic `DbEventStore` resolution
+- [x] `IEventCollector.Emit<T>` generic method added for type-agnostic event emission
+- [x] Durable ingestion job table/entity defined with status + retry + lease fields
+- [x] Startup recovery path reclaims stale leased jobs and resumes processing
+- [x] Availability-scope model (`tenant|user|channel`) is defined for ingestion and discovery
+- [x] Source ingestion code is available for behavioral reference (not a hard blocker)
+- [x] Document-library watch-folder paths are validated for gateway runtime
+- [x] `{Files:RootPath}` directory exists or is created at startup with `documents/` subdirectory
+- [ ] Post-ingestion enrichment trigger contract exists and can map ingestion scope to Dream source scope without widening visibility

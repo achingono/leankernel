@@ -14,8 +14,10 @@
 
 ## Optional Inputs
 - Source onboarding/identity references: `~/source/repos/leankernel/src/LeanKernel.Context/Identity/*`.
+- Truth lifecycle conflict semantics from `docs/plans/phase-22-knowledge-integrity-truth-lifecycle/`.
 
 ## Input Validation Checklist
 - [ ] All required inputs are current (not from a superseded version)
 - [ ] No required input is missing or in draft state
 - [ ] Current memory-key format confirmed against `GBrainMemoryClient`
+- [ ] High-risk entity-collision scenarios defined for regression tests (name/phone/email reuse across channels)

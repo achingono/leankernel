@@ -13,6 +13,12 @@
 10. Add tests: snapshot persistence, diagnostics API auth/results, spend gating, rate-limit enforcement, correlation propagation, and health tracking.
 11. Document diagnostics, spend guardrails, and production hardening in `docs/operations/` and `docs/features/`.
 
+### Intelligent Brain Delta Activities
+12. Add lifecycle tracing for `ingest -> enrichment queue -> Dream run -> retrieval` with shared correlation ids.
+13. Add metrics for memory freshness lag, contradiction rate, grounded-answer rate, and Dream phase failures.
+14. Add alerts for sustained enrichment backlog, stale Dream freshness, and repeated contradiction-resolution failures.
+15. Expose diagnostics query endpoints for Dream and enrichment run statuses.
+
 ## Review Focus
 - Diagnostics capture never blocks or meaningfully slows the turn path.
 - Snapshot persistence respects partitioning and retention limits.

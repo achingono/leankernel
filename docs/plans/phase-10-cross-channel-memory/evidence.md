@@ -18,3 +18,4 @@
 | Migration evidence | `src/Common/LeanKernel.Data/Migrations/20260715231531_AddUserPersonId.cs` | Adds `Users.PersonId`, index, and backfill (`PersonId = Id`) |
 | Verification | `dotnet test test/LeanKernel.Tests.Unit/LeanKernel.Tests.Unit.csproj` | 419 passed |
 | Sonar scan | `scripts/quality/sonarqube-scan.sh` | Completed analysis upload; quality gate failed in current workspace (`http://host.docker.internal:9000/dashboard?id=LeanKernel`) |
+| Truth lifecycle dependency | `docs/plans/phase-22-knowledge-integrity-truth-lifecycle/` | Cross-channel contradiction and supersession policy alignment |

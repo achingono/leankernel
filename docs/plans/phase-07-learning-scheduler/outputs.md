@@ -10,6 +10,7 @@
 | Knowledge update coordinator | Scope-correct write-back to knowledge/memory | C# source |
 | Onboarding intelligence | Gap detector + directive builder | C# source |
 | Scheduler | Cron evaluator, job executor, hosted service, time boundary | C# source |
+| Dream orchestration job | Scheduler-owned native Dream execution with source and window controls | C# source |
 | Job persistence | Scheduled-job entities/repository + migration | C# + EF migration |
 | Configuration + validation | Learning + scheduler settings | C# + appsettings |
 | Tests | Queue, steps, write-back, cron, jobs coverage | xUnit projects |
@@ -17,6 +18,7 @@
 
 ## Optional Outputs
 - Learning/scheduler signals surfaced to Phase 08 diagnostics.
+- Dream phase reports exported for replay/eval consumers (Phase 23).
 
 ## Output Quality Checklist
 - [ ] All mandatory outputs produced

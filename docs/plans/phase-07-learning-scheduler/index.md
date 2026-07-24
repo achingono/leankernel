@@ -36,6 +36,13 @@ This phase covers asynchronous, out-of-band processing that reacts to turns and 
 ## Exit Criteria
 Completed turns are asynchronously mined for facts/intent/gaps/engagement and written back under correct scope, onboarding gaps produce directives from learned intent, and cron-defined jobs run on schedule. See `exit-criteria.md`.
 
+## Design Delta: Intelligent Brain Track
+- Add a scheduler-owned `DreamCycleJob` that invokes native `gbrain dream` phases instead of re-implementing Dream semantics in C#.
+- Add cadence and bounded-window controls for Dream (`full`, `targeted`, `drain`) with lock-aware retry behavior.
+- Add explicit source scoping for Dream runs so freshness markers and maintenance outputs are attributable to a concrete source.
+- Add policy for when ingestion backlog should trigger Dream windows (time-based and queue-depth-based thresholds).
+- Persist Dream run reports and phase outcomes to runtime records for diagnostics and automated replay.
+
 ## Roles
 - Owner: Rebuild maintainer
 - Reviewer: Separate agent session / model review

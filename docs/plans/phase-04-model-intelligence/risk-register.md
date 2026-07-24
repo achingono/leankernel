@@ -10,7 +10,10 @@
 | R4 | Complexity scoring is non-deterministic | Flaky routing/tests | Deterministic heuristic inputs; snapshot tests | Open |
 | R5 | Orchestration bypasses tool governance or partitioning | Security/isolation breach | Route worker tools through existing governance + isolation keys | Open |
 | R6 | Degradation masks real provider outages silently | Hidden failures | Emit structured degradation signal for Phase 08 diagnostics | Open |
+| R7 | Grounding checks over-reject useful responses | UX degradation | Tune thresholds with replay/eval harness and allow bounded clarification fallback | Open |
+| R8 | Contradiction policy chooses wrong branch in ambiguous cases | Incorrect confidence behavior | Deterministic precedence rules + explicit uncertainty output path + tests | Open |
 
 ## Open Decisions
 - Whether shadow comparisons are stored now or deferred until Phase 08 persistence exists.
 - Escalation ladder definition (which alias escalates to which).
+- Grounded-memory threshold policy (strict citation required vs partial grounding accepted).

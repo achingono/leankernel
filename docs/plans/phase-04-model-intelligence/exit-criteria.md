@@ -5,6 +5,8 @@
 - [ ] Shadow routing runs a candidate without affecting the returned response or persisted turn.
 - [ ] Quality gates reject empty/too-short/uncovered responses and trigger bounded escalation/repair.
 - [ ] Response enhancement applies citation/synthesis/refusal steps deterministically and idempotently.
+- [ ] Grounded-memory checks enforce evidence attribution for high-confidence responses.
+- [ ] Contradiction-aware response policy handles conflicting memory candidates deterministically.
 - [ ] Graceful degradation falls back deterministically when a provider is unhealthy.
 - [ ] Multi-agent orchestration dispatches workers-as-tools while preserving partitioning and governance.
 - [ ] Provider-agnostic execution across LiteLLM-backed models is preserved.

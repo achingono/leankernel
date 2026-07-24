@@ -9,6 +9,7 @@
 - [x] Top-N queries identify highest-cost users and models within a date range.
 - [x] All aggregation queries are partition-scoped by `IPermit` — no cross-tenant/user/channel leakage.
 - [x] A deterministic, PII-aware labeled export exists for model-grouping / failover / cost-profile tuning (Phase 07 consumable).
+- [ ] Grounding/evidence-class labels are captured for each assistant turn and available in export/query surfaces.
 - [x] Missing or partial metadata degrades gracefully without dropping the turn; `CostIsEstimated` flag distinguishes reported vs estimated cost.
 - [ ] Configuration (enable/disable, currency, retain-raw-metadata) validated at startup.
 - [x] Unit + integration tests cover capture, persistence, aggregation correctness, partition isolation, and graceful degradation.

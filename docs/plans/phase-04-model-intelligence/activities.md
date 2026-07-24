@@ -12,6 +12,12 @@
 9. Add tests: routing decision determinism, shadow side-effect isolation, quality-gate triggering + escalation, enhancement step ordering, degradation fallback, orchestration dispatch.
 10. Document routing, shadow, quality, enhancement, and orchestration in `docs/features/`.
 
+### Intelligent Brain Delta Activities
+11. Add grounded-memory quality checks that require evidence attribution before high-confidence final responses.
+12. Add contradiction-aware gate behavior for conflicting memory candidates (clarify, hedge, or abstain policy).
+13. Thread telemetry feedback signals (grounded vs ungrounded outcomes) into ranking/escalation tuning inputs.
+14. Add tests for grounded citation enforcement and contradiction-policy branches.
+
 ## Review Focus
 - Routing decisions are deterministic given the same inputs and policy.
 - Shadow routing never affects the primary response or persistence.

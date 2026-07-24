@@ -52,7 +52,7 @@ with immediate value for routing (04), learning (07), and spend guardrails (08).
 
 | Phase | Plan | Focus | Status |
 | --- | --- | --- | --- |
-| 17 | [Model Telemetry In Chat History](phase-17-model-telemetry-chat-history/index.md) | Persist LiteLLM model/provider/token-usage/cost per assistant turn for budget accounting and supervised tuning | **Partial** (10/11 gates — telemetry startup validation pending) |
+| 17 | [Model Telemetry In Chat History](phase-17-model-telemetry-chat-history/index.md) | Persist LiteLLM model/provider/token-usage/cost per assistant turn for budget accounting and supervised tuning | **Partial** (10/12 gates — startup validation and grounding/evidence labels pending) |
 
 ## Infrastructure And Tooling
 
@@ -64,6 +64,47 @@ Infrastructure improvements that enhance development experience and tool integra
 | 18 | [Phase 18](phase-18-webwright-mcp-integration/index.md) | MCP SDK integration for Webwright-first browser tooling, exposing only Webwright MCP tools in the shipped rollout | **Complete** |
 | 19 | [Authorization Permits And Filters](phase-19-authorization-permits-filters/index.md) | Centralized permit/filter/repository enforcement for tenant/user/channel partitioning | **Complete** |
 | 20 | [Identity, Policy, And Event Spine](phase-20-identity-policy-event-spine/index.md) | Canonical identity model, in-process policy core, and append-only event spine | **Complete** |
+| 21 | [Channel-Aware Document Ingestion And Memory Pipeline](phase-21-channel-document-ingestion/index.md) | Channel-aware document ingestion, durable queue, and policy-scoped discovery | **Partial** (core ingestion complete; enrichment-trigger correlation and scope-preserving enrichment artifacts pending) |
+
+## Intelligent Brain Completion
+
+Focused phases to move from ingestion + synthesis to measurable, conflict-aware, policy-safe memory intelligence.
+
+| Phase | Plan | Focus | Status |
+| --- | --- | --- | --- |
+| 22 | [Knowledge Integrity And Truth Lifecycle](phase-22-knowledge-integrity-truth-lifecycle/index.md) | Canonical claim lifecycle, contradiction handling, temporal validity, confidence evolution | **Planned** |
+| 23 | [Memory Evaluation And Replay Harness](phase-23-memory-eval-replay-harness/index.md) | Deterministic replay, memory quality metrics, and promotion gates | **Planned** |
+
+## Implementation Order
+
+Recommended forward implementation order for the intelligent-brain track:
+
+1. **Phase 17 delta** — close telemetry startup validation and grounding/evidence labels first.
+2. **Phase 21 delta + Phase 07 delta** — complete `ingest -> enrich trigger -> Dream window` with durable correlation.
+3. **Phase 08 delta** — observability and lifecycle metrics on top of stabilized telemetry + enrichment signals.
+4. **Phase 22** — truth lifecycle and contradiction/confidence controls.
+5. **Phase 04 delta** — grounded-memory quality gates and contradiction-aware response behavior.
+6. **Phase 23** — replay/eval harness and CI promotion gates with explicit thresholds.
+7. **Phase 10 delta** — identity-link hardening and high-risk collision regression coverage.
+
+## Past Implementation Order
+
+Phases implemented so far, in chronological order. Commit hashes reference the primary implementation commit for each phase.
+
+| Phase | Plan | Status | Commit |
+| --- | --- | --- | --- |
+| 01 | [Tool Runtime Enablement](phase-01-built-in-tools/index.md) | **Complete** | `5eb5380` |
+| 02 | [Runtime Boundary Remediation](phase-02-runtime-boundary-remediation/index.md) | **Partial** (13/15 gates) | `6aa23c0` |
+| 03 | [Turn Runtime And Context Gating](phase-03-turn-runtime/index.md) | **Complete** | `83cce87` |
+| 05 | [Tool Expansion](phase-05-tool-expansion/index.md) | **Complete** | `f378396` |
+| 06 | [Channels](phase-06-channels/index.md) | **Partial** (13/16 gates) | `3aca397` |
+| 10 | [Unified Identity And Cross-Channel Memory](phase-10-cross-channel-memory/index.md) | **Partial** | `82694d3` |
+| 16 (track B) | [Terminal Shared Runtime](phase-16-terminal-shared-runtime/index.md) | **Partial** (3/8 gates) | `7d2c52b` |
+| 17 | [Model Telemetry In Chat History](phase-17-model-telemetry-chat-history/index.md) | **Partial** (10/12 gates) | `363c109` |
+| 18 | [Webwright MCP Integration](phase-18-webwright-mcp-integration/index.md) | **Complete** | `b55123d` |
+| 19 | [Authorization Permits And Filters](phase-19-authorization-permits-filters/index.md) | **Complete** | `89d5e04` |
+| 20 | [Identity, Policy, And Event Spine](phase-20-identity-policy-event-spine/index.md) | **Complete** | `9763550` |
+| 21 | [Channel-Aware Document Ingestion And Memory Pipeline](phase-21-channel-document-ingestion/index.md) | **Partial** | `05bf403` |
 
 ## Standalone PRDs
 

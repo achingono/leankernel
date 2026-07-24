@@ -37,6 +37,12 @@ This phase adds cross-cutting observability and request-hardening that the earli
 ## Exit Criteria
 The runtime emits structured diagnostics, persists per-turn context snapshots queryable via API, tracks provider health and spend with enforceable guardrails, exports OpenTelemetry metrics/traces, and protects/hardens API routes with correlation IDs, rate limiting, and API-key/open-mode auth. See `exit-criteria.md`.
 
+## Design Delta: Intelligent Brain Track
+- Add ingest-to-enrichment-to-retrieval lifecycle spans with shared correlation ids across queue jobs and Dream runs.
+- Add memory quality metrics: freshness lag, contradiction rate, grounded-answer rate, and recall-at-k evaluation feeds.
+- Add queue and Dream operational alerts for sustained backlog, repeat phase failure, and stale-source freshness.
+- Add diagnostics query surfaces for enrichment outcomes and Dream phase-level errors to support replay and remediation.
+
 ## Roles
 - Owner: Rebuild maintainer
 - Reviewer: Separate agent session / model review

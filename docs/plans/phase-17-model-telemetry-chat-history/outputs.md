@@ -13,6 +13,7 @@
 | **Model efficiency metrics** | **Cost per 1k tokens, completion ratio, avg tokens per turn — per model** | **C# source** |
 | **Top-N queries** | **Highest-cost users and models within a date range** | **C# source** |
 | Learning export | Deterministic, PII-aware labeled dataset for grouping/failover/cost profiles | C# source + schema |
+| Grounding attribution labels | Evidence-class and groundedness telemetry on assistant turns | C# source + schema |
 | Configuration + validation | Enable/disable, currency, retain-raw-metadata | C# + appsettings |
 | Tests | Capture, persistence, aggregation correctness, partition isolation, resilience | xUnit projects |
 | Documentation | Telemetry schema, aggregation API, cost model docs | Markdown |

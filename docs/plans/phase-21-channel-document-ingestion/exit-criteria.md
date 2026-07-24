@@ -22,6 +22,7 @@
 - [x] Retry budget, poison sink behavior, and staged-file cleanup/move policy are implemented and verified.
 - [x] Documents survive Gateway restarts (GBrain-backed plus file system), and pending/in-progress ingestion jobs recover from durable DB state on startup.
 - [x] Durable queue behavior is verified: claim lease, retry scheduling, poison transitions, and stale lease recovery.
+
 - [x] `POST /api/documents/upload` returns enqueue semantics (`202` + job id/status) and does not claim completion-only fields (fingerprint/duplicate) before processing.
 - [x] `LeanKernel.Logic` remains provider-agnostic (no direct GBrain tool calls or transport payload shaping outside Gateway).
 - [x] Unit tests cover ingestion, deduplication, policy enforcement, cross-channel visibility, and generic event emit/dispatch.

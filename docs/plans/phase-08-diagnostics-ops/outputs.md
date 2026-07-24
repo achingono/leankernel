@@ -10,6 +10,7 @@
 | Provider health tracking | PostgreSQL/LiteLLM/GBrain tracker feeding degradation | C# source |
 | Spend guardrails | Spend tracker + warn/block guard | C# source |
 | OpenTelemetry | Metrics, counters, log enricher | C# source |
+| Intelligence lifecycle telemetry | Correlated ingest/enrichment/Dream/retrieval spans and metrics | C# source + OTel wiring |
 | Gateway hardening | Correlation ID + rate limiting + API-key/open-mode | C# middleware |
 | Configuration + validation | Retention/spend/rate-limit/auth settings | C# + appsettings |
 | Tests | Snapshot, API, spend, rate-limit, correlation coverage | xUnit projects |

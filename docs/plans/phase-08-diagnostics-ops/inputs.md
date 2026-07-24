@@ -14,8 +14,11 @@
 
 ## Optional Inputs
 - Source PRDs: `phase-2-context-diagnostics-api-prd.md`, `phase-3-production-hardening-prd.md`, `budget-guardrails-fallback-prd.md`, `engine-health-recovery-prd.md`, `run-replay-provenance-prd.md`.
+- Dream run telemetry/report outputs from Phase 07 scheduler integration.
+- Truth lifecycle conflict/canonicalization signals from Phase 22.
 
 ## Input Validation Checklist
 - [ ] All required inputs are current (not from a superseded version)
 - [ ] No required input is missing or in draft state
 - [ ] Emit points from prior phases identified for instrumentation
+- [ ] Ingest-to-enrich-to-Dream lifecycle correlation strategy defined

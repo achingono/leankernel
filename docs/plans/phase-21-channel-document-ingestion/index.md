@@ -84,7 +84,14 @@ Implement a unified document ingestion pipeline that stores channel attachments 
 ## Exit Criteria
 Ingested documents are stored in the correct identity scope, survive restarts, are discoverable only through policy-resolved channels, and are searchable via the `document_search` tool. See `exit-criteria.md`.
 
+## Design Delta: Intelligent Brain Track
+- Add a durable post-ingestion enrichment trigger (`DocumentEnrichmentRequestedEvent`) emitted after `Completed` ingestion jobs so enrichment is decoupled from request latency.
+- Add a source/scope mapping contract from LeanKernel partition keys (`tenant`, `user`, `channel`) to GBrain source ids used by Dream runs.
+- Add durable correlation between ingestion and enrichment (`IngestionJobId`, `EnrichmentJobId`, `DreamRunId`) for observability and replay.
+- Add status/query surfaces for enrichment state (`Pending`, `Processing`, `Completed`, `Failed`, `Poisoned`) and dead-letter handling.
+- Keep identity partitioning invariant: derived artifacts (summaries, facts, links, patterns) inherit original availability scope and cannot broaden visibility.
+
 ## Roles
-- Owner:
-- Reviewer:
-- Approver:
+- Owner: Rebuild maintainer
+- Reviewer: Separate agent session / model review
+- Approver: Repository owner

@@ -8,6 +8,7 @@
 | Shadow routing | Background candidate + comparer with no side effects | C# source |
 | Quality gates | Ordered checks with escalation/repair | C# source |
 | Response enhancement | Citation/synthesis/refusal-interception pipeline | C# source |
+| Grounded-memory gate | Evidence/citation validation and contradiction-aware fallback behavior | C# source |
 | Degradation policy | Health-driven deterministic fallback | C# source |
 | Orchestration | Decider + worker agents + worker-as-tool adapter | C# source |
 | Configuration + validation | Routing/shadow/quality/orchestration settings | C# + appsettings |

@@ -1,5 +1,7 @@
 # Phase 21 Activities
 
+# Phase 21 Activities
+
 ## Step-By-Step Activities
 All new code lives in `LeanKernel.Logic` unless explicitly noted otherwise. Gateway-only items (transport, endpoint, DI wiring) are in `LeanKernel.Gateway`.
 
@@ -169,6 +171,13 @@ All new code lives in `LeanKernel.Logic` unless explicitly noted otherwise. Gate
 23. Update `docs/configuration/appsettings-reference.md` with new config sections
 24. Verify Phase 05 `exit-criteria.md` already references Phase 21 (`docs/plans/phase-05-tool-expansion/exit-criteria.md:11`); if not already present, update both `exit-criteria.md` and `evidence.md` to mark folder-ingestion gate as subsumed by Phase 21
 25. Complete `evidence.md` and `exit-criteria.md` approval table
+
+### I. Intelligent Brain Delta (Post-Ingestion Enrichment)
+
+26. Emit durable post-ingestion enrichment trigger events after successful job completion, carrying `IngestionJobId` and scoped identity metadata.
+27. Add enrichment queue/job model with statuses (`Pending`, `Processing`, `Completed`, `Failed`, `Poisoned`) and correlation to ingestion jobs.
+28. Add source-mapping contract from ingestion scope to Dream source ids and validate that derived artifacts inherit original visibility scope.
+29. Add status query/reporting surfaces for enrichment lifecycle (for scheduler, diagnostics, and replay consumers).
 
 ## Review Focus
 - Scope resolution: folder watcher and channel attachment both produce valid identity + availability scope context (`TenantId`, `UserId`, `PersonId`, `ChannelId`, `AvailabilityScope`)
