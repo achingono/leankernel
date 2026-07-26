@@ -42,6 +42,42 @@ public class FileSystemToolsTests
     }
 
     [Fact]
+    public async Task FileReadTool_reads_spreadsheet_openxml_files()
+    {
+        var root = CreateTempRoot();
+        var spreadsheet = Path.Combine(root, "birthdays.xlsx");
+        await File.WriteAllBytesAsync(spreadsheet, [1, 2, 3, 4]);
+        var fakePython = CreateFakePythonScript(root, "Name\tBirthday\nAlice\t1990-01-01");
+
+        var tool = FileReadTool.Create(CreateScopeFactory(root, fakePython));
+        var result = await tool.Handler!(new Dictionary<string, object?> { ["path"] = "birthdays.xlsx" }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Output.Should().Contain("Alice");
+    }
+
+    [Fact]
+    public async Task FileReadTool_reads_legacy_office_binary_files()
+    {
+        var root = CreateTempRoot();
+        var spreadsheet = Path.Combine(root, "birthdays.xls");
+        await File.WriteAllBytesAsync(
+            spreadsheet,
+            [
+                (byte)'N', (byte)'a', (byte)'m', (byte)'e', 0,
+                (byte)'A', (byte)'l', (byte)'i', (byte)'c', (byte)'e', 0,
+                (byte)'1', (byte)'9', (byte)'9', (byte)'0', (byte)'-', (byte)'0', (byte)'1', (byte)'-', (byte)'0', (byte)'1', 0
+            ]);
+
+        var tool = FileReadTool.Create(CreateScopeFactory(root));
+        var result = await tool.Handler!(new Dictionary<string, object?> { ["path"] = "birthdays.xls" }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Output.Should().Contain("Alice");
+        result.Output.Should().Contain("1990-01-01");
+    }
+
+    [Fact]
     public async Task FileWriteTool_writes_and_file_delete_tool_removes_files()
     {
         var root = CreateTempRoot();

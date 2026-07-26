@@ -86,7 +86,7 @@ print(extracted if extracted else '[No extractable text content found in EPUB]')
             return Truncate(epubOutput, maxExtractedCharacters);
         }
 
-        if (FileSystemSupport.IsDocxCandidate(path))
+        if (FileSystemSupport.IsWordOpenXmlCandidate(path))
         {
             var docxScript = """
 import sys, zipfile, xml.etree.ElementTree as ET
@@ -106,7 +106,62 @@ print('\n'.join(text_parts))
             return Truncate(docxOutput, maxExtractedCharacters);
         }
 
-        if (FileSystemSupport.IsPptxCandidate(path))
+        if (FileSystemSupport.IsSpreadsheetOpenXmlCandidate(path))
+        {
+            var xlsxScript = """
+import sys, zipfile, xml.etree.ElementTree as ET, re
+from pathlib import Path
+
+path = Path(sys.argv[1])
+ns = {'s': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+shared_strings = []
+rows = []
+
+with zipfile.ZipFile(path) as zf:
+    try:
+        sst = ET.fromstring(zf.read('xl/sharedStrings.xml'))
+        for si in sst.findall('.//s:si', ns):
+            parts = [t.text or '' for t in si.findall('.//s:t', ns)]
+            shared_strings.append(''.join(parts))
+    except KeyError:
+        pass
+
+    sheet_names = [name for name in zf.namelist() if re.match(r'xl/worksheets/sheet\d+\.xml', name)]
+    for sheet_name in sorted(sheet_names):
+        sheet = ET.fromstring(zf.read(sheet_name))
+        for row in sheet.findall('.//s:row', ns):
+            cells = []
+            for cell in row.findall('s:c', ns):
+                cell_type = cell.get('t')
+                value = ''
+                if cell_type == 's':
+                    v = cell.find('s:v', ns)
+                    if v is not None and v.text and v.text.isdigit():
+                        idx = int(v.text)
+                        if 0 <= idx < len(shared_strings):
+                            value = shared_strings[idx]
+                elif cell_type == 'inlineStr':
+                    is_node = cell.find('s:is', ns)
+                    if is_node is not None:
+                        value = ''.join((t.text or '') for t in is_node.findall('.//s:t', ns))
+                else:
+                    v = cell.find('s:v', ns)
+                    if v is not None and v.text:
+                        value = v.text
+
+                if value:
+                    cells.append(value)
+
+            if cells:
+                rows.append('\t'.join(cells))
+
+print('\n'.join(rows))
+""";
+            var xlsxOutput = await FileSystemSupport.RunPythonAsync(pythonExecutable, xlsxScript, [path], ct);
+            return Truncate(xlsxOutput, maxExtractedCharacters);
+        }
+
+        if (FileSystemSupport.IsPresentationOpenXmlCandidate(path))
         {
             var pptxScript = """
 import sys, zipfile, xml.etree.ElementTree as ET, re
@@ -127,6 +182,12 @@ print('\n'.join(text_parts))
 """;
             var pptxOutput = await FileSystemSupport.RunPythonAsync(pythonExecutable, pptxScript, [path], ct);
             return Truncate(pptxOutput, maxExtractedCharacters);
+        }
+
+        if (FileSystemSupport.IsLegacyOfficeBinaryCandidate(path))
+        {
+            var binaryText = await ExtractLegacyOfficeBinaryTextAsync(path, ct);
+            return Truncate(binaryText, maxExtractedCharacters);
         }
 
         if (!FileSystemSupport.IsOcrCandidate(path))
@@ -224,5 +285,99 @@ else:
         }
 
         return value[..limit] + "\n\n[Content truncated to " + limit + " characters.]";
+    }
+
+    private static async Task<string> ExtractLegacyOfficeBinaryTextAsync(string path, CancellationToken ct)
+    {
+        var bytes = await File.ReadAllBytesAsync(path, ct);
+        var fragments = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        CollectPrintableStrings(bytes, isUnicode: false, minLength: 3, fragments, seen);
+        CollectPrintableStrings(bytes, isUnicode: true, minLength: 3, fragments, seen);
+
+        if (fragments.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No extractable text found in legacy Office binary '{Path.GetExtension(path)}'.");
+        }
+
+        return string.Join("\n", fragments);
+    }
+
+    private static void CollectPrintableStrings(
+        IReadOnlyList<byte> bytes,
+        bool isUnicode,
+        int minLength,
+        ICollection<string> output,
+        ISet<string> seen)
+    {
+        var chars = new List<char>();
+        var step = isUnicode ? 2 : 1;
+
+        for (var i = 0; i < bytes.Count; i += step)
+        {
+            char ch;
+            if (isUnicode)
+            {
+                if (i + 1 >= bytes.Count)
+                {
+                    break;
+                }
+
+                if (bytes[i + 1] != 0)
+                {
+                    FlushBuffer(chars, minLength, output, seen);
+                    continue;
+                }
+
+                ch = (char)bytes[i];
+            }
+            else
+            {
+                ch = (char)bytes[i];
+            }
+
+            if (ch is '\r' or '\n' or '\t')
+            {
+                ch = ' ';
+            }
+
+            if (char.IsLetterOrDigit(ch) || char.IsPunctuation(ch) || ch == ' ')
+            {
+                chars.Add(ch);
+                continue;
+            }
+
+            FlushBuffer(chars, minLength, output, seen);
+        }
+
+        FlushBuffer(chars, minLength, output, seen);
+    }
+
+    private static void FlushBuffer(
+        List<char> chars,
+        int minLength,
+        ICollection<string> output,
+        ISet<string> seen)
+    {
+        if (chars.Count < minLength)
+        {
+            chars.Clear();
+            return;
+        }
+
+        var text = new string(chars.ToArray()).Trim();
+        chars.Clear();
+
+        if (text.Length < minLength)
+        {
+            return;
+        }
+
+        if (seen.Add(text))
+        {
+            output.Add(text);
+        }
     }
 }

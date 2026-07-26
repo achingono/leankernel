@@ -109,25 +109,64 @@ public static class FileSystemSupport
     }
 
     /// <summary>
-    /// Returns true when the file is a DOCX candidate.
+    /// Returns true when the file is a Word Open XML candidate.
     /// </summary>
     /// <param name="path">The file path to inspect.</param>
-    /// <returns>True when the file is a DOCX candidate; false otherwise.</returns>
-    public static bool IsDocxCandidate(string? path)
+    /// <returns>True when the file is a Word Open XML candidate; false otherwise.</returns>
+    public static bool IsWordOpenXmlCandidate(string? path)
     {
-        return !string.IsNullOrWhiteSpace(path)
-            && string.Equals(Path.GetExtension(path), ".docx", StringComparison.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        return Path.GetExtension(path).ToLowerInvariant() is ".docx" or ".docm" or ".dotx" or ".dotm";
     }
 
     /// <summary>
-    /// Returns true when the file is a PPTX candidate.
+    /// Returns true when the file is a spreadsheet Open XML candidate.
     /// </summary>
     /// <param name="path">The file path to inspect.</param>
-    /// <returns>True when the file is a PPTX candidate; false otherwise.</returns>
-    public static bool IsPptxCandidate(string? path)
+    /// <returns>True when the file is a spreadsheet Open XML candidate; false otherwise.</returns>
+    public static bool IsSpreadsheetOpenXmlCandidate(string? path)
     {
-        return !string.IsNullOrWhiteSpace(path)
-            && string.Equals(Path.GetExtension(path), ".pptx", StringComparison.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        return Path.GetExtension(path).ToLowerInvariant() is ".xlsx" or ".xlsm" or ".xltx" or ".xltm";
+    }
+
+    /// <summary>
+    /// Returns true when the file is a presentation Open XML candidate.
+    /// </summary>
+    /// <param name="path">The file path to inspect.</param>
+    /// <returns>True when the file is a presentation Open XML candidate; false otherwise.</returns>
+    public static bool IsPresentationOpenXmlCandidate(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        return Path.GetExtension(path).ToLowerInvariant() is
+            ".pptx" or ".pptm" or ".ppsx" or ".ppsm" or ".potx" or ".potm";
+    }
+
+    /// <summary>
+    /// Returns true when the file is a legacy binary Microsoft Office candidate.
+    /// </summary>
+    /// <param name="path">The file path to inspect.</param>
+    /// <returns>True when the file is a legacy binary Microsoft Office candidate; false otherwise.</returns>
+    public static bool IsLegacyOfficeBinaryCandidate(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        return Path.GetExtension(path).ToLowerInvariant() is ".xls" or ".doc" or ".ppt";
     }
 
     /// <summary>
