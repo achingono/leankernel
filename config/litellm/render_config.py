@@ -245,12 +245,10 @@ def provider_key_entry(
     api_base_env_name = provider_key_base_env(provider_name, key_spec, key_path, base_urls, idx)
 
     required_env = [api_key_env]
-    api_key_val = os.getenv(api_key_env)
-    litellm_params: dict[str, Any] = {"api_key": api_key_val} if api_key_val else {"api_key": f"os.environ/{api_key_env}"}
+    litellm_params: dict[str, Any] = {"api_key": f"os.environ/{api_key_env}"}
     if api_base_env_name:
         required_env.append(api_base_env_name)
-        api_base_val = os.getenv(api_base_env_name)
-        litellm_params["api_base"] = api_base_val if api_base_val else f"os.environ/{api_base_env_name}"
+        litellm_params["api_base"] = f"os.environ/{api_base_env_name}"
 
     return f"{prefix}{idx}", {
         "provider": provider_name,
@@ -287,8 +285,7 @@ def provider_base_url_entry(
     base_ref: Any,
 ) -> tuple[str, dict[str, Any]]:
     base_env = parse_env_ref(base_ref, f"providers.{provider_name}.base_url[{idx-1}]")
-    base_val = os.getenv(base_env)
-    litellm_params: dict[str, Any] = {"api_base": base_val} if base_val else {"api_base": f"os.environ/{base_env}"}
+    litellm_params: dict[str, Any] = {"api_base": f"os.environ/{base_env}"}
     if provider_name in {"ollama", "local"}:
         litellm_params["api_key"] = "local"
     return f"{prefix}{idx}", {
