@@ -643,6 +643,8 @@ public class IdentityResolverTests
         var refreshed = await resolver.ResolveOrCreateUserAsync(secondPrincipal);
 
         refreshed.Id.Should().Be(user.Id);
+        refreshed.FullName.Should().Be("Original Name",
+            because: "persisted profile names in the database take precedence over mutable claim values");
         refreshed.Organization.Should().Be("Updated Corp",
             because: "profile should refresh on each authenticated resolution");
     }

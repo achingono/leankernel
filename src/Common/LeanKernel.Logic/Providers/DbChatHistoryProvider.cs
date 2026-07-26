@@ -318,7 +318,7 @@ public class DbChatHistoryProvider(
     /// <summary>
     /// Builds turn entities from chat messages, filtering by persistence rules and computing idempotency keys.
     /// </summary>
-    private static List<TurnEntity> BuildTurnEntities(
+    private List<TurnEntity> BuildTurnEntities(
         IEnumerable<ChatMessage>? messages,
         Guid sessionGuid,
         bool isRequest)
@@ -334,7 +334,11 @@ public class DbChatHistoryProvider(
 
         return messages
             .Where(filter)
-            .Select(m => ToTurnEntity(m, sessionGuid, isRequest ? m.Role!.Value.ToString().ToLowerInvariant() : "assistant"))
+            .Select(m => ToTurnEntity(
+                m,
+                sessionGuid,
+                isRequest ? m.Role!.Value.ToString().ToLowerInvariant() : "assistant",
+                permit.Badge.FullName))
             .ToList();
     }
 
@@ -358,13 +362,21 @@ public class DbChatHistoryProvider(
     /// <summary>
     /// Converts a chat message into a persisted turn entity with an idempotency key in Metadata.
     /// </summary>
-    private static TurnEntity ToTurnEntity(ChatMessage message, Guid sessionGuid, string role)
+    private static TurnEntity ToTurnEntity(ChatMessage message, Guid sessionGuid, string role, string? requestAuthorName)
     {
+        var authorName = message.AuthorName;
+        if (string.Equals(role, "user", StringComparison.Ordinal)
+            && string.IsNullOrWhiteSpace(authorName)
+            && !string.IsNullOrWhiteSpace(requestAuthorName))
+        {
+            authorName = requestAuthorName;
+        }
+
         var turn = new TurnEntity
         {
             SessionId = sessionGuid,
             Role = role,
-            AuthorName = message.AuthorName,
+            AuthorName = authorName,
             Content = message.Text!,
             Timestamp = message.CreatedAt ?? DateTimeOffset.UtcNow,
             CreatedOn = DateTime.UtcNow,

@@ -95,7 +95,7 @@ public sealed class IdentityResolver(
                     ?? string.Empty,
             FirstName = principal.FindFirst(ClaimTypes.GivenName)?.Value ?? string.Empty,
             LastName = principal.FindFirst(ClaimTypes.Surname)?.Value ?? string.Empty,
-            FullName = principal.FindFirst(ClaimTypes.Name)?.Value ?? subject,
+            FullName = principal.FindFirst(ClaimTypes.Name)?.Value ?? string.Empty,
             PreferredUserName = string.Empty,
             Locale = string.Empty,
             TimeZone = string.Empty,
@@ -549,11 +549,11 @@ public sealed class IdentityResolver(
                 Constants.Claims.Subject)
             ?? user.UserName;
 
-        user.FullName = FindFirstNonEmpty(
-                principal,
-                ClaimTypes.Name,
-                Constants.Claims.Name)
-            ?? user.FullName;
+        var nameClaim = FindFirstNonEmpty(
+            principal,
+            ClaimTypes.Name,
+            Constants.Claims.Name);
+        ApplyPreferredFullName(user, nameClaim);
 
         user.FirstName = FindFirstNonEmpty(
                 principal,
@@ -673,5 +673,31 @@ public sealed class IdentityResolver(
         }
 
         return null;
+    }
+
+    private static void ApplyPreferredFullName(UserEntity user, string? claimName)
+    {
+        if (HasPersistedName(user))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(claimName)
+            && !string.Equals(claimName, user.Subject, StringComparison.Ordinal))
+        {
+            user.FullName = claimName.Trim();
+            return;
+        }
+
+        if (string.Equals(user.FullName, user.Subject, StringComparison.Ordinal))
+        {
+            user.FullName = string.Empty;
+        }
+    }
+
+    private static bool HasPersistedName(UserEntity user)
+    {
+        return !string.IsNullOrWhiteSpace(user.FullName)
+               && !string.Equals(user.FullName, user.Subject, StringComparison.Ordinal);
     }
 }

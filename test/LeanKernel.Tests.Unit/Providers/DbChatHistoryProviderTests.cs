@@ -446,6 +446,24 @@ public class DbChatHistoryProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task StoreChatHistoryAsync_UserTurnWithoutAuthorName_UsesPermitBadgeName()
+    {
+        var (provider, dbContext) = CreateSut();
+        var session = CreateSession(new Dictionary<string, string?>());
+        var requestMessages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "Test message")
+        };
+
+        await provider.InvokeStoreChatHistoryAsync(
+            CreateInvokedContext(session: session, requestMessages: requestMessages),
+            CancellationToken.None);
+
+        dbContext.Turns.Should().ContainSingle();
+        dbContext.Turns.Single().AuthorName.Should().Be("System");
+    }
+
+    [Fact]
     public async Task StoreChatHistoryAsync_WithResponseMessages_PersistsAssistantTurns()
     {
         var (provider, dbContext) = CreateSut();

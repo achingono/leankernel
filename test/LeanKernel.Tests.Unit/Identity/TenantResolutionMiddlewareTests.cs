@@ -159,6 +159,9 @@ public class TenantResolutionMiddlewareTests
         ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(userId);
         ctx.Items[TenantResolutionMiddleware.PersonIdKey].Should().Be(userId);
         ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
+        var badge = ctx.Items[TenantResolutionMiddleware.BadgeKey].Should().BeOfType<Badge>().Subject;
+        badge.FullName.Should().Be("Test");
+        badge.Email.Should().Be("t@t");
     }
 
     /// <summary>
@@ -215,7 +218,7 @@ public class TenantResolutionMiddlewareTests
             .ReturnsAsync(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
         resolver
             .Setup(r => r.ResolveUserAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserEntity { Id = userId, Issuer = "signal", Subject = "+15551234" });
+            .ReturnsAsync(new UserEntity { Id = userId, Issuer = "signal", Subject = "+15551234", FullName = "Signal User" });
         resolver
             .Setup(r => r.IsChannelSenderBindingActiveAsync(
                 tenantId,
@@ -248,6 +251,8 @@ public class TenantResolutionMiddlewareTests
         ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(userId);
         ctx.Items[TenantResolutionMiddleware.PersonIdKey].Should().Be(userId);
         ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
+        var badge = ctx.Items[TenantResolutionMiddleware.BadgeKey].Should().BeOfType<Badge>().Subject;
+        badge.FullName.Should().Be("Signal User");
     }
 
     [Fact]

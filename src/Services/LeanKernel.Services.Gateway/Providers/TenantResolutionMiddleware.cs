@@ -117,8 +117,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             context.Items[UserIdKey] = user.Id;
             context.Items[PersonIdKey] = user.PersonId == Guid.Empty ? user.Id : user.PersonId;
             context.Items[ChannelIdKey] = channel.Id;
-            var channelBadge = authenticatedPrincipal.ToBadge();
-            channelBadge.Id = user.Id;
+            var channelBadge = BuildResolvedBadge(authenticatedPrincipal, user);
             context.Items[BadgeKey] = channelBadge;
 
             await next(context);
@@ -145,8 +144,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             var user = await resolver.ResolveOrCreateUserAsync(cp, cancellationToken);
             userId = user.Id;
             personId = user.PersonId == Guid.Empty ? user.Id : user.PersonId;
-            badge = cp.ToBadge();
-            badge.Id = user.Id;
+            badge = BuildResolvedBadge(cp, user);
         }
         else
         {
@@ -175,6 +173,28 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         context.Items[ChannelIdKey] = openAiChannel.Id;
 
         await next(context);
+    }
+
+    private static Badge BuildResolvedBadge(ClaimsPrincipal principal, UserEntity resolvedUser)
+    {
+        var badge = principal.ToBadge();
+        badge.Id = resolvedUser.Id;
+
+        if (!string.IsNullOrWhiteSpace(resolvedUser.FullName))
+        {
+            badge.FullName = resolvedUser.FullName;
+        }
+        else if (!string.IsNullOrWhiteSpace(resolvedUser.UserName))
+        {
+            badge.FullName = resolvedUser.UserName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(resolvedUser.Email))
+        {
+            badge.Email = resolvedUser.Email;
+        }
+
+        return badge;
     }
 
     private static bool ShouldBypass(PathString path) =>
