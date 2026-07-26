@@ -1,5 +1,7 @@
 using System.Text;
 
+using LeanKernel.Entities;
+
 namespace LeanKernel.Channels.Signal;
 
 /// <summary>
@@ -35,7 +37,7 @@ public static class AttachmentParser
     /// <returns>The original text with an appended attachment context block.</returns>
     public static string AppendAttachmentContext(
         string text,
-        IReadOnlyList<InboundAttachment> attachments,
+        IReadOnlyList<ChannelAttachmentEnvelope> attachments,
         IReadOnlyList<string> attachmentHints)
     {
         if (attachments.Count == 0 && attachmentHints.Count == 0)
@@ -57,6 +59,10 @@ public static class AttachmentParser
             builder.AppendLine($"attachment_count={attachments.Count}");
             builder.AppendLine($"image_attachment_count={attachments.Count(attachment => attachment.IsImage)}");
             builder.AppendLine($"image_bytes_forwarded_count={attachments.Count(attachment => !string.IsNullOrWhiteSpace(attachment.ImageDataUrl))}");
+            var documentAttachmentCount = attachments.Count(attachment => !attachment.IsImage);
+            var queuedDocumentCount = attachments.Count(attachment => !attachment.IsImage && !string.IsNullOrWhiteSpace(attachment.FileDataUrl));
+            builder.AppendLine($"document_attachment_count={documentAttachmentCount}");
+            builder.AppendLine($"document_ingestion_queued_count={queuedDocumentCount}");
 
             foreach (var attachment in attachments.Take(5))
             {
@@ -67,7 +73,8 @@ public static class AttachmentParser
                     ? "unknown"
                     : attachment.FileName;
                 var hasImageBytes = string.IsNullOrWhiteSpace(attachment.ImageDataUrl) ? "no" : "yes";
-                builder.AppendLine($"attachment: content_type={mediaType}; file_name={fileName}; image_bytes_forwarded={hasImageBytes}");
+                var hasFileBytes = string.IsNullOrWhiteSpace(attachment.FileDataUrl) ? "no" : "yes";
+                builder.AppendLine($"attachment: content_type={mediaType}; file_name={fileName}; image_bytes_forwarded={hasImageBytes}; file_bytes_forwarded={hasFileBytes}");
             }
         }
 
@@ -94,7 +101,7 @@ public static class AttachmentParser
     /// <returns>An object representing the gateway input structure.</returns>
     public static object BuildGatewayInput(
         string text,
-        IReadOnlyList<InboundAttachment> attachments,
+        IReadOnlyList<ChannelAttachmentEnvelope> attachments,
         IReadOnlyList<string> attachmentHints)
     {
         if (attachments.Count == 0 && attachmentHints.Count == 0)

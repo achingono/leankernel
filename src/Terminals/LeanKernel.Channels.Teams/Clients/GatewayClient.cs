@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 
 using LeanKernel.Channels.Common.Configuration;
+using LeanKernel.Entities;
 
 using Microsoft.Extensions.Options;
 
@@ -12,11 +13,16 @@ namespace LeanKernel.Channels.Teams.Clients;
 public sealed class GatewayClient(HttpClient httpClient, IOptions<GatewaySettings> settings)
 {
     /// <summary>Sends user input to the gateway and returns the response text.</summary>
-    /// <param name="input">The user input text.</param>
+    /// <param name="input">The user input payload.</param>
     /// <param name="bearerToken">The bearer token for gateway authentication.</param>
+    /// <param name="attachments">The normalized attachment envelopes.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The gateway response text.</returns>
-    public async Task<string> RunTurnAsync(string input, string bearerToken, CancellationToken ct)
+    public async Task<string> RunTurnAsync(
+        object input,
+        string bearerToken,
+        IReadOnlyList<ChannelAttachmentEnvelope> attachments,
+        CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue(Constants.Http.Headers.Bearer, bearerToken);
@@ -25,6 +31,7 @@ public sealed class GatewayClient(HttpClient httpClient, IOptions<GatewaySetting
             {
                 model = settings.Value.Model,
                 input,
+                channel_attachments = attachments,
                 agent = new
                 {
                     name = settings.Value.AgentName

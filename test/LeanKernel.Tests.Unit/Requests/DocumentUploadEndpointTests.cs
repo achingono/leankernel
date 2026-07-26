@@ -25,6 +25,10 @@ public sealed class DocumentUploadEndpointTests
         typeof(DocumentUploadEndpoint).GetMethod("HandleUploadAsync", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("DocumentUploadEndpoint.HandleUploadAsync was not found.");
 
+    private static readonly MethodInfo HandleIngestBase64AsyncMethod =
+        typeof(DocumentUploadEndpoint).GetMethod("HandleIngestBase64Async", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("DocumentUploadEndpoint.HandleIngestBase64Async was not found.");
+
     [Fact]
     public async Task HandleUploadAsync_EmptyFile_ReturnsBadRequest()
     {
@@ -145,6 +149,148 @@ public sealed class DocumentUploadEndpointTests
         }
     }
 
+    [Fact]
+    public async Task HandleIngestBase64Async_MissingFileData_ReturnsBadRequest()
+    {
+        var context = CreateHttpContext([Guid.NewGuid()]);
+        var permit = CreatePermit();
+        var result = await InvokeHandleIngestBase64Async(
+            context,
+            new IngestDocumentRequest { FileName = "doc.txt", FileData = string.Empty },
+            permit,
+            Mock.Of<IDocumentIngestionQueue>(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath(), MaxDownloadBytes = 1024 }));
+
+        result.As<IStatusCodeHttpResult>().StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+    }
+
+    [Fact]
+    public async Task HandleIngestBase64Async_InvalidBase64_ReturnsBadRequest()
+    {
+        var context = CreateHttpContext([Guid.NewGuid()]);
+        var permit = CreatePermit();
+        var request = new IngestDocumentRequest { FileName = "doc.txt", FileData = "not-base64" };
+
+        var result = await InvokeHandleIngestBase64Async(
+            context,
+            request,
+            permit,
+            Mock.Of<IDocumentIngestionQueue>(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath(), MaxDownloadBytes = 1024 }));
+
+        result.As<IStatusCodeHttpResult>().StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+    }
+
+    [Fact]
+    public async Task HandleIngestBase64Async_FileTooLarge_ReturnsBadRequest()
+    {
+        var context = CreateHttpContext([Guid.NewGuid()]);
+        var permit = CreatePermit();
+        var request = new IngestDocumentRequest
+        {
+            FileName = "doc.txt",
+            FileData = Convert.ToBase64String(Encoding.UTF8.GetBytes("1234567890")),
+        };
+
+        var result = await InvokeHandleIngestBase64Async(
+            context,
+            request,
+            permit,
+            Mock.Of<IDocumentIngestionQueue>(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath(), MaxDownloadBytes = 5 }));
+
+        result.As<IStatusCodeHttpResult>().StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+    }
+
+    [Fact]
+    public async Task HandleIngestBase64Async_TenantScopeWithoutBadgeIdentity_ReturnsForbid()
+    {
+        var context = CreateHttpContext([Guid.NewGuid()]);
+        var permit = CreatePermit(badgeId: Guid.Empty);
+        var request = new IngestDocumentRequest
+        {
+            FileName = "doc.txt",
+            FileData = Convert.ToBase64String(Encoding.UTF8.GetBytes("hello")),
+            AvailabilityScope = "tenant",
+        };
+
+        var result = await InvokeHandleIngestBase64Async(
+            context,
+            request,
+            permit,
+            Mock.Of<IDocumentIngestionQueue>(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath(), MaxDownloadBytes = 1024 }));
+
+        result.Should().BeAssignableTo<ForbidHttpResult>();
+    }
+
+    [Fact]
+    public async Task HandleIngestBase64Async_ChannelNotReadable_ReturnsForbid()
+    {
+        var permit = CreatePermit();
+        var requestedChannel = Guid.NewGuid();
+        var context = CreateHttpContext([Guid.NewGuid()]);
+        var request = new IngestDocumentRequest
+        {
+            FileName = "doc.txt",
+            FileData = Convert.ToBase64String(Encoding.UTF8.GetBytes("hello")),
+            ChannelId = requestedChannel.ToString(),
+        };
+
+        var result = await InvokeHandleIngestBase64Async(
+            context,
+            request,
+            permit,
+            Mock.Of<IDocumentIngestionQueue>(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath(), MaxDownloadBytes = 1024 }));
+
+        result.Should().BeAssignableTo<ForbidHttpResult>();
+    }
+
+    [Fact]
+    public async Task HandleIngestBase64Async_ValidDataUrl_StagesFileAndEnqueuesJob()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"leankernel-ingest-tests-{Guid.NewGuid():N}");
+        var permit = CreatePermit();
+        var queue = new Mock<IDocumentIngestionQueue>();
+        DocumentIngestionJob? queuedJob = null;
+        queue.Setup(q => q.EnqueueAsync(It.IsAny<DocumentIngestionJob>(), It.IsAny<CancellationToken>()))
+            .Callback<DocumentIngestionJob, CancellationToken>((job, _) => queuedJob = job)
+            .Returns(Task.CompletedTask);
+
+        var context = CreateHttpContext([permit.ChannelId], rootPath);
+        var request = new IngestDocumentRequest
+        {
+            FileName = "doc.txt",
+            FileData = "data:text/plain;base64,SGVsbG8=",
+            ContentType = "application/octet-stream",
+        };
+
+        try
+        {
+            var result = await InvokeHandleIngestBase64Async(
+                context,
+                request,
+                permit,
+                queue.Object,
+                Options.Create(new FileSettings { RootPath = rootPath, MaxDownloadBytes = 1024 }));
+
+            result.As<IStatusCodeHttpResult>().StatusCode.Should().Be(StatusCodes.Status202Accepted);
+            queue.Verify(q => q.EnqueueAsync(It.IsAny<DocumentIngestionJob>(), It.IsAny<CancellationToken>()), Times.Once);
+            queuedJob.Should().NotBeNull();
+            queuedJob!.ContentType.Should().Be("text/plain");
+            File.Exists(queuedJob.FilePath).Should().BeTrue();
+            (await File.ReadAllTextAsync(queuedJob.FilePath)).Should().Be("Hello");
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
     private static async Task<IResult> InvokeHandleUploadAsync(
         HttpContext context,
         IFormFile file,
@@ -154,6 +300,17 @@ public sealed class DocumentUploadEndpointTests
         IDocumentIngestionQueue queue)
     {
         var task = (Task<IResult>)HandleUploadAsyncMethod.Invoke(null, [context, file, channelId, availabilityScope, permit, queue])!;
+        return await task;
+    }
+
+    private static async Task<IResult> InvokeHandleIngestBase64Async(
+        HttpContext context,
+        IngestDocumentRequest request,
+        IPermit permit,
+        IDocumentIngestionQueue queue,
+        IOptions<FileSettings> fileSettings)
+    {
+        var task = (Task<IResult>)HandleIngestBase64AsyncMethod.Invoke(null, [context, request, permit, queue, fileSettings])!;
         return await task;
     }
 

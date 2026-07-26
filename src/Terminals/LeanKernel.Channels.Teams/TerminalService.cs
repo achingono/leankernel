@@ -28,11 +28,11 @@ public sealed class TerminalService(
                 continue;
             }
 
-            var attachments = AttachmentParser.Parse(activity.AttachmentUrls);
-            var result = await gatewayClient.RunTurnAsync(activity.Text, activity.BearerToken, stoppingToken);
-            if (attachments.Count > 0)
+            var input = AttachmentParser.BuildGatewayInput(activity.Text, activity.Attachments);
+            var result = await gatewayClient.RunTurnAsync(input, activity.BearerToken, activity.Attachments, stoppingToken);
+            if (activity.Attachments.Count > 0)
             {
-                result = $"{result}\n\n(attachments={attachments.Count})";
+                result = $"{result}\n\n(attachments={activity.Attachments.Count})";
             }
 
             await transport.SendAsync(activity, result, stoppingToken);

@@ -430,7 +430,7 @@ public sealed class SocketTransportClient(
                 ? filenameElement.GetString() ?? string.Empty
                 : string.Empty;
 
-            attachments.Add(new InboundAttachment(attachmentId, contentType, fileName, string.Empty));
+            attachments.Add(new InboundAttachment(attachmentId, contentType, fileName, string.Empty, string.Empty));
         }
 
         return attachments;
@@ -482,41 +482,50 @@ public sealed class SocketTransportClient(
         }
 
         var maxImagesPerMessage = Math.Max(0, settings.Value.MaxImageAttachmentsPerMessage);
-        var maxImageAttachmentBytes = settings.Value.MaxImageAttachmentBytes;
+        var maxAttachmentBytes = settings.Value.MaxImageAttachmentBytes;
 
-        if (maxImagesPerMessage == 0 || maxImageAttachmentBytes <= 0)
+        if (maxImagesPerMessage == 0 || maxAttachmentBytes <= 0)
         {
             return attachments;
         }
 
         var enriched = new List<InboundAttachment>(attachments.Count);
-        var forwardedCount = 0;
+        var imageForwardedCount = 0;
 
         foreach (var attachment in attachments)
         {
-            if (!attachment.IsImage
-                || string.IsNullOrWhiteSpace(attachment.AttachmentId)
-                || forwardedCount >= maxImagesPerMessage)
+            if (string.IsNullOrWhiteSpace(attachment.AttachmentId))
             {
                 enriched.Add(attachment);
                 continue;
             }
 
-            var imageDataUrl = await TryDownloadImageDataUrlAsync(attachment, maxImageAttachmentBytes, ct);
-            if (string.IsNullOrWhiteSpace(imageDataUrl))
+            var dataUrl = await TryDownloadAttachmentAsync(attachment, maxAttachmentBytes, ct);
+            if (string.IsNullOrWhiteSpace(dataUrl))
             {
                 enriched.Add(attachment);
                 continue;
             }
 
-            enriched.Add(attachment with { ImageDataUrl = imageDataUrl });
-            forwardedCount++;
+            if (attachment.IsImage && imageForwardedCount < maxImagesPerMessage)
+            {
+                enriched.Add(attachment with { ImageDataUrl = dataUrl });
+                imageForwardedCount++;
+            }
+            else if (!attachment.IsImage)
+            {
+                enriched.Add(attachment with { FileDataUrl = dataUrl });
+            }
+            else
+            {
+                enriched.Add(attachment);
+            }
         }
 
         return enriched;
     }
 
-    private async Task<string> TryDownloadImageDataUrlAsync(InboundAttachment attachment, int maxAttachmentBytes, CancellationToken ct)
+    private async Task<string> TryDownloadAttachmentAsync(InboundAttachment attachment, int maxAttachmentBytes, CancellationToken ct)
     {
         try
         {
@@ -562,11 +571,6 @@ public sealed class SocketTransportClient(
             var mediaType = !string.IsNullOrWhiteSpace(attachment.ContentType)
                 ? attachment.ContentType
                 : response.Content.Headers.ContentType?.MediaType ?? string.Empty;
-
-            if (!mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            {
-                return string.Empty;
-            }
 
             var base64 = Convert.ToBase64String(bytes);
             return $"data:{mediaType};base64,{base64}";

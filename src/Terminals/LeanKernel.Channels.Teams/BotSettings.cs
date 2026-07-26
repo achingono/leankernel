@@ -22,4 +22,13 @@ public sealed class BotSettings
         ".botframework.com",
         ".botframework.us"
     ];
+
+    /// <summary>Gets or sets the maximum number of image attachments to forward per message.</summary>
+    public int MaxImageAttachmentsPerMessage { get; set; } = 3;
+
+    /// <summary>Gets or sets the maximum number of non-image attachments to stage per message.</summary>
+    public int MaxFileAttachmentsPerMessage { get; set; } = 3;
+
+    /// <summary>Gets or sets the maximum attachment size in bytes for downloads.</summary>
+    public int MaxAttachmentBytes { get; set; } = 5 * 1024 * 1024;
 }

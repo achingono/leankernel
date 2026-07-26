@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 
 using LeanKernel.Channels.Common.Configuration;
+using LeanKernel.Entities;
 
 using Microsoft.Extensions.Options;
 
@@ -11,16 +12,24 @@ namespace LeanKernel.Channels.Signal;
 /// <summary>
 /// HTTP client for invoking the LeanKernel gateway agent endpoints.
 /// </summary>
-public sealed class GatewayChannelClient(HttpClient httpClient, IOptions<GatewaySettings> settings)
+public sealed class GatewayChannelClient(
+    HttpClient httpClient,
+    IOptions<GatewaySettings> settings,
+    ILogger<GatewayChannelClient> logger)
 {
     /// <summary>
     /// Sends an input payload to the gateway agent and returns the parsed response.
     /// </summary>
     /// <param name="input">The gateway input payload.</param>
     /// <param name="bearerToken">The bearer token for authentication.</param>
+    /// <param name="attachments">Normalized channel attachments to forward alongside the turn payload.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The parsed turn result containing response text and text styles.</returns>
-    public async Task<GatewayTurnResult> RunTurnAsync(object input, string bearerToken, CancellationToken ct)
+    public async Task<GatewayTurnResult> RunTurnAsync(
+        object input,
+        string bearerToken,
+        IReadOnlyList<ChannelAttachmentEnvelope> attachments,
+        CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue(Constants.Http.Headers.Bearer, bearerToken);
@@ -29,6 +38,7 @@ public sealed class GatewayChannelClient(HttpClient httpClient, IOptions<Gateway
             {
                 model = settings.Value.Model,
                 input,
+                channel_attachments = attachments,
                 agent = new
                 {
                     name = settings.Value.AgentName
@@ -43,6 +53,46 @@ public sealed class GatewayChannelClient(HttpClient httpClient, IOptions<Gateway
 
         var payload = await response.Content.ReadAsStringAsync(ct);
         return ExtractResponseText(payload);
+    }
+
+    /// <summary>
+    /// Stages a file's base64 data for document ingestion via the gateway.
+    /// </summary>
+    /// <param name="fileName">The original file name.</param>
+    /// <param name="contentType">The MIME content type.</param>
+    /// <param name="fileDataUrl">The data URL containing the file bytes.</param>
+    /// <param name="bearerToken">The bearer token for authentication.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True when the file was accepted for ingestion; false otherwise.</returns>
+    public async Task<bool> StageFileDataAsync(
+        string fileName,
+        string contentType,
+        string fileDataUrl,
+        string bearerToken,
+        CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/documents/ingest");
+        request.Headers.Authorization = new AuthenticationHeaderValue(Constants.Http.Headers.Bearer, bearerToken);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(new
+            {
+                fileName,
+                contentType,
+                fileData = fileDataUrl,
+                availabilityScope = "user"
+            }), Encoding.UTF8, Constants.ContentTypes.Json);
+
+        using var response = await httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogDebug(
+                "File staging failed for {FileName}: status {StatusCode}.",
+                fileName,
+                (int)response.StatusCode);
+            return false;
+        }
+
+        return true;
     }
 
     private static GatewayTurnResult ExtractResponseText(string payload)

@@ -122,6 +122,227 @@ public sealed class AttachmentIngestionMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_JsonEnvelopeWithDocumentAttachment_StagesFileEmitsEventAndInvokesNext()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-attachment-tests-{Guid.NewGuid():N}");
+        var permit = CreatePermit();
+        var json = """
+        {
+          "channel_attachments": [
+            {
+              "contentType": "application/pdf",
+              "fileName": "doc.pdf",
+              "fileDataUrl": "data:application/pdf;base64,SGVsbG8="
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        DocumentIngestionRequestedEvent? emitted = null;
+        eventCollector.Setup(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()))
+            .Callback<DocumentIngestionRequestedEvent>(e => emitted = e);
+
+        var invoked = false;
+        var middleware = new AttachmentIngestionMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            await middleware.InvokeAsync(
+                context,
+                permit,
+                Options.Create(new FileSettings { RootPath = tempRoot }),
+                eventCollector.Object,
+                Mock.Of<IChannelMemoryPolicyResolver>(),
+                NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+            invoked.Should().BeTrue();
+            eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Once);
+            emitted.Should().NotBeNull();
+            emitted!.FileName.Should().Be("doc.pdf");
+            File.Exists(emitted.StagedFilePath).Should().BeTrue();
+            (await File.ReadAllTextAsync(emitted.StagedFilePath)).Should().Be("Hello");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_JsonEnvelopeWithImageAttachment_DoesNotEmitIngestionEvent()
+    {
+        var json = """
+        {
+          "channel_attachments": [
+            {
+              "contentType": "image/png",
+              "fileName": "picture.png",
+              "fileDataUrl": "data:image/png;base64,SGVsbG8="
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        var invoked = false;
+        var middleware = new AttachmentIngestionMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(
+            context,
+            CreatePermit(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath() }),
+            eventCollector.Object,
+            Mock.Of<IChannelMemoryPolicyResolver>(),
+            NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+        invoked.Should().BeTrue();
+        eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_JsonEnvelopeWithMalformedDataUrl_DoesNotEmitEvent()
+    {
+        var json = """
+        {
+          "channel_attachments": [
+            {
+              "contentType": "application/pdf",
+              "fileName": "bad.pdf",
+              "fileDataUrl": "data:application/pdf;base64,not-valid-base64"
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        var invoked = false;
+        var middleware = new AttachmentIngestionMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(
+            context,
+            CreatePermit(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath() }),
+            eventCollector.Object,
+            Mock.Of<IChannelMemoryPolicyResolver>(),
+            NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+        invoked.Should().BeTrue();
+        eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_JsonEnvelope_ChannelNotReadable_ReturnsForbiddenWithoutInvokingNext()
+    {
+        var permit = CreatePermit();
+        var requestedChannel = Guid.NewGuid();
+        var json = $$"""
+        {
+          "channelId": "{{requestedChannel}}",
+          "channel_attachments": [
+            {
+              "contentType": "application/pdf",
+              "fileName": "doc.pdf",
+              "fileDataUrl": "data:application/pdf;base64,SGVsbG8="
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var policyResolver = new Mock<IChannelMemoryPolicyResolver>();
+        policyResolver.Setup(r => r.ResolveAsync(permit.TenantId, permit.ChannelId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChannelMemoryPolicyResolution
+            {
+                TenantId = permit.TenantId,
+                ChannelId = permit.ChannelId,
+                ReadableChannelIds = [Guid.NewGuid()],
+                MutuallyVisibleChannelIds = [],
+            });
+
+        var invoked = false;
+        var middleware = new AttachmentIngestionMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(
+            context,
+            permit,
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath() }),
+            Mock.Of<IEventCollector>(),
+            policyResolver.Object,
+            NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+        context.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        invoked.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_JsonEnvelope_TenantScopeWithoutBadgeIdentity_ReturnsForbidden()
+    {
+        var json = """
+        {
+          "availabilityScope": "tenant",
+          "channel_attachments": [
+            {
+              "contentType": "application/pdf",
+              "fileName": "doc.pdf",
+              "fileDataUrl": "data:application/pdf;base64,SGVsbG8="
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var middleware = new AttachmentIngestionMiddleware(_ => Task.CompletedTask);
+
+        await middleware.InvokeAsync(
+            context,
+            CreatePermit(badgeId: Guid.Empty),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath() }),
+            Mock.Of<IEventCollector>(),
+            Mock.Of<IChannelMemoryPolicyResolver>(),
+            NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+        context.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
     public async Task InvokeAsync_ChannelNotReadable_ReturnsForbiddenWithoutInvokingNext()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-attachment-tests-{Guid.NewGuid():N}");

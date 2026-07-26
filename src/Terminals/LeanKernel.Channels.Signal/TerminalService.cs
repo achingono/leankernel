@@ -37,6 +37,7 @@ public sealed class TerminalService(
             {
                 var attachmentHints = AttachmentParser.ParseAttachmentHints(inbound.Text);
                 var input = AttachmentParser.BuildGatewayInput(inbound.Text, inbound.Attachments, attachmentHints);
+
                 await using var typingKeepAlive = TypingIndicatorKeepAlive.Start(
                     transport,
                     inbound.Account,
@@ -45,7 +46,7 @@ public sealed class TerminalService(
                     logger,
                     stoppingToken);
 
-                var output = await gatewayClient.RunTurnAsync(input, inbound.BearerToken, stoppingToken);
+                var output = await gatewayClient.RunTurnAsync(input, inbound.BearerToken, inbound.Attachments, stoppingToken);
 
                 var attachmentCount = inbound.Attachments.Count > 0
                     ? inbound.Attachments.Count

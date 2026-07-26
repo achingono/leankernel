@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
 /// <summary>
-/// Maps the document upload Minimal API endpoint.
+/// Maps the document upload Minimal API endpoints.
 /// </summary>
 public static class DocumentUploadEndpoint
 {
@@ -23,6 +23,150 @@ public static class DocumentUploadEndpoint
         endpoints.MapPost("/api/documents/upload", HandleUploadAsync)
         .RequireAuthorization()
         .DisableAntiforgery();
+
+        endpoints.MapPost("/api/documents/ingest", HandleIngestBase64Async)
+        .RequireAuthorization()
+        .DisableAntiforgery();
+    }
+
+    private static async Task<IResult> HandleIngestBase64Async(
+        HttpContext context,
+        [FromBody] IngestDocumentRequest request,
+        [FromServices] IPermit permit,
+        [FromServices] IDocumentIngestionQueue queue,
+        [FromServices] IOptions<FileSettings> fileSettings)
+    {
+        if (string.IsNullOrWhiteSpace(request?.FileData))
+        {
+            return Results.BadRequest(new { error = "file_data is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.FileName))
+        {
+            return Results.BadRequest(new { error = "file_name is required." });
+        }
+
+        var channelResolution = await ResolveChannelAsync(context, permit, request.ChannelId);
+        if (!channelResolution.Allowed)
+        {
+            return Results.Forbid();
+        }
+
+        var channelId = channelResolution.ChannelId;
+
+        var scope = ParseAvailabilityScope(request.AvailabilityScope);
+
+        if (scope == DocumentAvailabilityScope.Tenant && permit.Badge.Id == Guid.Empty)
+        {
+            return Results.Forbid();
+        }
+
+        var decodedFile = DecodeFileData(request.FileData, request.ContentType);
+        if (!decodedFile.Success)
+        {
+            return Results.BadRequest(new { error = decodedFile.ErrorMessage });
+        }
+
+        var maxBytes = fileSettings.Value.MaxDownloadBytes;
+        if (maxBytes > 0 && decodedFile.Bytes.Length > maxBytes)
+        {
+            return Results.BadRequest(new { error = $"file_data exceeds maximum size of {maxBytes} bytes." });
+        }
+
+        var tenantId = permit.TenantId;
+        var userId = permit.UserId;
+        var personId = permit.PersonId;
+
+        var stagingDir = Path.Combine(
+            fileSettings.Value.RootPath,
+            "documents",
+            tenantId.ToString(),
+            scope.ToString().ToLowerInvariant(),
+            channelId.ToString(),
+            userId.ToString(),
+            "_staging");
+
+        Directory.CreateDirectory(stagingDir);
+        var safeName = SanitizeFileName(request.FileName);
+        var stagedPath = Path.Combine(stagingDir, safeName);
+
+        if (!stagedPath.StartsWith(stagingDir, StringComparison.Ordinal))
+        {
+            return Results.BadRequest(new { error = "Invalid file name." });
+        }
+
+        await File.WriteAllBytesAsync(stagedPath, decodedFile.Bytes, context.RequestAborted);
+
+        var job = new DocumentIngestionJob(
+            stagedPath,
+            safeName,
+            decodedFile.ContentType,
+            tenantId,
+            userId,
+            personId,
+            channelId,
+            scope,
+            DocumentIngestionSource.Upload);
+
+        await queue.EnqueueAsync(job, context.RequestAborted);
+
+        return Results.Accepted($"/api/documents/jobs/{job.GetHashCode()}", new { status = "queued" });
+    }
+
+    private static async Task<ChannelResolution> ResolveChannelAsync(HttpContext context, IPermit permit, string? channelIdValue)
+    {
+        if (string.IsNullOrWhiteSpace(channelIdValue)
+            || !Guid.TryParse(channelIdValue, out var parsedChannelId))
+        {
+            return new ChannelResolution(true, permit.ChannelId);
+        }
+
+        var policyResolver = context.RequestServices.GetRequiredService<IChannelMemoryPolicyResolver>();
+        var policy = await policyResolver.ResolveAsync(permit.TenantId, permit.ChannelId, context.RequestAborted);
+        var readableChannels = policy.ReadableChannelIds.Append(permit.ChannelId).Distinct().ToList();
+        return new ChannelResolution(readableChannels.Contains(parsedChannelId), parsedChannelId);
+    }
+
+    private static DecodedFileData DecodeFileData(string fileData, string? requestedContentType)
+    {
+        var base64Data = fileData;
+        var contentType = string.IsNullOrWhiteSpace(requestedContentType)
+            ? "application/octet-stream"
+            : requestedContentType;
+
+        if (base64Data.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            var semicolonIndex = base64Data.IndexOf(';', StringComparison.Ordinal);
+            if (semicolonIndex > 5)
+            {
+                var declaredType = base64Data[5..semicolonIndex];
+                if (!string.IsNullOrWhiteSpace(declaredType))
+                {
+                    contentType = declaredType;
+                }
+            }
+
+            var commaIndex = base64Data.IndexOf(',', StringComparison.Ordinal);
+            if (commaIndex >= 0)
+            {
+                base64Data = base64Data[(commaIndex + 1)..];
+            }
+        }
+
+        try
+        {
+            var bytes = Convert.FromBase64String(base64Data);
+            if (bytes.Length == 0)
+            {
+                return new DecodedFileData(false, [], contentType, "file_data is empty.");
+            }
+
+            return new DecodedFileData(true, bytes, contentType, string.Empty);
+        }
+        catch (FormatException)
+        {
+            return new DecodedFileData(false, [], contentType, "file_data is not valid base64.");
+        }
     }
 
     private static async Task<IResult> HandleUploadAsync(
@@ -141,4 +285,12 @@ public static class DocumentUploadEndpoint
             _ => DocumentAvailabilityScope.User,
         };
     }
+
+    private readonly record struct ChannelResolution(bool Allowed, Guid ChannelId);
+
+    private readonly record struct DecodedFileData(
+        bool Success,
+        byte[] Bytes,
+        string ContentType,
+        string ErrorMessage);
 }

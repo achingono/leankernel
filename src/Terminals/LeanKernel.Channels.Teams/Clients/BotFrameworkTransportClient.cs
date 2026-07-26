@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 
 using LeanKernel.Channels.Teams.Services;
+using LeanKernel.Entities;
 
 using Microsoft.Extensions.Options;
 
@@ -28,10 +29,145 @@ public sealed class BotFrameworkTransportClient(
         if (await _channel.Reader.WaitToReadAsync(ct) && _channel.Reader.TryRead(out var activity))
         {
             var token = await credentialProvider.ResolveBearerTokenAsync(activity.SenderId, ct);
-            return activity with { BearerToken = token };
+            var hydratedAttachments = await EnrichAttachmentsAsync(activity.Attachments, ct);
+            return activity with { BearerToken = token, Attachments = hydratedAttachments };
         }
 
         return null;
+    }
+
+    private async Task<IReadOnlyList<ChannelAttachmentEnvelope>> EnrichAttachmentsAsync(
+        IReadOnlyList<ChannelAttachmentEnvelope> attachments,
+        CancellationToken ct)
+    {
+        if (attachments.Count == 0)
+        {
+            return attachments;
+        }
+
+        var maxAttachmentBytes = Math.Max(0, settings.Value.MaxAttachmentBytes);
+        if (maxAttachmentBytes <= 0)
+        {
+            return attachments;
+        }
+
+        var maxImagesPerMessage = Math.Max(0, settings.Value.MaxImageAttachmentsPerMessage);
+        var maxFilesPerMessage = Math.Max(0, settings.Value.MaxFileAttachmentsPerMessage);
+        var connectorToken = await GetConnectorTokenAsync(ct);
+        var enriched = new List<ChannelAttachmentEnvelope>(attachments.Count);
+        var imageCount = 0;
+        var fileCount = 0;
+
+        foreach (var attachment in attachments)
+        {
+            if (attachment.HasImageData || attachment.HasFileData)
+            {
+                enriched.Add(attachment);
+                continue;
+            }
+
+            if (!Uri.TryCreate(attachment.AttachmentId, UriKind.Absolute, out var attachmentUri))
+            {
+                enriched.Add(attachment);
+                continue;
+            }
+
+            if (!TryShouldDownload(attachment, maxImagesPerMessage, maxFilesPerMessage, imageCount, fileCount))
+            {
+                enriched.Add(attachment);
+                continue;
+            }
+
+            var dataUrl = await TryDownloadAttachmentAsDataUrlAsync(attachment, attachmentUri, connectorToken, maxAttachmentBytes, ct);
+            if (string.IsNullOrWhiteSpace(dataUrl))
+            {
+                enriched.Add(attachment);
+                continue;
+            }
+
+            if (attachment.IsImage)
+            {
+                enriched.Add(attachment with { ImageDataUrl = dataUrl });
+                imageCount++;
+                continue;
+            }
+
+            enriched.Add(attachment with { FileDataUrl = dataUrl });
+            fileCount++;
+        }
+
+        return enriched;
+    }
+
+    private static bool TryShouldDownload(
+        ChannelAttachmentEnvelope attachment,
+        int maxImagesPerMessage,
+        int maxFilesPerMessage,
+        int imageCount,
+        int fileCount)
+    {
+        if (attachment.IsImage)
+        {
+            return imageCount < maxImagesPerMessage;
+        }
+
+        return fileCount < maxFilesPerMessage;
+    }
+
+    private async Task<string> TryDownloadAttachmentAsDataUrlAsync(
+        ChannelAttachmentEnvelope attachment,
+        Uri attachmentUri,
+        string connectorToken,
+        int maxAttachmentBytes,
+        CancellationToken ct)
+    {
+        try
+        {
+            var client = httpClientFactory.CreateClient("teams-connector");
+            using var request = new HttpRequestMessage(HttpMethod.Get, attachmentUri);
+            if (!string.IsNullOrWhiteSpace(connectorToken))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue(Constants.Http.Headers.Bearer, connectorToken);
+            }
+
+            using var response = await client.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogDebug(
+                    "Teams attachment download failed for {AttachmentId} with status {StatusCode}.",
+                    attachment.AttachmentId,
+                    response.StatusCode);
+                return string.Empty;
+            }
+
+            var contentLength = response.Content.Headers.ContentLength;
+            if (contentLength.HasValue && contentLength.Value > maxAttachmentBytes)
+            {
+                logger.LogInformation(
+                    "Skipping Teams attachment {AttachmentId}: size {SizeBytes} exceeds limit {LimitBytes}.",
+                    attachment.AttachmentId,
+                    contentLength.Value,
+                    maxAttachmentBytes);
+                return string.Empty;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+            if (bytes.Length == 0 || bytes.Length > maxAttachmentBytes)
+            {
+                return string.Empty;
+            }
+
+            var mediaType = !string.IsNullOrWhiteSpace(attachment.ContentType)
+                ? attachment.ContentType
+                : response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+            var base64 = Convert.ToBase64String(bytes);
+            return $"data:{mediaType};base64,{base64}";
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogDebug(ex, "Teams attachment download failed for {AttachmentId}.", attachment.AttachmentId);
+            return string.Empty;
+        }
     }
 
     /// <summary>Enqueues an inbound activity for processing.</summary>

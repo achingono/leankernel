@@ -126,11 +126,7 @@ app.MapPost("/api/messages", async (
         ServiceUrl: tokenServiceUrl ?? activity.ServiceUrl ?? string.Empty,
         Text: activity.Text ?? string.Empty,
         BearerToken: string.Empty,
-        AttachmentUrls: activity.Attachments?
-            .Select(attachment => attachment.ContentUrl ?? string.Empty)
-            .Where(url => !string.IsNullOrWhiteSpace(url))
-            .ToArray()
-            ?? []);
+        Attachments: AttachmentParser.Parse(activity.Attachments));
 
     await transport.EnqueueAsync(inbound, ct);
     return Results.Accepted();
