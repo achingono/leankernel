@@ -4,7 +4,6 @@ using LeanKernel;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
-using LeanKernel.Logic.Events;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
 using LeanKernel.Services.Common.Configuration;

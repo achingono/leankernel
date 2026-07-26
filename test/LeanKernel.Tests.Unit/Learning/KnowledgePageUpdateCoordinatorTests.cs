@@ -1,5 +1,3 @@
-using FluentAssertions;
-
 using LeanKernel.Logic.Memory;
 using LeanKernel.Services.Learning;
 

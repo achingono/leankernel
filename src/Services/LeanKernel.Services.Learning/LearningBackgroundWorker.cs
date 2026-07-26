@@ -3,7 +3,6 @@ using System.Text.Json;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Events;
-using LeanKernel.Logic.Events;
 using LeanKernel.Services.Learning.Steps;
 
 using Microsoft.EntityFrameworkCore;

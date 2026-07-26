@@ -1,9 +1,5 @@
-using System.Collections.Generic;
-using System.Linq;
-
 using FluentAssertions;
 
-using LeanKernel;
 using LeanKernel.Events;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;

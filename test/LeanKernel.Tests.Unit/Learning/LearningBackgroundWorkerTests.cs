@@ -3,16 +3,13 @@ using System.Text.Json;
 
 using FluentAssertions;
 
-using LeanKernel;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Events;
-using LeanKernel.Logic.Events;
 using LeanKernel.Services.Learning;
 
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -167,7 +164,6 @@ public sealed class LearningBackgroundWorkerTests
                 Mock.Of<ITurnEventConsumer>(),
                 producer,
                 ContextFactory,
-                Mock.Of<IEventStore>(),
                 provider.GetRequiredService<IServiceScopeFactory>(),
                 Options.Create(new LearningSettings { Enabled = true }),
                 NullLogger<LearningBackgroundWorker>.Instance);
