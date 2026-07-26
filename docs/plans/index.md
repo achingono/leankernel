@@ -21,7 +21,7 @@ from a gap analysis of the mature source implementation against the current rebu
 | 04 | [Model Intelligence And Response Quality](phase-04-model-intelligence/index.md) | Model routing/escalation, shadow routing, quality gates, response enhancement, degradation, multi-agent | **Not started** |
 | 05 | [Tool Expansion](phase-05-tool-expansion/index.md) | Filesystem suite, data tools, web_fetch/http, browser tool, document ingestion | **Complete** (document ingestion gate moved to Phase 21) |
 | 06 | [Channels](phase-06-channels/index.md) | Channel abstraction/router, Signal adapter, fail-closed auth, keep-alive, attachments | **Partial** (13/16 gates — reconnect/retry, startup validation, terminal tests pending) |
-| 07 | [Learning And Scheduler](phase-07-learning-scheduler/index.md) | Learning pipeline, onboarding intelligence, cron scheduler | **Not started** |
+| 07 | [Learning And Scheduler](phase-07-learning-scheduler/index.md) | Learning pipeline, onboarding intelligence, cron scheduler | **Complete** |
 | 08 | [Diagnostics And Production Operations](phase-08-diagnostics-ops/index.md) | Diagnostics collector + API, health/spend guardrails, OpenTelemetry, gateway hardening | **Not started** |
 | 09 | [Blazor User Interface](phase-09-ui/index.md) | Chat, Diagnostics, Admin, Knowledge, Onboarding UIs | **Not started** |
 
@@ -63,7 +63,7 @@ Infrastructure improvements that enhance development experience and tool integra
 | 18 | [Phase 18](phase-18-webwright-mcp-integration/index.md) | MCP SDK integration for Webwright-first browser tooling, exposing only Webwright MCP tools in the shipped rollout | **Complete** |
 | 19 | [Authorization Permits And Filters](phase-19-authorization-permits-filters/index.md) | Centralized permit/filter/repository enforcement for tenant/user/channel partitioning | **Complete** |
 | 20 | [Identity, Policy, And Event Spine](phase-20-identity-policy-event-spine/index.md) | Canonical identity model, in-process policy core, and append-only event spine | **Complete** |
-| 21 | [Channel-Aware Document Ingestion And Memory Pipeline](phase-21-channel-document-ingestion/index.md) | Channel-aware document ingestion, durable queue, and policy-scoped discovery | **Partial** (core ingestion complete; enrichment-trigger correlation and scope-preserving enrichment artifacts pending) |
+| 21 | [Channel-Aware Document Ingestion And Memory Pipeline](phase-21-channel-document-ingestion/index.md) | Channel-aware document ingestion, durable queue, and policy-scoped discovery | **Complete** |
 
 ## Intelligent Brain Completion
 
@@ -103,7 +103,8 @@ Phases implemented so far, in chronological order. Commit hashes reference the p
 | 18 | [Webwright MCP Integration](phase-18-webwright-mcp-integration/index.md) | **Complete** | `b55123d` |
 | 19 | [Authorization Permits And Filters](phase-19-authorization-permits-filters/index.md) | **Complete** | `89d5e04` |
 | 20 | [Identity, Policy, And Event Spine](phase-20-identity-policy-event-spine/index.md) | **Complete** | `9763550` |
-| 21 | [Channel-Aware Document Ingestion And Memory Pipeline](phase-21-channel-document-ingestion/index.md) | **Partial** | `05bf403` |
+| 07 | [Learning And Scheduler](phase-07-learning-scheduler/index.md) | **Complete** | `ff96c87` |
+| 21 | [Channel-Aware Document Ingestion And Memory Pipeline](phase-21-channel-document-ingestion/index.md) | **Complete** | `05bf403` (+ enrichment delta in `ff96c87`) |
 
 ## Standalone PRDs
 
