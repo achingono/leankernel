@@ -22,7 +22,6 @@ public sealed class LearningBackgroundWorker : BackgroundService
     private readonly ITurnEventConsumer _consumer;
     private readonly ITurnEventProducer _producer;
     private readonly IDbContextFactory<EntityContext> _contextFactory;
-    private readonly IEventStore _eventStore;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptions<LearningSettings> _settings;
     private readonly ILogger<LearningBackgroundWorker> _logger;
@@ -34,7 +33,6 @@ public sealed class LearningBackgroundWorker : BackgroundService
     /// <param name="consumer">The turn event consumer.</param>
     /// <param name="producer">The turn event producer.</param>
     /// <param name="contextFactory">The entity-context factory.</param>
-    /// <param name="eventStore">The event store for enrichment events.</param>
     /// <param name="scopeFactory">The service scope factory.</param>
     /// <param name="settings">The learning settings.</param>
     /// <param name="logger">The logger.</param>
@@ -42,7 +40,6 @@ public sealed class LearningBackgroundWorker : BackgroundService
         ITurnEventConsumer consumer,
         ITurnEventProducer producer,
         IDbContextFactory<EntityContext> contextFactory,
-        IEventStore eventStore,
         IServiceScopeFactory scopeFactory,
         IOptions<LearningSettings> settings,
         ILogger<LearningBackgroundWorker> logger)
@@ -50,7 +47,6 @@ public sealed class LearningBackgroundWorker : BackgroundService
         _consumer = consumer;
         _producer = producer;
         _contextFactory = contextFactory;
-        _eventStore = eventStore;
         _scopeFactory = scopeFactory;
         _settings = settings;
         _logger = logger;

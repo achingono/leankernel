@@ -23,6 +23,7 @@ services:
   # ── Redis (Cache & Pub/Sub) ─────────────────────────────────
   redis:
     image: redis:8-alpine
+    container_name: leankernel-redis
     volumes:
       - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
       - ./config/redis/entrypoint.sh:/run/wrapper/entrypoint.sh:ro
@@ -256,6 +257,12 @@ services:
       gateway:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${LEANKERNEL_GATEWAY_PORT:-8080}/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   signal-channel:
     build:

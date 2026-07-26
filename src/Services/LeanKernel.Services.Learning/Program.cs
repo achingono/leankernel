@@ -37,41 +37,20 @@ builder.Services.AddOptions<SchedulerSettings>()
     .Validate(settings => settings.PollIntervalSeconds > 0, "PollIntervalSeconds must be > 0")
     .ValidateOnStart();
 
-var connectionStringName = builder.Configuration.GetSection("ConnectionStrings").GetChildren()
-    .FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.Value))?.Key
-    ?? Constants.ConnectionStrings.Sqlite;
-
-var connectionString = builder.Configuration.GetConnectionString(connectionStringName);
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    connectionString = $"Data Source={Path.GetTempPath()}leankernel_learning.db";
-}
-
 builder.Services.AddDbContextFactory<EntityContext>(options =>
 {
-    switch (connectionStringName)
-    {
-        case Constants.ConnectionStrings.SqlServer:
-            options.UseSqlServer(connectionString, sqlOptions => sqlOptions.EnableRetryOnFailure());
-            break;
-        case Constants.ConnectionStrings.Sqlite:
-            options.UseSqlite(connectionString);
-            break;
-        case Constants.ConnectionStrings.Postgres:
-            options.UseNpgsql(connectionString);
-            break;
-        default:
-            options.UseSqlite(connectionString);
-            break;
-    }
+    var (connectionStringName, connectionString) = builder.Configuration.ResolveConnectionString(
+        Constants.ConnectionStrings.All);
 
-    options.EnableDetailedErrors(builder.Environment.IsDevelopment());
-    options.EnableSensitiveDataLogging(builder.Environment.IsDevelopment());
+    options.ConfigureOptions(
+        connectionStringName,
+        connectionString,
+        builder.Environment.EnvironmentName.Equals("Testing", StringComparison.OrdinalIgnoreCase),
+        builder.Environment.IsDevelopment(),
+        builder.Environment.IsDevelopment());
 });
 
-builder.Services.AddScoped<DbEventStore>();
-builder.Services.AddTelemetry(builder.Configuration);
-builder.Services.AddContextProviders();
+builder.Services.AddMemoryPageServices();
 builder.Services.AddScoped<IChannelMemoryPolicyResolver, ChannelMemoryPolicyResolver>();
 
 builder.Services.AddChatClient(sp =>

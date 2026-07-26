@@ -124,7 +124,7 @@ public static class IEndpointRouteBuilderExtensions
 
             if (responseMessage.IsSuccessStatusCode)
             {
-                return Results.Stream(responseStream, contentType);
+                return new SseToolCallFilteringResult(responseStream, contentType);
             }
 
             using var errorReader = new StreamReader(responseStream);
