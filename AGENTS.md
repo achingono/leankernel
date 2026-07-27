@@ -4,7 +4,6 @@ Contributor and coding-agent guide for this repository.
 
 ## Workspace Snapshot
 
-- Source of truth: current worktree at `~/source/worktrees/leankernel`
 - Full solution: [`LeanKernel.sln`](LeanKernel.sln)
 - App-only solution: [`src/LeanKernel.sln`](src/LeanKernel.sln)
 - Primary runtime app: [`src/Services/LeanKernel.Gateway`](src/Services/LeanKernel.Gateway)
@@ -62,7 +61,6 @@ The reusable blank planning templates live under [`docs/templates/`](docs/templa
 
 ## Durable Repo-Specific Guidance
 
-- Use this worktree, not `~/source/repos/leankernel`, as the current implementation source of truth.
 - For MAF persistence and provider work, read session state from the invocation context rather than constructor-injecting `AgentSession`-style state.
 - Keep `app.MapOpenAIResponses()` on the current no-argument path unless you are deliberately reworking named-agent registration and have verified the endpoint semantics.
 - Preserve identity partitioning across transcript history, agent state, and memory scope. Related runtime details: [`docs/features/identity-partitioning.md`](docs/features/identity-partitioning.md)
