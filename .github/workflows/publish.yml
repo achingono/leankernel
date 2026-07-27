@@ -21,6 +21,10 @@ jobs:
             dockerfile: src/Services/LeanKernel.Services.Gateway/Dockerfile
             context: .
             platforms: linux/amd64,linux/arm64
+          - image: learning
+            dockerfile: src/Services/LeanKernel.Services.Learning/Dockerfile
+            context: .
+            platforms: linux/amd64,linux/arm64
           - image: gbrain
             dockerfile: config/gbrain/Dockerfile
             context: .

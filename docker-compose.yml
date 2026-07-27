@@ -47,9 +47,9 @@ services:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
       - POSTGRES_HOST=database
       - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-leankernel}
-      - POSTGRES_USER=${POSTGRES_USER:-leankernel}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - POSTGRES_DB=${LITELLM_POSTGRES_DB:-litellm}
+      - POSTGRES_USER=${LITELLM_POSTGRES_USER:-leankernel}
+      - POSTGRES_PASSWORD=${LITELLM_POSTGRES_PASSWORD:-leankernel-dev-password}
       - LITELLM_DB_SCHEMA=${LITELLM_DB_SCHEMA:-litellm}
       - PYTHONPATH=/app/config
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -97,9 +97,9 @@ services:
     environment:
       - POSTGRES_HOST=database
       - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-leankernel}
-      - POSTGRES_USER=${POSTGRES_USER:-leankernel}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-leankernel-dev-password}
+      - POSTGRES_DB=${GBRAIN_POSTGRES_DB:-gbrain}
+      - POSTGRES_USER=${GBRAIN_POSTGRES_USER:-leankernel}
+      - POSTGRES_PASSWORD=${GBRAIN_POSTGRES_PASSWORD:-leankernel-dev-password}
       - GBRAIN_DB_URL=${GBRAIN_DB_URL:-}
       - GBRAIN_EMBEDDING_MODEL=${GBRAIN_EMBEDDING_MODEL:-openai:embedding}
       - GBRAIN_EMBEDDING_DIMENSIONS=${GBRAIN_EMBEDDING_DIMENSIONS:-3072}
