@@ -9,3 +9,4 @@ coverage-results*/
 **/coverage.*.xml
 __pycache__/
 sonar-reports/
+scripts/db/seed.sql
