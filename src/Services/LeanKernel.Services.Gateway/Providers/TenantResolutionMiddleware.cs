@@ -52,12 +52,14 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
     /// <param name="context">The HTTP context.</param>
     /// <param name="resolver">The identity resolver.</param>
     /// <param name="identitySettings">The identity configuration options.</param>
+    /// <param name="logger">The logger for this middleware type.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     [SuppressMessage("Critical Code Smell", "S3776", Justification = "Request identity resolution keeps channel and anonymous flows explicit to preserve security checks.")]
     public async Task InvokeAsync(
         HttpContext context,
         IIdentityResolver resolver,
-        IOptions<IdentitySettings> identitySettings)
+        IOptions<IdentitySettings> identitySettings,
+        ILogger<TenantResolutionMiddleware> logger)
     {
         var cancellationToken = context.RequestAborted;
 
@@ -83,31 +85,9 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 
             var tenant = await resolver.ResolveTenantByIdAsync(tenantId, cancellationToken);
             var channel = await resolver.ResolveChannelAsync(channelClaim, cancellationToken);
-            var user = await resolver.ResolveUserAsync(authenticatedPrincipal, cancellationToken);
+            var user = await resolver.ResolveUserByBindingAsync(authenticatedPrincipal, cancellationToken);
 
             if (tenant is null || channel is null || user is null)
-            {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return;
-            }
-
-            var senderIssuer = authenticatedPrincipal.FindFirst(ChannelSenderIssuerClaimType)?.Value
-                ?? authenticatedPrincipal.FindFirst("iss")?.Value
-                ?? string.Empty;
-            var senderSubject = authenticatedPrincipal.FindFirst(ChannelSenderSubjectClaimType)?.Value
-                ?? authenticatedPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? authenticatedPrincipal.FindFirst("sub")?.Value
-                ?? string.Empty;
-
-            var isActiveBinding = await resolver.IsChannelSenderBindingActiveAsync(
-                tenant.Id,
-                user.Id,
-                channel.Id,
-                senderIssuer,
-                senderSubject,
-                cancellationToken);
-
-            if (!isActiveBinding)
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
@@ -141,7 +121,17 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 
         if (context.User?.Identity?.IsAuthenticated == true && context.User is ClaimsPrincipal cp)
         {
-            var user = await resolver.ResolveOrCreateUserAsync(cp, cancellationToken);
+            var user = await resolver.ResolveUserAsync(cp, cancellationToken);
+            if (user is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                logger.LogWarning(
+                    "Authenticated request from issuer={Issuer}, subject={Subject} rejected: no matching user record.",
+                    cp.FindFirst(Constants.Claims.ChannelSenderIssuer)?.Value ?? cp.FindFirst("iss")?.Value,
+                    cp.FindFirst(Constants.Claims.ChannelSenderSubject)?.Value ?? cp.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                return;
+            }
+
             userId = user.Id;
             personId = user.PersonId == Guid.Empty ? user.Id : user.PersonId;
             badge = BuildResolvedBadge(cp, user);

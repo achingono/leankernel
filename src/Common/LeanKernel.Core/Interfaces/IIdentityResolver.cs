@@ -73,6 +73,16 @@ public interface IIdentityResolver
     Task<ChannelEntity?> ResolveChannelAsync(string channelName, CancellationToken ct = default);
 
     /// <summary>
+    /// Resolves an existing <see cref="UserEntity"/> from a channel sender binding
+    /// identified by <c>lk_sender_iss</c> and <c>lk_sender_sub</c> claims.
+    /// Returns null if no binding or user is found.
+    /// </summary>
+    /// <param name="principal">The authenticated claims principal with channel sender claims.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching <see cref="UserEntity"/>, or null if not found.</returns>
+    Task<UserEntity?> ResolveUserByBindingAsync(ClaimsPrincipal principal, CancellationToken ct = default);
+
+    /// <summary>
     /// Validates that a pre-provisioned sender binding exists and is active.
     /// </summary>
     /// <param name="tenantId">The tenant identifier.</param>

@@ -163,6 +163,12 @@ public sealed class IdentityResolver(
         var existing = await context.Users
             .FirstOrDefaultAsync(u => u.Issuer == issuer && u.Subject == subject && !u.IsDeleted, ct);
 
+        if (existing is null && Guid.TryParse(subject, out var userId))
+        {
+            existing = await context.Users
+                .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, ct);
+        }
+
         if (existing is null)
         {
             return null;
@@ -177,6 +183,47 @@ public sealed class IdentityResolver(
         existing.LastActivity = DateTime.UtcNow;
         await context.SaveChangesAsync(ct);
         return existing;
+    }
+
+    /// <inheritdoc />
+    public async Task<UserEntity?> ResolveUserByBindingAsync(ClaimsPrincipal principal, CancellationToken ct = default)
+    {
+        var issuer = principal.FindFirst(Constants.Claims.ChannelSenderIssuer)?.Value;
+        var subject = principal.FindFirst(Constants.Claims.ChannelSenderSubject)?.Value;
+
+        if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(subject))
+        {
+            return null;
+        }
+
+        using var context = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var binding = await context.ChannelSenderBindings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Issuer == issuer && b.Subject == subject && b.IsActive, ct);
+
+        if (binding is null)
+        {
+            return null;
+        }
+
+        var user = await context.Users
+            .FirstOrDefaultAsync(u => u.Id == binding.UserId && !u.IsDeleted, ct);
+
+        if (user is null)
+        {
+            return null;
+        }
+
+        if (user.PersonId == Guid.Empty)
+        {
+            user.PersonId = user.Id;
+        }
+
+        ApplyIdentityProfile(user, principal, _identityClaimsSettings);
+        user.LastActivity = DateTime.UtcNow;
+        await context.SaveChangesAsync(ct);
+        return user;
     }
 
     /// <inheritdoc />
@@ -692,6 +739,11 @@ public sealed class IdentityResolver(
         if (string.Equals(user.FullName, user.Subject, StringComparison.Ordinal))
         {
             user.FullName = string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(user.FullName) && !string.IsNullOrWhiteSpace(user.UserName))
+        {
+            user.FullName = user.UserName.Trim();
         }
     }
 

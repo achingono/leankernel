@@ -6,6 +6,7 @@ using LeanKernel.Services.Gateway.Providers;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using Moq;
@@ -48,7 +49,7 @@ public class TenantResolutionMiddlewareTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings);
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
         ctx.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized,
             because: "requests from unknown tenants must be rejected to prevent ownership confusion");
@@ -82,7 +83,7 @@ public class TenantResolutionMiddlewareTests
 
         var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
 
-        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings);
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
         ctx.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
     }
@@ -108,7 +109,7 @@ public class TenantResolutionMiddlewareTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings);
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
         nextInvoked.Should().BeTrue("health probes must never be blocked by tenant resolution");
         resolver.Verify(
@@ -135,7 +136,7 @@ public class TenantResolutionMiddlewareTests
             .Setup(r => r.ResolveTenantAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TenantEntity { Id = tenantId, Name = "T", HostName = "t.test", IsActive = true });
         resolver
-            .Setup(r => r.ResolveOrCreateUserAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.ResolveUserAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UserEntity { Id = userId, FullName = "Test", Email = "t@t" });
         resolver
             .Setup(r => r.ResolveOrCreateChannelAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -152,7 +153,7 @@ public class TenantResolutionMiddlewareTests
 
         var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
 
-        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings);
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
         ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId,
             because: "TenantId must be stored in Items for RequestContextPermit to read");
@@ -194,7 +195,7 @@ public class TenantResolutionMiddlewareTests
 
         var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
 
-        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings);
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
         ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId);
         ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(guestUserId);
@@ -217,17 +218,8 @@ public class TenantResolutionMiddlewareTests
             .Setup(r => r.ResolveChannelAsync(ChannelEntity.SignalName, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
         resolver
-            .Setup(r => r.ResolveUserAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.ResolveUserByBindingAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UserEntity { Id = userId, Issuer = "signal", Subject = "+15551234", FullName = "Signal User" });
-        resolver
-            .Setup(r => r.IsChannelSenderBindingActiveAsync(
-                tenantId,
-                userId,
-                channelId,
-                "signal",
-                "+15551234",
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Path = "/v1/responses";
@@ -244,7 +236,7 @@ public class TenantResolutionMiddlewareTests
 
         var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
 
-        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings);
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
         ctx.Response.StatusCode.Should().NotBe(StatusCodes.Status401Unauthorized);
         ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId);
@@ -270,17 +262,8 @@ public class TenantResolutionMiddlewareTests
             .Setup(r => r.ResolveChannelAsync(ChannelEntity.SignalName, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
         resolver
-            .Setup(r => r.ResolveUserAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserEntity { Id = userId, Issuer = "signal", Subject = "+15551234" });
-        resolver
-            .Setup(r => r.IsChannelSenderBindingActiveAsync(
-                It.IsAny<Guid>(),
-                It.IsAny<Guid>(),
-                It.IsAny<Guid>(),
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+            .Setup(r => r.ResolveUserByBindingAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((UserEntity?)null);
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Path = "/v1/responses";
@@ -297,7 +280,7 @@ public class TenantResolutionMiddlewareTests
 
         var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
 
-        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings);
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
         ctx.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
     }
