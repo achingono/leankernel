@@ -9,7 +9,7 @@
 - [Evidence](evidence.md)
 
 ## Objective
-Introduce an explicit, testable turn-execution pipeline in the rebuild so that each request flows through deterministic, observable stages instead of relying on implicit MAF middleware ordering. This phase ports the source repo's gated turn runtime — deny-by-default context assembly with budget enforcement, deterministic history shaping/compaction, scoped knowledge retrieval into the prompt, and long-running task progress/continuation — into the rebuild's `LeanKernel.Logic` and `LeanKernel.Gateway` boundaries while preserving the current identity partitioning and memory-pipeline behavior.
+Introduce an explicit, testable turn-execution pipeline in the rebuild so that each request flows through deterministic, observable stages instead of relying on implicit MAF middleware ordering. This phase ports the gated turn runtime from commit `5033dafcbe48a9b364941dc37383791bd99110a6` — deny-by-default context assembly with budget enforcement, deterministic history shaping/compaction, scoped knowledge retrieval into the prompt, and long-running task progress/continuation — into the rebuild's `LeanKernel.Logic` and `LeanKernel.Gateway` boundaries while preserving the current identity partitioning and memory-pipeline behavior.
 
 ## Scope
 This phase covers the runtime plumbing that sits between an inbound `/v1/responses` turn and the model invocation: turn lifecycle, context admission, prompt assembly, history windowing, retrieval scoping, and multi-step/long-running turn progress. It does not cover model selection strategy, response quality post-processing, or UI (those are later phases).

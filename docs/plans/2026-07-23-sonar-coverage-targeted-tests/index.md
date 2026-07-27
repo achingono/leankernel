@@ -24,7 +24,7 @@ Raise SonarQube new-code coverage from 73% to at least 80% by adding targeted te
 
 ## Entry Criteria
 - Sonar project `LeanKernel` is reachable at local host URL.
-- Existing test projects compile and run in the worktree.
+- Existing test projects compile and run in the repository.
 - Baseline quality gate failure is confirmed as `new_coverage` below threshold.
 
 ## Exit Criteria

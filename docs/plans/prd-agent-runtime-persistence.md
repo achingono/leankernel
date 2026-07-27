@@ -422,7 +422,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 
 > Ordered by dependency. Each item is independently verifiable. `[ ]` = todo.
 >
-> Status below reflects the current implementation state in this worktree. Items remain unchecked unless the full item is clearly implemented end-to-end.
+> Status below reflects the current implementation state in the repository. Items remain unchecked unless the full item is clearly implemented end-to-end.
 
 ### Phase 0 — Solution & build scaffolding
 
@@ -516,7 +516,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 
 ### Phase 9 — Docs
 
-- [ ] Update `README.md` "Repository Structure" to match reality; it still lists many aspirational projects that do not exist in this worktree instead of the actual 4 src + 3 test projects.
+- [ ] Update `README.md` "Repository Structure" to match reality; it still lists many aspirational projects that do not exist in the repository instead of the actual 4 src + 3 test projects.
 - [ ] Add `docs/architecture/agent-runtime.md` describing the provider pipeline + partitioning; link from this PRD.
 
 ---

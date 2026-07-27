@@ -5,9 +5,9 @@
 | **Status** | In progress - core pipeline implemented in `LeanKernel.Logic`; remaining gaps tracked in checklist |
 | **Owner** | @achingono |
 | **Target area** | `src/Common/LeanKernel.Logic` |
-| **Source repo** | `~/source/repos/leankernel` |
+| **Historical baseline** | commit `5033dafcbe48a9b364941dc37383791bd99110a6` |
 | **Primary source files** | `src/LeanKernel.Scheduler/JobExecutor.cs`, `src/LeanKernel.Learning/FactExtractionStep.cs`, `docs/plans/knowledge-fact-defrag-job.md` |
-| **Note** | The source repo contains `LeanKernel.Learning` with `FactExtractionStep.cs`; the rebuilt architecture consolidates all memory logic into `LeanKernel.Logic`. Fact extraction from conversation turns is **in-scope** for porting into `LeanKernel.Logic` as a new service. |
+| **Note** | Commit `5033dafcbe48a9b364941dc37383791bd99110a6` contains `LeanKernel.Learning` with `FactExtractionStep.cs`; the rebuilt architecture consolidates all memory logic into `LeanKernel.Logic`. Fact extraction from conversation turns is **in-scope** for porting into `LeanKernel.Logic` as a new service. |
 
 ---
 
@@ -24,7 +24,7 @@
 
 That logic lives today inside scheduler-oriented code in `~/source/repos/leankernel/src/LeanKernel.Scheduler/JobExecutor.cs`. It is useful, but it is in the wrong place for the rebuilt runtime and is mixed with maintenance-job concerns such as retirement planning and job execution bookkeeping.
 
-**Additionally, the source repo's `LeanKernel.Learning/FactExtractionStep.cs` extracts facts from conversation turns using an LLM and seeds `# Learned Fact` pages.** The rebuilt architecture consolidates all memory logic into `LeanKernel.Logic` — there is no separate `LeanKernel.Learning` project.
+**Additionally, commit `5033dafcbe48a9b364941dc37383791bd99110a6`'s `LeanKernel.Learning/FactExtractionStep.cs` extracts facts from conversation turns using an LLM and seeds `# Learned Fact` pages.** The rebuilt architecture consolidates all memory logic into `LeanKernel.Logic` — there is no separate `LeanKernel.Learning` project.
 
 This PRD defines how to import and adapt the reusable 5W1H memory logic **and** the fact extraction capability into `src/Common/LeanKernel.Logic` so the runtime can:
 
@@ -81,7 +81,7 @@ The rebuild needs the reusable logic extracted into runtime-friendly services th
 
 ### 3.1 Goals
 
-- **G1 - Reuse the proven 5W1H page shape** from the source repo in `LeanKernel.Logic`.
+- **G1 - Reuse the proven 5W1H page shape** from commit `5033dafcbe48a9b364941dc37383791bd99110a6` in `LeanKernel.Logic`.
 - **G2 - Separate reusable logic from scheduler concerns** so the same normalization can run on writeback, repair, or batch maintenance.
 - **G3 - Add dimension identification** so each page can be organized by its strongest dimensions, not just stored as free text.
 - **G4 - Use a small LLM reasoning step for dimension extraction and graph building** when deterministic signals are incomplete or ambiguous.
@@ -140,7 +140,7 @@ Success for this phase means:
 
 ## 4. Source Logic to Import
 
-The source repo already contains the core behaviors we want.
+Commit `5033dafcbe48a9b364941dc37383791bd99110a6` already contains the core behaviors we want.
 
 ### 4.1 Directly reusable concepts
 
@@ -252,7 +252,7 @@ Add a small service set under `src/Common/LeanKernel.Logic`:
 - `MemoryPageParser`
 - `FactExtractionService`
 
-Keep the public contract minimal. The implementation may use internal records similar to the source repo's `FactPageSnapshot`, `RelatedEvidencePage`, and `PageNormalizationResult`.
+Keep the public contract minimal. The implementation may use internal records similar to commit `5033dafcbe48a9b364941dc37383791bd99110a6`'s `FactPageSnapshot`, `RelatedEvidencePage`, and `PageNormalizationResult`.
 
 ### 6.3 Proposed core models
 
@@ -569,7 +569,7 @@ Examples:
 - linking an action page to a place page when the place is implied in the fact text,
 - linking follow-up facts that continue the same event thread without exact string overlap.
 
-Use bounded selection similar to the source repo's related-evidence collector:
+Use bounded selection similar to commit `5033dafcbe48a9b364941dc37383791bd99110a6`'s related-evidence collector:
 
 - always keep explicit links,
 - cap same-session links,
@@ -782,8 +782,8 @@ Use source-inspired markdown fixtures to verify exact rendered page shape.
 
 ## 14. Implementation Notes
 
-- The imported logic should preserve the source repo's ordered 5W1H field contract exactly.
-- Use the source repo's deterministic formatting style as the baseline so pages remain comparable across repos. This applies to the `## 5W1H` and `## Normalization` blocks; the `## Dimensions` and `## Links` sections are additive and have no source equivalent (see §16, F7).
+- The imported logic should preserve commit `5033dafcbe48a9b364941dc37383791bd99110a6`'s ordered 5W1H field contract exactly.
+- Use commit `5033dafcbe48a9b364941dc37383791bd99110a6`'s deterministic formatting style as the baseline so pages remain comparable across repos. This applies to the `## 5W1H` and `## Normalization` blocks; the `## Dimensions` and `## Links` sections are additive and have no source equivalent (see §16, F7).
 - Keep records and helper methods internal unless another project needs them.
 - Prefer adapting the source algorithms rather than copying the entire scheduler class.
 - Treat dimension identification and page linking as first-class outputs of normalization, not optional extras.
@@ -796,7 +796,7 @@ Use source-inspired markdown fixtures to verify exact rendered page shape.
 The authoritative, dependency-ordered, and verifiable task list is the **Implementation Checklist in §17**. As a summary, implement the logic in this order:
 
 1. **Contracts, models, plumbing** (Phase 0)
-2. **`FactExtractionService`** — port `FactExtractionStep` from source repo (**LLM-required**, Phase 1)
+2. **`FactExtractionService`** — port `FactExtractionStep` from commit `5033dafcbe48a9b364941dc37383791bd99110a6` (**LLM-required**, Phase 1)
 3. `MemoryPageParser` + `MemoryPageRenderer` (Phase 2)
 4. `MemoryPageNormalizer` (Phase 3)
 5. `MemoryDimensionClassifier` (Phase 4)
@@ -811,7 +811,7 @@ Note: `MemoryPageLinker` precedes `MemoryGraphReasoner` because the deterministi
 
 ## 16. Architecture Review - Findings and Decisions
 
-This section records the review of architectural soundness and implementation completeness against the current worktree (`src/Common/LeanKernel.Logic`) and the source repo. Items marked **Decision** are binding for implementation and are referenced by the checklist in §17.
+This section records the review of architectural soundness and implementation completeness against the current repository (`src/Common/LeanKernel.Logic`) and commit `5033dafcbe48a9b364941dc37383791bd99110a6`. Items marked **Decision** are binding for implementation and are referenced by the checklist in §17.
 
 ### 16.1 Soundness summary
 

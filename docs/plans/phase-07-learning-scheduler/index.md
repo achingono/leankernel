@@ -9,7 +9,7 @@
 - [Evidence](evidence.md)
 
 ## Objective
-Add background self-improvement and time-based automation to the rebuild: a post-turn learning pipeline that mines completed turns for facts, identity intent, capability gaps, and engagement signals and writes results back into knowledge/memory; identity-onboarding gap detection and directive building driven by learned intent; and a scheduler that runs cron-defined proactive jobs. This ports the source repo's `LeanKernel.Learning`, identity-onboarding pieces from `LeanKernel.Context`, and `LeanKernel.Scheduler`.
+Add background self-improvement and time-based automation to the rebuild: a post-turn learning pipeline that mines completed turns for facts, identity intent, capability gaps, and engagement signals and writes results back into knowledge/memory; identity-onboarding gap detection and directive building driven by learned intent; and a scheduler that runs cron-defined proactive jobs. This ports the `LeanKernel.Learning`, identity-onboarding pieces from `LeanKernel.Context`, and `LeanKernel.Scheduler` behavior from commit `5033dafcbe48a9b364941dc37383791bd99110a6`.
 
 ## Scope
 This phase covers asynchronous, out-of-band processing that reacts to turns and time, plus the onboarding intelligence that depends on learning. It reuses the memory pipeline, knowledge service, and identity partitioning. It does not cover the synchronous turn pipeline internals (Phase 03), model routing (Phase 04), tools (Phase 05), channels (Phase 06), diagnostics persistence/UI (Phase 08), or Blazor UI (Phase 09).

@@ -1,6 +1,6 @@
 # Phase 02 Review Findings
 
-Contextual / architectural review performed 2026-07-13 against the current worktree
+Contextual / architectural review performed 2026-07-13 against the current repository
 (`src/Services/LeanKernel.Gateway`, `src/Common/LeanKernel.Logic`, `src/Common/LeanKernel.Data`,
 `src/Common/LeanKernel.Core`). This pass deliberately excludes anything SonarQube already covers
 (style, coverage, CVEs, generic hotspots) and focuses on business logic, trust boundaries,

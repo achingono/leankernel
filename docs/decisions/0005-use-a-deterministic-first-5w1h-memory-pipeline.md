@@ -5,7 +5,7 @@
 
 ## Context
 
-The source repository already had reusable 5W1H page-shaping logic, but it lived inside scheduler-oriented code. The rebuild needed that capability inside `LeanKernel.Logic`, without importing scheduler orchestration.
+Commit `5033dafcbe48a9b364941dc37383791bd99110a6` already had reusable 5W1H page-shaping logic, but it lived inside scheduler-oriented code. The rebuild needed that capability inside `LeanKernel.Logic`, without importing scheduler orchestration.
 
 The planning sessions then extended that requirement: memory pages should not only normalize 5W1H fields, but also identify dominant dimensions, organize pages by those dimensions, and form a navigable graph. At the same time, the logs repeatedly rejected an LLM-only design because the pipeline still needed to work when the small model was disabled or failed.
 
@@ -49,7 +49,7 @@ Tradeoffs:
 ## Evidence From Session Logs
 
 - OpenCode session `ses_0a81f451effevpB4Agt5S5J2iJ`, `2026-07-12`, "PRD for 5W1H memory logic adaptation"
-  - Chose to import reusable 5W1H logic from the source repo into `LeanKernel.Logic` without dragging scheduler behavior into the new runtime.
+  - Chose to import reusable 5W1H logic from commit `5033dafcbe48a9b364941dc37383791bd99110a6` into `LeanKernel.Logic` without dragging scheduler behavior into the new runtime.
   - Expanded the design to include key-dimension identification, canonical organization by primary dimension, deterministic cross links, and page graphing.
   - Explicitly added small-LLM reasoning for ambiguous dimension extraction and graph building, while keeping deterministic fallback mandatory.
 - Copilot session `2e34b49f-0e5c-4dcb-9912-69fa3fe84acc`, `2026-07-12`, "Review PRD for Architecture and Implementation"

@@ -1,6 +1,6 @@
 # Phase 16 Deep Review Findings
 
-Contextual and architectural review performed on 2026-07-15 against the current worktree
+Contextual and architectural review performed on 2026-07-15 against the current repository
 for identity linking/unlinking behavior in:
 
 - `src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs`

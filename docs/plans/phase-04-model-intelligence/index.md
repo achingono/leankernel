@@ -9,7 +9,7 @@
 - [Evidence](evidence.md)
 
 ## Objective
-Add intelligent model selection and response-quality behavior to the rebuild's turn runtime so the `leankernel` agent can route turns to the most appropriate model, optionally shadow-compare candidates, gate low-quality outputs, enhance responses with citations/synthesis, degrade gracefully when providers are unhealthy, and orchestrate worker agents as tools. This ports the source repo's `Routing`, `Quality`, `Enhancement`, `Resilience`, and `Orchestration` behavior onto the Phase 03 pipeline while staying provider-agnostic through LiteLLM/`IChatClient`.
+Add intelligent model selection and response-quality behavior to the rebuild's turn runtime so the `leankernel` agent can route turns to the most appropriate model, optionally shadow-compare candidates, gate low-quality outputs, enhance responses with citations/synthesis, degrade gracefully when providers are unhealthy, and orchestrate worker agents as tools. This ports the behavior from commit `5033dafcbe48a9b364941dc37383791bd99110a6` (`Routing`, `Quality`, `Enhancement`, `Resilience`, and `Orchestration`) onto the Phase 03 pipeline while staying provider-agnostic through LiteLLM/`IChatClient`.
 
 ## Scope
 This phase builds on the explicit turn pipeline from Phase 03. It covers model strategy selection, shadow routing, output quality gating, response post-processing, degradation policy, and multi-agent orchestration. It does not add new tools, channels, learning, scheduling, diagnostics UI, or Blazor UI.

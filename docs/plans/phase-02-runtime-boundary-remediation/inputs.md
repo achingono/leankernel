@@ -5,7 +5,7 @@ _List every document, data source, or artefact that must exist before this phase
 
 | Input | Source | Owner |
 |---|---|---|
-| Layer-by-layer review findings dated 2026-07-13 | OpenCode review conversation in this worktree session | OpenCode |
+| Layer-by-layer review findings dated 2026-07-13 | OpenCode review conversation in the repository session | OpenCode |
 | Identity partitioning feature doc | `docs/features/identity-partitioning.md` | repository owner |
 | ADR 0002 persisted identity partitioning | `docs/decisions/0002-partition-runtime-state-by-persisted-identities.md` | repository owner |
 | ADR 0003 transcript vs runtime separation | `docs/decisions/0003-separate-transcript-sessions-from-agent-runtime-state.md` | repository owner |

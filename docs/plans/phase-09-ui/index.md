@@ -9,7 +9,7 @@
 - [Evidence](evidence.md)
 
 ## Objective
-Deliver the operator- and user-facing web UI for the rebuild as a Blazor Server surface hosted by the gateway: a chat experience, a diagnostics explorer, an admin/governance console, a knowledge browser, and an onboarding wizard. This ports the source repo's `LeanKernel.Gateway` Blazor Components/Pages and their backing UI services, consuming the runtime, diagnostics, knowledge, and onboarding capabilities delivered in earlier phases.
+Deliver the operator- and user-facing web UI for the rebuild as a Blazor Server surface hosted by the gateway: a chat experience, a diagnostics explorer, an admin/governance console, a knowledge browser, and an onboarding wizard. This ports the `LeanKernel.Gateway` Blazor Components/Pages and their backing UI services from commit `5033dafcbe48a9b364941dc37383791bd99110a6`, consuming the runtime, diagnostics, knowledge, and onboarding capabilities delivered in earlier phases.
 
 ## Scope
 This phase is the presentation layer only; it consumes existing runtime/diagnostics/knowledge/onboarding APIs and services rather than reimplementing them. It replaces the current Development-only DevUI with real product UI. It does not add new runtime behavior beyond thin UI-backing services.

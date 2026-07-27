@@ -23,6 +23,6 @@
 - Source repository behavioral references: `~/source/repos/leankernel/src/LeanKernel.Learning/*.cs`, `LeanKernel.Scheduler/*.cs`, `LeanKernel.Context/Identity/*.cs`
 
 ## Input Validation Checklist
-- [x] All required inputs in the current implementation worktree
+- [x] All required inputs in the current implementation repository
 - [ ] Phase 03 turn pipeline completion hook verified
 - [ ] `FactExtractionService` operational and testable

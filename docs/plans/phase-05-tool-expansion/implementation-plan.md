@@ -39,9 +39,9 @@
 
 ### Adaptation Strategy
 
-The source repo uses a monolithic `LeanKernelConfig` with sub-sections. The worktree uses separate typed configs (`FileSettings`, `ToolSettings`, `AgentSettings`). Each tool must be adapted:
+Commit `5033dafcbe48a9b364941dc37383791bd99110a6` uses a monolithic `LeanKernelConfig` with sub-sections. The current repository uses separate typed configs (`FileSettings`, `ToolSettings`, `AgentSettings`). Each tool must be adapted:
 
-| Source Pattern | Worktree Equivalent |
+| Source Pattern | Current Equivalent |
 |---|---|
 | `LeanKernelConfig.FileSystem.AllowedRoot` | `FileSettings.RootPath` |
 | `LeanKernelConfig.FileSystem.ScratchRoot` | New: `FileSettings.ScratchRoot` |
@@ -50,10 +50,10 @@ The source repo uses a monolithic `LeanKernelConfig` with sub-sections. The work
 | `LeanKernelConfig.FileSystem.PythonExecutable` | New: `FileSettings.PythonExecutable` |
 | `LeanKernelConfig.DatabaseQuery` | New: `ToolSettings.DatabaseQuery` |
 | `LeanKernelConfig.Webwright` | New: `ToolSettings.Webwright` |
-| `ToolArgumentReader.GetString()` returns `""` | Worktree returns `null` — all null checks must use `string.IsNullOrWhiteSpace()` |
-| `ToolArgumentReader.GetInt32OrDefault()` | Worktree has `GetInt()` returning `int?` |
-| `ToolArgumentReader.GetBoolOrDefault()` | Worktree has `GetBool()` returning `bool?` |
-| `ToolArgumentReader.GetObjectDictionary()` | Worktree has `GetJson()` returning string |
+| `ToolArgumentReader.GetString()` returns `""` | Current equivalent returns `null` — all null checks must use `string.IsNullOrWhiteSpace()` |
+| `ToolArgumentReader.GetInt32OrDefault()` | Current equivalent has `GetInt()` returning `int?` |
+| `ToolArgumentReader.GetBoolOrDefault()` | Current equivalent has `GetBool()` returning `bool?` |
+| `ToolArgumentReader.GetObjectDictionary()` | Current equivalent has `GetJson()` returning string |
 | Namespace `LeanKernel.Tools.BuiltIn.*` | `LeanKernel.Logic.Tools.BuiltIn.*` |
 
 ### Step 1: Extend Configuration Models
