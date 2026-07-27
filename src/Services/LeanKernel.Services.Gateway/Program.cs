@@ -94,6 +94,7 @@ builder.Services.TryAddScoped<IPrincipal>(provider =>
     return accessor.Principal ?? new GenericPrincipal(new GenericIdentity(string.Empty), []);
 });
 builder.Services.TryAddSingleton<IHostNameAccessor, HostNameAccessor>();
+builder.Services.TryAddScoped<ISecurityTokenGenerator, JwtSecurityTokenGenerator>();
 
 builder.Services.AddScoped<IIdentityResolver, IdentityResolver>();
 builder.Services.AddScoped<IPermit, RequestContextPermit>();

@@ -22,6 +22,7 @@ public static class IServiceCollectionExtensions
     {
         services.TryAddScoped<ISaveChangesInterceptor, AuditableInterceptor>();
         services.TryAddScoped<ISaveChangesInterceptor, RecyclableInterceptor>();
+        services.TryAddScoped<ISaveChangesInterceptor, SenderInterceptor>();
 
         static void ConfigureFactoryOptions(DbContextOptionsBuilder option, Action<DbContextOptionsBuilder> configure)
         {
