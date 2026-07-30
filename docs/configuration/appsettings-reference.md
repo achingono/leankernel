@@ -129,6 +129,7 @@ learning and scheduler service.
 | `Identity:Token:PersistentTimeoutInDays` | Persistent token expiry | `365` |
 | `Identity:OpenId:Authority` | OIDC authority for external JWT validation | `""` |
 | `Identity:OpenId:ClientId` | OIDC client id used during validation | `""` |
+| `Identity:AllowGuestFallback` | When `true`, unauthenticated requests fall back to a guest/anonymous identity instead of being rejected with 401. Defaults to `false`. | `false` |
 | `Identity:TrustedProxies` | Known proxy/network CIDR ranges for forwarded headers | `[]` |
 
 ## CORS

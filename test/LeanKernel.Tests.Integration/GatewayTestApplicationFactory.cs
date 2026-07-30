@@ -27,6 +27,7 @@ public class GatewayTestApplicationFactory : WebApplicationFactory<Program>
                 ["OpenAI:ApiKey"] = "test-key",
                 ["OpenAI:BaseUrl"] = "http://localhost:1",
                 ["OpenAI:DefaultModel"] = "test-model",
+                ["Identity:AllowGuestFallback"] = "true",
                 ["Agents:DefaultName"] = "leankernel",
                 ["Agents:DefaultDescription"] = "Test agent",
                 ["Agents:DefaultInstructions"] = "You are a test assistant.",

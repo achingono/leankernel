@@ -23,6 +23,9 @@ public class TenantResolutionMiddlewareTests
     private static IOptions<IdentitySettings> DefaultSettings =>
         Options.Create(new IdentitySettings());
 
+    private static IOptions<IdentitySettings> GuestFallbackSettings =>
+        Options.Create(new IdentitySettings { AllowGuestFallback = true });
+
     // ─── C2: Fail-closed tenant resolution ───────────────────────────────────
 
     /// <summary>
@@ -195,12 +198,46 @@ public class TenantResolutionMiddlewareTests
 
         var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
 
-        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
+        await middleware.InvokeAsync(ctx, resolver.Object, GuestFallbackSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
         ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId);
         ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(guestUserId);
         ctx.Items[TenantResolutionMiddleware.PersonIdKey].Should().Be(guestUserId);
         ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
+    }
+
+    /// <summary>
+    /// Phase 24: Anonymous requests are blocked with 401 when AllowGuestFallback is false.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
+    [Fact]
+    public async Task InvokeAsync_AnonymousUser_WhenFallbackDisabled_Returns401()
+    {
+        var tenantId = Guid.NewGuid();
+
+        var resolver = new Mock<IIdentityResolver>();
+        resolver
+            .Setup(r => r.ResolveTenantAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TenantEntity { Id = tenantId, Name = "T", HostName = "t.test", IsActive = true });
+
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Path = "/v1/responses";
+        ctx.Response.Body = new System.IO.MemoryStream();
+
+        ctx.Features.Set<ISessionFeature>(new TestSessionFeature());
+
+        var nextInvoked = false;
+        var middleware = new TenantResolutionMiddleware(_ =>
+        {
+            nextInvoked = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
+
+        ctx.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized,
+            because: "anonymous requests must be blocked when AllowGuestFallback is false");
+        nextInvoked.Should().BeFalse("next middleware must not run when anonymous fallback is blocked");
     }
 
     [Fact]

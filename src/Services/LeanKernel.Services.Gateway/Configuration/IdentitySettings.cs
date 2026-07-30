@@ -34,4 +34,11 @@ public class IdentitySettings
     /// Gets or sets the settings required for OpenID Connect authentication.
     /// </summary>
     public OpenIdSettings OpenId { get; set; } = new OpenIdSettings();
+
+    /// <summary>
+    /// Gets or sets a value indicating whether unauthenticated requests should fall back
+    /// to a guest/anonymous identity. Defaults to <c>false</c> so that production
+    /// deployments fail closed with 401 unless explicitly enabled.
+    /// </summary>
+    public bool AllowGuestFallback { get; set; }
 }

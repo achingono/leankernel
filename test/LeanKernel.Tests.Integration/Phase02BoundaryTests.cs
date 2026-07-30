@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 
 using FluentAssertions;
 
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+
 using Xunit;
 
 namespace LeanKernel.Tests.Integration;
@@ -14,6 +17,7 @@ namespace LeanKernel.Tests.Integration;
 public class Phase02BoundaryTests : IClassFixture<GatewayTestApplicationFactory>
 {
     private readonly HttpClient _client;
+    private readonly GatewayTestApplicationFactory _factory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Phase02BoundaryTests"/> class.
@@ -21,6 +25,7 @@ public class Phase02BoundaryTests : IClassFixture<GatewayTestApplicationFactory>
     /// </summary>
     public Phase02BoundaryTests(GatewayTestApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -99,5 +104,37 @@ public class Phase02BoundaryTests : IClassFixture<GatewayTestApplicationFactory>
         // The endpoint should still respond (not error), and must NOT return 403.
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden,
             because: "forged tokens are rejected by the current auth path");
+    }
+
+    /// <summary>
+    /// Phase 24: Anonymous requests return 401 when AllowGuestFallback is false.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> representing the asynchronous unit test.</returns>
+    [Fact]
+    public async Task AnonymousRequest_WhenFallbackDisabled_Returns401()
+    {
+        using var overriddenFactory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((context, config) =>
+            {
+                config.AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["Identity:AllowGuestFallback"] = "false"
+                    });
+            });
+        });
+
+        using var client = overriddenFactory.CreateClient();
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses")
+        {
+            Content = JsonContent.Create(new { model = "test-model", input = "hello" })
+        };
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            because: "anonymous requests must be rejected with 401 when AllowGuestFallback is false");
     }
 }

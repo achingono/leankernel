@@ -138,10 +138,24 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         }
         else
         {
+            var settings = identitySettings.Value;
+
+            if (!settings.AllowGuestFallback)
+            {
+                logger.LogWarning(
+                    "Anonymous request blocked by configuration: AllowGuestFallback is false. Tenant={TenantId}, Host={Host}",
+                    hostTenant.Id, host);
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
+            logger.LogWarning(
+                "Anonymous request allowed via guest fallback (Path C): Tenant={TenantId}, Host={Host}",
+                hostTenant.Id, host);
+
             context.Session.SetString(SessionInitMarker, "1");
 
             var sessionId = context.Session.Id;
-            var settings = identitySettings.Value;
             var guestUser = await resolver.ResolveGuestUserAsync(
                 hostTenant.Id, settings.AnonymousUserName, sessionId, cancellationToken);
             userId = guestUser.Id;
