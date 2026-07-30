@@ -25,23 +25,22 @@ public class SenderInterceptor : ISaveChangesInterceptor
         DbContextEventData eventData,
         InterceptionResult<int> result)
     {
-        var entries = eventData.Context?.ChangeTracker.Entries() ?? Enumerable.Empty<EntityEntry>();
-
-        foreach (var entry in entries)
+        var context = eventData.Context;
+        if (context is null)
         {
-            if (entry.Entity is ChannelSenderBindingEntity entity)
-            {
-                switch (entry.State)
-                {
-                    case EntityState.Added:
-                    case EntityState.Modified:
-                        if (string.IsNullOrWhiteSpace(entity.BearerToken))
-                        {
-                            entity.BearerToken = this.securityTokenGenerator.GenerateToken(entity, false);
-                        }
+            return result;
+        }
 
-                        break;
-                }
+        foreach (var entry in context.ChangeTracker.Entries())
+        {
+            if (entry.Entity is ChannelSenderBindingEntity entity
+                && entry.State is EntityState.Added or EntityState.Modified
+                && string.IsNullOrWhiteSpace(entity.BearerToken))
+            {
+                context.Entry(entity).Reference(e => e.User).Load();
+                context.Entry(entity).Reference(e => e.Tenant).Load();
+                context.Entry(entity).Reference(e => e.Channel).Load();
+                entity.BearerToken = this.securityTokenGenerator.GenerateToken(entity, true);
             }
         }
 

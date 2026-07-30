@@ -31,6 +31,12 @@ Code anchors:
 - [`../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs`](../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs)
 - [`../../src/Services/LeanKernel.Gateway/Providers/IdentityIsolationKeyProvider.cs`](../../src/Services/LeanKernel.Gateway/Providers/IdentityIsolationKeyProvider.cs)
 
+## Silent Anonymous Fallback
+
+When JWT validation fails (e.g., stale bearer token after a signing-key change), `TenantResolutionMiddleware` does **not** reject the request. `context.User.Identity.IsAuthenticated` is `false`, and the middleware falls through to Path C — the anonymous/guest path. A guest `UserEntity` is created with `FullName = "anonymous"` (from `Identity:AnonymousUserName`), and the identity context injected into the model prompt reads `full_name: anonymous`.
+
+This is not logged as an error, making it appear as though the model doesn't know the user's name. See [`docs/decisions/0006-manage-jwt-signing-key-for-bearer-token-durability.md`](../decisions/0006-manage-jwt-signing-key-for-bearer-token-durability.md) for details and fix.
+
 ## Where It Is Enforced
 
 - chat history ownership checks

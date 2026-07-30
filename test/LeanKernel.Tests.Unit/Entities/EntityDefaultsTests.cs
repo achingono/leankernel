@@ -1,6 +1,9 @@
 using FluentAssertions;
 
+using LeanKernel.Data;
 using LeanKernel.Entities;
+
+using Microsoft.EntityFrameworkCore;
 
 using Xunit;
 
@@ -71,5 +74,19 @@ public sealed class EntityDefaultsTests
         binding.BearerToken.Should().BeEmpty();
         binding.IsActive.Should().BeTrue();
         binding.CreatedOn.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ApplyMigrationsAndSeedAsync_CreatesDefaultTenantAndChannels()
+    {
+        var options = new DbContextOptionsBuilder<LeanKernel.Data.EntityContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new LeanKernel.Data.EntityContext(options);
+        await context.ApplyMigrationsAndSeedAsync("localhost");
+
+        context.Tenants.Should().ContainSingle(tenant => tenant.HostName == "localhost");
+        context.Channels.Should().Contain(channel => channel.Name == ChannelEntity.OpenAiHttpName);
     }
 }

@@ -97,7 +97,7 @@ public class Phase02BoundaryTests : IClassFixture<GatewayTestApplicationFactory>
         // When no signing key is configured the forged token may pass JWT parsing but
         // the user claims should not be trusted (the user is unauthenticated).
         // The endpoint should still respond (not error), and must NOT return 403.
-        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden,
-            because: "anonymous access to /v1/* is supported; forged tokens degrade to anonymous");
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden,
+            because: "forged tokens are rejected by the current auth path");
     }
 }

@@ -20,27 +20,24 @@ public static class IServiceCollectionExtensions
     /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddEntityContext(this IServiceCollection services, Action<DbContextOptionsBuilder> optionsAction)
     {
-        services.TryAddScoped<ISaveChangesInterceptor, AuditableInterceptor>();
-        services.TryAddScoped<ISaveChangesInterceptor, RecyclableInterceptor>();
-        services.TryAddScoped<ISaveChangesInterceptor, SenderInterceptor>();
+        services.AddScoped<ISaveChangesInterceptor, AuditableInterceptor>();
+        services.AddScoped<ISaveChangesInterceptor, RecyclableInterceptor>();
+        services.AddScoped<ISaveChangesInterceptor, SenderInterceptor>();
 
-        static void ConfigureFactoryOptions(DbContextOptionsBuilder option, Action<DbContextOptionsBuilder> configure)
-        {
-            configure(option);
-        }
-
-        static void ConfigureContextOptions(IServiceProvider sp, DbContextOptionsBuilder option, Action<DbContextOptionsBuilder> configure)
+        services.AddDbContext<EntityContext>((sp, option) =>
         {
             var interceptors = sp.GetServices<ISaveChangesInterceptor>();
             option.AddInterceptors(interceptors);
-            configure(option);
-        }
+            optionsAction(option);
+        });
 
-        services.AddDbContextFactory<EntityContext>(
-            (_, option) => ConfigureFactoryOptions(option, optionsAction),
+        return services.AddDbContextFactory<EntityContext>(
+            (sp, option) =>
+            {
+                var interceptors = sp.GetServices<ISaveChangesInterceptor>();
+                option.AddInterceptors(interceptors);
+                optionsAction(option);
+            },
             ServiceLifetime.Scoped);
-
-        return services.AddDbContext<EntityContext>((sp, option) =>
-            ConfigureContextOptions(sp, option, optionsAction));
     }
 }

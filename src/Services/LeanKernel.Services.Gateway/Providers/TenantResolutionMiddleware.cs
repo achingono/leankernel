@@ -20,10 +20,10 @@ namespace LeanKernel.Services.Gateway.Providers;
 /// </remarks>
 public sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
-    private const string ChannelNameClaimType = "lk_channel";
-    private const string ChannelTenantIdClaimType = "lk_tenant_id";
-    private const string ChannelSenderIssuerClaimType = "lk_sender_iss";
-    private const string ChannelSenderSubjectClaimType = "lk_sender_sub";
+    internal const string ChannelNameClaimType = "lk_channel";
+    internal const string ChannelTenantIdClaimType = "lk_tenant_id";
+    internal const string ChannelSenderIssuerClaimType = "lk_sender_iss";
+    internal const string ChannelSenderSubjectClaimType = "lk_sender_sub";
 
     /// <summary>Key used to store the resolved tenant identifier in <see cref="HttpContext.Items"/>.</summary>
     public const string TenantKey = "LK.TenantId";

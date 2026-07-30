@@ -1,8 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
-using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Services.Gateway.Configuration;
 
@@ -18,21 +18,19 @@ public class JwtSecurityTokenGenerator : ISecurityTokenGenerator
 {
     private SecurityTokenHandler SecurityTokenHandler { get; }
 
-    private EntityContext EntityContext { get; }
-
     private IdentitySettings Settings { get; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JwtSecurityTokenGenerator"/> class with the specified dependencies.
     /// </summary>
-    /// <param name="entityContext">The entity context.</param>
     /// <param name="settings">The identity settings.</param>
-    public JwtSecurityTokenGenerator(EntityContext entityContext, IOptions<IdentitySettings> settings)
+    public JwtSecurityTokenGenerator(IOptions<IdentitySettings> settings)
     {
         SecurityTokenHandler = new JwtSecurityTokenHandler();
-        EntityContext = entityContext;
         Settings = settings.Value;
     }
+
+    private static readonly byte[] DevSecretKey = RandomNumberGenerator.GetBytes(32);
 
     /// <summary>
     /// Generates a security token for the specified <see cref="ChannelSenderBindingEntity"/> with an option to make it persistent.
@@ -42,20 +40,21 @@ public class JwtSecurityTokenGenerator : ISecurityTokenGenerator
     /// <returns>The generated security token.</returns>
     public string GenerateToken(ChannelSenderBindingEntity sender, bool isPersistent)
     {
-        var secretKey = Encoding.UTF8.GetBytes(Settings.Token.SecretKey);
+        var secretKey = string.IsNullOrWhiteSpace(Settings.Token.SecretKey)
+            ? DevSecretKey
+            : Encoding.UTF8.GetBytes(Settings.Token.SecretKey);
         var securityKey = new SymmetricSecurityKey(secretKey);
         var signinCredentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);
-        var entry = EntityContext.ChannelSenderBindings.Entry(sender);
         var notBefore = DateTime.UtcNow;
         var expires = isPersistent
             ? notBefore.AddDays(Settings.Token.PersistentTimeoutInDays)
             : notBefore.AddMinutes(Settings.Token.TimeoutMinutes);
-        var claims = GenerateClaimsWithRights(entry.Entity);
+        var claims = GenerateClaimsWithRights(sender);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Issuer = Settings.Token.Issuer,
-            Audience = Settings.Token.Audience,
+            Issuer = string.IsNullOrWhiteSpace(Settings.Token.Issuer) ? "leankernel-dev" : Settings.Token.Issuer,
+            Audience = string.IsNullOrWhiteSpace(Settings.Token.Audience) ? "leankernel-dev" : Settings.Token.Audience,
             Subject = new ClaimsIdentity(claims),
             NotBefore = notBefore,
             Expires = expires,
@@ -85,6 +84,12 @@ public class JwtSecurityTokenGenerator : ISecurityTokenGenerator
         yield return new Claim(ClaimTypes.GivenName, sender.User.FirstName, ClaimValueTypes.String);
         yield return new Claim(ClaimTypes.Surname, sender.User.LastName, ClaimValueTypes.String);
         yield return new Claim(ClaimTypes.Email, sender.User.Email, ClaimValueTypes.Email);
+
+        // Claims required by <see cref="TenantResolutionMiddleware"/> to resolve the tenant for the current request.
+        yield return new Claim(TenantResolutionMiddleware.ChannelTenantIdClaimType, sender.Tenant.Id.ToString(), ClaimValueTypes.String);
+        yield return new Claim(TenantResolutionMiddleware.ChannelNameClaimType, sender.Channel.Name, ClaimValueTypes.String);
+        yield return new Claim(TenantResolutionMiddleware.ChannelSenderIssuerClaimType, sender.Issuer, ClaimValueTypes.String);
+        yield return new Claim(TenantResolutionMiddleware.ChannelSenderSubjectClaimType, sender.Subject, ClaimValueTypes.String);
 
         // Rights for entities used in the normal chat flow and profile management.
         // A user can read, create, and update their own sessions and turns,

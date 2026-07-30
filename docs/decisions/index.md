@@ -11,3 +11,6 @@ These ADRs document decisions that repeatedly appeared during planning and imple
 - [0003 - Separate transcript sessions from durable agent runtime state](0003-separate-transcript-sessions-from-agent-runtime-state.md)
 - [0004 - Keep GBrain transport in Gateway and Logic provider-agnostic](0004-keep-gbrain-transport-in-gateway.md)
 - [0005 - Use a deterministic-first 5W1H memory pipeline with bounded small-model refinement](0005-use-a-deterministic-first-5w1h-memory-pipeline.md)
+- [0006 - Manage JWT signing key for bearer token durability](0006-manage-jwt-signing-key-for-bearer-token-durability.md)
+- [0007 - Use `Add` not `TryAdd` for multi-implementation service registration](0007-use-add-not-tryadd-for-multi-implementation-service-registration.md)
+- [0008 - Use persistent tokens for pre-provisioned channel bindings](0008-use-persistent-tokens-for-preprovisioned-channel-bindings.md)

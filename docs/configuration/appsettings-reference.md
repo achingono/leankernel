@@ -120,6 +120,15 @@ learning and scheduler service.
 
 | Key | Purpose | Default |
 |-----|---------|---------|
+| `Identity:AnonymousUserName` | UserName and FullName assigned to guest user entities | `"anonymous"` |
+| `Identity:AnonymousFullName` | FullName displayed on the Badge for guest users | `"Anonymous User"` |
+| `Identity:Token:SecretKey` | HMAC-SHA256 key for JWT signing. When empty, `JwtSecurityTokenGenerator` uses a random key generated at process startup — bearer tokens will not survive restarts. | `""` |
+| `Identity:Token:Issuer` | JWT issuer claim | `"leankernel-dev"` |
+| `Identity:Token:Audience` | JWT audience claim | `"leankernel-dev"` |
+| `Identity:Token:TimeoutMinutes` | Non-persistent token expiry | `30` |
+| `Identity:Token:PersistentTimeoutInDays` | Persistent token expiry | `365` |
+| `Identity:OpenId:Authority` | OIDC authority for external JWT validation | `""` |
+| `Identity:OpenId:ClientId` | OIDC client id used during validation | `""` |
 | `Identity:TrustedProxies` | Known proxy/network CIDR ranges for forwarded headers | `[]` |
 
 ## CORS

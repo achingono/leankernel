@@ -269,6 +269,7 @@ app.MapDocumentUpload();
 
 if (app.Environment.IsDevelopment())
 {
+    app.MapDevSeedEndpoint();
     app.MapDevUI();
 }
 

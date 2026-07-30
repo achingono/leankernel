@@ -190,8 +190,13 @@ public sealed class IdentityResolver(
     {
         var issuer = principal.FindFirst(Constants.Claims.ChannelSenderIssuer)?.Value;
         var subject = principal.FindFirst(Constants.Claims.ChannelSenderSubject)?.Value;
+        var tenantClaim = principal.FindFirst("lk_tenant_id")?.Value;
+        var channelClaim = principal.FindFirst("lk_channel")?.Value;
 
-        if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(subject))
+        if (string.IsNullOrWhiteSpace(issuer)
+            || string.IsNullOrWhiteSpace(subject)
+            || !Guid.TryParse(tenantClaim, out var tenantId)
+            || string.IsNullOrWhiteSpace(channelClaim))
         {
             return null;
         }
@@ -200,7 +205,13 @@ public sealed class IdentityResolver(
 
         var binding = await context.ChannelSenderBindings
             .AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Issuer == issuer && b.Subject == subject && b.IsActive, ct);
+            .Where(b => b.TenantId == tenantId && b.Issuer == issuer && b.Subject == subject && b.IsActive)
+            .Join(
+                context.Channels.AsNoTracking().Where(channel => channel.Name == channelClaim),
+                binding => binding.ChannelId,
+                channel => channel.Id,
+                (binding, channel) => binding)
+            .FirstOrDefaultAsync(ct);
 
         if (binding is null)
         {

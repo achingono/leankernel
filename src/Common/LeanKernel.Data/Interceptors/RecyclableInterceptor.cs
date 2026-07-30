@@ -1,8 +1,5 @@
 namespace LeanKernel.Data.Interceptors;
 
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Reflection;
-
 using LeanKernel;
 
 using Microsoft.EntityFrameworkCore;
@@ -42,11 +39,6 @@ public class RecyclableInterceptor : ISaveChangesInterceptor
                     auditable.UpdatedOn = DateTime.UtcNow;
                     auditable.UpdatedBy = this.permit.Badge;
                 }
-            }
-
-            if (entry.Entity.GetType().GetCustomAttributes<ComplexTypeAttribute>().Any())
-            {
-                entry.State = EntityState.Unchanged;
             }
         }
 
