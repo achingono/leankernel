@@ -3,6 +3,7 @@ using System.ClientModel;
 using LeanKernel;
 using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
+using LeanKernel.Logic.Diagnostics;
 using LeanKernel.Logic.Events;
 using LeanKernel.Logic.Memory;
 using LeanKernel.Logic.Providers;
@@ -132,6 +133,8 @@ public static class IServiceCollectionExtensions
         services.AddScoped<ITurnTelemetryCollector, TurnTelemetryCollector>();
         services.AddScoped<ITelemetryAggregationService, TelemetryAggregationService>();
         services.AddScoped<ITelemetryExportService, TelemetryExportService>();
+        services.AddScoped<IDiagnosticsCollector, DiagnosticsCollector>();
+        services.AddScoped<IHealthAggregator, HealthAggregator>();
         return services;
     }
 

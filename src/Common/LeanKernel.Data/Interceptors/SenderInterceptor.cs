@@ -3,7 +3,6 @@ namespace LeanKernel.Data.Interceptors;
 using LeanKernel.Entities;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 /// <summary>
@@ -48,12 +47,31 @@ public class SenderInterceptor : ISaveChangesInterceptor
     }
 
     /// <inheritdoc />
-    public ValueTask<InterceptionResult<int>> SavingChangesAsync(
+    public async ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
-        return ValueTask.FromResult(this.SavingChanges(eventData, result));
+        var context = eventData.Context;
+        if (context is null)
+        {
+            return result;
+        }
+
+        foreach (var entry in context.ChangeTracker.Entries())
+        {
+            if (entry.Entity is ChannelSenderBindingEntity entity
+                && entry.State is EntityState.Added or EntityState.Modified
+                && string.IsNullOrWhiteSpace(entity.BearerToken))
+            {
+                await context.Entry(entity).Reference(e => e.User).LoadAsync(cancellationToken);
+                await context.Entry(entity).Reference(e => e.Tenant).LoadAsync(cancellationToken);
+                await context.Entry(entity).Reference(e => e.Channel).LoadAsync(cancellationToken);
+                entity.BearerToken = this.securityTokenGenerator.GenerateToken(entity, true);
+            }
+        }
+
+        return result;
     }
 
     private readonly ISecurityTokenGenerator securityTokenGenerator;

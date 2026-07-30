@@ -67,7 +67,16 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
-builder.Services.Configure<OpenAISettings>(builder.Configuration.GetSection("OpenAI"));
+builder.Services
+    .AddOptions<OpenAISettings>()
+    .BindConfiguration("OpenAI")
+    .Validate(
+        settings =>
+            !string.IsNullOrWhiteSpace(settings.ApiKey)
+            && !string.IsNullOrWhiteSpace(settings.BaseUrl)
+            && Uri.TryCreate(settings.BaseUrl, UriKind.Absolute, out _),
+        "OpenAI settings are invalid.")
+    .ValidateOnStart();
 builder.Services.Configure<AgentSettings>(builder.Configuration.GetSection("Agents"));
 builder.Services.Configure<MemorySettings>(builder.Configuration.GetSection("OpenAI:Memory"));
 builder.Services.Configure<FactExtractionSettings>(builder.Configuration.GetSection("OpenAI:FactExtraction"));
@@ -84,6 +93,14 @@ builder.Services
     .ValidateOnStart();
 builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("Files"));
 builder.Services.Configure<GBrainSettings>(builder.Configuration.GetSection("GBrain"));
+builder.Services.Configure<DiagnosticsSettings>(builder.Configuration.GetSection("Diagnostics"));
+builder.Services
+    .AddOptions<HardeningSettings>()
+    .BindConfiguration("Hardening")
+    .Validate(
+        static settings => !settings.RequireApiKey || !string.IsNullOrWhiteSpace(settings.ApiKey),
+        "Hardening:ApiKey must be set when Hardening:RequireApiKey is true.")
+    .ValidateOnStart();
 builder.Services.Configure<EntityScopePolicies>(builder.Configuration.GetSection("Agents:EntityScopePolicies"));
 
 builder.Services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
@@ -163,8 +180,13 @@ builder.Services.AddAuthentication(Constants.Http.Headers.Bearer)
         }
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireAuthenticatedUser().RequireRole("Admin"));
+});
 builder.Services.AddHostedService<ChannelConfigurationValidatorHostedService>();
+builder.Services.AddHostedService<DiagnosticsCleanupHostedService>();
 
 builder.Services.AddCors(options =>
 {
@@ -249,6 +271,8 @@ if (agentToolSettings.Enabled)
 }
 
 app.UseForwardedHeaders();
+app.UseMiddleware<HardeningMiddleware>();
+app.UseMiddleware<DiagnosticsPersistenceMiddleware>();
 app.UseHttpsRedirection();
 app.UseCors("AllowLocal");
 app.UseSession();
@@ -266,6 +290,7 @@ app.MapProxiedOpenAIChatCompletions(Constants.Agent.DefaultName, "/v1/internal/c
 });
 
 app.MapDocumentUpload();
+app.MapDiagnosticsEndpoints();
 
 if (app.Environment.IsDevelopment())
 {

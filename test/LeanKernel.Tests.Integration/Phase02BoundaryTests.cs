@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 
 using FluentAssertions;
 
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 
 using Xunit;

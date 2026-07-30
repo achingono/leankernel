@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="LeanKernel.Tests.Unit" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Common\LeanKernel.Core\LeanKernel.Core.csproj" />
     <ProjectReference Include="..\..\Common\LeanKernel.Data\LeanKernel.Data.csproj" />
     <ProjectReference Include="..\..\Common\LeanKernel.Logic\LeanKernel.Logic.csproj" />

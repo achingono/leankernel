@@ -1,4 +1,4 @@
-﻿namespace LeanKernel.Data;
+namespace LeanKernel.Data;
 
 using LeanKernel.Entities;
 
@@ -22,6 +22,11 @@ public class EntityContext : DbContext
     /// Gets the persisted sessions.
     /// </summary>
     public DbSet<SessionEntity> Sessions => this.Set<SessionEntity>();
+
+    /// <summary>
+    /// Gets the persisted diagnostic entries.
+    /// </summary>
+    public DbSet<DiagnosticEntry> DiagnosticEntries => this.Set<DiagnosticEntry>();
 
     /// <summary>
     /// Gets the persisted conversation turns.
@@ -367,6 +372,19 @@ public class EntityContext : DbContext
             entity.HasKey(e => e.Name);
             entity.Property(e => e.Name).HasMaxLength(100);
             entity.HasIndex(e => e.UpdatedAt);
+        });
+
+        // DiagnosticEntry
+        modelBuilder.Entity<DiagnosticEntry>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CorrelationId).HasMaxLength(200);
+            entity.Property(e => e.Source).HasMaxLength(100);
+            entity.Property(e => e.Category).HasMaxLength(100);
+            entity.Property(e => e.PayloadJson).HasColumnType("text");
+            entity.HasIndex(e => e.CorrelationId);
+            entity.HasIndex(e => e.TurnId);
+            entity.HasIndex(e => e.CapturedAt);
         });
     }
 
