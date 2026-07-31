@@ -10,3 +10,4 @@ coverage-results*/
 __pycache__/
 sonar-reports/
 scripts/db/seed.sql
+Library/

@@ -447,7 +447,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
     {
         bytes = [];
         resolvedContentType = string.IsNullOrWhiteSpace(fallbackContentType)
-            ? "application/octet-stream"
+            ? Constants.ContentTypes.ApplicationOctetStream
             : fallbackContentType;
 
         var payload = fileDataUrl;

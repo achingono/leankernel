@@ -85,7 +85,7 @@ public static class FileSearchTool
                     {
                         ToolName = ToolName,
                         Success = false,
-                        Error = "Access denied: path is outside the allowed directory."
+                        Error = Constants.FileSystem.Errors.PathOutsideAllowedDirectory
                     };
                 }
 

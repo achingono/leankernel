@@ -71,7 +71,7 @@ public static class CsvXlsxReadWriteTool
                 var fullPath = FileSystemSupport.ResolveWithinRoot(fileSettings.RootPath, path);
                 if (fullPath is null)
                 {
-                    return Err("Access denied: path is outside the allowed directory");
+                    return Err(Constants.FileSystem.Errors.PathOutsideAllowedDirectory);
                 }
 
                 var format = ToolArgumentReader.GetString(args, "format");

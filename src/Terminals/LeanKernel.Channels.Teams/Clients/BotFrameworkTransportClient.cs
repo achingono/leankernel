@@ -159,7 +159,7 @@ public sealed class BotFrameworkTransportClient(
 
             var mediaType = !string.IsNullOrWhiteSpace(attachment.ContentType)
                 ? attachment.ContentType
-                : response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+                : response.Content.Headers.ContentType?.MediaType ?? Constants.ContentTypes.ApplicationOctetStream;
             var base64 = Convert.ToBase64String(bytes);
             return $"data:{mediaType};base64,{base64}";
         }

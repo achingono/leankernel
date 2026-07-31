@@ -32,25 +32,25 @@ public sealed class RequestContextPermit(
 
     /// <inheritdoc />
     public Guid UserId =>
-        this.Ctx?.Items[TenantResolutionMiddleware.UserIdKey] is Guid uid ? uid : Guid.Empty;
+        this.Ctx?.Items[Constants.Http.ContextItems.UserIdKey] is Guid uid ? uid : Guid.Empty;
 
     /// <inheritdoc />
     public Guid PersonId =>
-        this.Ctx?.Items[TenantResolutionMiddleware.PersonIdKey] is Guid pid
+        this.Ctx?.Items[Constants.Http.ContextItems.PersonIdKey] is Guid pid
             ? pid
             : this.UserId;
 
     /// <inheritdoc />
     public Guid TenantId =>
-        this.Ctx?.Items[TenantResolutionMiddleware.TenantKey] is Guid tid ? tid : Guid.Empty;
+        this.Ctx?.Items[Constants.Http.ContextItems.TenantKey] is Guid tid ? tid : Guid.Empty;
 
     /// <inheritdoc />
     public Guid ChannelId =>
-        this.Ctx?.Items[TenantResolutionMiddleware.ChannelIdKey] is Guid cid ? cid : Guid.Empty;
+        this.Ctx?.Items[Constants.Http.ContextItems.ChannelIdKey] is Guid cid ? cid : Guid.Empty;
 
     /// <inheritdoc />
     public Badge Badge =>
-        this.Ctx?.Items[TenantResolutionMiddleware.BadgeKey] is Badge badge
+        this.Ctx?.Items[Constants.Http.ContextItems.BadgeKey] is Badge badge
             ? badge
             : new Badge
             {

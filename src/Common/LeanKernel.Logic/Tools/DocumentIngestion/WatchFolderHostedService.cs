@@ -183,7 +183,7 @@ public sealed class WatchFolderHostedService : BackgroundService
             ".html" => "text/html",
             ".png" => "image/png",
             ".jpg" or ".jpeg" => "image/jpeg",
-            _ => "application/octet-stream",
+            _ => Constants.ContentTypes.ApplicationOctetStream,
         };
     }
 }

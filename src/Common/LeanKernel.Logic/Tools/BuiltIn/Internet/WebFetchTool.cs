@@ -208,7 +208,7 @@ public static class WebFetchTool
                 "image/bmp" => ".bmp",
                 "image/tiff" => ".tiff",
                 "application/pdf" => ".pdf",
-                "application/octet-stream" => string.IsNullOrWhiteSpace(urlExtension) ? ".bin" : urlExtension,
+                Constants.ContentTypes.ApplicationOctetStream => string.IsNullOrWhiteSpace(urlExtension) ? ".bin" : urlExtension,
                 _ => string.IsNullOrWhiteSpace(urlExtension) ? ".bin" : urlExtension
             };
         }

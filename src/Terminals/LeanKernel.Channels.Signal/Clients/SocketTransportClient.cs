@@ -85,7 +85,7 @@ public sealed class SocketTransportClient(
     /// <returns>A task representing the asynchronous operation.</returns>
     public async Task SendAsync(string account, string recipient, string text, IReadOnlyList<SignalTextStyle> textStyles, CancellationToken ct)
     {
-        var httpClient = httpClientFactory.CreateClient("signal-api");
+        var httpClient = httpClientFactory.CreateClient(Constants.HttpClientNames.SignalApi);
         var payload = new
         {
             number = account,
@@ -248,7 +248,7 @@ public sealed class SocketTransportClient(
 
     private async Task<IReadOnlyList<string>> DiscoverConfiguredAccountsAsync(CancellationToken ct)
     {
-        var httpClient = httpClientFactory.CreateClient("signal-api");
+        var httpClient = httpClientFactory.CreateClient(Constants.HttpClientNames.SignalApi);
 
         try
         {
@@ -313,7 +313,7 @@ public sealed class SocketTransportClient(
         {
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, settings.Value.TypingRequestTimeoutSeconds)));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-            var httpClient = httpClientFactory.CreateClient("signal-api");
+            var httpClient = httpClientFactory.CreateClient(Constants.HttpClientNames.SignalApi);
             using var request = new HttpRequestMessage(
                 stop ? HttpMethod.Delete : HttpMethod.Put,
                 $"/v1/typing-indicator/{Uri.EscapeDataString(account)}")
@@ -529,7 +529,7 @@ public sealed class SocketTransportClient(
     {
         try
         {
-            var httpClient = httpClientFactory.CreateClient("signal-api");
+            var httpClient = httpClientFactory.CreateClient(Constants.HttpClientNames.SignalApi);
 
             using var response = await httpClient.GetAsync($"/v1/attachments/{Uri.EscapeDataString(attachment.AttachmentId)}", ct);
             if (!response.IsSuccessStatusCode)

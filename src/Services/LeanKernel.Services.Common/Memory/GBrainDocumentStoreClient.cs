@@ -167,7 +167,7 @@ public sealed class GBrainDocumentStoreClient : IDocumentStoreClient
         return new DocumentSearchHit(
             Fingerprint: fingerprint,
             FileName: fileName,
-            ContentType: "application/octet-stream",
+            ContentType: Constants.ContentTypes.ApplicationOctetStream,
             Excerpt: Truncate(content, 200),
             Score: score,
             IngestedAt: DateTime.UtcNow);
@@ -183,7 +183,7 @@ public sealed class GBrainDocumentStoreClient : IDocumentStoreClient
         return new DocumentCatalogEntry(
             slug,
             string.Empty,
-            "application/octet-stream",
+            Constants.ContentTypes.ApplicationOctetStream,
             content ?? string.Empty,
             Guid.Empty, userId, Guid.Empty, channelId,
             DocumentAvailabilityScope.Channel,

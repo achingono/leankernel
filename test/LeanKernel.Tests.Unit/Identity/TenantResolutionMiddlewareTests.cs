@@ -158,12 +158,12 @@ public class TenantResolutionMiddlewareTests
 
         await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
-        ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId,
+        ctx.Items[Constants.Http.ContextItems.TenantKey].Should().Be(tenantId,
             because: "TenantId must be stored in Items for RequestContextPermit to read");
-        ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(userId);
-        ctx.Items[TenantResolutionMiddleware.PersonIdKey].Should().Be(userId);
-        ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
-        var badge = ctx.Items[TenantResolutionMiddleware.BadgeKey].Should().BeOfType<Badge>().Subject;
+        ctx.Items[Constants.Http.ContextItems.UserIdKey].Should().Be(userId);
+        ctx.Items[Constants.Http.ContextItems.PersonIdKey].Should().Be(userId);
+        ctx.Items[Constants.Http.ContextItems.ChannelIdKey].Should().Be(channelId);
+        var badge = ctx.Items[Constants.Http.ContextItems.BadgeKey].Should().BeOfType<Badge>().Subject;
         badge.FullName.Should().Be("Test");
         badge.Email.Should().Be("t@t");
     }
@@ -200,10 +200,10 @@ public class TenantResolutionMiddlewareTests
 
         await middleware.InvokeAsync(ctx, resolver.Object, GuestFallbackSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
-        ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId);
-        ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(guestUserId);
-        ctx.Items[TenantResolutionMiddleware.PersonIdKey].Should().Be(guestUserId);
-        ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
+        ctx.Items[Constants.Http.ContextItems.TenantKey].Should().Be(tenantId);
+        ctx.Items[Constants.Http.ContextItems.UserIdKey].Should().Be(guestUserId);
+        ctx.Items[Constants.Http.ContextItems.PersonIdKey].Should().Be(guestUserId);
+        ctx.Items[Constants.Http.ContextItems.ChannelIdKey].Should().Be(channelId);
     }
 
     /// <summary>
@@ -276,11 +276,11 @@ public class TenantResolutionMiddlewareTests
         await middleware.InvokeAsync(ctx, resolver.Object, DefaultSettings, Mock.Of<ILogger<TenantResolutionMiddleware>>());
 
         ctx.Response.StatusCode.Should().NotBe(StatusCodes.Status401Unauthorized);
-        ctx.Items[TenantResolutionMiddleware.TenantKey].Should().Be(tenantId);
-        ctx.Items[TenantResolutionMiddleware.UserIdKey].Should().Be(userId);
-        ctx.Items[TenantResolutionMiddleware.PersonIdKey].Should().Be(userId);
-        ctx.Items[TenantResolutionMiddleware.ChannelIdKey].Should().Be(channelId);
-        var badge = ctx.Items[TenantResolutionMiddleware.BadgeKey].Should().BeOfType<Badge>().Subject;
+        ctx.Items[Constants.Http.ContextItems.TenantKey].Should().Be(tenantId);
+        ctx.Items[Constants.Http.ContextItems.UserIdKey].Should().Be(userId);
+        ctx.Items[Constants.Http.ContextItems.PersonIdKey].Should().Be(userId);
+        ctx.Items[Constants.Http.ContextItems.ChannelIdKey].Should().Be(channelId);
+        var badge = ctx.Items[Constants.Http.ContextItems.BadgeKey].Should().BeOfType<Badge>().Subject;
         badge.FullName.Should().Be("Signal User");
     }
 

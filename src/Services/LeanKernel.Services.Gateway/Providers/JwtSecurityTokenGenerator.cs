@@ -86,24 +86,24 @@ public class JwtSecurityTokenGenerator : ISecurityTokenGenerator
         yield return new Claim(ClaimTypes.Email, sender.User.Email, ClaimValueTypes.Email);
 
         // Claims required by <see cref="TenantResolutionMiddleware"/> to resolve the tenant for the current request.
-        yield return new Claim(TenantResolutionMiddleware.ChannelTenantIdClaimType, sender.Tenant.Id.ToString(), ClaimValueTypes.String);
-        yield return new Claim(TenantResolutionMiddleware.ChannelNameClaimType, sender.Channel.Name, ClaimValueTypes.String);
-        yield return new Claim(TenantResolutionMiddleware.ChannelSenderIssuerClaimType, sender.Issuer, ClaimValueTypes.String);
-        yield return new Claim(TenantResolutionMiddleware.ChannelSenderSubjectClaimType, sender.Subject, ClaimValueTypes.String);
+        yield return new Claim(Constants.Claims.ChannelTenantId, sender.Tenant.Id.ToString(), ClaimValueTypes.String);
+        yield return new Claim(Constants.Claims.ChannelName, sender.Channel.Name, ClaimValueTypes.String);
+        yield return new Claim(Constants.Claims.ChannelSenderIssuer, sender.Issuer, ClaimValueTypes.String);
+        yield return new Claim(Constants.Claims.ChannelSenderSubject, sender.Subject, ClaimValueTypes.String);
 
         // Rights for entities used in the normal chat flow and profile management.
         // A user can read, create, and update their own sessions and turns,
         // read telemetry records, view/update their profile, and check memory policies.
-        yield return new Claim("right", "Create:SessionEntity");
-        yield return new Claim("right", "Read:SessionEntity");
-        yield return new Claim("right", "Update:SessionEntity");
-        yield return new Claim("right", "Create:TurnEntity");
-        yield return new Claim("right", "Read:TurnEntity");
-        yield return new Claim("right", "Create:TurnTelemetryEntity");
-        yield return new Claim("right", "Read:TurnTelemetryEntity");
-        yield return new Claim("right", "Read:UserEntity");
-        yield return new Claim("right", "Update:UserEntity");
-        yield return new Claim("right", "Read:ChannelMemoryPolicyEntity");
-        yield return new Claim("right", "Read:ChannelSenderBindingEntity");
+        yield return new Claim(Constants.Claims.Right, "Create:SessionEntity");
+        yield return new Claim(Constants.Claims.Right, "Read:SessionEntity");
+        yield return new Claim(Constants.Claims.Right, "Update:SessionEntity");
+        yield return new Claim(Constants.Claims.Right, "Create:TurnEntity");
+        yield return new Claim(Constants.Claims.Right, "Read:TurnEntity");
+        yield return new Claim(Constants.Claims.Right, "Create:TurnTelemetryEntity");
+        yield return new Claim(Constants.Claims.Right, "Read:TurnTelemetryEntity");
+        yield return new Claim(Constants.Claims.Right, "Read:UserEntity");
+        yield return new Claim(Constants.Claims.Right, "Update:UserEntity");
+        yield return new Claim(Constants.Claims.Right, "Read:ChannelMemoryPolicyEntity");
+        yield return new Claim(Constants.Claims.Right, "Read:ChannelSenderBindingEntity");
     }
 }

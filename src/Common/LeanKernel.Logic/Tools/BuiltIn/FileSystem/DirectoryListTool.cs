@@ -41,7 +41,7 @@ public static class DirectoryListTool
                 var fullPath = FileSystemSupport.ResolveWithinRoot(fileSettings.RootPath, path);
                 if (fullPath is null)
                 {
-                    return Task.FromResult(new ToolResult { ToolName = "directory_list", Success = false, Error = "Access denied: path is outside the allowed directory" });
+                    return Task.FromResult(new ToolResult { ToolName = "directory_list", Success = false, Error = Constants.FileSystem.Errors.PathOutsideAllowedDirectory });
                 }
 
                 if (!Directory.Exists(fullPath))

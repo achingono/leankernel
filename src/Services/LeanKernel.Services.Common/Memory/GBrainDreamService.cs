@@ -47,16 +47,16 @@ public sealed class GBrainDreamService : IDreamService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Dream MCP call failed for scope {Scope} mode {Mode}", sourceScope, mode);
-            return new DreamRunResult(sourceScope, mode, "Failed", 0, 0, null);
+            return new DreamRunResult(sourceScope, mode, Constants.JobStatus.Failed, 0, 0, null);
         }
 
         if (payload is null)
         {
-            return new DreamRunResult(sourceScope, mode, "Completed", 0, 0, null);
+            return new DreamRunResult(sourceScope, mode, Constants.JobStatus.Completed, 0, 0, null);
         }
 
         var result = payload.Value;
-        var status = ReadString(result, "status") ?? "Completed";
+        var status = ReadString(result, "status") ?? Constants.JobStatus.Completed;
         var totalPages = ReadInt(result, "total_pages") ?? ReadInt(result, "totalPages") ?? 0;
         var failedPages = ReadInt(result, "failed_pages") ?? ReadInt(result, "failedPages") ?? 0;
 

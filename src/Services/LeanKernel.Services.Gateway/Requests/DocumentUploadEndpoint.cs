@@ -131,7 +131,7 @@ public static class DocumentUploadEndpoint
     {
         var base64Data = fileData;
         var contentType = string.IsNullOrWhiteSpace(requestedContentType)
-            ? "application/octet-stream"
+            ? Constants.ContentTypes.ApplicationOctetStream
             : requestedContentType;
 
         if (base64Data.StartsWith("data:", StringComparison.OrdinalIgnoreCase))

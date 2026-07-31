@@ -45,27 +45,27 @@ public class RequestContextPermitTests
         // Pre-populate HttpContext.Items as the middleware would (new architecture).
         if (resolvedTenantId.HasValue)
         {
-            ctx.Items[TenantResolutionMiddleware.TenantKey] = resolvedTenantId.Value;
+            ctx.Items[Constants.Http.ContextItems.TenantKey] = resolvedTenantId.Value;
         }
 
         if (resolvedUserId.HasValue)
         {
-            ctx.Items[TenantResolutionMiddleware.UserIdKey] = resolvedUserId.Value;
+            ctx.Items[Constants.Http.ContextItems.UserIdKey] = resolvedUserId.Value;
         }
 
         if (resolvedPersonId.HasValue)
         {
-            ctx.Items[TenantResolutionMiddleware.PersonIdKey] = resolvedPersonId.Value;
+            ctx.Items[Constants.Http.ContextItems.PersonIdKey] = resolvedPersonId.Value;
         }
 
         if (resolvedChannelId.HasValue)
         {
-            ctx.Items[TenantResolutionMiddleware.ChannelIdKey] = resolvedChannelId.Value;
+            ctx.Items[Constants.Http.ContextItems.ChannelIdKey] = resolvedChannelId.Value;
         }
 
         if (resolvedBadge is not null)
         {
-            ctx.Items[TenantResolutionMiddleware.BadgeKey] = resolvedBadge;
+            ctx.Items[Constants.Http.ContextItems.BadgeKey] = resolvedBadge;
         }
 
         httpAccessor.Setup(a => a.HttpContext).Returns(ctx);

@@ -64,7 +64,7 @@ public sealed class DocumentIngestionJobEntity
     /// <summary>
     /// Gets or sets the job status (Pending, InProgress, Completed, Failed, Poisoned).
     /// </summary>
-    public string Status { get; set; } = "Pending";
+    public string Status { get; set; } = Constants.JobStatus.Pending;
 
     /// <summary>
     /// Gets or sets the number of processing attempts.

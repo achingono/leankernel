@@ -56,7 +56,7 @@ public static class FileEditTool
                 var fullPath = FileSystemSupport.ResolveWithinRoot(fileSettings.RootPath, path);
                 if (fullPath is null)
                 {
-                    return new ToolResult { ToolName = "file_edit", Success = false, Error = "Access denied: path is outside the allowed directory" };
+                    return new ToolResult { ToolName = "file_edit", Success = false, Error = Constants.FileSystem.Errors.PathOutsideAllowedDirectory };
                 }
 
                 if (!File.Exists(fullPath))

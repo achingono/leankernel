@@ -33,6 +33,27 @@ public static class Constants
             /// </summary>
             public const string Bearer = "Bearer";
         }
+
+        /// <summary>
+        /// Contains keys for storing values in "HttpContext.Items"/>.
+        /// </summary>
+        public static class ContextItems
+        {
+            /// <summary>Key used to store the resolved tenant identifier in "HttpContext.Items".</summary>
+            public const string TenantKey = "LK.TenantId";
+
+            /// <summary>Key used to store the resolved user identifier in "HttpContext.Items".</summary>
+            public const string UserIdKey = "LK.UserId";
+
+            /// <summary>Key used to store the resolved canonical person identifier in "HttpContext.Items".</summary>
+            public const string PersonIdKey = "LK.PersonId";
+
+            /// <summary>Key used to store the resolved channel identifier in "HttpContext.Items".</summary>
+            public const string ChannelIdKey = "LK.ChannelId";
+
+            /// <summary>Key used to store the resolved badge in "HttpContext.Items".</summary>
+            public const string BadgeKey = "LK.Badge";
+        }
     }
 
     /// <summary>
@@ -46,9 +67,94 @@ public static class Constants
         public const string Json = "application/json";
 
         /// <summary>
+        /// The content type for JSON data including UTF-8 charset.
+        /// </summary>
+        public const string JsonUtf8 = "application/json; charset=utf-8";
+
+        /// <summary>
         /// The content type for plain text data.
         /// </summary>
         public const string PlainText = "text/plain";
+
+        /// <summary>
+        /// The content type for binary data.
+        /// </summary>
+        public const string ApplicationOctetStream = "application/octet-stream";
+    }
+
+    /// <summary>
+    /// Contains file system-related constants.
+    /// </summary>
+    public static class FileSystem
+    {
+        /// <summary>
+        /// Contains error messages for file system operations.
+        /// </summary>
+        public static class Errors
+        {
+            /// <summary>
+            /// Error returned when a path is outside the allowed sandbox.
+            /// </summary>
+            public const string PathOutsideAllowedDirectory = "Access denied: path is outside the allowed directory";
+
+            /// <summary>
+            /// Error returned when a source or destination path is outside the allowed sandbox.
+            /// </summary>
+            public const string SourceOrDestinationPathOutsideAllowedDirectory = "Access denied: source or destination path is outside the allowed directory";
+        }
+    }
+
+    /// <summary>
+    /// Contains registered HTTP client names.
+    /// </summary>
+    public static class HttpClientNames
+    {
+        /// <summary>
+        /// The HTTP client name for the Signal API.
+        /// </summary>
+        public const string SignalApi = "signal-api";
+    }
+
+    /// <summary>
+    /// Contains tool names used in MCP/skill definitions.
+    /// </summary>
+    public static class ToolNames
+    {
+        /// <summary>
+        /// The file copy tool name.
+        /// </summary>
+        public const string FileCopy = "file_copy";
+    }
+
+    /// <summary>
+    /// Contains shared job status values.
+    /// </summary>
+    public static class JobStatus
+    {
+        /// <summary>
+        /// The pending status.
+        /// </summary>
+        public const string Pending = "Pending";
+
+        /// <summary>
+        /// The processing status.
+        /// </summary>
+        public const string Processing = "Processing";
+
+        /// <summary>
+        /// The completed status.
+        /// </summary>
+        public const string Completed = "Completed";
+
+        /// <summary>
+        /// The failed status.
+        /// </summary>
+        public const string Failed = "Failed";
+
+        /// <summary>
+        /// The poisoned status.
+        /// </summary>
+        public const string Poisoned = "Poisoned";
     }
 
     /// <summary>
@@ -235,6 +341,21 @@ public static class Constants
         /// Channel sender subject claim type.
         /// </summary>
         public const string ChannelSenderSubject = "lk_sender_sub";
+
+        /// <summary>
+        /// Channel name claim type.
+        /// </summary>
+        public const string ChannelName = "lk_channel";
+
+        /// <summary>
+        /// Channel tenant identifier claim type.
+        /// </summary>
+        public const string ChannelTenantId = "lk_tenant_id";
+
+        /// <summary>
+        /// User access right claim type.
+        /// </summary>
+        public const string Right = "right";
     }
 
     /// <summary>

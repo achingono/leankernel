@@ -25,7 +25,7 @@ builder.Services.AddHttpClient<GatewayChannelClient>(client =>
 {
     client.BaseAddress = new Uri(gatewaySettings.BaseUrl);
 });
-builder.Services.AddHttpClient("signal-api", client =>
+builder.Services.AddHttpClient(Constants.HttpClientNames.SignalApi, client =>
 {
     client.BaseAddress = new Uri($"http://{signalSettings.Host}:{signalSettings.Port}");
 });
@@ -58,7 +58,7 @@ builder.Services.AddHostedService<TerminalService>();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<EntityContext>(Constants.Healthchecks.Database, tags: [Constants.Healthchecks.Database])
     .AddCheck<GatewayHealthCheck>(Constants.Healthchecks.Gateway, tags: [Constants.Healthchecks.Gateway])
-    .AddCheck<SignalApiHealthCheck>("signal-api", tags: ["signal-api"]);
+    .AddCheck<SignalApiHealthCheck>(Constants.HttpClientNames.SignalApi, tags: [Constants.HttpClientNames.SignalApi]);
 
 var app = builder.Build();
 app.MapGet("/live", () => Results.Ok(new { status = "alive" }));
@@ -66,7 +66,7 @@ app.MapHealthChecks(Constants.Healthchecks.Path, new HealthCheckOptions
 {
     ResponseWriter = (context, report) =>
     {
-        context.Response.ContentType = "application/json; charset=utf-8";
+        context.Response.ContentType = Constants.ContentTypes.JsonUtf8;
         return context.Response.WriteAsync(report.ToJson());
     }
 });

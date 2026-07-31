@@ -20,26 +20,6 @@ namespace LeanKernel.Services.Gateway.Providers;
 /// </remarks>
 public sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
-    internal const string ChannelNameClaimType = "lk_channel";
-    internal const string ChannelTenantIdClaimType = "lk_tenant_id";
-    internal const string ChannelSenderIssuerClaimType = "lk_sender_iss";
-    internal const string ChannelSenderSubjectClaimType = "lk_sender_sub";
-
-    /// <summary>Key used to store the resolved tenant identifier in <see cref="HttpContext.Items"/>.</summary>
-    public const string TenantKey = "LK.TenantId";
-
-    /// <summary>Key used to store the resolved user identifier in <see cref="HttpContext.Items"/>.</summary>
-    public const string UserIdKey = "LK.UserId";
-
-    /// <summary>Key used to store the resolved canonical person identifier in <see cref="HttpContext.Items"/>.</summary>
-    public const string PersonIdKey = "LK.PersonId";
-
-    /// <summary>Key used to store the resolved channel identifier in <see cref="HttpContext.Items"/>.</summary>
-    public const string ChannelIdKey = "LK.ChannelId";
-
-    /// <summary>Key used to store the resolved badge in <see cref="HttpContext.Items"/>.</summary>
-    public const string BadgeKey = "LK.Badge";
-
     /// <summary>Marker written to session to force materialization and stabilize the session id.</summary>
     private const string SessionInitMarker = "_lk_init";
 
@@ -74,8 +54,8 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             && context.User is ClaimsPrincipal authenticatedPrincipal
             && HasChannelClaims(authenticatedPrincipal))
         {
-            var tenantClaim = authenticatedPrincipal.FindFirst(ChannelTenantIdClaimType)?.Value;
-            var channelClaim = authenticatedPrincipal.FindFirst(ChannelNameClaimType)?.Value;
+            var tenantClaim = authenticatedPrincipal.FindFirst(Constants.Claims.ChannelTenantId)?.Value;
+            var channelClaim = authenticatedPrincipal.FindFirst(Constants.Claims.ChannelName)?.Value;
 
             if (!Guid.TryParse(tenantClaim, out var tenantId) || string.IsNullOrWhiteSpace(channelClaim))
             {
@@ -93,12 +73,12 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 return;
             }
 
-            context.Items[TenantKey] = tenant.Id;
-            context.Items[UserIdKey] = user.Id;
-            context.Items[PersonIdKey] = user.PersonId == Guid.Empty ? user.Id : user.PersonId;
-            context.Items[ChannelIdKey] = channel.Id;
+            context.Items[Constants.Http.ContextItems.TenantKey] = tenant.Id;
+            context.Items[Constants.Http.ContextItems.UserIdKey] = user.Id;
+            context.Items[Constants.Http.ContextItems.PersonIdKey] = user.PersonId == Guid.Empty ? user.Id : user.PersonId;
+            context.Items[Constants.Http.ContextItems.ChannelIdKey] = channel.Id;
             var channelBadge = BuildResolvedBadge(authenticatedPrincipal, user);
-            context.Items[BadgeKey] = channelBadge;
+            context.Items[Constants.Http.ContextItems.BadgeKey] = channelBadge;
 
             await next(context);
             return;
@@ -113,7 +93,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             return;
         }
 
-        context.Items[TenantKey] = hostTenant.Id;
+        context.Items[Constants.Http.ContextItems.TenantKey] = hostTenant.Id;
 
         Guid userId;
         Guid personId;
@@ -168,13 +148,13 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             };
         }
 
-        context.Items[UserIdKey] = userId;
-        context.Items[PersonIdKey] = personId;
-        context.Items[BadgeKey] = badge;
+        context.Items[Constants.Http.ContextItems.UserIdKey] = userId;
+        context.Items[Constants.Http.ContextItems.PersonIdKey] = personId;
+        context.Items[Constants.Http.ContextItems.BadgeKey] = badge;
 
         var openAiChannel = await resolver.ResolveOrCreateChannelAsync(
             ChannelEntity.OpenAiHttpName, cancellationToken);
-        context.Items[ChannelIdKey] = openAiChannel.Id;
+        context.Items[Constants.Http.ContextItems.ChannelIdKey] = openAiChannel.Id;
 
         await next(context);
     }
@@ -205,5 +185,5 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         BypassPaths.Any(p => path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase));
 
     private static bool HasChannelClaims(ClaimsPrincipal principal) =>
-        principal.HasClaim(claim => claim.Type == ChannelNameClaimType || claim.Type == ChannelTenantIdClaimType);
+        principal.HasClaim(claim => claim.Type == Constants.Claims.ChannelName || claim.Type == Constants.Claims.ChannelTenantId);
 }

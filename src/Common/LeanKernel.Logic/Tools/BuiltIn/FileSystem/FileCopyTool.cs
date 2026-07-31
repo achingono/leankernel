@@ -24,7 +24,7 @@ public static class FileCopyTool
 
         return new ToolDefinition
         {
-            Name = "file_copy",
+            Name = Constants.ToolNames.FileCopy,
             Description = "Copy a file or directory within the allowed data directory",
             Category = "filesystem",
             Parameters =
@@ -45,7 +45,7 @@ public static class FileCopyTool
 
                 if (string.IsNullOrWhiteSpace(sourcePath) || string.IsNullOrWhiteSpace(destinationPath))
                 {
-                    return Task.FromResult(new ToolResult { ToolName = "file_copy", Success = false, Error = "Source and destination paths are required" });
+                    return Task.FromResult(new ToolResult { ToolName = Constants.ToolNames.FileCopy, Success = false, Error = "Source and destination paths are required" });
                 }
 
                 using var scope = scopeFactory.CreateScope();
@@ -54,12 +54,12 @@ public static class FileCopyTool
                 var destinationFullPath = FileSystemSupport.ResolveWithinRoot(fileSettings.RootPath, destinationPath);
                 if (sourceFullPath is null || destinationFullPath is null)
                 {
-                    return Task.FromResult(new ToolResult { ToolName = "file_copy", Success = false, Error = "Access denied: source or destination path is outside the allowed directory" });
+                    return Task.FromResult(new ToolResult { ToolName = Constants.ToolNames.FileCopy, Success = false, Error = Constants.FileSystem.Errors.SourceOrDestinationPathOutsideAllowedDirectory });
                 }
 
                 if (PathsEqual(sourceFullPath, destinationFullPath))
                 {
-                    return Task.FromResult(new ToolResult { ToolName = "file_copy", Success = false, Error = "Source and destination must be different paths" });
+                    return Task.FromResult(new ToolResult { ToolName = Constants.ToolNames.FileCopy, Success = false, Error = "Source and destination must be different paths" });
                 }
 
                 if (File.Exists(sourceFullPath))
@@ -71,26 +71,26 @@ public static class FileCopyTool
                     }
 
                     File.Copy(sourceFullPath, destinationFullPath, overwrite);
-                    return Task.FromResult(new ToolResult { ToolName = "file_copy", Success = true, Output = $"Copied {sourcePath} to {destinationPath}" });
+                    return Task.FromResult(new ToolResult { ToolName = Constants.ToolNames.FileCopy, Success = true, Output = $"Copied {sourcePath} to {destinationPath}" });
                 }
 
                 if (!Directory.Exists(sourceFullPath))
                 {
-                    return Task.FromResult(new ToolResult { ToolName = "file_copy", Success = false, Error = $"Source path not found: {sourcePath}" });
+                    return Task.FromResult(new ToolResult { ToolName = Constants.ToolNames.FileCopy, Success = false, Error = $"Source path not found: {sourcePath}" });
                 }
 
                 if (!recursive)
                 {
-                    return Task.FromResult(new ToolResult { ToolName = "file_copy", Success = false, Error = "Directory copy requires recursive=true" });
+                    return Task.FromResult(new ToolResult { ToolName = Constants.ToolNames.FileCopy, Success = false, Error = "Directory copy requires recursive=true" });
                 }
 
                 if (IsSameOrDescendantPath(sourceFullPath, destinationFullPath))
                 {
-                    return Task.FromResult(new ToolResult { ToolName = "file_copy", Success = false, Error = "Destination directory cannot be the source directory or a child of it" });
+                    return Task.FromResult(new ToolResult { ToolName = Constants.ToolNames.FileCopy, Success = false, Error = "Destination directory cannot be the source directory or a child of it" });
                 }
 
                 CopyDirectory(sourceFullPath, destinationFullPath, overwrite, createDirectories);
-                return Task.FromResult(new ToolResult { ToolName = "file_copy", Success = true, Output = $"Copied {sourcePath} to {destinationPath}" });
+                return Task.FromResult(new ToolResult { ToolName = Constants.ToolNames.FileCopy, Success = true, Output = $"Copied {sourcePath} to {destinationPath}" });
             }
         };
     }

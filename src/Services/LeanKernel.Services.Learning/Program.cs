@@ -136,7 +136,7 @@ app.MapHealthChecks(Constants.Healthchecks.Path, new HealthCheckOptions
 {
     ResponseWriter = (context, report) =>
     {
-        context.Response.ContentType = "application/json; charset=utf-8";
+        context.Response.ContentType = Constants.ContentTypes.JsonUtf8;
         return context.Response.WriteAsync(report.ToJson());
     },
 });

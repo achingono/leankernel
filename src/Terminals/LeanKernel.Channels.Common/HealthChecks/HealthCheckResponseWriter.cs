@@ -14,7 +14,7 @@ public static class HealthCheckResponseWriter
     /// <returns>A task that completes when the response has been written.</returns>
     public static Task WriteAsync(HttpContext context, HealthReport report)
     {
-        context.Response.ContentType = "application/json; charset=utf-8";
+        context.Response.ContentType = Constants.ContentTypes.JsonUtf8;
 
         var payload = new
         {

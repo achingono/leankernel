@@ -48,7 +48,7 @@ public sealed class DreamRunRecord
     /// <summary>
     /// Gets or sets the run status (Pending, Running, Completed, Failed, TimedOut).
     /// </summary>
-    public string Status { get; set; } = "Pending";
+    public string Status { get; set; } = Constants.JobStatus.Pending;
 
     /// <summary>
     /// Gets or sets the optional FK back to the enrichment job that triggered this run.

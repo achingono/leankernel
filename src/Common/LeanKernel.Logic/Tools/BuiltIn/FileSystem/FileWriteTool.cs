@@ -53,7 +53,7 @@ public static class FileWriteTool
                 var fullPath = FileSystemSupport.ResolveWithinRoot(fileSettings.RootPath, path);
                 if (fullPath is null)
                 {
-                    return new ToolResult { ToolName = "file_write", Success = false, Error = "Access denied: path is outside the allowed directory" };
+                    return new ToolResult { ToolName = "file_write", Success = false, Error = Constants.FileSystem.Errors.PathOutsideAllowedDirectory };
                 }
 
                 var directory = Path.GetDirectoryName(fullPath);
