@@ -77,7 +77,7 @@ GBrain uses whichever Postgres database `start-gbrain.sh` resolves — `GBRAIN_D
 - The local `database` container has `psql`/`pg_dump` and can reach the remote host directly (Postgres 16.14 remote):
   ```sh
   docker cp ~/source/repos/swarm/deploy/platform/secrets/postgres_password.txt leankernel-database:/tmp/
-  docker compose exec -T database sh -c 'PGPASSWORD=$(cat /tmp/postgres_password.txt) psql -h 192.168.1.5 -U "$(cat /tmp/postgres_user.txt)" -d leankernel -c "..."'
+  docker compose exec -T database sh -c 'PGPASSWORD=$(cat /tmp/postgres_password.txt) psql -h 192.168.*.* -U "$(cat /tmp/postgres_user.txt)" -d leankernel -c "..."'
   ```
 - tsvector (`search_vector`) is maintained by triggers on `pages`/`content_chunks`; embeddings are not — they are written by the embed path and must be regenerated deliberately (see above).
 

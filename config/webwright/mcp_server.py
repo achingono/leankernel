@@ -116,8 +116,7 @@ class RunManager:
 
     # -- public API --------------------------------------------------------
 
-    def submit(self, task: str, start_url: str | None = None,
-               request_id: str | None = None, model: str | None = None) -> dict[str, Any]:
+    def _build_run_payload(self, task: str, start_url: str | None, request_id: str | None, model: str | None) -> tuple[dict[str, Any], str]:
         payload: dict[str, Any] = {"task": task.strip()}
         if start_url:
             payload["startUrl"] = start_url.strip()
@@ -125,18 +124,28 @@ class RunManager:
             payload["requestId"] = request_id.strip()
         if model:
             payload["model"] = model.strip()
-        payload_hash = _hash(payload)
+        return payload, _hash(payload)
 
-        if request_id:
-            existing_id = self.idempotency.get(request_id)
-            if existing_id:
-                existing = self.runs.get(existing_id)
-                if existing is None:
-                    self.idempotency.pop(request_id, None)
-                else:
-                    if existing.payload_hash != payload_hash:
-                        raise ValueError("requestId was already used with a different payload.")
-                    return _submission_summary(existing)
+    def _check_idempotency(self, request_id: str | None, payload_hash: str) -> dict[str, Any] | None:
+        if not request_id:
+            return None
+        existing_id = self.idempotency.get(request_id)
+        if not existing_id:
+            return None
+        existing = self.runs.get(existing_id)
+        if existing is None:
+            self.idempotency.pop(request_id, None)
+            return None
+        if existing.payload_hash != payload_hash:
+            raise ValueError("requestId was already used with a different payload.")
+        return _submission_summary(existing)
+
+    def submit(self, task: str, start_url: str | None = None,
+               request_id: str | None = None, model: str | None = None) -> dict[str, Any]:
+        payload, payload_hash = self._build_run_payload(task, start_url, request_id, model)
+
+        if summary := self._check_idempotency(request_id, payload_hash):
+            return summary
 
         run_id = str(uuid.uuid4())
         state = RunState(run_id=run_id, payload=payload, payload_hash=payload_hash)

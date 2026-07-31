@@ -448,12 +448,12 @@ public static class Constants
             /// <summary>
             /// Identity source label.
             /// </summary>
-            public const string Identity = "identity";
+            public const string IdentityContext = "identity";
 
             /// <summary>
             /// Memory source label.
             /// </summary>
-            public const string Memory = "memory";
+            public const string MemoryContext = "memory";
 
             /// <summary>
             /// Retrieval source label.

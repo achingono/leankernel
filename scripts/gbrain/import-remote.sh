@@ -24,7 +24,7 @@ SQL_DIR_REMOTE=/tmp/gbrain-import-sql
 BACKUP_DIR="$ROOT_DIR/scripts/gbrain/backups"
 DB_CONTAINER=leankernel-database
 GBRAIN_CONTAINER=leankernel-gbrain
-REMOTE_HOST=192.168.1.5
+REMOTE_HOST=192.168.*.*
 STAGING_DB=gbrain_import_staging
 
 usage() {

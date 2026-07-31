@@ -7,7 +7,7 @@ namespace LeanKernel.Logic.Policy;
 /// and <c>IRepository{TEntity}</c> rather than replacing them.
 /// </summary>
 /// <typeparam name="TEntity">The entity type this policy evaluates.</typeparam>
-public interface IPolicy<TEntity>
+public interface IPolicy<in TEntity>
     where TEntity : class
 {
     /// <summary>

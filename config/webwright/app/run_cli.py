@@ -72,7 +72,7 @@ class _Capture:
     def write(self, text: str) -> None:
         self.lines.append(text)
     def flush(self) -> None:
-        pass
+        return None
 
 
 async def exec_code(
@@ -203,16 +203,75 @@ async def run_llm(messages: list[dict], config: LiteLLMConfig) -> str:
     return response.choices[0].message.content or ""
 
 
-async def run_browser_task(config: LiteLLMConfig, run_cfg: RunConfig) -> dict:
-    from playwright.async_api import async_playwright
-
+def _build_run_dirs(run_cfg: RunConfig) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path]:
     run_dir = pathlib.Path(run_cfg.output_dir) / run_cfg.task_id
     screenshots_dir = run_dir / "screenshots"
     screenshots_dir.mkdir(parents=True, exist_ok=True)
-    log_path = run_dir / "run_cli.log"
-    report_path = run_dir / "report.json"
-    script_path = run_dir / "final_script.py"
-    script_log_path = run_dir / "final_script_log.txt"
+    return (
+        run_dir,
+        screenshots_dir,
+        run_dir / "run_cli.log",
+        run_dir / "report.json",
+        run_dir / "final_script.py",
+        run_dir / "final_script_log.txt",
+    )
+
+
+async def _execute_step_code_blocks(
+    code_blocks: list[str],
+    step: int,
+    page: typing.Any,
+    context: typing.Any,
+    loop_artifacts: dict,
+    all_code: list[str],
+    all_logs: list[str],
+) -> tuple[bool, str | None]:
+    executed_any = False
+    previous_error: str | None = None
+    for code in code_blocks:
+        logger.info("Executing code block (%d chars)...", len(code))
+        all_code.append(f"# Step {step}\n{code}\n")
+        output = await exec_code(code, page, context, loop_artifacts, timeout=30)
+        executed_any = True
+        timestamp = datetime.now(tz=None).isoformat()
+        log_entry = f"[{timestamp}] STEP {step}\n--- code ---\n{code}\n--- output ---\n{output}\n"
+        all_logs.append(log_entry)
+        logger.info("Step %d output: %s", step, output[:200])
+
+        if output.startswith("<error>"):
+            previous_error = output
+        else:
+            previous_error = None
+    return executed_any, previous_error
+
+
+async def _capture_step_screenshot(
+    page: typing.Any,
+    step: int,
+    screenshots_dir: pathlib.Path,
+    run_dir: pathlib.Path,
+    manifest: list[dict],
+) -> None:
+    await page.wait_for_timeout(SCREENSHOT_DELAY_MS)
+    screenshot_path = screenshots_dir / f"step_{step:03d}.png"
+    try:
+        await page.screenshot(path=str(screenshot_path), full_page=False)
+        manifest.append({
+            "id": f"screenshot-{step}",
+            "kind": "screenshot",
+            "displayName": f"step_{step:03d}.png",
+            "contentType": "image/png",
+            "bytes": screenshot_path.stat().st_size,
+            "path": str(screenshot_path.relative_to(run_dir)),
+        })
+    except Exception as exc:
+        logger.warning("Screenshot failed at step %d: %s", step, exc)
+
+
+async def run_browser_task(config: LiteLLMConfig, run_cfg: RunConfig) -> dict:
+    from playwright.async_api import async_playwright
+
+    run_dir, screenshots_dir, log_path, report_path, script_path, script_log_path = _build_run_dirs(run_cfg)
 
     manifest: list[dict] = []
     all_code: list[str] = []
@@ -260,58 +319,29 @@ async def run_browser_task(config: LiteLLMConfig, run_cfg: RunConfig) -> dict:
             response_text = await run_llm(messages, config)
             messages.append({"role": "assistant", "content": response_text})
 
-            # Check for completion
             summary = extract_task_complete(response_text)
             if summary:
                 final_datum = summary
                 logger.info("Task complete at step %d: %s", step, summary)
                 break
 
-            # Execute code blocks
             code_blocks = extract_code_blocks(response_text)
             if not code_blocks:
                 logger.warning("No code blocks in LLM response at step %d", step)
                 previous_error = "No code was generated. Generate Python code or ##TASK_COMPLETE##."
                 continue
 
-            executed_any = False
-            for code in code_blocks:
-                logger.info("Executing code block (%d chars)...", len(code))
-                all_code.append(f"# Step {step}\n{code}\n")
-                output = await exec_code(code, page, context, loop_artifacts, timeout=30)
-                executed_any = True
-                timestamp = datetime.now(tz=None).isoformat()
-                log_entry = f"[{timestamp}] STEP {step}\n--- code ---\n{code}\n--- output ---\n{output}\n"
-                all_logs.append(log_entry)
-                logger.info("Step %d output: %s", step, output[:200])
+            executed_any, previous_error = await _execute_step_code_blocks(
+                code_blocks, step, page, context, loop_artifacts, all_code, all_logs
+            )
 
-                if output.startswith("<error>"):
-                    previous_error = output
-                else:
-                    previous_error = None
-
-            # Screenshot after each step
-            await page.wait_for_timeout(SCREENSHOT_DELAY_MS)
-            screenshot_path = screenshots_dir / f"step_{step:03d}.png"
-            try:
-                await page.screenshot(path=str(screenshot_path), full_page=False)
-                manifest.append({
-                    "id": f"screenshot-{step}",
-                    "kind": "screenshot",
-                    "displayName": f"step_{step:03d}.png",
-                    "contentType": "image/png",
-                    "bytes": screenshot_path.stat().st_size,
-                    "path": str(screenshot_path.relative_to(run_dir)),
-                })
-            except Exception as exc:
-                logger.warning("Screenshot failed at step %d: %s", step, exc)
+            await _capture_step_screenshot(page, step, screenshots_dir, run_dir, manifest)
 
             if not executed_any:
                 previous_error = "No code was generated. Generate Python code or ##TASK_COMPLETE##."
         else:
             logger.warning("Reached max steps (%d) without completing task", MAX_STEPS)
 
-    # Final report
     report = {
         "taskId": run_cfg.task_id,
         "task": run_cfg.task,
@@ -322,11 +352,9 @@ async def run_browser_task(config: LiteLLMConfig, run_cfg: RunConfig) -> dict:
     }
     report_path.write_text(json.dumps(report, indent=2))
 
-    # Save final script
     script_path.write_text("\n".join(all_code))
     script_log_path.write_text("".join(all_logs))
 
-    # Build full manifest
     script_rel = str(script_path.relative_to(run_dir))
     log_rel = str(script_log_path.relative_to(run_dir))
     if script_size := safe_size(script_path):

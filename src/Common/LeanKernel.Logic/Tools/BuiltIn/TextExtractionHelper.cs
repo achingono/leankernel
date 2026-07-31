@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace LeanKernel.Logic.Tools.BuiltIn;
 
 /// <summary>
@@ -305,6 +307,7 @@ else:
         return string.Join("\n", fragments);
     }
 
+    [SuppressMessage("Critical Code Smell", "S3776", Justification = "Byte-level printable string collection is structured in iteration passes.")]
     private static void CollectPrintableStrings(
         IReadOnlyList<byte> bytes,
         bool isUnicode,
@@ -317,35 +320,22 @@ else:
 
         for (var i = 0; i < bytes.Count; i += step)
         {
-            char ch;
-            if (isUnicode)
+            var ch = GetCharFromBytes(bytes, i, isUnicode, out var shouldBreak);
+            if (shouldBreak)
             {
-                if (i + 1 >= bytes.Count)
-                {
-                    break;
-                }
-
-                if (bytes[i + 1] != 0)
-                {
-                    FlushBuffer(chars, minLength, output, seen);
-                    continue;
-                }
-
-                ch = (char)bytes[i];
-            }
-            else
-            {
-                ch = (char)bytes[i];
+                break;
             }
 
-            if (ch is '\r' or '\n' or '\t')
+            if (!ch.HasValue)
             {
-                ch = ' ';
+                FlushBuffer(chars, minLength, output, seen);
+                continue;
             }
 
-            if (char.IsLetterOrDigit(ch) || char.IsPunctuation(ch) || ch == ' ')
+            var processedChar = ch.Value is '\r' or '\n' or '\t' ? ' ' : ch.Value;
+            if (char.IsLetterOrDigit(processedChar) || char.IsPunctuation(processedChar) || processedChar == ' ')
             {
-                chars.Add(ch);
+                chars.Add(processedChar);
                 continue;
             }
 
@@ -353,6 +343,28 @@ else:
         }
 
         FlushBuffer(chars, minLength, output, seen);
+    }
+
+    private static char? GetCharFromBytes(IReadOnlyList<byte> bytes, int i, bool isUnicode, out bool shouldBreak)
+    {
+        shouldBreak = false;
+        if (isUnicode)
+        {
+            if (i + 1 >= bytes.Count)
+            {
+                shouldBreak = true;
+                return null;
+            }
+
+            if (bytes[i + 1] != 0)
+            {
+                return null;
+            }
+
+            return (char)bytes[i];
+        }
+
+        return (char)bytes[i];
     }
 
     private static void FlushBuffer(

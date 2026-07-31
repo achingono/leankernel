@@ -18,7 +18,7 @@ public static class IDbContextFactoryExtensions
     /// <returns>
     /// A tuple containing the first matching bearer token and the total number of matches found.
     /// </returns>
-    public static async Task<(string Token, int MatchCount)> ResolveSenderAsync(
+    public static Task<(string Token, int MatchCount)> ResolveSenderAsync(
         this IDbContextFactory<EntityContext> dbContextFactory,
         string senderId,
         string issuer,
@@ -31,18 +31,28 @@ public static class IDbContextFactoryExtensions
             || string.IsNullOrWhiteSpace(issuer)
             || string.IsNullOrWhiteSpace(channelName))
         {
-            return (string.Empty, 0);
+            return Task.FromResult((string.Empty, 0));
         }
 
+        return ResolveSenderCoreAsync(dbContextFactory, senderId, issuer, channelName, ct);
+    }
+
+    private static async Task<(string Token, int MatchCount)> ResolveSenderCoreAsync(
+        IDbContextFactory<EntityContext> dbContextFactory,
+        string senderId,
+        string issuer,
+        string channelName,
+        CancellationToken ct)
+    {
         await using var context = await dbContextFactory.CreateDbContextAsync(ct);
 
         var matches = await context.ChannelSenderBindings
             .AsNoTracking()
             .Where(binding => binding.IsActive
-                              && binding.Issuer == issuer
-                              && binding.Subject == senderId
-                              && binding.Channel.Name == channelName
-                              && !string.IsNullOrWhiteSpace(binding.BearerToken))
+                               && binding.Issuer == issuer
+                               && binding.Subject == senderId
+                               && binding.Channel.Name == channelName
+                               && !string.IsNullOrWhiteSpace(binding.BearerToken))
             .Select(binding => binding.BearerToken)
             .Take(2)
             .ToListAsync(ct);

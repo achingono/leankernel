@@ -30,7 +30,7 @@ public sealed class ContextGatekeeper(
 
         // Allocate system/identity budget first
         var systemItems = context.Candidates
-            .Where(c => c.Source is Constants.TurnRuntime.ContextSource.System or Constants.TurnRuntime.ContextSource.Identity)
+            .Where(c => c.Source is Constants.TurnRuntime.ContextSource.System or Constants.TurnRuntime.ContextSource.IdentityContext)
             .OrderByDescending(c => c.Score)
             .ToList();
 
@@ -76,7 +76,7 @@ public sealed class ContextGatekeeper(
         // Allocate retrieval/memory budget
         var retrievalBudget = Math.Min(_settings.RetrievalTokenBudget, context.RemainingBudget);
         var retrievalItems = context.Candidates
-            .Where(c => c.Source is Constants.TurnRuntime.ContextSource.Memory or Constants.TurnRuntime.ContextSource.Retrieval)
+            .Where(c => c.Source is Constants.TurnRuntime.ContextSource.MemoryContext or Constants.TurnRuntime.ContextSource.Retrieval)
             .OrderByDescending(c => c.Score)
             .ToList();
 
@@ -141,7 +141,7 @@ public sealed class ContextGatekeeper(
 
         // Admit all remaining non-retrieval, non-system items if budget allows
         var remainingItems = context.Candidates
-            .Where(c => c.Source is not (Constants.TurnRuntime.ContextSource.System or Constants.TurnRuntime.ContextSource.Identity or Constants.TurnRuntime.ContextSource.Memory or Constants.TurnRuntime.ContextSource.Retrieval))
+            .Where(c => c.Source is not (Constants.TurnRuntime.ContextSource.System or Constants.TurnRuntime.ContextSource.IdentityContext or Constants.TurnRuntime.ContextSource.MemoryContext or Constants.TurnRuntime.ContextSource.Retrieval))
             .OrderByDescending(c => c.Score)
             .ToList();
 

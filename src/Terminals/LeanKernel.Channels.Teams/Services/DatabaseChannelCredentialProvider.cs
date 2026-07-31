@@ -1,5 +1,4 @@
 using LeanKernel.Data;
-using LeanKernel.Entities;
 
 using Microsoft.EntityFrameworkCore;
 

@@ -57,12 +57,34 @@ function parseCoberturaClass(cls) {
     }
   }
 
+  uncoveredLines.sort((a, b) => a - b);
   return {
     name: fileName,
     lineRate: classLineRate,
     branchRate: classBranchRate,
-    uncoveredLines: uncoveredLines.sort((a, b) => a - b)
+    uncoveredLines
   };
+}
+
+function populateCoverageTotals(coverage, attrs) {
+  coverage.lineRate = parseFloat(attrs['line-rate'] || 0) || 0;
+  coverage.branchRate = parseFloat(attrs['branch-rate'] || 0) || 0;
+  coverage.linesCovered = parseInt(attrs['lines-covered'] || '0', 10) || 0;
+  coverage.linesValid = parseInt(attrs['lines-valid'] || '0', 10) || 0;
+  coverage.branchesCovered = parseInt(attrs['branches-covered'] || '0', 10) || 0;
+  coverage.branchesValid = parseInt(attrs['branches-valid'] || '0', 10) || 0;
+}
+
+function populateCoverageFiles(coverage, packages) {
+  for (const pkg of packages) {
+    const classes = pkg.classes?.[0]?.class || [];
+    for (const cls of classes) {
+      const fileEntry = parseCoberturaClass(cls);
+      if (fileEntry) {
+        coverage.files.push(fileEntry);
+      }
+    }
+  }
 }
 
 // Parse Cobertura coverage file
@@ -77,25 +99,9 @@ async function parseCoberturaFile(filePath) {
       return coverage;
     }
 
-    const attrs = result.coverage.$;
-    coverage.lineRate = parseFloat(attrs['line-rate'] || 0) || 0;
-    coverage.branchRate = parseFloat(attrs['branch-rate'] || 0) || 0;
-    coverage.linesCovered = parseInt(attrs['lines-covered'] || '0', 10) || 0;
-    coverage.linesValid = parseInt(attrs['lines-valid'] || '0', 10) || 0;
-    coverage.branchesCovered = parseInt(attrs['branches-covered'] || '0', 10) || 0;
-    coverage.branchesValid = parseInt(attrs['branches-valid'] || '0', 10) || 0;
-
+    populateCoverageTotals(coverage, result.coverage.$);
     const packages = result.coverage.packages?.[0]?.package || [];
-    for (const pkg of packages) {
-      const classes = pkg.classes?.[0]?.class || [];
-      for (const cls of classes) {
-        const fileEntry = parseCoberturaClass(cls);
-        if (fileEntry) {
-          coverage.files.push(fileEntry);
-        }
-      }
-    }
-
+    populateCoverageFiles(coverage, packages);
     return coverage;
   } catch (err) {
     console.log(`Warning: Failed to parse coverage file ${filePath}: ${err.message}`);
@@ -103,58 +109,73 @@ async function parseCoberturaFile(filePath) {
   }
 }
 
-// Parse JUnit XML file (Playwright reporter output)
-async function parseJUnitFile(filePath) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const result = await parseStringPromise(content);
-
-  const testResults = {
+function createEmptyTestResults() {
+  return {
     total: 0,
     passed: 0,
     failed: 0,
     skipped: 0,
     failures: []
   };
+}
 
-  const testsuites = result.testsuites?.testsuite || [];
-  for (const suite of testsuites) {
-    const tests = parseInt(suite.$.tests || 0);
-    const failures = parseInt(suite.$.failures || 0);
-    const skipped = parseInt(suite.$.skipped || 0);
-    const errors = parseInt(suite.$.errors || 0);
+function addJUnitSuiteTotals(testResults, suite) {
+  const tests = parseInt(suite.$.tests || 0);
+  const failures = parseInt(suite.$.failures || 0);
+  const skipped = parseInt(suite.$.skipped || 0);
+  const errors = parseInt(suite.$.errors || 0);
 
-    testResults.total += tests;
-    testResults.failed += failures + errors;
-    testResults.skipped += skipped;
-    testResults.passed += tests - failures - errors - skipped;
+  testResults.total += tests;
+  testResults.failed += failures + errors;
+  testResults.skipped += skipped;
+  testResults.passed += tests - failures - errors - skipped;
+}
 
-    const testcases = suite.testcase || [];
-    for (const tc of testcases) {
-      const hasFailure = tc.failure || tc.error;
-      if (hasFailure) {
-        const failNode = (tc.failure || tc.error)[0];
-        const message = typeof failNode === 'string' ? failNode : (failNode.$?.message || failNode._ || 'Test failed');
+function extractJUnitLocation(body) {
+  const match = body.match(/at (?:.*?)[(]?([\w./\\-]+\.[jt]sx?):(\d+):\d+/);
+  if (!match) return { file: null, line: null };
+  return { file: match[1], line: parseInt(match[2]) };
+}
 
-        // Try to extract file and line from the failure message/body
-        let file = null;
-        let line = null;
-        const body = typeof failNode === 'string' ? failNode : (failNode._ || '');
-        const match = body.match(/at (?:.*?)[(]?([\w./\\-]+\.[jt]sx?):(\d+):\d+/);
-        if (match) {
-          file = match[1];
-          line = parseInt(match[2]);
-        }
+function parseJUnitFailure(testcase, suite) {
+  const failure = testcase.failure || testcase.error;
+  if (!failure) return null;
 
-        testResults.failures.push({
-          name: tc.$.name || 'Unknown Test',
-          className: tc.$.classname || suite.$.name || '',
-          message: typeof message === 'string' ? message.substring(0, 500) : String(message).substring(0, 500),
-          stackTrace: body.substring(0, 2000),
-          file,
-          line
-        });
-      }
+  const failNode = failure[0];
+  const message = typeof failNode === 'string' ? failNode : (failNode.$?.message || failNode._ || 'Test failed');
+  const body = typeof failNode === 'string' ? failNode : (failNode._ || '');
+  const location = extractJUnitLocation(body);
+
+  return {
+    name: testcase.$.name || 'Unknown Test',
+    className: testcase.$.classname || suite.$.name || '',
+    message: typeof message === 'string' ? message.substring(0, 500) : String(message).substring(0, 500),
+    stackTrace: body.substring(0, 2000),
+    file: location.file,
+    line: location.line
+  };
+}
+
+function addJUnitFailures(testResults, suite) {
+  const testcases = suite.testcase || [];
+  for (const testcase of testcases) {
+    const failure = parseJUnitFailure(testcase, suite);
+    if (failure) {
+      testResults.failures.push(failure);
     }
+  }
+}
+
+// Parse JUnit XML file (Playwright reporter output)
+async function parseJUnitFile(filePath) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  const result = await parseStringPromise(content);
+  const testResults = createEmptyTestResults();
+  const testsuites = result.testsuites?.testsuite || [];
+
+  for (const suite of testsuites) {
+    addJUnitSuiteTotals(testResults, suite);
+    addJUnitFailures(testResults, suite);
   }
 
   return testResults;
@@ -181,53 +202,51 @@ function parseTrxFailure(testResult, testDefinitions) {
   return { name: testName, className, message, stackTrace, file, line };
 }
 
+function populateTrxTotals(testResults, testRun) {
+  const counters = testRun.ResultSummary?.[0]?.Counters?.[0].$;
+  if (!counters) return;
+
+  testResults.total = parseInt(counters.total || 0);
+  testResults.passed = parseInt(counters.passed || 0);
+  testResults.failed = parseInt(counters.failed || 0);
+  testResults.skipped = parseInt(counters.notExecuted || 0) + parseInt(counters.inconclusive || 0);
+}
+
+function parseTrxDefinitions(testRun) {
+  const testDefinitions = new Map();
+  const unitTests = testRun.TestDefinitions?.[0]?.UnitTest || [];
+  for (const unitTest of unitTests) {
+    const id = unitTest.$.id;
+    const name = unitTest.$.name;
+    const className = unitTest.TestMethod?.[0]?.$.className;
+    testDefinitions.set(id, { name, className });
+  }
+  return testDefinitions;
+}
+
+function populateTrxFailures(testResults, testRun, testDefinitions) {
+  const unitTestResults = testRun.Results?.[0]?.UnitTestResult || [];
+  for (const testResult of unitTestResults) {
+    if (testResult.$.outcome === 'Failed') {
+      testResults.failures.push(parseTrxFailure(testResult, testDefinitions));
+    }
+  }
+}
+
 // Parse TRX file (.NET test results)
 async function parseTrxFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
   const result = await parseStringPromise(content);
-
-  const testResults = {
-    total: 0,
-    passed: 0,
-    failed: 0,
-    skipped: 0,
-    failures: []
-  };
+  const testResults = createEmptyTestResults();
 
   if (!result.TestRun) {
     console.log('Invalid TRX file format');
     return testResults;
   }
 
-  const resultSummary = result.TestRun.ResultSummary?.[0];
-  if (resultSummary) {
-    const counters = resultSummary.Counters?.[0].$;
-    if (counters) {
-      testResults.total = parseInt(counters.total || 0);
-      testResults.passed = parseInt(counters.passed || 0);
-      testResults.failed = parseInt(counters.failed || 0);
-      testResults.skipped = parseInt(counters.notExecuted || 0) + parseInt(counters.inconclusive || 0);
-    }
-  }
-
-  const testDefinitions = new Map();
-  if (result.TestRun.TestDefinitions?.[0]?.UnitTest) {
-    for (const unitTest of result.TestRun.TestDefinitions[0].UnitTest) {
-      const id = unitTest.$.id;
-      const name = unitTest.$.name;
-      const className = unitTest.TestMethod?.[0]?.$.className;
-      testDefinitions.set(id, { name, className });
-    }
-  }
-
-  if (result.TestRun.Results?.[0]?.UnitTestResult) {
-    for (const testResult of result.TestRun.Results[0].UnitTestResult) {
-      if (testResult.$.outcome === 'Failed') {
-        testResults.failures.push(parseTrxFailure(testResult, testDefinitions));
-      }
-    }
-  }
-
+  populateTrxTotals(testResults, result.TestRun);
+  const testDefinitions = parseTrxDefinitions(result.TestRun);
+  populateTrxFailures(testResults, result.TestRun, testDefinitions);
   return testResults;
 }
 

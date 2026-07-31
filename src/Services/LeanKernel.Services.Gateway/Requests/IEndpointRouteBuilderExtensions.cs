@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -143,6 +144,7 @@ public static class IEndpointRouteBuilderExtensions
     /// </summary>
     /// <param name="rawJson">Original request payload.</param>
     /// <returns>Rewritten payload with role-first message objects.</returns>
+    [SuppressMessage("Critical Code Smell", "S3776", Justification = "JSON message reconstruction normalizes property order across chat messages.")]
     internal static string ReconstructMessage(string rawJson)
     {
         var rootNode = JsonNode.Parse(rawJson);
@@ -155,24 +157,7 @@ public static class IEndpointRouteBuilderExtensions
             {
                 if (message is JsonObject msgObj)
                 {
-                    var roleVal = msgObj["role"]?.ToString() ?? "user";
-                    var contentVal = msgObj["content"]?.ToString() ?? string.Empty;
-
-                    var compliantMessageObj = new JsonObject
-                    {
-                        { "role", roleVal },
-                        { "content", contentVal },
-                    };
-
-                    foreach (var property in msgObj)
-                    {
-                        if (property.Key != "role" && property.Key != "content")
-                        {
-                            compliantMessageObj.Add(property.Key, property.Value?.DeepClone());
-                        }
-                    }
-
-                    serializedMessages.Add(compliantMessageObj);
+                    serializedMessages.Add(ReconstructSingleMessage(msgObj));
                 }
             }
 
@@ -180,5 +165,27 @@ public static class IEndpointRouteBuilderExtensions
         }
 
         return rootNode!.ToJsonString();
+    }
+
+    private static JsonObject ReconstructSingleMessage(JsonObject msgObj)
+    {
+        var roleVal = msgObj["role"]?.ToString() ?? "user";
+        var contentVal = msgObj["content"]?.ToString() ?? string.Empty;
+
+        var compliantMessageObj = new JsonObject
+        {
+            { "role", roleVal },
+            { "content", contentVal },
+        };
+
+        foreach (var property in msgObj)
+        {
+            if (property.Key != "role" && property.Key != "content")
+            {
+                compliantMessageObj.Add(property.Key, property.Value?.DeepClone());
+            }
+        }
+
+        return compliantMessageObj;
     }
 }

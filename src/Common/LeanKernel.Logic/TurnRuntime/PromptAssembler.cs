@@ -35,8 +35,8 @@ public sealed class PromptAssembler(
             .OrderBy(c => c.Source switch
             {
                 Constants.TurnRuntime.ContextSource.System => 0,
-                Constants.TurnRuntime.ContextSource.Identity => 1,
-                Constants.TurnRuntime.ContextSource.Memory => 2,
+                Constants.TurnRuntime.ContextSource.IdentityContext => 1,
+                Constants.TurnRuntime.ContextSource.MemoryContext => 2,
                 Constants.TurnRuntime.ContextSource.Retrieval => 3,
                 _ => 4
             })

@@ -73,11 +73,13 @@ public class JwtSecurityTokenGenerator : ISecurityTokenGenerator
     /// <returns>An enumeration of <see cref="Claim"/>.</returns>
     public IEnumerable<Claim> GenerateClaimsWithRights(ChannelSenderBindingEntity sender)
     {
-        if (sender == null)
-        {
-            throw new ArgumentNullException(nameof(sender));
-        }
+        ArgumentNullException.ThrowIfNull(sender);
 
+        return GenerateClaimsCore(sender);
+    }
+
+    private static IEnumerable<Claim> GenerateClaimsCore(ChannelSenderBindingEntity sender)
+    {
         yield return new Claim(ClaimTypes.Sid, sender.User.Id.ToString(), ClaimValueTypes.String);
         yield return new Claim(ClaimTypes.NameIdentifier, sender.User.Email, ClaimValueTypes.Email);
         yield return new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(sender.User.FullName) ? $"{sender.User.FirstName} {sender.User.LastName}" : sender.User.FullName, ClaimValueTypes.String);

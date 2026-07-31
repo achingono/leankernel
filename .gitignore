@@ -12,3 +12,4 @@ sonar-reports/
 scripts/db/seed.sql
 Library/
 scripts/gbrain/backups/
+.github/actions/test-reporter/node_modules/

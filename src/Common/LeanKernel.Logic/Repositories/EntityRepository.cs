@@ -1,6 +1,5 @@
 namespace LeanKernel.Logic.Repositories;
 
-using System.Collections.Concurrent;
 using System.Reflection;
 
 using LeanKernel.Data;
@@ -18,8 +17,6 @@ using Microsoft.EntityFrameworkCore;
 public sealed class EntityRepository<TEntity> : IRepository<TEntity>
     where TEntity : class, IEntity
 {
-    private static readonly ConcurrentDictionary<Type, PartitionKeyProps> PartitionKeyCache = new();
-
     private readonly EntityContext _context;
     private readonly IFilter<TEntity> _filter;
     private readonly IPermit<TEntity> _permit;
@@ -129,7 +126,7 @@ public sealed class EntityRepository<TEntity> : IRepository<TEntity>
 
     private void StampPartitionKeys(TEntity entity)
     {
-        var props = PartitionKeyCache.GetOrAdd(typeof(TEntity), static t => new PartitionKeyProps
+        var props = (PartitionKeyProps)EntityRepositoryCache.PartitionKeyCache.GetOrAdd(typeof(TEntity), static t => new PartitionKeyProps
         {
             TenantId = t.GetProperty("TenantId"),
             UserId = t.GetProperty("UserId"),

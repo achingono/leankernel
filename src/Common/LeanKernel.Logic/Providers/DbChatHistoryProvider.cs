@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 using LeanKernel.Entities;
@@ -92,6 +93,7 @@ public class DbChatHistoryProvider(
     }
 
     /// <inheritdoc />
+    [SuppressMessage("Critical Code Smell", "S3776", Justification = "Chat history persistence handles multi-turn candidate processing and telemetry coordination.")]
     protected override async ValueTask StoreChatHistoryAsync(
         InvokedContext context,
         CancellationToken cancellationToken = default)
@@ -144,46 +146,7 @@ public class DbChatHistoryProvider(
                     // Persist telemetry for assistant turns when available.
                     if (telemetry is not null && turn.Role == "assistant")
                     {
-                        var telemetryEntity = new TurnTelemetryEntity
-                        {
-                            TurnId = turn.Id,
-                            RequestedModel = telemetry.RequestedModel,
-                            ServedModel = telemetry.ServedModel,
-                            Provider = telemetry.Provider,
-                            ModelId = telemetry.ModelId,
-                            ApiBase = telemetry.ApiBase,
-                            PromptTokens = telemetry.PromptTokens,
-                            CompletionTokens = telemetry.CompletionTokens,
-                            TotalTokens = telemetry.TotalTokens,
-                            ResponseCost = telemetry.ResponseCost,
-                            Currency = telemetry.Currency,
-                            CostIsEstimated = telemetry.CostIsEstimated,
-                            LatencyMs = telemetry.Latency.HasValue
-                                ? (long)telemetry.Latency.Value.TotalMilliseconds
-                                : null,
-                            CapturedAt = telemetry.CapturedAt,
-                            SchemaVersion = telemetry.SchemaVersion,
-                            EvidenceClass = telemetry.EvidenceClass,
-                            GroundingStatus = telemetry.GroundingStatus,
-                            RetrievedMemoryKeysJson = telemetry.RetrievedMemoryKeys is { Count: > 0 }
-                                ? JsonSerializer.Serialize(telemetry.RetrievedMemoryKeys)
-                                : null,
-                            RetrievedEvidenceClassesJson = telemetry.RetrievedEvidenceClasses is { Count: > 0 }
-                                ? JsonSerializer.Serialize(telemetry.RetrievedEvidenceClasses)
-                                : null,
-                            CreatedOn = DateTime.UtcNow,
-                            CreatedBy = new Badge
-                            {
-                                Id = Guid.Empty,
-                                FullName = "System",
-                                Email = string.Empty
-                            }
-                        };
-
-                        telemetryRepo.Add(telemetryEntity);
-
-                        // Emit telemetry event alongside persistence.
-                        EmitTelemetryEvent(telemetryEntity, telemetry);
+                        PersistTelemetryForTurn(turn, telemetry);
                     }
 
                     if (eventStore is not null && turn.Role == "assistant")
@@ -244,6 +207,50 @@ public class DbChatHistoryProvider(
                 permit.UserId,
                 permit.ChannelId);
         }
+    }
+
+    private void PersistTelemetryForTurn(TurnEntity turn, TurnTelemetry telemetry)
+    {
+        var telemetryEntity = new TurnTelemetryEntity
+        {
+            TurnId = turn.Id,
+            RequestedModel = telemetry.RequestedModel,
+            ServedModel = telemetry.ServedModel,
+            Provider = telemetry.Provider,
+            ModelId = telemetry.ModelId,
+            ApiBase = telemetry.ApiBase,
+            PromptTokens = telemetry.PromptTokens,
+            CompletionTokens = telemetry.CompletionTokens,
+            TotalTokens = telemetry.TotalTokens,
+            ResponseCost = telemetry.ResponseCost,
+            Currency = telemetry.Currency,
+            CostIsEstimated = telemetry.CostIsEstimated,
+            LatencyMs = telemetry.Latency.HasValue
+                ? (long)telemetry.Latency.Value.TotalMilliseconds
+                : null,
+            CapturedAt = telemetry.CapturedAt,
+            SchemaVersion = telemetry.SchemaVersion,
+            EvidenceClass = telemetry.EvidenceClass,
+            GroundingStatus = telemetry.GroundingStatus,
+            RetrievedMemoryKeysJson = telemetry.RetrievedMemoryKeys is { Count: > 0 }
+                ? JsonSerializer.Serialize(telemetry.RetrievedMemoryKeys)
+                : null,
+            RetrievedEvidenceClassesJson = telemetry.RetrievedEvidenceClasses is { Count: > 0 }
+                ? JsonSerializer.Serialize(telemetry.RetrievedEvidenceClasses)
+                : null,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = new Badge
+            {
+                Id = Guid.Empty,
+                FullName = "System",
+                Email = string.Empty
+            }
+        };
+
+        telemetryRepo.Add(telemetryEntity);
+
+        // Emit telemetry event alongside persistence.
+        EmitTelemetryEvent(telemetryEntity);
     }
 
     private static bool IsPermitFailure(InvalidOperationException exception)
@@ -453,10 +460,7 @@ public class DbChatHistoryProvider(
         });
     }
 
-    /// <summary>
-    /// Emits a telemetry event to the event collector alongside current persistence.
-    /// </summary>
-    private void EmitTelemetryEvent(TurnTelemetryEntity entity, TurnTelemetry telemetry)
+    private void EmitTelemetryEvent(TurnTelemetryEntity entity)
     {
         if (eventCollector is null)
         {

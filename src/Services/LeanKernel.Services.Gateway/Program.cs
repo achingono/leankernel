@@ -35,37 +35,7 @@ var identityConfig = builder.Configuration.GetSection("Identity").Get<IdentitySe
 var agentConfig = builder.Configuration.GetSection("Agents").Get<AgentSettings>() ?? new AgentSettings();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-
-    var trustedProxyIps = builder.Configuration
-        .GetSection("Identity:TrustedProxies")
-        .Get<string[]>() ?? [];
-
-    if (trustedProxyIps.Length > 0)
-    {
-        options.ForwardedHeaders |= ForwardedHeaders.XForwardedHost;
-        options.KnownProxies.Clear();
-        options.KnownIPNetworks.Clear();
-
-        foreach (var proxyIp in trustedProxyIps)
-        {
-            if (System.Net.IPAddress.TryParse(proxyIp, out var ip))
-            {
-                options.KnownProxies.Add(ip);
-            }
-            else if (System.Net.IPNetwork.TryParse(proxyIp, out var net))
-            {
-                options.KnownIPNetworks.Add(net);
-            }
-        }
-    }
-    else
-    {
-        options.KnownIPNetworks.Clear();
-        options.KnownProxies.Clear();
-    }
-});
+    ConfigureForwardedHeaders(options, builder.Configuration));
 
 builder.Services
     .AddOptions<OpenAISettings>()
@@ -124,61 +94,7 @@ builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession();
 
 builder.Services.AddAuthentication(Constants.Http.Headers.Bearer)
-    .AddJwtBearer(Constants.Http.Headers.Bearer, options =>
-    {
-        options.RequireHttpsMetadata = identityConfig.OpenId.RequireHttpsMetadata;
-        options.SaveToken = true;
-
-        var tokenSettings = identityConfig.Token;
-        var hasSigningKey = !string.IsNullOrWhiteSpace(tokenSettings.SecretKey);
-        var hasIssuer = !string.IsNullOrWhiteSpace(tokenSettings.Issuer);
-        var hasAudience = !string.IsNullOrWhiteSpace(tokenSettings.Audience);
-
-        if (hasSigningKey)
-        {
-            var key = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-                System.Text.Encoding.UTF8.GetBytes(tokenSettings.SecretKey));
-            options.TokenValidationParameters.IssuerSigningKey = key;
-        }
-
-        options.TokenValidationParameters.RequireSignedTokens = hasSigningKey;
-        options.TokenValidationParameters.ValidateIssuerSigningKey = hasSigningKey;
-        options.TokenValidationParameters.ValidateIssuer = hasIssuer;
-        options.TokenValidationParameters.ValidateAudience = hasAudience;
-        options.TokenValidationParameters.ValidateLifetime = hasSigningKey;
-
-        if (hasIssuer)
-        {
-            options.TokenValidationParameters.ValidIssuer = tokenSettings.Issuer;
-        }
-
-        var trustedChannelIssuers = agentConfig.Channels.TrustedIssuers
-            .Where(issuer => !string.IsNullOrWhiteSpace(issuer))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
-        if (trustedChannelIssuers.Count > 0)
-        {
-            options.TokenValidationParameters.ValidIssuers = hasIssuer
-                ? trustedChannelIssuers.Append(tokenSettings.Issuer)
-                : trustedChannelIssuers;
-            options.TokenValidationParameters.ValidateIssuer = true;
-        }
-
-        if (hasAudience)
-        {
-            options.TokenValidationParameters.ValidAudience = tokenSettings.Audience;
-        }
-
-        if (!string.IsNullOrWhiteSpace(identityConfig.OpenId.Authority))
-        {
-            options.Authority = identityConfig.OpenId.Authority;
-            options.TokenValidationParameters.ValidateIssuer = true;
-            options.TokenValidationParameters.ValidateAudience = !string.IsNullOrWhiteSpace(identityConfig.OpenId.ClientId);
-            options.TokenValidationParameters.ValidAudience = identityConfig.OpenId.ClientId;
-            options.TokenValidationParameters.ValidateIssuerSigningKey = true;
-        }
-    });
+    .AddJwtBearer(Constants.Http.Headers.Bearer, options => ConfigureJwtBearer(options, identityConfig, agentConfig));
 
 builder.Services.AddAuthorization(options =>
 {
@@ -308,3 +224,90 @@ app.MapHealthChecks(Constants.Healthchecks.Path, new HealthCheckOptions
 });
 
 app.Run();
+
+static void ConfigureForwardedHeaders(ForwardedHeadersOptions options, IConfiguration configuration)
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    var trustedProxyIps = configuration
+        .GetSection("Identity:TrustedProxies")
+        .Get<string[]>() ?? [];
+
+    options.KnownProxies.Clear();
+    options.KnownIPNetworks.Clear();
+
+    if (trustedProxyIps.Length == 0)
+    {
+        return;
+    }
+
+    options.ForwardedHeaders |= ForwardedHeaders.XForwardedHost;
+
+    foreach (var proxyIp in trustedProxyIps)
+    {
+        if (System.Net.IPAddress.TryParse(proxyIp, out var ip))
+        {
+            options.KnownProxies.Add(ip);
+        }
+        else if (System.Net.IPNetwork.TryParse(proxyIp, out var net))
+        {
+            options.KnownIPNetworks.Add(net);
+        }
+    }
+}
+
+static void ConfigureJwtBearer(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions options, IdentitySettings identityConfig, AgentSettings agentConfig)
+{
+    options.RequireHttpsMetadata = identityConfig.OpenId.RequireHttpsMetadata;
+    options.SaveToken = true;
+
+    var tokenSettings = identityConfig.Token;
+    var hasSigningKey = !string.IsNullOrWhiteSpace(tokenSettings.SecretKey);
+    var hasIssuer = !string.IsNullOrWhiteSpace(tokenSettings.Issuer);
+    var hasAudience = !string.IsNullOrWhiteSpace(tokenSettings.Audience);
+
+    if (hasSigningKey)
+    {
+        var key = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+            System.Text.Encoding.UTF8.GetBytes(tokenSettings.SecretKey));
+        options.TokenValidationParameters.IssuerSigningKey = key;
+    }
+
+    options.TokenValidationParameters.RequireSignedTokens = hasSigningKey;
+    options.TokenValidationParameters.ValidateIssuerSigningKey = hasSigningKey;
+    options.TokenValidationParameters.ValidateIssuer = hasIssuer;
+    options.TokenValidationParameters.ValidateAudience = hasAudience;
+    options.TokenValidationParameters.ValidateLifetime = hasSigningKey;
+
+    if (hasIssuer)
+    {
+        options.TokenValidationParameters.ValidIssuer = tokenSettings.Issuer;
+    }
+
+    var trustedChannelIssuers = agentConfig.Channels.TrustedIssuers
+        .Where(issuer => !string.IsNullOrWhiteSpace(issuer))
+        .Distinct(StringComparer.Ordinal)
+        .ToList();
+
+    if (trustedChannelIssuers.Count > 0)
+    {
+        options.TokenValidationParameters.ValidIssuers = hasIssuer
+            ? trustedChannelIssuers.Append(tokenSettings.Issuer)
+            : trustedChannelIssuers;
+        options.TokenValidationParameters.ValidateIssuer = true;
+    }
+
+    if (hasAudience)
+    {
+        options.TokenValidationParameters.ValidAudience = tokenSettings.Audience;
+    }
+
+    if (!string.IsNullOrWhiteSpace(identityConfig.OpenId.Authority))
+    {
+        options.Authority = identityConfig.OpenId.Authority;
+        options.TokenValidationParameters.ValidateIssuer = true;
+        options.TokenValidationParameters.ValidateAudience = !string.IsNullOrWhiteSpace(identityConfig.OpenId.ClientId);
+        options.TokenValidationParameters.ValidAudience = identityConfig.OpenId.ClientId;
+        options.TokenValidationParameters.ValidateIssuerSigningKey = true;
+    }
+}

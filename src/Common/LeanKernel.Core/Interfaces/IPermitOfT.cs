@@ -6,9 +6,14 @@ namespace LeanKernel;
 /// Generic permit for entity-scoped CRUD authorization.
 /// </summary>
 /// <typeparam name="TEntity">The entity type to authorize against.</typeparam>
-public interface IPermit<TEntity> : IPermit
+public interface IPermit<out TEntity> : IPermit
     where TEntity : class
 {
+    /// <summary>
+    /// Gets the entity type authorized by this permit.
+    /// </summary>
+    Type EntityType => typeof(TEntity);
+
     /// <summary>
     /// Determines whether the current identity can perform the specified operation on <typeparamref name="TEntity"/>.
     /// </summary>

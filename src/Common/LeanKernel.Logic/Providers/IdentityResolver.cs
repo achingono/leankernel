@@ -703,20 +703,25 @@ public sealed class IdentityResolver(
         {
             try
             {
-                var array = JsonSerializer.Deserialize<List<string>>(trimmed, JsonOptions);
-                return array ?? [];
+                return JsonSerializer.Deserialize<List<string>>(trimmed, JsonOptions) ?? [];
             }
             catch (JsonException)
             {
+                return SplitNonJsonClaimValue(trimmed);
             }
         }
 
-        if (trimmed.Contains(',', StringComparison.Ordinal))
+        return SplitNonJsonClaimValue(trimmed);
+    }
+
+    private static IEnumerable<string> SplitNonJsonClaimValue(string value)
+    {
+        if (value.Contains(',', StringComparison.Ordinal))
         {
-            return trimmed.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         }
 
-        return [trimmed];
+        return [value];
     }
 
     private static string? FindFirstNonEmpty(ClaimsPrincipal principal, params string[] claimTypes)

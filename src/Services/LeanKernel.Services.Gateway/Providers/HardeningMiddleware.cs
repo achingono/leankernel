@@ -27,14 +27,11 @@ public sealed class HardeningMiddleware(RequestDelegate next)
         context.TraceIdentifier = correlationId;
         context.Response.Headers[hardening.CorrelationIdHeader] = correlationId;
 
-        if (RequiresApiKey(context.Request.Path) && hardening.RequireApiKey)
+        if (RequiresApiKey(context.Request.Path) && hardening.RequireApiKey && !HasValidApiKey(context.Request, hardening))
         {
-            if (!HasValidApiKey(context.Request, hardening))
-            {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                logger.LogWarning("Request to {Path} rejected: missing or invalid API key.", context.Request.Path);
-                return;
-            }
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            logger.LogWarning("Request to {Path} rejected: missing or invalid API key.", context.Request.Path);
+            return;
         }
 
         await next(context);

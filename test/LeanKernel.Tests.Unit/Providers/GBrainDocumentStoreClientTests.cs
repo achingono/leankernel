@@ -528,6 +528,129 @@ public sealed class GBrainDocumentStoreClientTests
         entries[102].Fingerprint.Should().EndWith("fp-1");
     }
 
+    [Fact]
+    public async Task SearchAsync_NullResult_ReturnsEmpty()
+    {
+        var mcp = new Mock<IGBrainMcpClient>();
+        mcp.Setup(c => c.CallToolAsync("search", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((JsonElement?)null);
+        var sut = CreateSut(mcp.Object);
+
+        var result = await sut.SearchAsync(CreateScope(), "alpha", channelIds: null, maxResults: 10);
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ListAsync_NullResult_ReturnsEmpty()
+    {
+        var mcp = new Mock<IGBrainMcpClient>();
+        mcp.Setup(c => c.CallToolAsync("list_pages", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((JsonElement?)null);
+        var sut = CreateSut(mcp.Object);
+
+        var result = await sut.ListAsync(CreateScope(), channelIds: null, limit: 10);
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task IsReadable_TenantMismatch_ReturnsFalse()
+    {
+        var tenantId = Guid.NewGuid();
+        var otherTenant = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var channel = Guid.NewGuid();
+
+        var payload = JsonDocument.Parse(
+            $$"""
+            [
+              {
+                "slug": "documents/{{otherTenant}}/tenant/{{channel}}/{{userId}}/fp-1",
+                "content": "test"
+              }
+            ]
+            """).RootElement.Clone();
+
+        var mcp = new Mock<IGBrainMcpClient>();
+        mcp.Setup(c => c.CallToolAsync("list_pages", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payload);
+        var sut = CreateSut(mcp.Object);
+
+        var scope = new DocumentScopeContext(tenantId, userId, Guid.NewGuid(), channel, DocumentAvailabilityScope.Tenant);
+        var entries = await sut.ListAsync(scope, [channel], 10);
+
+        entries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task IsReadable_UnknownScope_ReturnsFalse()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var channel = Guid.NewGuid();
+
+        var payload = JsonDocument.Parse(
+            $$"""
+            [
+              {
+                "slug": "documents/{{tenantId}}/unknownscope/{{channel}}/{{userId}}/fp-1",
+                "content": "test"
+              }
+            ]
+            """).RootElement.Clone();
+
+        var mcp = new Mock<IGBrainMcpClient>();
+        mcp.Setup(c => c.CallToolAsync("list_pages", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payload);
+        var sut = CreateSut(mcp.Object);
+
+        var scope = new DocumentScopeContext(tenantId, userId, Guid.NewGuid(), channel, DocumentAvailabilityScope.Channel);
+        var entries = await sut.ListAsync(scope, [channel], 10);
+
+        entries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task MapToSearchHit_SupportsNumericAndBooleanContent()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var channel = Guid.NewGuid();
+
+        var payload = JsonDocument.Parse(
+            $$"""
+            {
+              "results": [
+                {
+                  "slug": "documents/{{tenantId}}/channel/{{channel}}/{{userId}}/fp-num",
+                  "title": "num.txt",
+                  "content": 123,
+                  "score": 0.5
+                },
+                {
+                  "slug": "documents/{{tenantId}}/channel/{{channel}}/{{userId}}/fp-bool",
+                  "title": "bool.txt",
+                  "compiled_truth": true,
+                  "score": 0.4
+                }
+              ]
+            }
+            """).RootElement.Clone();
+
+        var mcp = new Mock<IGBrainMcpClient>();
+        mcp.Setup(c => c.CallToolAsync("search", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payload);
+        var sut = CreateSut(mcp.Object);
+
+        var scope = new DocumentScopeContext(tenantId, userId, Guid.NewGuid(), channel, DocumentAvailabilityScope.Channel);
+        var hits = await sut.SearchAsync(scope, "test", [channel], 10);
+
+        hits.Should().HaveCount(2);
+        hits[0].Excerpt.Should().Be("123");
+        hits[1].Excerpt.Should().Be("True");
+    }
+
     private static GBrainDocumentStoreClient CreateSut(IGBrainMcpClient mcp)
         => new(
             mcp,
