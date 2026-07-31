@@ -590,9 +590,8 @@ public class DbChatHistoryProviderTests : IDisposable
             CancellationToken.None);
 
         eventStore.Verify(
-            s => s.AppendBatchAsync(
-                It.Is<IEnumerable<object>>(events => events.OfType<TurnCompletedEvent>().Any()),
-                It.IsAny<CancellationToken>()),
+            s => s.AttachBatch(
+                It.Is<IEnumerable<object>>(events => events.OfType<TurnCompletedEvent>().Any())),
             Times.Once);
     }
 

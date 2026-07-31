@@ -178,12 +178,12 @@ public class DbChatHistoryProvider(
                 }
             }
 
-            await turnRepo.SaveChangesAsync(cancellationToken);
-
             if (eventStore is not null && completedTurns.Count > 0)
             {
-                await eventStore.AppendBatchAsync(completedTurns, cancellationToken);
+                eventStore.AttachBatch(completedTurns);
             }
+
+            await turnRepo.SaveChangesAsync(cancellationToken);
 
             if (eventCollector is not null)
             {

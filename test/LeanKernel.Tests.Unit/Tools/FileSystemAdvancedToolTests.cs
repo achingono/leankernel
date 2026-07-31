@@ -96,6 +96,161 @@ public class FileSystemAdvancedToolTests
         result.Error.Should().Contain("Invalid regex pattern");
     }
 
+    [Fact]
+    public async Task FileCopy_non_recursive_directory_copy_returns_error()
+    {
+        var root = CreateTempRoot();
+        var scopeFactory = CreateScopeFactory(root);
+
+        Directory.CreateDirectory(Path.Combine(root, "source_dir"));
+        await File.WriteAllTextAsync(Path.Combine(root, "source_dir", "file.txt"), "content");
+
+        var copy = FileCopyTool.Create(scopeFactory);
+        var result = await copy.Handler!(new Dictionary<string, object?>
+        {
+            ["sourcePath"] = "source_dir",
+            ["destinationPath"] = "dest_dir",
+            ["recursive"] = false
+        }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("recursive=true");
+    }
+
+    [Fact]
+    public async Task FileCopy_recursive_directory_copy_copies_all_content()
+    {
+        var root = CreateTempRoot();
+        var scopeFactory = CreateScopeFactory(root);
+
+        Directory.CreateDirectory(Path.Combine(root, "source_dir", "subdir"));
+        await File.WriteAllTextAsync(Path.Combine(root, "source_dir", "file1.txt"), "content1");
+        await File.WriteAllTextAsync(Path.Combine(root, "source_dir", "subdir", "file2.txt"), "content2");
+
+        var copy = FileCopyTool.Create(scopeFactory);
+        var result = await copy.Handler!(new Dictionary<string, object?>
+        {
+            ["sourcePath"] = "source_dir",
+            ["destinationPath"] = "dest_dir",
+            ["recursive"] = true
+        }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Output.Should().Contain("Copied");
+        File.Exists(Path.Combine(root, "dest_dir", "file1.txt")).Should().BeTrue();
+        File.Exists(Path.Combine(root, "dest_dir", "subdir", "file2.txt")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task FileCopy_missing_source_returns_not_found_error()
+    {
+        var root = CreateTempRoot();
+        var scopeFactory = CreateScopeFactory(root);
+
+        var copy = FileCopyTool.Create(scopeFactory);
+        var result = await copy.Handler!(new Dictionary<string, object?>
+        {
+            ["sourcePath"] = "nonexistent.txt",
+            ["destinationPath"] = "dest.txt"
+        }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("not found");
+    }
+
+    [Fact]
+    public async Task FileCopy_missing_destination_directory_creates_when_createDirectories_true()
+    {
+        var root = CreateTempRoot();
+        var scopeFactory = CreateScopeFactory(root);
+
+        await File.WriteAllTextAsync(Path.Combine(root, "docs", "source.txt"), "hello");
+
+        var copy = FileCopyTool.Create(scopeFactory);
+        var result = await copy.Handler!(new Dictionary<string, object?>
+        {
+            ["sourcePath"] = "docs/source.txt",
+            ["destinationPath"] = "newdir/copy.txt"
+        }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        File.Exists(Path.Combine(root, "newdir", "copy.txt")).Should().BeTrue();
+        var content = await File.ReadAllTextAsync(Path.Combine(root, "newdir", "copy.txt"));
+        content.Should().Be("hello");
+    }
+
+    [Fact]
+    public async Task FileCopy_empty_source_or_destination_returns_error()
+    {
+        var root = CreateTempRoot();
+        var scopeFactory = CreateScopeFactory(root);
+
+        var copy = FileCopyTool.Create(scopeFactory);
+        var result = await copy.Handler!(new Dictionary<string, object?>
+        {
+            ["sourcePath"] = "docs/source.txt",
+            ["destinationPath"] = "   "
+        }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("required");
+    }
+
+    [Fact]
+    public async Task FileCopy_null_source_or_destination_returns_error()
+    {
+        var root = CreateTempRoot();
+        var scopeFactory = CreateScopeFactory(root);
+
+        var copy = FileCopyTool.Create(scopeFactory);
+        var result = await copy.Handler!(new Dictionary<string, object?>
+        {
+            ["sourcePath"] = null,
+            ["destinationPath"] = null
+        }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("required");
+    }
+
+    [Fact]
+    public async Task FileCopy_source_path_outside_root_returns_error()
+    {
+        var root = CreateTempRoot();
+        var scopeFactory = CreateScopeFactory(root);
+
+        await File.WriteAllTextAsync(Path.Combine(root, "docs", "source.txt"), "hello");
+
+        var copy = FileCopyTool.Create(scopeFactory);
+        var result = await copy.Handler!(new Dictionary<string, object?>
+        {
+            ["sourcePath"] = "../outside.txt",
+            ["destinationPath"] = "docs/dest.txt"
+        }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("outside");
+    }
+
+    [Fact]
+    public async Task FileCopy_same_source_and_destination_returns_error()
+    {
+        var root = CreateTempRoot();
+        var scopeFactory = CreateScopeFactory(root);
+
+        await File.WriteAllTextAsync(Path.Combine(root, "docs", "source.txt"), "hello");
+
+        var copy = FileCopyTool.Create(scopeFactory);
+        var result = await copy.Handler!(new Dictionary<string, object?>
+        {
+            ["sourcePath"] = "docs/source.txt",
+            ["destinationPath"] = "docs/source.txt"
+        }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("different paths");
+    }
+
     private static IServiceScopeFactory CreateScopeFactory(string root)
     {
         var services = new ServiceCollection();

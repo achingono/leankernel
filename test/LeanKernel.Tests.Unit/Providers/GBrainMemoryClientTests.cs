@@ -426,4 +426,155 @@ public class GBrainMemoryClientTests
         result[0].ChannelId.Should().Be(scope.ChannelId);
         result[0].ScopeRelativeKey.Should().Be("facts/who/jane/x1");
     }
+
+    [Fact]
+    public async Task GetMemoryAsync_Success_ReturnsMemoryItem()
+    {
+        var scope = CreateScope();
+        var json = System.Text.Json.JsonDocument.Parse(
+            """{"compiled_truth":"page content","score":1.0}""")
+            .RootElement.Clone();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("get_page", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json);
+
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+
+        var result = await client.GetMemoryAsync(scope, "facts/who/jane/x1");
+
+        result.Should().NotBeNull();
+        result!.Text.Should().Be("page content");
+        result.Score.Should().Be(1.0);
+        result.Source.Should().Be("gbrain");
+    }
+
+    [Fact]
+    public async Task GetMemoryAsync_NullResult_ReturnsNull()
+    {
+        var scope = CreateScope();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("get_page", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((System.Text.Json.JsonElement?)null);
+
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+
+        var result = await client.GetMemoryAsync(scope, "some-key");
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetMemoryAsync_NullContent_ReturnsNull()
+    {
+        var scope = CreateScope();
+        var json = System.Text.Json.JsonDocument.Parse(
+            """{"compiled_truth":null}""")
+            .RootElement.Clone();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("get_page", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json);
+
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+
+        var result = await client.GetMemoryAsync(scope, "some-key");
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetMemoryAsync_ContentFallback_UsesContentProperty()
+    {
+        var scope = CreateScope();
+        var json = System.Text.Json.JsonDocument.Parse(
+            """{"content":"fallback content"}""")
+            .RootElement.Clone();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("get_page", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json);
+
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+
+        var result = await client.GetMemoryAsync(scope, "some-key");
+
+        result.Should().NotBeNull();
+        result!.Text.Should().Be("fallback content");
+    }
+
+    [Fact]
+    public async Task GetMemoryAsync_ChunkTextFallback_UsesChunkTextProperty()
+    {
+        var scope = CreateScope();
+        var json = System.Text.Json.JsonDocument.Parse(
+            """{"chunk_text":"chunk content"}""")
+            .RootElement.Clone();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("get_page", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json);
+
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+
+        var result = await client.GetMemoryAsync(scope, "some-key");
+
+        result.Should().NotBeNull();
+        result!.Text.Should().Be("chunk content");
+    }
+
+    [Fact]
+    public async Task GetMemoryAsync_AllNullContent_ReturnsNull()
+    {
+        var scope = CreateScope();
+        var json = System.Text.Json.JsonDocument.Parse(
+            """{"compiled_truth":null,"content":"","chunk_text":null}""")
+            .RootElement.Clone();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("get_page", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json);
+
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+
+        var result = await client.GetMemoryAsync(scope, "some-key");
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetMemoryAsync_WithGBrainException_ReturnsNull()
+    {
+        var scope = CreateScope();
+
+        var mockClient = new Mock<IGBrainMcpClient>();
+        mockClient
+            .Setup(c => c.CallToolAsync("get_page", It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new GBrainException("not found"));
+
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+
+        var result = await client.GetMemoryAsync(scope, "some-key");
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetMemoryAsync_ThrowsForNullScopeRelativeKey()
+    {
+        var mockClient = new Mock<IGBrainMcpClient>();
+        var client = new GBrainMemoryClient(mockClient.Object, CreatePolicyResolver().Object, Mock.Of<ILogger<GBrainMemoryClient>>());
+        var scope = CreateScope();
+
+        var act = () => client.GetMemoryAsync(scope, string.Empty);
+
+        await act.Should().ThrowAsync<ArgumentException>();
+    }
 }

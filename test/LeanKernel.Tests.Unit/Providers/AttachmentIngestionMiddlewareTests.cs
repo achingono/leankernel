@@ -514,6 +514,7 @@ public sealed class AttachmentIngestionMiddlewareTests
             UserId = Guid.NewGuid(),
             PersonId = Guid.NewGuid(),
             ChannelId = Guid.NewGuid(),
+            IsAuthenticated = badgeId?.Equals(Guid.Empty) != true,
             Badge = new Badge
             {
                 Id = badgeId ?? Guid.NewGuid(),

@@ -377,6 +377,12 @@ Remote channel answer
             Saved.Add((key, content));
             return Task.CompletedTask;
         }
+
+        /// <inheritdoc />
+        public Task<MemoryItem?> GetMemoryAsync(MemoryScope scope, string scopeRelativeKey, CancellationToken ct = default)
+        {
+            return Task.FromResult<MemoryItem?>(null);
+        }
     }
 
     /// <summary>

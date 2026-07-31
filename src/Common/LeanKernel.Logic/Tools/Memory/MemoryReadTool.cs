@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-using LeanKernel.Logic.Memory;
+using LeanKernel.Logic.Providers;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,7 +25,7 @@ public static class MemoryReadTool
         return new ToolDefinition
         {
             Name = ToolName,
-            Description = "Retrieve a knowledge page from Memory by its key",
+            Description = "Retrieve a knowledge page from Memory by its scope-relative key. Use the ScopeRelativeKey from memory_search results.",
             Category = "knowledge",
             Parameters =
             [
@@ -33,7 +33,7 @@ public static class MemoryReadTool
                 {
                     Name = "key",
                     Type = "string",
-                    Description = "The page key (slug) to retrieve",
+                    Description = "The scope-relative page key to retrieve (use ScopeRelativeKey from search results)",
                     Required = true
                 }
             ],
@@ -48,9 +48,19 @@ public static class MemoryReadTool
                 try
                 {
                     using var scope = scopeFactory.CreateScope();
-                    var memoryService = scope.ServiceProvider.GetRequiredService<IMemoryService>();
+                    var permit = scope.ServiceProvider.GetRequiredService<IPermit>();
+                    var memoryClient = scope.ServiceProvider.GetRequiredService<IMemoryClient>();
 
-                    var page = await memoryService.GetPageAsync(key, ct).ConfigureAwait(false);
+                    var memoryScope = new MemoryScope
+                    {
+                        TenantId = permit.TenantId,
+                        PersonId = permit.PersonId,
+                        ChannelId = permit.ChannelId,
+                    };
+
+                    var page = await memoryClient.GetMemoryAsync(memoryScope, key, ct)
+                        .ConfigureAwait(false);
+
                     if (page is null)
                     {
                         return new ToolResult

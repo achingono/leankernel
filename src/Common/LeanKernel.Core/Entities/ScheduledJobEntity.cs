@@ -56,6 +56,16 @@ public sealed class ScheduledJobEntity
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
+    /// Gets or sets the worker ID that holds the current lease.
+    /// </summary>
+    public string? LeaseOwner { get; set; }
+
+    /// <summary>
+    /// Gets or sets the lease expiration timestamp.
+    /// </summary>
+    public DateTime? LeaseExpiresAt { get; set; }
+
+    /// <summary>
     /// Gets or sets the last update timestamp.
     /// </summary>
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

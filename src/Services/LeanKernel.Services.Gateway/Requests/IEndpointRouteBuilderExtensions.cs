@@ -105,8 +105,9 @@ public static class IEndpointRouteBuilderExtensions
         {
             var rewrittenJson = ReconstructMessage(rawJson);
 
+            var selfUrl = $"{context.Request.Scheme}://{context.Request.Host}{internalPath}";
             var client = httpClientFactory.CreateClient();
-            var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"http://localhost:8080{internalPath}")
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, selfUrl)
             {
                 Content = new StringContent(rewrittenJson, System.Text.Encoding.UTF8, Constants.ContentTypes.Json),
             };
@@ -169,14 +170,22 @@ public static class IEndpointRouteBuilderExtensions
 
     private static JsonObject ReconstructSingleMessage(JsonObject msgObj)
     {
-        var roleVal = msgObj["role"]?.ToString() ?? "user";
-        var contentVal = msgObj["content"]?.ToString() ?? string.Empty;
+        var roleVal = msgObj["role"]?.ToString();
+        if (roleVal is null)
+        {
+            return msgObj;
+        }
 
+        var contentNode = msgObj["content"];
         var compliantMessageObj = new JsonObject
         {
             { "role", roleVal },
-            { "content", contentVal },
         };
+
+        if (contentNode is not null)
+        {
+            compliantMessageObj.Add("content", contentNode.DeepClone());
+        }
 
         foreach (var property in msgObj)
         {

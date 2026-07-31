@@ -26,6 +26,7 @@ public sealed class SchedulerHostedServiceTests
 
         var services = new ServiceCollection();
         services.AddDbContext<EntityContext>(o => o.UseSqlite(connection));
+        services.AddDbContextFactory<EntityContext>(o => o.UseSqlite(connection));
         services.AddScoped<CronScheduleEvaluator>();
         services.AddScoped(sp => new JobExecutor(sp.GetRequiredService<IServiceScopeFactory>(), NullLogger<JobExecutor>.Instance));
         var provider = services.BuildServiceProvider();
@@ -52,7 +53,8 @@ public sealed class SchedulerHostedServiceTests
         var sut = new SchedulerHostedService(
             provider.GetRequiredService<IServiceScopeFactory>(),
             Options.Create(new SchedulerSettings { PollIntervalSeconds = 1 }),
-            NullLogger<SchedulerHostedService>.Instance);
+            healthState: null,
+            logger: NullLogger<SchedulerHostedService>.Instance);
 
         await InvokePrivateAsync(sut, "EvaluateAndExecuteJobsAsync", CancellationToken.None);
 
@@ -73,6 +75,7 @@ public sealed class SchedulerHostedServiceTests
 
         var services = new ServiceCollection();
         services.AddDbContext<EntityContext>(o => o.UseSqlite(connection));
+        services.AddDbContextFactory<EntityContext>(o => o.UseSqlite(connection));
         services.AddScoped<CronScheduleEvaluator>();
         services.AddScoped(sp => new JobExecutor(sp.GetRequiredService<IServiceScopeFactory>(), NullLogger<JobExecutor>.Instance));
         var provider = services.BuildServiceProvider();
@@ -86,7 +89,8 @@ public sealed class SchedulerHostedServiceTests
         var sut = new SchedulerHostedService(
             provider.GetRequiredService<IServiceScopeFactory>(),
             Options.Create(new SchedulerSettings { PollIntervalSeconds = 1 }),
-            NullLogger<SchedulerHostedService>.Instance);
+            healthState: null,
+            logger: NullLogger<SchedulerHostedService>.Instance);
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();

@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Tools;
+using LeanKernel.Logic.Tools.Dynamic;
 
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
@@ -50,6 +51,16 @@ public static class McpToolDefinitionAdapter
     {
         try
         {
+            if (!string.IsNullOrWhiteSpace(server.Endpoint) && IsEgressBlocked(server.Endpoint))
+            {
+                return new ToolResult
+                {
+                    ToolName = toolName,
+                    Success = false,
+                    Error = $"MCP server '{server.Name}' endpoint '{server.Endpoint}' is not allowed for tool execution."
+                };
+            }
+
             var transport = McpTransportFactory.Create(server);
             await using var client = await McpClient.CreateAsync(transport, null, null, ct).ConfigureAwait(false);
             var tools = await client.ListToolsAsync(cancellationToken: ct).ConfigureAwait(false);
@@ -194,5 +205,15 @@ public static class McpToolDefinitionAdapter
         }
 
         return string.Empty;
+    }
+
+    private static bool IsEgressBlocked(string endpoint)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+        {
+            return true;
+        }
+
+        return EgressValidator.IsPrivateOrLoopbackHost(uri.Host);
     }
 }

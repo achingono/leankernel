@@ -65,6 +65,7 @@ Infrastructure improvements that enhance development experience and tool integra
 | 20 | [Identity, Policy, And Event Spine](phase-20-identity-policy-event-spine/index.md) | Canonical identity model, in-process policy core, and append-only event spine | **Complete** |
 | 21 | [Channel-Aware Document Ingestion And Memory Pipeline](phase-21-channel-document-ingestion/index.md) | Channel-aware document ingestion, durable queue, and policy-scoped discovery | **Complete** |
 | 24 | [Anonymous Fallback Hardening](phase-24-anonymous-fallback-hardening/index.md) | Tenant resolution hardening; anonymous fallback requires explicit opt-in | **Complete** |
+| — | [GBrain Import To Local](2026-07-31-gbrain-import-to-local/index.md) | One-time GBrain data import into local DB with re-embed | **Complete** |
 
 ## Intelligent Brain Completion
 

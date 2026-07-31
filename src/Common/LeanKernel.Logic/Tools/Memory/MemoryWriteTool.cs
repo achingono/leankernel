@@ -1,4 +1,4 @@
-using LeanKernel.Logic.Memory;
+using LeanKernel.Logic.Providers;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -6,6 +6,7 @@ namespace LeanKernel.Logic.Tools.Memory;
 
 /// <summary>
 /// Provides the LeanKernel-owned <c>memory_write</c> tool backed by Memory.
+/// Pages are saved within the current identity's scope.
 /// </summary>
 public static class MemoryWriteTool
 {
@@ -23,7 +24,7 @@ public static class MemoryWriteTool
         return new ToolDefinition
         {
             Name = ToolName,
-            Description = "Create or update a knowledge page in Memory",
+            Description = "Create or update a knowledge page in Memory within the current identity's scope",
             Category = "knowledge",
             Parameters =
             [
@@ -31,7 +32,7 @@ public static class MemoryWriteTool
                 {
                     Name = "key",
                     Type = "string",
-                    Description = "The page key (slug) to create or update",
+                    Description = "The scope-relative page key to create or update",
                     Required = true
                 },
                 new ToolParameter
@@ -60,9 +61,19 @@ public static class MemoryWriteTool
                 try
                 {
                     using var scope = scopeFactory.CreateScope();
-                    var knowledge = scope.ServiceProvider.GetRequiredService<IMemoryService>();
+                    var permit = scope.ServiceProvider.GetRequiredService<IPermit>();
+                    var memoryClient = scope.ServiceProvider.GetRequiredService<IMemoryClient>();
 
-                    await knowledge.PutPageAsync(key, content, ct).ConfigureAwait(false);
+                    var memoryScope = new MemoryScope
+                    {
+                        TenantId = permit.TenantId,
+                        PersonId = permit.PersonId,
+                        ChannelId = permit.ChannelId,
+                    };
+
+                    await memoryClient.SaveMemoryAsync(memoryScope, key, content, ct)
+                        .ConfigureAwait(false);
+
                     return new ToolResult
                     {
                         ToolName = ToolName,

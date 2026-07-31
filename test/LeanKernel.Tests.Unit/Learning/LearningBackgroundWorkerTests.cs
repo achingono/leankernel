@@ -166,7 +166,8 @@ public sealed class LearningBackgroundWorkerTests
                 ContextFactory,
                 provider.GetRequiredService<IServiceScopeFactory>(),
                 Options.Create(new LearningSettings { Enabled = true }),
-                NullLogger<LearningBackgroundWorker>.Instance);
+                healthState: null,
+                logger: NullLogger<LearningBackgroundWorker>.Instance);
         }
 
         public ValueTask DisposeAsync()

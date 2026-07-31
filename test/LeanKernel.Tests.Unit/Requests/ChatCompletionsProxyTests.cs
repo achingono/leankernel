@@ -58,6 +58,8 @@ public class ChatCompletionsProxyTests
         }));
 
         var context = new DefaultHttpContext();
+        context.Request.Scheme = "http";
+        context.Request.Host = new HostString("localhost:8080");
         context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(
             """{"model":"test-model","messages":[{"content":"hello","role":"user"}]}"""));
 

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using FluentAssertions;
 
 using LeanKernel.Services.Common.Interfaces;
@@ -58,5 +60,77 @@ public sealed class GBrainDreamServiceTests
         result.Status.Should().Be("Failed");
         result.TotalPages.Should().Be(0);
         result.FailedPages.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RunDreamAsync_WhenPayloadIsNull_ReturnsCompletedWithZeroPages()
+    {
+        var clientMock = new Mock<IGBrainMcpClient>();
+        var loggerMock = new Mock<ILogger<GBrainDreamService>>();
+
+        clientMock
+            .Setup(c => c.CallToolAsync("dream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((JsonElement?)null);
+
+        var service = new GBrainDreamService(clientMock.Object, loggerMock.Object);
+        var result = await service.RunDreamAsync("tenant/user", "full");
+
+        result.Status.Should().Be("Completed");
+        result.TotalPages.Should().Be(0);
+        result.FailedPages.Should().Be(0);
+        result.PhaseStatusJson.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task RunDreamAsync_UsesCamelCaseFallback_WhenSnakeCaseAbsent()
+    {
+        var clientMock = new Mock<IGBrainMcpClient>();
+        var loggerMock = new Mock<ILogger<GBrainDreamService>>();
+
+        using var json = System.Text.Json.JsonDocument.Parse(
+            """
+            {
+              "status": "Processing",
+              "totalPages": 5,
+              "failedPages": 0
+            }
+            """);
+
+        clientMock
+            .Setup(c => c.CallToolAsync("dream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json.RootElement);
+
+        var service = new GBrainDreamService(clientMock.Object, loggerMock.Object);
+        var result = await service.RunDreamAsync("tenant/user", "incremental");
+
+        result.Status.Should().Be("Processing");
+        result.TotalPages.Should().Be(5);
+        result.FailedPages.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RunDreamAsync_DefaultsStatusToCompleted_WhenStatusPropertyMissing()
+    {
+        var clientMock = new Mock<IGBrainMcpClient>();
+        var loggerMock = new Mock<ILogger<GBrainDreamService>>();
+
+        using var json = System.Text.Json.JsonDocument.Parse(
+            """
+            {
+              "total_pages": 3,
+              "failed_pages": 1
+            }
+            """);
+
+        clientMock
+            .Setup(c => c.CallToolAsync("dream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(json.RootElement);
+
+        var service = new GBrainDreamService(clientMock.Object, loggerMock.Object);
+        var result = await service.RunDreamAsync("tenant/user", "full");
+
+        result.Status.Should().Be("Completed");
+        result.TotalPages.Should().Be(3);
+        result.FailedPages.Should().Be(1);
     }
 }

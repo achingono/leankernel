@@ -23,7 +23,7 @@ public sealed class TurnEventQueueTests
     }
 
     [Fact]
-    public async Task FullQueue_DropsOldest()
+    public async Task FullQueue_DropsNewestWhenFull()
     {
         var queue = new TurnEventQueue(capacity: 1);
         var first = CreateTurnEvent("first");
@@ -34,7 +34,8 @@ public sealed class TurnEventQueueTests
         var dequeued = await queue.TryDequeueAsync();
 
         dequeued.Should().NotBeNull();
-        dequeued!.TurnId.Should().Be(second.TurnId);
+        dequeued!.TurnId.Should().Be(first.TurnId);
+        queue.DroppedCount.Should().Be(1);
     }
 
     private static TurnCompletedEvent CreateTurnEvent(string message)

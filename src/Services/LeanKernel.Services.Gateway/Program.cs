@@ -101,8 +101,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminOnly", policy =>
         policy.RequireAuthenticatedUser().RequireRole("Admin"));
 });
+builder.Services.Configure<EventRetentionSettings>(builder.Configuration.GetSection("Diagnostics:EventRetention"));
 builder.Services.AddHostedService<ChannelConfigurationValidatorHostedService>();
 builder.Services.AddHostedService<DiagnosticsCleanupHostedService>();
+builder.Services.AddHostedService<EventRetentionHostedService>();
 
 builder.Services.AddCors(options =>
 {
@@ -194,8 +196,8 @@ app.UseCors("AllowLocal");
 app.UseSession();
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
-app.UseMiddleware<AttachmentIngestionMiddleware>();
 app.UseAuthorization();
+app.UseMiddleware<AttachmentIngestionMiddleware>();
 
 app.MapOpenAIResponses();
 app.MapOpenAIConversations();

@@ -93,6 +93,53 @@ public sealed class GBrainMemoryClient : IMemoryClient
     }
 
     /// <inheritdoc />
+    public async Task<MemoryItem?> GetMemoryAsync(
+        MemoryScope scope,
+        string scopeRelativeKey,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scopeRelativeKey);
+
+        this._logger.LogDebug(
+            "GBrain memory get: {Key} (tenant={Tenant})",
+            scopeRelativeKey, scope.TenantId);
+
+        try
+        {
+            var slug = BuildScopedSlug(scope, scopeRelativeKey);
+            var result = await this._client.CallToolAsync("get_page", new { slug }, ct)
+                .ConfigureAwait(false);
+
+            if (result is null)
+            {
+                return null;
+            }
+
+            var (channelId, parsedKey) = TryParseScopedKey(slug);
+            var pageContent = ExtractPageContent(result.Value);
+            if (pageContent is null)
+            {
+                return null;
+            }
+
+            return new MemoryItem
+            {
+                Key = slug,
+                Text = pageContent,
+                Score = 1.0,
+                Source = "gbrain",
+                ChannelId = channelId,
+                ScopeRelativeKey = parsedKey,
+            };
+        }
+        catch (GBrainException ex)
+        {
+            this._logger.LogWarning(ex, "GBrain get_page failed for key: {Key}", scopeRelativeKey);
+            return null;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task SaveMemoryAsync(
         MemoryScope scope,
         string key,
@@ -170,6 +217,34 @@ public sealed class GBrainMemoryClient : IMemoryClient
             ChannelId = channelId,
             ScopeRelativeKey = scopeRelativeKey,
         };
+    }
+
+    private static string? ExtractPageContent(JsonElement result)
+    {
+        if (result.ValueKind == JsonValueKind.Null || result.ValueKind == JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        if (result.TryGetProperty("compiled_truth", out var compiledTruth)
+            && !string.IsNullOrWhiteSpace(compiledTruth.GetString()))
+        {
+            return compiledTruth.GetString();
+        }
+
+        if (result.TryGetProperty("content", out var content)
+            && !string.IsNullOrWhiteSpace(content.GetString()))
+        {
+            return content.GetString();
+        }
+
+        if (result.TryGetProperty("chunk_text", out var chunkText)
+            && !string.IsNullOrWhiteSpace(chunkText.GetString()))
+        {
+            return chunkText.GetString();
+        }
+
+        return null;
     }
 
     private static (Guid? ChannelId, string? ScopeRelativeKey) TryParseScopedKey(string key)

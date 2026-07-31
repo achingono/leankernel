@@ -73,7 +73,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         var files = multipart.Value.Files;
         var scope = ResolveAvailabilityScope(form);
 
-        if (scope == DocumentAvailabilityScope.Tenant && permit.Badge.Id == Guid.Empty)
+        if (scope == DocumentAvailabilityScope.Tenant && !permit.IsAuthenticated)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
@@ -128,7 +128,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         }
 
         var scope = ResolveAvailabilityScope(attachmentEnvelope.AvailabilityScope);
-        if (scope == DocumentAvailabilityScope.Tenant && permit.Badge.Id == Guid.Empty)
+        if (scope == DocumentAvailabilityScope.Tenant && !permit.IsAuthenticated)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;

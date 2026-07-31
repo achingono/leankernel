@@ -22,4 +22,12 @@ public interface IEventStore
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task AppendBatchAsync(IEnumerable<object> eventRecords, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Attaches a batch of event records to the underlying context without saving,
+    /// allowing callers to commit events transactionally with other work.
+    /// </summary>
+    /// <param name="eventRecords">The event records to attach.</param>
+    /// <returns>The attached entity count.</returns>
+    int AttachBatch(IEnumerable<object> eventRecords);
 }

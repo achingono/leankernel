@@ -1,5 +1,7 @@
+using LeanKernel.Entities;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Memory;
+using LeanKernel.Logic.Providers;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -10,6 +12,8 @@ namespace LeanKernel.Logic.Tools.DocumentIngestion;
 
 /// <summary>
 /// Background service that dequeues and processes enrichment jobs.
+/// Reads staged document content, extracts facts, and persists them
+/// to scoped memory pages for downstream learning consumption.
 /// </summary>
 public sealed class EnrichmentHostedService : BackgroundService
 {
@@ -71,18 +75,30 @@ public sealed class EnrichmentHostedService : BackgroundService
                 try
                 {
                     var factService = scope.ServiceProvider.GetRequiredService<FactExtractionService>();
+                    var memoryClient = scope.ServiceProvider.GetRequiredService<IMemoryClient>();
+
+                    var documentContent = await ReadDocumentContentAsync(claimed.FilePath, stoppingToken);
 
                     var facts = await factService.ExtractFactsAsync(
                         null,
-                        claimed.FileName,
+                        documentContent,
                         [],
                         stoppingToken);
+
+                    if (facts.Count > 0)
+                    {
+                        await WriteEnrichedFactsAsync(
+                            memoryClient,
+                            claimed,
+                            facts,
+                            stoppingToken);
+                    }
 
                     var result = new EnrichmentResult(
                         claimed.IngestionJobId,
                         claimed.Id,
                         null,
-                        true);
+                        facts.Count > 0);
 
                     await queue.CompleteAsync(claimed.Id, result, stoppingToken);
                     _logger.LogInformation(
@@ -110,6 +126,35 @@ public sealed class EnrichmentHostedService : BackgroundService
         }
 
         _logger.LogInformation("Enrichment hosted service stopped");
+    }
+
+    private static async Task<string> ReadDocumentContentAsync(string filePath, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            return string.Empty;
+        }
+
+        return await File.ReadAllTextAsync(filePath, ct);
+    }
+
+    private static async Task WriteEnrichedFactsAsync(
+        IMemoryClient memoryClient,
+        EnrichmentJobEntity job,
+        IReadOnlyList<string> facts,
+        CancellationToken ct)
+    {
+        var scope = new MemoryScope
+        {
+            TenantId = job.TenantId,
+            PersonId = job.PersonId,
+            ChannelId = job.ChannelId,
+        };
+
+        var key = $"enrichment/{job.FileName}/{DateTime.UtcNow:yyyy-MM-dd}";
+        var content = string.Join("\n", facts.Select((f, i) => $"{i + 1}. {f}"));
+
+        await memoryClient.SaveMemoryAsync(scope, key, content, ct);
     }
 
     private async Task RecoverStaleLeasesAsync(CancellationToken ct)

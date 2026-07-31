@@ -125,11 +125,19 @@ builder.Services.AddServiceHealthChecks();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+if (app.Environment.IsDevelopment())
 {
+    using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<IDbContextFactory<EntityContext>>();
     await using var db = await context.CreateDbContextAsync();
-    await db.Database.EnsureCreatedAsync();
+    if (db.Database.IsNpgsql())
+    {
+        await db.Database.MigrateAsync();
+    }
+    else
+    {
+        await db.Database.EnsureCreatedAsync();
+    }
 }
 
 app.MapHealthChecks(Constants.Healthchecks.Path, new HealthCheckOptions

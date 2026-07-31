@@ -305,6 +305,7 @@ public class EntityContext : DbContext
             entity.Property(e => e.RecordType).HasMaxLength(300);
             entity.Property(e => e.PayloadJson).HasColumnType("text");
             entity.HasIndex(e => e.EventId).IsUnique();
+            entity.HasIndex(e => new { e.RecordType, e.CreatedOn, e.Id });
             entity.HasIndex(e => new { e.TenantId, e.Timestamp });
             entity.HasIndex(e => new { e.TenantId, e.UserId, e.ChannelId, e.Timestamp });
             entity.HasIndex(e => e.EventType);
@@ -351,6 +352,7 @@ public class EntityContext : DbContext
             entity.Property(e => e.CronExpression).HasMaxLength(100);
             entity.Property(e => e.JobType).HasMaxLength(100);
             entity.Property(e => e.ConfigurationJson).HasColumnType("text");
+            entity.Property(e => e.LeaseOwner).HasMaxLength(200);
             entity.HasIndex(e => new { e.Enabled, e.NextRunAt });
         });
 

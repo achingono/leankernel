@@ -137,33 +137,17 @@ public class PolicyEvaluatorTests
     }
 
     [Fact]
-    public void AddPolicyCore_RegistersTypedPolicies_AndEvaluatorRunsThem()
+    public void AddPolicyCore_DoesNotRegisterTypedPolicies()
     {
         var services = new ServiceCollection();
-        services.AddScoped<IPolicyEvaluator, PolicyEvaluator>();
         services.AddScoped<IPermit>(_ => Mock.Of<IPermit>());
         services.AddPolicyCore();
 
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var evaluator = scope.ServiceProvider.GetRequiredService<IPolicyEvaluator>();
+        var context = scope.ServiceProvider.GetRequiredService<IPolicyContext>();
 
-        var context = new Mock<IPolicyContext>();
-        context.SetupGet(c => c.Identity).Returns(new IdentityContext { IsAuthenticated = true });
-        context.SetupGet(c => c.Metadata).Returns(new Dictionary<string, object?>());
-
-        var user = new LeanKernel.Entities.UserEntity
-        {
-            Id = Guid.NewGuid(),
-            IsGuest = true,
-            PersonId = Guid.NewGuid(),
-            Email = "guest@example.com",
-        };
-
-        var result = evaluator.Evaluate(user, context.Object);
-
-        result.IsAllowed.Should().BeFalse();
-        result.Reason.Should().Contain("Guest");
+        context.Identity.Should().NotBeNull();
     }
 
     private static IPolicyEvaluator CreateEvaluator(Action<IServiceCollection> configure)

@@ -15,27 +15,39 @@ public sealed class TerminalService(
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            var activity = await transport.ReceiveAsync(stoppingToken);
-            if (activity is null)
+            try
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(250), stoppingToken);
-                continue;
-            }
+                var activity = await transport.ReceiveAsync(stoppingToken);
+                if (activity is null)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(250), stoppingToken);
+                    continue;
+                }
 
-            if (string.IsNullOrWhiteSpace(activity.BearerToken))
+                if (string.IsNullOrWhiteSpace(activity.BearerToken))
+                {
+                    logger.LogWarning("Rejecting Teams sender {SenderId}; no provisioned credential is available.", activity.SenderId);
+                    continue;
+                }
+
+                var input = AttachmentParser.BuildGatewayInput(activity.Text, activity.Attachments);
+                var result = await gatewayClient.RunTurnAsync(input, activity.BearerToken, activity.Attachments, stoppingToken);
+                if (activity.Attachments.Count > 0)
+                {
+                    result = $"{result}\n\n(attachments={activity.Attachments.Count})";
+                }
+
+                await transport.SendAsync(activity, result, stoppingToken);
+            }
+            catch (OperationCanceledException)
             {
-                logger.LogWarning("Rejecting Teams sender {SenderId}; no provisioned credential is available.", activity.SenderId);
-                continue;
+                break;
             }
-
-            var input = AttachmentParser.BuildGatewayInput(activity.Text, activity.Attachments);
-            var result = await gatewayClient.RunTurnAsync(input, activity.BearerToken, activity.Attachments, stoppingToken);
-            if (activity.Attachments.Count > 0)
+            catch (Exception ex)
             {
-                result = $"{result}\n\n(attachments={activity.Attachments.Count})";
+                logger.LogError(ex, "Unhandled error in Teams terminal loop; restarting in 5 seconds");
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
-
-            await transport.SendAsync(activity, result, stoppingToken);
         }
     }
 }

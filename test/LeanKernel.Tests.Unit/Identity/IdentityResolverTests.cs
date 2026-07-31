@@ -681,4 +681,109 @@ public class IdentityResolverTests
         };
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
     }
+
+    [Fact]
+    public async Task ResolveOrCreateUserAsync_WithCommaSeparatedGroupClaims_SplitsIntoMultipleValues()
+    {
+        var settings = new IdentityClaimsContextSettings
+        {
+            Enabled = true,
+            AllowedCustomClaims = [],
+            PromptFields = [],
+        };
+
+        var resolver = CreateResolver(out var db, settings);
+
+        var claims = new List<Claim>
+        {
+            new("sub", "group-sub"),
+            new("iss", "group-iss"),
+            new("groups", "group1,group2,group3"),
+        };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
+
+        var user = await resolver.ResolveOrCreateUserAsync(principal);
+
+        var groups = System.Text.Json.JsonSerializer.Deserialize<List<string>>(user.GroupsJson);
+        groups.Should().ContainInOrder("group1", "group2", "group3");
+    }
+
+    [Fact]
+    public async Task ResolveOrCreateUserAsync_WithJsonArrayGroupClaims_ParsesArray()
+    {
+        var settings = new IdentityClaimsContextSettings
+        {
+            Enabled = true,
+            AllowedCustomClaims = [],
+            PromptFields = [],
+        };
+
+        var resolver = CreateResolver(out var db, settings);
+
+        var claims = new List<Claim>
+        {
+            new("sub", "json-sub"),
+            new("iss", "json-iss"),
+            new("groups", "[\"alpha\",\"beta\"]"),
+        };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
+
+        var user = await resolver.ResolveOrCreateUserAsync(principal);
+
+        var groups = System.Text.Json.JsonSerializer.Deserialize<List<string>>(user.GroupsJson);
+        groups.Should().ContainInOrder("alpha", "beta");
+    }
+
+    [Fact]
+    public async Task ResolveOrCreateUserAsync_WithInvalidJsonArrayGroupClaims_FallsBackToSplit()
+    {
+        var settings = new IdentityClaimsContextSettings
+        {
+            Enabled = true,
+            AllowedCustomClaims = [],
+            PromptFields = [],
+        };
+
+        var resolver = CreateResolver(out var db, settings);
+
+        var claims = new List<Claim>
+        {
+            new("sub", "invalid-sub"),
+            new("iss", "invalid-iss"),
+            new("groups", "[\"broken"),
+        };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
+
+        var user = await resolver.ResolveOrCreateUserAsync(principal);
+
+        var groups = System.Text.Json.JsonSerializer.Deserialize<List<string>>(user.GroupsJson);
+        groups.Should().Contain("[\"broken");
+    }
+
+    [Fact]
+    public async Task ResolveOrCreateUserAsync_WithCustomClaims_PersistsAllowedClaims()
+    {
+        var settings = new IdentityClaimsContextSettings
+        {
+            Enabled = true,
+            AllowedCustomClaims = ["custom_claim"],
+            PromptFields = [],
+        };
+
+        var resolver = CreateResolver(out var db, settings);
+
+        var claims = new List<Claim>
+        {
+            new("sub", "custom-sub"),
+            new("iss", "custom-iss"),
+            new("custom_claim", "value1"),
+        };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
+
+        var user = await resolver.ResolveOrCreateUserAsync(principal);
+
+        var custom = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, List<string>>>(user.CustomClaimsJson);
+        custom.Should().ContainKey("custom_claim");
+        custom!["custom_claim"].Should().Contain("value1");
+    }
 }

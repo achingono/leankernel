@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-using LeanKernel.Logic.Memory;
+using LeanKernel.Logic.Providers;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,7 +25,7 @@ public static class MemorySearchTool
         return new ToolDefinition
         {
             Name = ToolName,
-            Description = "Search Memory knowledge pages for documents matching the given query",
+            Description = "Search Memory knowledge pages for documents matching the given query. Results are scoped to the current identity.",
             Category = "knowledge",
             Parameters =
             [
@@ -57,9 +57,19 @@ public static class MemorySearchTool
                 try
                 {
                     using var scope = scopeFactory.CreateScope();
-                    var memoryService = scope.ServiceProvider.GetRequiredService<IMemoryService>();
+                    var permit = scope.ServiceProvider.GetRequiredService<IPermit>();
+                    var memoryClient = scope.ServiceProvider.GetRequiredService<IMemoryClient>();
 
-                    var results = await memoryService.SearchAsync(query, limit, ct).ConfigureAwait(false);
+                    var memoryScope = new MemoryScope
+                    {
+                        TenantId = permit.TenantId,
+                        PersonId = permit.PersonId,
+                        ChannelId = permit.ChannelId,
+                    };
+
+                    var results = await memoryClient.SearchMemoriesAsync(memoryScope, query, limit, ct)
+                        .ConfigureAwait(false);
+
                     return new ToolResult
                     {
                         ToolName = ToolName,

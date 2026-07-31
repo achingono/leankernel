@@ -20,6 +20,18 @@ public interface IMemoryClient
         CancellationToken ct = default);
 
     /// <summary>
+    /// Retrieves a single memory item by its scope-relative key.
+    /// </summary>
+    /// <param name="scope">The scope to retrieve from.</param>
+    /// <param name="scopeRelativeKey">The scope-relative memory key.</param>
+    /// <param name="ct">The token used to cancel the operation.</param>
+    /// <returns>The matching <see cref="MemoryItem"/>, or null if not found.</returns>
+    Task<MemoryItem?> GetMemoryAsync(
+        MemoryScope scope,
+        string scopeRelativeKey,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Saves a memory item within the given scope.
     /// </summary>
     /// <param name="scope">The scope to save within.</param>

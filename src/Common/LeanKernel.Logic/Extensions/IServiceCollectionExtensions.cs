@@ -200,7 +200,10 @@ public static class IServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers the shared policy core: policy context, evaluator, and default policies.
+    /// Registers the shared policy core context factory.
+    /// Individual policy evaluators remain available as helper types
+    /// for consumption by Phase 08 diagnostics and Phase 04 quality gates without acting as a
+    /// first-class enforcement mechanism (per Phase 20 addendum recommendation).
     /// </summary>
     /// <param name="services">The service collection to update.</param>
     /// <returns>The updated service collection.</returns>
@@ -211,13 +214,6 @@ public static class IServiceCollectionExtensions
             var permit = sp.GetRequiredService<IPermit>();
             return new PolicyContext(permit);
         });
-
-        services.AddScoped<IPolicyEvaluator, PolicyEvaluator>();
-
-        // Register default domain policies
-        services.AddScoped<IPolicy<object>, BudgetCheckPolicy>();
-        services.AddScoped<IPolicy<UserEntity>, IdentityLinkingPolicy>();
-        services.AddScoped<IPolicy<ChannelMemoryPolicyEntity>, MemoryAccessPolicy>();
 
         return services;
     }

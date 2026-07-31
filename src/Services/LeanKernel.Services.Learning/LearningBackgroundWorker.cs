@@ -3,6 +3,7 @@ using System.Text.Json;
 using LeanKernel.Data;
 using LeanKernel.Entities;
 using LeanKernel.Events;
+using LeanKernel.Services.Common.HealthChecks;
 using LeanKernel.Services.Learning.Steps;
 
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ namespace LeanKernel.Services.Learning;
 
 /// <summary>
 /// Background service that processes turn-completed events through the learning pipeline.
+/// Checkpoints are advanced only after successful processing of each event.
 /// </summary>
 public sealed class LearningBackgroundWorker : BackgroundService
 {
@@ -24,7 +26,10 @@ public sealed class LearningBackgroundWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptions<LearningSettings> _settings;
     private readonly ILogger<LearningBackgroundWorker> _logger;
+    private readonly WorkerHealthState? _healthState;
     private DateTime _lastPollAtUtc = DateTime.MinValue;
+    private readonly HashSet<Guid> _processedEventIds = [];
+    private DateTime _lastCheckpointCreatedOnUtc;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LearningBackgroundWorker"/> class.
@@ -34,6 +39,7 @@ public sealed class LearningBackgroundWorker : BackgroundService
     /// <param name="contextFactory">The entity-context factory.</param>
     /// <param name="scopeFactory">The service scope factory.</param>
     /// <param name="settings">The learning settings.</param>
+    /// <param name="healthState">Optional worker health state tracker.</param>
     /// <param name="logger">The logger.</param>
     public LearningBackgroundWorker(
         ITurnEventConsumer consumer,
@@ -41,13 +47,15 @@ public sealed class LearningBackgroundWorker : BackgroundService
         IDbContextFactory<EntityContext> contextFactory,
         IServiceScopeFactory scopeFactory,
         IOptions<LearningSettings> settings,
-        ILogger<LearningBackgroundWorker> logger)
+        WorkerHealthState? healthState = null,
+        ILogger<LearningBackgroundWorker> logger = null!)
     {
         _consumer = consumer;
         _producer = producer;
         _contextFactory = contextFactory;
         _scopeFactory = scopeFactory;
         _settings = settings;
+        _healthState = healthState;
         _logger = logger;
     }
 
@@ -75,6 +83,8 @@ public sealed class LearningBackgroundWorker : BackgroundService
                 }
 
                 await ProcessTurnAsync(turnEvent, stoppingToken);
+                await AdvanceCheckpointAsync(turnEvent.Envelope.CorrelationId ?? string.Empty, stoppingToken);
+                _healthState?.MarkLearningWorkerHealthy();
             }
             catch (OperationCanceledException)
             {
@@ -108,16 +118,12 @@ public sealed class LearningBackgroundWorker : BackgroundService
             await db.SaveChangesAsync(ct);
         }
 
+        _lastCheckpointCreatedOnUtc = checkpoint.LastProcessedCreatedOnUtc ?? DateTime.MinValue;
+
         var query = db.Events
             .AsNoTracking()
-            .Where(e => e.RecordType == TurnCompletedRecordType);
-
-        if (checkpoint.LastProcessedCreatedOnUtc is { } lastCreated)
-        {
-            var lastEventRowId = checkpoint.LastProcessedEventRowId;
-            query = query.Where(e => e.CreatedOn > lastCreated
-                || (e.CreatedOn == lastCreated && lastEventRowId.HasValue && e.Id != lastEventRowId.Value));
-        }
+            .Where(e => e.RecordType == TurnCompletedRecordType
+                        && e.CreatedOn >= _lastCheckpointCreatedOnUtc);
 
         var replayBatch = await query
             .OrderBy(e => e.CreatedOn)
@@ -125,37 +131,83 @@ public sealed class LearningBackgroundWorker : BackgroundService
             .Take(200)
             .ToListAsync(ct);
 
+        Guid? lastEventId = null;
+        var enqueuedCount = 0;
         foreach (var eventRow in replayBatch)
         {
+            if (_processedEventIds.Contains(eventRow.Id))
+            {
+                continue;
+            }
+
             TurnCompletedEvent? turnEvent;
             try
             {
-                turnEvent = JsonSerializer.Deserialize<TurnCompletedEvent>(eventRow.PayloadJson, Constants.Serialization.JsonOptions);
+                turnEvent = JsonSerializer.Deserialize<TurnCompletedEvent>(
+                    eventRow.PayloadJson, Constants.Serialization.JsonOptions);
             }
             catch (JsonException ex)
             {
                 _logger.LogWarning(ex, "Skipping malformed TurnCompletedEvent payload for row {EventRowId}", eventRow.Id);
+                _processedEventIds.Add(eventRow.Id);
                 continue;
             }
 
             if (turnEvent is null)
             {
+                _processedEventIds.Add(eventRow.Id);
                 continue;
             }
 
             await _producer.EnqueueAsync(turnEvent, ct);
-            checkpoint.LastProcessedCreatedOnUtc = eventRow.CreatedOn;
-            checkpoint.LastProcessedEventRowId = eventRow.Id;
-            checkpoint.UpdatedAt = DateTime.UtcNow;
+            _processedEventIds.Add(eventRow.Id);
+            lastEventId = eventRow.Id;
+            enqueuedCount++;
         }
 
-        if (replayBatch.Count > 0)
+        if (enqueuedCount > 0)
         {
+            checkpoint.LastProcessedCreatedOnUtc = lastEventId.HasValue
+                ? (replayBatch.Last().CreatedOn > _lastCheckpointCreatedOnUtc
+                    ? replayBatch.Last().CreatedOn
+                    : _lastCheckpointCreatedOnUtc)
+                : _lastCheckpointCreatedOnUtc;
+            checkpoint.LastProcessedEventRowId = lastEventId;
+            checkpoint.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
-            _logger.LogDebug("Queued {Count} replayed turn-completed events", replayBatch.Count);
+            _logger.LogDebug("Queued {Count} replayed turn-completed events", enqueuedCount);
         }
 
         _lastPollAtUtc = DateTime.UtcNow;
+    }
+
+    private async Task AdvanceCheckpointAsync(string correlationId, CancellationToken ct)
+    {
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+
+        var checkpoint = await db.Set<LearningCheckpointEntity>()
+            .SingleOrDefaultAsync(c => c.Name == CheckpointName, ct);
+
+        if (checkpoint is null)
+        {
+            return;
+        }
+
+        var matchingEvent = await db.Events
+            .AsNoTracking()
+            .Where(e => e.CorrelationId == correlationId)
+            .OrderByDescending(e => e.CreatedOn)
+            .FirstOrDefaultAsync(ct);
+
+        if (matchingEvent is null)
+        {
+            return;
+        }
+
+        checkpoint.LastProcessedCreatedOnUtc = matchingEvent.CreatedOn;
+        checkpoint.LastProcessedEventRowId = matchingEvent.Id;
+        checkpoint.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task ProcessTurnAsync(LeanKernel.Events.TurnCompletedEvent turnEvent, CancellationToken ct)

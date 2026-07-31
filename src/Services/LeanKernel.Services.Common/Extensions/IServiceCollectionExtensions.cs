@@ -105,7 +105,7 @@ public static class IServiceCollectionExtensions
 
     /// <summary>
     /// Registers health checks for the gateway's dependent services:
-    /// the EF Core database, LiteLLM proxy, and GBrain MCP service.
+    /// the EF Core database, LiteLLM proxy, GBrain MCP service, and worker liveness.
     /// </summary>
     /// <param name="services">The service collection to update.</param>
     /// <returns>The <see cref="IHealthChecksBuilder"/> for further configuration.</returns>
@@ -121,9 +121,13 @@ public static class IServiceCollectionExtensions
         services.AddHttpClient(GBrainHealthCheck.HttpClientName)
             .ConfigureHttpClient(c => c.Timeout = probeTimeout);
 
+        services.AddSingleton<WorkerHealthState>();
+
         return services.AddHealthChecks()
             .AddDbContextCheck<EntityContext>(Constants.Healthchecks.Database, tags: [Constants.Healthchecks.Database])
             .AddCheck<LiteLlmHealthCheck>("litellm", tags: ["litellm"])
-            .AddCheck<GBrainHealthCheck>("gbrain", tags: ["gbrain"]);
+            .AddCheck<GBrainHealthCheck>("gbrain", tags: ["gbrain"])
+            .AddCheck<LearningWorkerHealthCheck>("learning-worker", tags: ["worker"])
+            .AddCheck<SchedulerHealthCheck>("scheduler", tags: ["worker"]);
     }
 }

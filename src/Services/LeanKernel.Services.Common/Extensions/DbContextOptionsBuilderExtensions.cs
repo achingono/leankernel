@@ -39,7 +39,7 @@ public static class DbContextOptionsBuilderExtensions
                 options.UseSqlite(connectionString);
                 break;
             case Constants.ConnectionStrings.Postgres:
-                options.UseNpgsql(connectionString);
+                options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure());
                 break;
             case null when !allowEmptyConnectionString:
                 throw new InvalidOperationException(

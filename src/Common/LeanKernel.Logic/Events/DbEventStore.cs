@@ -31,7 +31,7 @@ public sealed class DbEventStore : IEventStore
     }
 
     /// <inheritdoc />
-    public async Task AppendBatchAsync(IEnumerable<object> eventRecords, CancellationToken cancellationToken = default)
+    public int AttachBatch(IEnumerable<object> eventRecords)
     {
         var entities = eventRecords
             .Select(ToEntity)
@@ -39,10 +39,22 @@ public sealed class DbEventStore : IEventStore
 
         if (entities.Count == 0)
         {
-            return;
+            return 0;
         }
 
         _context.Events.AddRange(entities);
+        return entities.Count;
+    }
+
+    /// <inheritdoc />
+    public async Task AppendBatchAsync(IEnumerable<object> eventRecords, CancellationToken cancellationToken = default)
+    {
+        var entityCount = AttachBatch(eventRecords);
+        if (entityCount == 0)
+        {
+            return;
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
     }
 

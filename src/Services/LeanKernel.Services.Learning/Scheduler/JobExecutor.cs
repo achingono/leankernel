@@ -27,9 +27,10 @@ public sealed class JobExecutor
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     public async Task ExecuteAsync(LeanKernel.Entities.ScheduledJobEntity job, CancellationToken ct = default)
     {
+        using var handlerScope = _scopeFactory.CreateScope();
         IJobHandler? handler = job.JobType switch
         {
-            "DreamCycle" => ActivatorUtilities.CreateInstance<DreamCycleJobHandler>(_scopeFactory.CreateScope().ServiceProvider),
+            "DreamCycle" => ActivatorUtilities.CreateInstance<DreamCycleJobHandler>(handlerScope.ServiceProvider),
             _ => null,
         };
 

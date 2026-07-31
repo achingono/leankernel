@@ -20,21 +20,23 @@ public sealed class TerminalService(
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            var inbound = await transport.ReceiveAsync(stoppingToken);
-            if (inbound is null)
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(250), stoppingToken);
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(inbound.BearerToken))
-            {
-                logger.LogWarning("Rejecting Signal sender {Sender}; no provisioned credential is available.", inbound.Sender);
-                continue;
-            }
-
             try
             {
+                var inbound = await transport.ReceiveAsync(stoppingToken);
+                if (inbound is null)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(250), stoppingToken);
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(inbound.BearerToken))
+                {
+                    logger.LogWarning("Rejecting Signal sender {Sender}; no provisioned credential is available.", inbound.Sender);
+                    continue;
+                }
+
+                try
+                {
                 var attachmentHints = AttachmentParser.ParseAttachmentHints(inbound.Text);
                 var input = AttachmentParser.BuildGatewayInput(inbound.Text, inbound.Attachments, attachmentHints);
 
@@ -69,6 +71,16 @@ public sealed class TerminalService(
             catch (Exception ex)
             {
                 logger.LogError(ex, "Signal message processing failed for sender {Sender}; continuing.", inbound.Sender);
+            }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Signal transport error; restarting loop in 5 seconds");
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
     }

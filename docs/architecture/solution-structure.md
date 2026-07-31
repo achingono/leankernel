@@ -11,12 +11,14 @@ The full repo solution, which also includes the test projects, is [`../../LeanKe
 Projects in the app-only solution:
 
 | Project | Role |
-|---|---|
+|---|---|---|
 | `src/Common/LeanKernel.Core` | Shared entities and cross-project interfaces/contracts, including canonical identity and event-envelope contracts |
-| `src/Terminals/LeanKernel.Channels.Common` | Shared terminal/gateway helpers (health response writer, gateway health probe, connection-string resolver, channel binding token resolver) |
+| `src/Terminals/LeanKernel.Channels.Common` | Shared terminal configuration and gateway health check helpers |
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, design-time factory |
-| `src/Common/LeanKernel.Logic` | Chat history provider, memory pipeline, identity resolution, policy core, event spine, and MAF-facing logic services |
-| `src/Services/LeanKernel.Services.Gateway` | Web host, endpoint mapping, auth/session middleware, GBrain wiring, and composition of logic services (including policy core and event spine) |
+| `src/Common/LeanKernel.Logic` | Chat history provider, memory pipeline, identity resolution, tool runtime, turn pipeline, telemetry, event spine, and MAF-facing logic services |
+| `src/Services/LeanKernel.Services.Common` | Shared service-host plumbing: GBrain MCP/memory/document clients, health checks, DB provider options ext, and worker health state |
+| `src/Services/LeanKernel.Services.Gateway` | Web host, endpoint mapping, auth/session middleware, attachment ingestion, and composition of logic and common services |
+| `src/Services/LeanKernel.Services.Learning` | Background learning worker: turn-event processing, fact extraction, onboarding, cron scheduler, and dream cycle execution |
 | `src/Terminals/LeanKernel.Channels.Signal` | Signal channel terminal process (JSON-RPC socket transport to signal-cli sidecar) |
 | `src/Terminals/LeanKernel.Channels.Teams` | Teams Bot Framework terminal process (webhook ingress + connector egress) |
 
@@ -35,9 +37,17 @@ flowchart BT
     Gateway[LeanKernel.Services.Gateway] --> Logic[LeanKernel.Logic]
     Gateway --> Data[LeanKernel.Data]
     Gateway --> Core[LeanKernel.Core]
+    Gateway --> ServicesCommon[LeanKernel.Services.Common]
 
     Logic --> Data
     Logic --> Core
+
+    Learning[LeanKernel.Services.Learning] --> Logic
+    Learning --> Data
+    Learning --> ServicesCommon
+
+    ServicesCommon --> Logic
+    ServicesCommon --> Data
 
     Signal[LeanKernel.Channels.Signal] --> Data
     Signal --> Logic

@@ -27,6 +27,13 @@ public sealed class NullEventStore : IEventStore
     }
 
     /// <inheritdoc />
+    public int AttachBatch(IEnumerable<object> eventRecords)
+    {
+        _logger?.LogDebug("EventStore (no-op): {Count} events attached.", eventRecords.Count());
+        return eventRecords.Count();
+    }
+
+    /// <inheritdoc />
     public Task AppendBatchAsync(IEnumerable<object> eventRecords, CancellationToken cancellationToken = default)
     {
         _logger?.LogDebug("EventStore (no-op): {Count} events emitted.", eventRecords.Count());

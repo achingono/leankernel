@@ -16,6 +16,15 @@ public sealed class StubMemoryClient : IMemoryClient
     }
 
     /// <inheritdoc />
+    public Task<MemoryItem?> GetMemoryAsync(
+        MemoryScope scope,
+        string scopeRelativeKey,
+        CancellationToken ct = default)
+    {
+        return Task.FromResult<MemoryItem?>(null);
+    }
+
+    /// <inheritdoc />
     public Task SaveMemoryAsync(
         MemoryScope scope,
         string key,
