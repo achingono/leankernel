@@ -23,12 +23,12 @@ public class ChannelMemoryPolicyEntity : IEntity
     /// <summary>
     /// Gets or sets a comma-separated allow-list of channel names this channel shares to.
     /// </summary>
-    public string ShareList { get; set; } = ChannelEntity.MemoryPolicyWildcard;
+    public string ShareList { get; set; } = Constants.Memory.WildcardPolicy;
 
     /// <summary>
     /// Gets or sets a comma-separated allow-list of channel names this channel can access.
     /// </summary>
-    public string AccessList { get; set; } = ChannelEntity.MemoryPolicyWildcard;
+    public string AccessList { get; set; } = Constants.Memory.WildcardPolicy;
 
     /// <summary>
     /// Gets or sets when this override was created.

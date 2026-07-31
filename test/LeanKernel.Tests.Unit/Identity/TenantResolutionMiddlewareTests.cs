@@ -252,11 +252,11 @@ public class TenantResolutionMiddlewareTests
             .Setup(r => r.ResolveTenantByIdAsync(tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TenantEntity { Id = tenantId, Name = "Tenant", HostName = "tenant.test", IsActive = true });
         resolver
-            .Setup(r => r.ResolveChannelAsync(ChannelEntity.SignalName, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
+            .Setup(r => r.ResolveChannelAsync(Constants.Channels.SignalName, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChannelEntity { Id = channelId, Name = Constants.Channels.SignalName });
         resolver
             .Setup(r => r.ResolveUserByBindingAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserEntity { Id = userId, Issuer = "signal", Subject = "+15551234", FullName = "Signal User" });
+            .ReturnsAsync(new UserEntity { Id = userId, Issuer = Constants.Channels.SignalName, Subject = "+15551234", FullName = "Signal User" });
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Path = "/v1/responses";
@@ -264,8 +264,8 @@ public class TenantResolutionMiddlewareTests
         var identity = new System.Security.Claims.ClaimsIdentity(
             [
                 new System.Security.Claims.Claim("lk_tenant_id", tenantId.ToString()),
-                new System.Security.Claims.Claim("lk_channel", ChannelEntity.SignalName),
-                new System.Security.Claims.Claim("lk_sender_iss", "signal"),
+                new System.Security.Claims.Claim("lk_channel", Constants.Channels.SignalName),
+                new System.Security.Claims.Claim("lk_sender_iss", Constants.Channels.SignalName),
                 new System.Security.Claims.Claim("lk_sender_sub", "+15551234")
             ],
             "Bearer");
@@ -296,8 +296,8 @@ public class TenantResolutionMiddlewareTests
             .Setup(r => r.ResolveTenantByIdAsync(tenantId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TenantEntity { Id = tenantId, Name = "Tenant", HostName = "tenant.test", IsActive = true });
         resolver
-            .Setup(r => r.ResolveChannelAsync(ChannelEntity.SignalName, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
+            .Setup(r => r.ResolveChannelAsync(Constants.Channels.SignalName, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChannelEntity { Id = channelId, Name = Constants.Channels.SignalName });
         resolver
             .Setup(r => r.ResolveUserByBindingAsync(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((UserEntity?)null);
@@ -308,8 +308,8 @@ public class TenantResolutionMiddlewareTests
         var identity = new System.Security.Claims.ClaimsIdentity(
             [
                 new System.Security.Claims.Claim("lk_tenant_id", tenantId.ToString()),
-                new System.Security.Claims.Claim("lk_channel", ChannelEntity.SignalName),
-                new System.Security.Claims.Claim("lk_sender_iss", "signal"),
+                new System.Security.Claims.Claim("lk_channel", Constants.Channels.SignalName),
+                new System.Security.Claims.Claim("lk_sender_iss", Constants.Channels.SignalName),
                 new System.Security.Claims.Claim("lk_sender_sub", "+15551234")
             ],
             "Bearer");

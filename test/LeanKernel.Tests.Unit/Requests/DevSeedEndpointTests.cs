@@ -30,7 +30,7 @@ public sealed class DevSeedEndpointTests
             CreatedOn = DateTime.UtcNow,
             CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "system@leankernel.local" }
         };
-        var channel = new ChannelEntity { Id = Guid.NewGuid(), Name = ChannelEntity.OpenAiHttpName };
+        var channel = new ChannelEntity { Id = Guid.NewGuid(), Name = Constants.Channels.OpenAiHttpName };
         context.Tenants.Add(tenant);
         context.Channels.Add(channel);
         await context.SaveChangesAsync();
@@ -38,11 +38,11 @@ public sealed class DevSeedEndpointTests
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Host = new HostString("localhost");
 
-        var request = new DevSeedEndpoint.SeedBindingRequest(ChannelEntity.OpenAiHttpName, "cumbersome", "+16474050515", "alfero", "alfero@chingono.com", "Alfero", "Chingono", null, null);
+        var request = new DevSeedEndpoint.SeedBindingRequest(Constants.Channels.OpenAiHttpName, "cumbersome", "+18005551212", "testuser", "testuser@example.com", "Test", "User", null, null);
         var result = await InvokeAsync(httpContext, context, request);
 
         result.Should().NotBeNull();
-        context.Users.Should().ContainSingle(user => user.Issuer == "cumbersome" && user.Subject == "+16474050515");
+        context.Users.Should().ContainSingle(user => user.Issuer == "cumbersome" && user.Subject == "+18005551212");
         context.ChannelSenderBindings.Should().ContainSingle(binding => binding.TenantId == tenant.Id && binding.ChannelId == channel.Id);
     }
 
@@ -63,13 +63,13 @@ public sealed class DevSeedEndpointTests
             CreatedOn = DateTime.UtcNow,
             CreatedBy = new Badge { Id = Guid.Empty, FullName = "System", Email = "system@leankernel.local" }
         });
-        context.Channels.Add(new ChannelEntity { Id = Guid.NewGuid(), Name = ChannelEntity.OpenAiHttpName });
+        context.Channels.Add(new ChannelEntity { Id = Guid.NewGuid(), Name = Constants.Channels.OpenAiHttpName });
         await context.SaveChangesAsync();
 
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Host = new HostString("localhost");
 
-        var request = new DevSeedEndpoint.SeedBindingRequest(ChannelEntity.OpenAiHttpName, "cumbersome", "+16474050515", "alfero", "not-an-email", "Alfero", "Chingono", null, null);
+        var request = new DevSeedEndpoint.SeedBindingRequest(Constants.Channels.OpenAiHttpName, "cumbersome", "+18005551212", "testuser", "not-an-email", "Test", "User", null, null);
         var result = await InvokeAsync(httpContext, context, request);
 
         result.Should().NotBeNull();

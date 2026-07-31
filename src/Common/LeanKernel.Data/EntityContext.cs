@@ -434,9 +434,9 @@ public class EntityContext : DbContext
     {
         var knownChannelNames = new[]
         {
-            ChannelEntity.OpenAiHttpName,
-            ChannelEntity.SignalName,
-            ChannelEntity.TeamsName,
+            Constants.Channels.OpenAiHttpName,
+            Constants.Channels.SignalName,
+            Constants.Channels.TeamsName,
         };
 
         var existing = await this.Channels

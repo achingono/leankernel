@@ -96,7 +96,7 @@ public sealed class ChannelConfigurationValidatorHostedService(
     {
         foreach (var value in values)
         {
-            if (string.Equals(value, ChannelEntity.MemoryPolicyWildcard, StringComparison.Ordinal))
+            if (string.Equals(value, Constants.Memory.WildcardPolicy, StringComparison.Ordinal))
             {
                 continue;
             }
@@ -121,9 +121,9 @@ public sealed class ChannelConfigurationValidatorHostedService(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (normalized.Contains(ChannelEntity.MemoryPolicyWildcard, StringComparer.OrdinalIgnoreCase))
+        if (normalized.Contains(Constants.Memory.WildcardPolicy, StringComparer.OrdinalIgnoreCase))
         {
-            return [ChannelEntity.MemoryPolicyWildcard];
+            return [Constants.Memory.WildcardPolicy];
         }
 
         return normalized;

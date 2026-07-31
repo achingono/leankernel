@@ -66,9 +66,9 @@ public sealed class ChannelMemoryPolicyResolver(
             var sourcePolicy = policies[sourceChannelId];
             var candidatePolicy = policies[candidateChannelId];
 
-            var sourceCanAccess = sourcePolicy.Access.Contains(ChannelEntity.MemoryPolicyWildcard)
+            var sourceCanAccess = sourcePolicy.Access.Contains(Constants.Memory.WildcardPolicy)
                                   || sourcePolicy.Access.Contains(candidate.Name);
-            var candidateSharesToSource = candidatePolicy.Share.Contains(ChannelEntity.MemoryPolicyWildcard)
+            var candidateSharesToSource = candidatePolicy.Share.Contains(Constants.Memory.WildcardPolicy)
                                           || candidatePolicy.Share.Contains(source.Name);
             return sourceCanAccess && candidateSharesToSource;
         }
@@ -101,9 +101,9 @@ public sealed class ChannelMemoryPolicyResolver(
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        if (normalized.Contains(ChannelEntity.MemoryPolicyWildcard))
+        if (normalized.Contains(Constants.Memory.WildcardPolicy))
         {
-            return new HashSet<string>([ChannelEntity.MemoryPolicyWildcard], StringComparer.OrdinalIgnoreCase);
+            return new HashSet<string>([Constants.Memory.WildcardPolicy], StringComparer.OrdinalIgnoreCase);
         }
 
         return normalized;

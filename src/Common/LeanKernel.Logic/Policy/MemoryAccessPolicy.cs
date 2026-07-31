@@ -20,7 +20,7 @@ public sealed class MemoryAccessPolicy : IPolicy<ChannelMemoryPolicyEntity>
             return PolicyResult.Deny("Person identity is required for memory access.");
         }
 
-        if (policy.ShareList == ChannelEntity.MemoryPolicyWildcard)
+        if (policy.ShareList == Constants.Memory.WildcardPolicy)
         {
             return PolicyResult.Allow();
         }
@@ -38,7 +38,7 @@ public sealed class MemoryAccessPolicy : IPolicy<ChannelMemoryPolicyEntity>
             ? channelNameValue as string
             : null;
 
-        var isAllowed = channels.Contains(ChannelEntity.MemoryPolicyWildcard, StringComparer.OrdinalIgnoreCase)
+        var isAllowed = channels.Contains(Constants.Memory.WildcardPolicy, StringComparer.OrdinalIgnoreCase)
             || channels.Contains(currentChannelId, StringComparer.OrdinalIgnoreCase)
             || (!string.IsNullOrWhiteSpace(currentChannelName)
                 && channels.Contains(currentChannelName, StringComparer.OrdinalIgnoreCase));

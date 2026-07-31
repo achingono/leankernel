@@ -25,8 +25,8 @@ public class ChannelMemoryPolicyResolverTests
         });
 
         var tenantId = Guid.NewGuid();
-        var openAi = new ChannelEntity { Id = Guid.NewGuid(), Name = ChannelEntity.OpenAiHttpName };
-        var signal = new ChannelEntity { Id = Guid.NewGuid(), Name = ChannelEntity.SignalName };
+        var openAi = new ChannelEntity { Id = Guid.NewGuid(), Name = Constants.Channels.OpenAiHttpName };
+        var signal = new ChannelEntity { Id = Guid.NewGuid(), Name = Constants.Channels.SignalName };
         db.Channels.AddRange(openAi, signal);
         await db.SaveChangesAsync();
 
@@ -46,9 +46,9 @@ public class ChannelMemoryPolicyResolverTests
         });
 
         var tenantId = Guid.NewGuid();
-        var openAi = new ChannelEntity { Id = Guid.NewGuid(), Name = ChannelEntity.OpenAiHttpName };
-        var signal = new ChannelEntity { Id = Guid.NewGuid(), Name = ChannelEntity.SignalName };
-        var teams = new ChannelEntity { Id = Guid.NewGuid(), Name = ChannelEntity.TeamsName };
+        var openAi = new ChannelEntity { Id = Guid.NewGuid(), Name = Constants.Channels.OpenAiHttpName };
+        var signal = new ChannelEntity { Id = Guid.NewGuid(), Name = Constants.Channels.SignalName };
+        var teams = new ChannelEntity { Id = Guid.NewGuid(), Name = Constants.Channels.TeamsName };
         db.Channels.AddRange(openAi, signal, teams);
         db.ChannelMemoryPolicies.AddRange(
             new ChannelMemoryPolicyEntity
@@ -56,16 +56,16 @@ public class ChannelMemoryPolicyResolverTests
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
                 ChannelId = openAi.Id,
-                ShareList = ChannelEntity.SignalName,
-                AccessList = ChannelEntity.SignalName
+                ShareList = Constants.Channels.SignalName,
+                AccessList = Constants.Channels.SignalName
             },
             new ChannelMemoryPolicyEntity
             {
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
                 ChannelId = signal.Id,
-                ShareList = ChannelEntity.OpenAiHttpName,
-                AccessList = ChannelEntity.OpenAiHttpName
+                ShareList = Constants.Channels.OpenAiHttpName,
+                AccessList = Constants.Channels.OpenAiHttpName
             },
             new ChannelMemoryPolicyEntity
             {

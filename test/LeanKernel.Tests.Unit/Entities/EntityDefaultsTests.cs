@@ -64,8 +64,8 @@ public sealed class EntityDefaultsTests
         var policy = new ChannelMemoryPolicyEntity();
         var binding = new ChannelSenderBindingEntity();
 
-        policy.ShareList.Should().Be(ChannelEntity.MemoryPolicyWildcard);
-        policy.AccessList.Should().Be(ChannelEntity.MemoryPolicyWildcard);
+        policy.ShareList.Should().Be(Constants.Memory.WildcardPolicy);
+        policy.AccessList.Should().Be(Constants.Memory.WildcardPolicy);
         policy.CreatedOn.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
 
         binding.Issuer.Should().BeEmpty();
@@ -86,6 +86,6 @@ public sealed class EntityDefaultsTests
         await context.ApplyMigrationsAndSeedAsync("localhost");
 
         context.Tenants.Should().ContainSingle(tenant => tenant.HostName == "localhost");
-        context.Channels.Should().Contain(channel => channel.Name == ChannelEntity.OpenAiHttpName);
+        context.Channels.Should().Contain(channel => channel.Name == Constants.Channels.OpenAiHttpName);
     }
 }

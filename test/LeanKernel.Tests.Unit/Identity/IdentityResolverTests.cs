@@ -116,8 +116,8 @@ public class IdentityResolverTests
         guest2.Id.Should().Be(guest1.Id);
         guest2.PersonId.Should().Be(guest1.PersonId);
 
-        var channel1 = await resolver.ResolveOrCreateChannelAsync("openai-http");
-        var channel2 = await resolver.ResolveOrCreateChannelAsync("openai-http");
+        var channel1 = await resolver.ResolveOrCreateChannelAsync(Constants.Channels.OpenAiHttpName);
+        var channel2 = await resolver.ResolveOrCreateChannelAsync(Constants.Channels.OpenAiHttpName);
         channel2.Id.Should().Be(channel1.Id);
 
         db.Users.Count().Should().Be(1);
@@ -129,7 +129,7 @@ public class IdentityResolverTests
     {
         var resolver = CreateResolver(out _);
 
-        var principal = Principal("missing-user", "signal", "Missing", "missing@test");
+        var principal = Principal("missing-user", Constants.Channels.SignalName, "Missing", "missing@test");
 
         var existing = await resolver.ResolveUserAsync(principal);
 
@@ -141,7 +141,7 @@ public class IdentityResolverTests
     {
         var resolver = CreateResolver(out _);
 
-        var principal = Principal("existing-sub", "signal", "Existing", "existing@test");
+        var principal = Principal("existing-sub", Constants.Channels.SignalName, "Existing", "existing@test");
         var created = await resolver.ResolveOrCreateUserAsync(principal);
 
         var existing = await resolver.ResolveUserAsync(principal);
@@ -156,7 +156,7 @@ public class IdentityResolverTests
         var resolver = CreateResolver(out var db);
         var tenantId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var principal = Principal("+15551234", "signal", "Signal User", "signal@test");
+        var principal = Principal("+15551234", Constants.Channels.SignalName, "Signal User", "signal@test");
         var user = await resolver.ResolveOrCreateUserAsync(principal);
 
         db.Tenants.Add(new TenantEntity
@@ -168,22 +168,22 @@ public class IdentityResolverTests
             CreatedOn = DateTime.UtcNow,
             CreatedBy = new Badge { Id = Guid.Empty, FullName = "system", Email = string.Empty }
         });
-        db.Channels.Add(new ChannelEntity { Id = channelId, Name = ChannelEntity.SignalName });
+        db.Channels.Add(new ChannelEntity { Id = channelId, Name = Constants.Channels.SignalName });
         db.ChannelSenderBindings.Add(new ChannelSenderBindingEntity
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             ChannelId = channelId,
             UserId = user.Id,
-            Issuer = "signal",
+            Issuer = Constants.Channels.SignalName,
             Subject = "+15551234",
             BearerToken = "test-token",
             IsActive = true
         });
         await db.SaveChangesAsync();
 
-        var active = await resolver.IsChannelSenderBindingActiveAsync(tenantId, user.Id, channelId, "signal", "+15551234");
-        var wrongSubject = await resolver.IsChannelSenderBindingActiveAsync(tenantId, user.Id, channelId, "signal", "+15557654");
+        var active = await resolver.IsChannelSenderBindingActiveAsync(tenantId, user.Id, channelId, Constants.Channels.SignalName, "+15551234");
+        var wrongSubject = await resolver.IsChannelSenderBindingActiveAsync(tenantId, user.Id, channelId, Constants.Channels.SignalName, "+15557654");
 
         active.Should().BeTrue();
         wrongSubject.Should().BeFalse();

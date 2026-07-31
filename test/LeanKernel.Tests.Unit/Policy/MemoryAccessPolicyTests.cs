@@ -16,7 +16,7 @@ public class MemoryAccessPolicyTests
     {
         var context = CreateContext(Guid.NewGuid(), "tenant.example.com", "teams");
         var policy = new MemoryAccessPolicy();
-        var entity = new ChannelMemoryPolicyEntity { ShareList = ChannelEntity.MemoryPolicyWildcard };
+        var entity = new ChannelMemoryPolicyEntity { ShareList = Constants.Memory.WildcardPolicy };
 
         var result = policy.Evaluate(entity, context.Object);
 

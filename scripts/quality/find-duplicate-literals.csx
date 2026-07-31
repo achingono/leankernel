@@ -13,6 +13,7 @@ var csFiles = Directory.GetFiles(projectDirectory, "*.cs", SearchOption.AllDirec
     .Where(file => {
         var normalized = file.Replace(Path.DirectorySeparatorChar, '/');
         return !normalized.Contains("/Migrations/")
+            && !normalized.Contains("/Tools/")
             && !normalized.Contains("/obj/")
             && !normalized.Contains("/bin/");
     })

@@ -22,8 +22,8 @@ public sealed class DatabaseChannelCredentialProvider(
     {
         var (token, matchCount) = await dbContextFactory.ResolveSenderAsync(
             senderId,
-            ChannelEntity.SignalName,
-            ChannelEntity.SignalName,
+            Constants.Channels.SignalName,
+            Constants.Channels.SignalName,
             ct);
 
         if (matchCount > 1)

@@ -116,6 +116,27 @@ public static class Constants
     }
 
     /// <summary>
+    /// Contains well-known channel names.
+    /// </summary>
+    public static class Channels
+    {
+        /// <summary>
+        /// Well-known channel name for the OpenAI-compatible HTTP surface.
+        /// </summary>
+        public const string OpenAiHttpName = "openai-http";
+
+        /// <summary>
+        /// Well-known channel name for the Signal terminal.
+        /// </summary>
+        public const string SignalName = "signal";
+
+        /// <summary>
+        /// Well-known channel name for the Microsoft Teams terminal.
+        /// </summary>
+        public const string TeamsName = "teams";
+    }
+
+    /// <summary>
     /// Contains tool names used in MCP/skill definitions.
     /// </summary>
     public static class ToolNames
@@ -475,5 +496,16 @@ public static class Constants
             /// </summary>
             public const string Admitted = "admitted";
         }
+    }
+
+    /// <summary>
+    /// Memory-related constants.
+    /// </summary>
+    public static class Memory
+    {
+        /// <summary>
+        /// Wildcard token used by channel memory policy allow-lists.
+        /// </summary>
+        public const string WildcardPolicy = "*";
     }
 }

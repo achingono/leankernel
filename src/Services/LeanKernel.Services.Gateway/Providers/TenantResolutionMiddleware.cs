@@ -153,7 +153,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         context.Items[Constants.Http.ContextItems.BadgeKey] = badge;
 
         var openAiChannel = await resolver.ResolveOrCreateChannelAsync(
-            ChannelEntity.OpenAiHttpName, cancellationToken);
+            Constants.Channels.OpenAiHttpName, cancellationToken);
         context.Items[Constants.Http.ContextItems.ChannelIdKey] = openAiChannel.Id;
 
         await next(context);
