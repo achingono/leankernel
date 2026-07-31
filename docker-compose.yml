@@ -45,6 +45,7 @@ services:
     container_name: leankernel-litellm
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-leankernel-local}
+      - LITELLM_SPEC_PATH=${LITELLM_SPEC_PATH:-/app/config/config.yaml}
       - POSTGRES_HOST=database
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${LITELLM_POSTGRES_DB:-litellm}

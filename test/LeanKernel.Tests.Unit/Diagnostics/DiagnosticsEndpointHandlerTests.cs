@@ -9,8 +9,8 @@ using LeanKernel.Services.Gateway.Requests;
 using LeanKernel.Tests.Unit.TestDoubles;
 
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 using Xunit;

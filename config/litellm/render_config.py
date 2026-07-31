@@ -601,8 +601,8 @@ def render_config(spec_path: Path, output_path: Path) -> None:
 def main() -> int:
     load_env_file(os.getenv("LITELLM_KEYS_FILE"))
     
-    spec_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/litellm_spec.yaml")
-    output_path = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("/tmp/litellm_config.yaml")
+    spec_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/config/config.yaml")
+    output_path = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("/app/config/config.generated.yaml")
     try:
         render_config(spec_path, output_path)
     except (SpecValidationError, yaml.YAMLError, OSError) as exc:

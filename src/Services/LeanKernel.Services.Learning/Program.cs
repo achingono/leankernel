@@ -12,8 +12,10 @@ using LeanKernel.Services.Learning.Onboarding;
 using LeanKernel.Services.Learning.Scheduler;
 using LeanKernel.Services.Learning.Steps;
 
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
 using OpenAI;
@@ -119,6 +121,7 @@ builder.Services.AddHostedService<SchedulerHostedService>();
 
 var gbrainSettings = builder.Configuration.GetSection("GBrain").Get<GBrainSettings>() ?? new GBrainSettings();
 builder.Services.AddGBrainMemory(gbrainSettings);
+builder.Services.AddServiceHealthChecks();
 
 var app = builder.Build();
 
@@ -128,5 +131,14 @@ using (var scope = app.Services.CreateScope())
     await using var db = await context.CreateDbContextAsync();
     await db.Database.EnsureCreatedAsync();
 }
+
+app.MapHealthChecks(Constants.Healthchecks.Path, new HealthCheckOptions
+{
+    ResponseWriter = (context, report) =>
+    {
+        context.Response.ContentType = "application/json; charset=utf-8";
+        return context.Response.WriteAsync(report.ToJson());
+    },
+});
 
 app.Run();

@@ -1,5 +1,3 @@
-using FluentAssertions;
-
 using LeanKernel.Data;
 using LeanKernel.Data.Interceptors;
 using LeanKernel.Entities;
