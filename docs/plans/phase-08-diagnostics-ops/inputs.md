@@ -7,9 +7,9 @@
 | LiteLLM proxy configuration | `proxy_config.yaml` (deploy-time) | Operations |
 | LiteLLM proxy admin API | `/health/services`, `/spend`, `/metrics` endpoints | Operations |
 | EF persistence context | `src/Common/LeanKernel.Data/EntityContext.cs` | Rebuild maintainer |
-| Existing health checks | `src/Services/LeanKernel.Gateway/HealthChecks/*` | Rebuild maintainer |
+| Existing health checks | `src/Services/LeanKernel.Services.Gateway/HealthChecks/*` | Rebuild maintainer |
 | Runtime emit points | Phase 03/04/05/07 signals | Rebuild maintainer |
-| Existing auth wiring | `src/Services/LeanKernel.Gateway/Programs.cs` (JWT/forwarded headers/CORS) | Rebuild maintainer |
+| Existing auth wiring | `src/Services/LeanKernel.Services.Gateway/Programs.cs` (JWT/forwarded headers/CORS) | Rebuild maintainer |
 
 ## Optional Inputs
 - Dream run telemetry/report outputs from Phase 07 scheduler integration.

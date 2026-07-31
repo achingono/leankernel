@@ -26,10 +26,10 @@ Anonymous traffic also uses the ASP.NET session id as an additional isolation di
 
 Code anchors:
 
-- [`../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs`](../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs)
-- [`../../src/Services/LeanKernel.Gateway/Providers/TenantResolutionMiddleware.cs`](../../src/Services/LeanKernel.Gateway/Providers/TenantResolutionMiddleware.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs`](../../src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Providers/TenantResolutionMiddleware.cs`](../../src/Services/LeanKernel.Services.Gateway/Providers/TenantResolutionMiddleware.cs)
 - [`../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs`](../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs)
-- [`../../src/Services/LeanKernel.Gateway/Providers/IdentityIsolationKeyProvider.cs`](../../src/Services/LeanKernel.Gateway/Providers/IdentityIsolationKeyProvider.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Providers/IdentityIsolationKeyProvider.cs`](../../src/Services/LeanKernel.Services.Gateway/Providers/IdentityIsolationKeyProvider.cs)
 
 ## Silent Anonymous Fallback
 

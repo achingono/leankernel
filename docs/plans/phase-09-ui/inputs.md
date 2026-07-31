@@ -8,7 +8,7 @@
 | Diagnostics API | Phase 08 diagnostics query API | Rebuild maintainer |
 | Knowledge/document services | Phase 05 ingestion + `GBrainKnowledgeService` | Rebuild maintainer |
 | Onboarding intelligence | Phase 07 onboarding gap/directive services | Rebuild maintainer |
-| Identity/auth + partitioning | `src/Services/LeanKernel.Gateway/Programs.cs`, `Providers/RequestContextPermit.cs` | Rebuild maintainer |
+| Identity/auth + partitioning | `src/Services/LeanKernel.Services.Gateway/Programs.cs`, `Providers/RequestContextPermit.cs` | Rebuild maintainer |
 | Source UI pages | `~/source/repos/leankernel/src/LeanKernel.Gateway/Components/Pages/*.razor` | Reviewer |
 | Source UI services | `~/source/repos/leankernel/src/LeanKernel.Gateway/Services/{ChatService,DiagnosticsService,AdminService,KnowledgeUiService,DocumentUiService,OnboardingService}.cs` | Reviewer |
 | Playwright harness | `test/LeanKernel.Tests.Playwright` | Rebuild maintainer |

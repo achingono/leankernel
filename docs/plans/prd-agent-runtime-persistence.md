@@ -70,7 +70,7 @@ Four projects (no `.sln` yet):
 | `src/Common/LeanKernel.Core` | classlib | — | ✅ |
 | `src/Common/LeanKernel.Data` | classlib | Core, EF Core 10.0.9 | ✅ |
 | `src/Common/LeanKernel.Logic` | classlib | Core, Data, `Microsoft.Agents.AI*` 1.13.0 | ❌ |
-| `src/Services/LeanKernel.Gateway` | web | Core, Data, Logic, Hosting.OpenAI, DevUI, EF providers | ❌ (depends on Logic) |
+| `src/Services/LeanKernel.Services.Gateway` | web | Core, Data, Logic, Hosting.OpenAI, DevUI, EF providers | ❌ (depends on Logic) |
 
 > The README lists many additional projects (Knowledge, Tools, Plugins, Channels, etc.) and `src/LeanKernel.sln`; these **do not exist** and are aspirational. This PRD only touches the four real projects and adds test projects.
 
@@ -81,7 +81,7 @@ Four projects (no `.sln` yet):
 - **B1** — `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs:38` — invalid expression `Role = switch (m.Role) { ... }`. Must be `Role = m.Role switch { ... }`. Causes ~30 cascading parser errors (`CS1525`, `CS1513`, `CS1026`, `CS8803`, …).
 - **B2** — `DbChatHistoryProvider.cs:36` references `m.AuthorName`, but `TurnEntity` has no `AuthorName` property.
 - **B3** — `MemoryProvider` calls `_memoryClient.LoadMemoriesAsync(...)`, but `IMemoryClient` (`Providers/IMemoryClient.cs`) is an **empty** interface.
-- **B4** — `src/Services/LeanKernel.Gateway/Programs.cs:2` imports `using LeanKernel.Requests;`, but the actual namespace is `LeanKernel.Gateway.Requests`.
+- **B4** — `src/Services/LeanKernel.Services.Gateway/Programs.cs:2` imports `using LeanKernel.Requests;`, but the actual namespace is `LeanKernel.Gateway.Requests`.
 
 **Design/runtime defects that will fail correctness once B1-B4 are fixed:**
 
@@ -569,7 +569,7 @@ Create three projects under `test/` (matching original conventions), and a `Lean
 1. **Channel strategy** — the OpenAI HTTP surface resolves to a canonical `ChannelEntity`; `ChannelEntity.Id` is the canonical channel partition key.
 1. **Authentication model** — principals are expected from configured auth; startup must explicitly wire `AddAuthentication(...)` and `AddAuthorization()` before middleware.
 1. **Conversation durability** — Agent chat history is durable via `DbChatHistoryProvider` (EF-backed, identity-scoped `SessionEntity` + `TurnEntity`). The `/v1/conversations` API surface uses in-memory MAF defaults because `IConversationStorage`/`IAgentConversationIndex` are internal in MAF 1.13.0-alpha.
-1. **Memory layering** — memory abstractions stay in `src/Common/LeanKernel.Logic`; GBrain implementation stays in `src/Services/LeanKernel.Gateway`.
+1. **Memory layering** — memory abstractions stay in `src/Common/LeanKernel.Logic`; GBrain implementation stays in `src/Services/LeanKernel.Services.Gateway`.
 1. **DB strategy** — SQLite for local dev/tests and Postgres for production.
 1. **Entity ID strategy for this PRD** — keep existing string IDs on `SessionEntity`/`TurnEntity`; use persisted GUID foreign keys (`TenantId`, `UserId`, `ChannelId`) for ownership, and defer any `Guid`-based `IEntity` unification to a separate migration PRD.
 1. **Conversation ID strategy** — keep external OpenAI `conversationId`, internal `scopedConversationId`, and persisted `chatSessionId` as distinct values with explicit translation.

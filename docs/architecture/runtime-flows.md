@@ -12,7 +12,7 @@ This page summarizes the main request and persistence flows in the current runti
 6. Authorization middleware runs.
 7. OpenAI-compatible endpoints are mapped through MAF hosting.
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
+Reference: [`../../src/Services/LeanKernel.Services.Gateway/Program.cs`](../../src/Services/LeanKernel.Services.Gateway/Program.cs)
 
 ## Identity Resolution Flow
 
@@ -26,7 +26,7 @@ Reference: [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Servic
 
 References:
 
-- [`../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs`](../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs`](../../src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs)
 - [`../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs`](../../src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs)
 
 ## End-To-End Runtime Data Flow
@@ -109,8 +109,8 @@ Reference: [`../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.c
 
 References:
 
-- [`../../src/Services/LeanKernel.Gateway/Requests/DocumentUploadEndpoint.cs`](../../src/Services/LeanKernel.Gateway/Requests/DocumentUploadEndpoint.cs)
-- [`../../src/Services/LeanKernel.Gateway/Providers/AttachmentIngestionMiddleware.cs`](../../src/Services/LeanKernel.Gateway/Providers/AttachmentIngestionMiddleware.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Requests/DocumentUploadEndpoint.cs`](../../src/Services/LeanKernel.Services.Gateway/Requests/DocumentUploadEndpoint.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Providers/AttachmentIngestionMiddleware.cs`](../../src/Services/LeanKernel.Services.Gateway/Providers/AttachmentIngestionMiddleware.cs)
 - [`../../src/Common/LeanKernel.Logic/Tools/DocumentIngestion/`](../../src/Common/LeanKernel.Logic/Tools/DocumentIngestion/)
 
 ## Memory Flow
@@ -135,8 +135,8 @@ This flow is intentionally separate from durable memory scope so transcript/sess
 
 References:
 
-- [`../../src/Services/LeanKernel.Gateway/Providers/IdentityIsolationKeyProvider.cs`](../../src/Services/LeanKernel.Gateway/Providers/IdentityIsolationKeyProvider.cs)
-- [`../../src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs`](../../src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Providers/IdentityIsolationKeyProvider.cs`](../../src/Services/LeanKernel.Services.Gateway/Providers/IdentityIsolationKeyProvider.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Sessions/DbAgentStateStore.cs`](../../src/Services/LeanKernel.Services.Gateway/Sessions/DbAgentStateStore.cs)
 
 ## Tool Invocation Flow
 

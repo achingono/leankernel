@@ -12,7 +12,7 @@ The logs show an early correction from "stored memory" about the solution shape 
 - `src/Common/LeanKernel.Core`
 - `src/Common/LeanKernel.Data`
 - `src/Common/LeanKernel.Logic`
-- `src/Services/LeanKernel.Gateway`
+- `src/Services/LeanKernel.Services.Gateway`
 
 The design work repeatedly emphasized that custom code should exist only where MAF needs durable persistence, identity scoping, or integration-specific glue.
 

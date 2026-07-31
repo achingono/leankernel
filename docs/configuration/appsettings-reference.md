@@ -2,8 +2,8 @@
 
 The gateway reads configuration primarily from:
 
-- [`../../src/Services/LeanKernel.Gateway/appsettings.json`](../../src/Services/LeanKernel.Gateway/appsettings.json)
-- [`../../src/Services/LeanKernel.Gateway/appsettings.Development.json`](../../src/Services/LeanKernel.Gateway/appsettings.Development.json)
+- [`../../src/Services/LeanKernel.Services.Gateway/appsettings.json`](../../src/Services/LeanKernel.Services.Gateway/appsettings.json)
+- [`../../src/Services/LeanKernel.Services.Gateway/appsettings.Development.json`](../../src/Services/LeanKernel.Services.Gateway/appsettings.Development.json)
 
 ## Current Sections
 
@@ -160,7 +160,7 @@ Code anchors:
 - [`../../src/Common/LeanKernel.Logic/Configuration/IdentityClaimsContextSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/IdentityClaimsContextSettings.cs)
 - [`../../src/Common/LeanKernel.Logic/Configuration/FileSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/FileSettings.cs)
 - [`../../src/Common/LeanKernel.Logic/Configuration/DocumentIngestionToolSettings.cs`](../../src/Common/LeanKernel.Logic/Configuration/DocumentIngestionToolSettings.cs)
-- [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Program.cs`](../../src/Services/LeanKernel.Services.Gateway/Program.cs)
 
 ## Provider Selection Notes
 
@@ -170,4 +170,4 @@ Database provider selection is not hardcoded to one backend. The gateway resolve
 2. `Postgres`
 3. `Sqlite`
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs`](../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs)
+Reference: [`../../src/Services/LeanKernel.Services.Common/Extensions/DbContextOptionsBuilderExtensions.cs`](../../src/Services/LeanKernel.Services.Common/Extensions/DbContextOptionsBuilderExtensions.cs)

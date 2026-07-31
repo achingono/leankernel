@@ -58,7 +58,7 @@ If the GBrain capability probe finds degraded support (e.g., search works but `g
 is missing), only the supported subset is registered. If GBrain is unreachable, these tools
 are skipped entirely and the rest of the runtime starts normally.
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Memory/GBrainCapabilityCheck.cs`](../../src/Services/LeanKernel.Gateway/Memory/GBrainCapabilityCheck.cs)
+Reference: [`../../src/Services/LeanKernel.Services.Common/Memory/GBrainCapabilityCheck.cs`](../../src/Services/LeanKernel.Services.Common/Memory/GBrainCapabilityCheck.cs)
 
 ### Document Tools
 

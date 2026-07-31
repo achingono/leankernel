@@ -37,7 +37,7 @@ curl http://127.0.0.1:8080/health
 
 Expected result: HTTP 200 with a small JSON payload containing `status: healthy`.
 
-Health endpoint mapping lives in [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs).
+Health endpoint mapping lives in [`../../src/Services/LeanKernel.Services.Gateway/Program.cs`](../../src/Services/LeanKernel.Services.Gateway/Program.cs).
 
 ## Key Local URLs
 

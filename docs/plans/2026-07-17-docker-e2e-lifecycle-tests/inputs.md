@@ -6,8 +6,8 @@
 |---|---|---|
 | Existing Playwright test harness | `test/LeanKernel.Tests.Playwright/PlaywrightTests.cs` | Engineering |
 | Docker topology and service ports | `docker-compose.yml` | Engineering |
-| Identity and memory runtime behavior | `src/Services/LeanKernel.Gateway/Providers/TenantResolutionMiddleware.cs`, `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` | Engineering |
-| Memory transport contracts | `src/Services/LeanKernel.Gateway/Memory/GBrainMcpClient.cs` | Engineering |
+| Identity and memory runtime behavior | `src/Services/LeanKernel.Services.Gateway/Providers/TenantResolutionMiddleware.cs`, `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` | Engineering |
+| Memory transport contracts | `src/Services/LeanKernel.Services.Gateway/Memory/GBrainMcpClient.cs` | Engineering |
 
 ## Optional Inputs
 - Existing local `.env` values for docker port overrides.

@@ -10,7 +10,7 @@ _List every document, data source, or artefact that must exist before this phase
 | ADR 0002 persisted identity partitioning | `docs/decisions/0002-partition-runtime-state-by-persisted-identities.md` | repository owner |
 | ADR 0003 transcript vs runtime separation | `docs/decisions/0003-separate-transcript-sessions-from-agent-runtime-state.md` | repository owner |
 | Current solution structure | `docs/architecture/solution-structure.md` | repository owner |
-| Current runtime implementation | `src/Services/LeanKernel.Gateway`, `src/Common/LeanKernel.Logic`, `src/Common/LeanKernel.Data`, `src/Common/LeanKernel.Core` | repository owner |
+| Current runtime implementation | `src/Services/LeanKernel.Services.Gateway`, `src/Common/LeanKernel.Logic`, `src/Common/LeanKernel.Data`, `src/Common/LeanKernel.Core` | repository owner |
 
 ## Optional Inputs
 _Inputs that improve the phase but are not blockers._

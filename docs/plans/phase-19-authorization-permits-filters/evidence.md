@@ -12,7 +12,7 @@
 | Famorize DI: AddPermits | `~/source/repos/famorize/src/Services/Famorize.Api/Extensions/IServiceCollectionExtensions.cs` (line 500) | Open-generic `IPermit<TEntity>` → `ClaimsPermit<TEntity>` |
 | Famorize DI: AddFilters | `~/source/repos/famorize/src/Common/Famorize.Logic/Extensions/IServiceCollectionExtensions.cs` (line 33) | 21 per-entity scoped filter registrations |
 | Existing LeanKernel IPermit | `src/Common/LeanKernel.Core/Interfaces/IPermit.cs` | 8 properties: PersonId, UserId, TenantId, ChannelId, HostName, IsAuthenticated, SessionId, Badge |
-| Existing LeanKernel RequestContextPermit | `src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs` | Reads from HttpContext.Items |
+| Existing LeanKernel RequestContextPermit | `src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs` | Reads from HttpContext.Items |
 | Existing LeanKernel Operation enum | `src/Common/LeanKernel.Core/Operation.cs` | Create/Read/Update/Delete — already aligned |
 | Existing ad-hoc triad pattern 1 | `src/Common/LeanKernel.Logic/Telemetry/TelemetryAggregationService.cs:253-257` | `.Where(row => row.Turn.Session.TenantId == ...)` — repetitive manual triad |
 | Existing ad-hoc triad pattern 2 | `src/Common/LeanKernel.Logic/Telemetry/TelemetryExportService.cs:45-47` | Same nav-through pattern as aggregation |
@@ -21,7 +21,7 @@
 | Existing IRecyclable | `src/Common/LeanKernel.Core/Interfaces/IRecyclable.cs` | `IsDeleted` property for soft-delete predicates |
 | Existing IAuditable | `src/Common/LeanKernel.Core/Interfaces/IAuditable.cs` | `CreatedOn/CreatedBy/UpdatedOn/UpdatedBy` for audit stamping |
 | Existing IEntity | `src/Common/LeanKernel.Core/Interfaces/IEntity.cs` | `Guid Id` — entity identifier |
-| Configuration options pattern | `src/Services/LeanKernel.Gateway/Programs.cs` | Existing options binding pattern; Phase 19 binds under `Agents:EntityScopePolicies` |
+| Configuration options pattern | `src/Services/LeanKernel.Services.Gateway/Programs.cs` | Existing options binding pattern; Phase 19 binds under `Agents:EntityScopePolicies` |
 | IOptions pattern for code defaults | `src/Common/LeanKernel.Logic/Providers/ChannelMemoryPolicyResolver.cs:42-44` | Reads `agentSettings.Value.Channels.MemoryPolicyDefaults` for runtime defaults; Phase 19 can use similar `IOptions<T>.Value` pattern plus `PostConfigure` for fallback |
 
 ## Implementation Artifacts
@@ -68,7 +68,7 @@
 | --- | --- | --- |
 | `EntityRepository.cs` | ~143 | Generic Guid-key repository: filter on reads, permit on writes, audit/partition stamping |
 
-### Gateway Permit (`src/Services/LeanKernel.Gateway/Providers/`)
+### Gateway Permit (`src/Services/LeanKernel.Services.Gateway/Providers/`)
 
 | File | Lines | Purpose |
 | --- | --- | --- |
@@ -79,8 +79,8 @@
 | File | Location | Purpose |
 | --- | --- | --- |
 | `IServiceCollectionExtensions.cs` (Logic) | `src/Common/LeanKernel.Logic/Extensions/` | `AddFilters()`: open-generic filter, policy provider, scope builder |
-| `IServiceCollectionExtensions.cs` (Gateway) | `src/Services/LeanKernel.Gateway/Extensions/` | `AddPermits()`: open-generic permit; `AddRepositories()`: open-generic repo + config binding |
-| `Programs.cs` | `src/Services/LeanKernel.Gateway/` | Calls `services.AddPermits().AddFilters().AddRepositories()` |
+| `IServiceCollectionExtensions.cs` (Gateway) | `src/Services/LeanKernel.Services.Gateway/Extensions/` | `AddPermits()`: open-generic permit; `AddRepositories()`: open-generic repo + config binding |
+| `Programs.cs` | `src/Services/LeanKernel.Services.Gateway/` | Calls `services.AddPermits().AddFilters().AddRepositories()` |
 
 ### Consumer Migrations
 

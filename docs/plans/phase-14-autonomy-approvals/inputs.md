@@ -4,7 +4,7 @@
 
 | Input | Source | Owner |
 |---|---|---|
-| Tool runtime + governance | `src/Common/LeanKernel.Logic/Tools/*`, `src/Services/LeanKernel.Gateway/Tools/*` | Rebuild maintainer |
+| Tool runtime + governance | `src/Common/LeanKernel.Logic/Tools/*`, `src/Services/LeanKernel.Services.Gateway/Tools/*` | Rebuild maintainer |
 | Channels (approval delivery) | `docs/plans/phase-06-channels/` | Rebuild maintainer |
 | Diagnostics persistence (audit) | `docs/plans/phase-08-diagnostics-ops/` | Rebuild maintainer |
 | Person/tenant scoping | `docs/plans/phase-10-cross-channel-memory/` | Rebuild maintainer |

@@ -38,7 +38,7 @@ LeanKernel is aimed at teams that want an agent runtime they can actually inspec
 | `src/Common/LeanKernel.Core` | Shared interfaces, entities, and low-level contracts |
 | `src/Common/LeanKernel.Data` | EF Core context, migrations, interceptors, and design-time data access support |
 | `src/Common/LeanKernel.Logic` | Chat history, memory pipeline, identity resolution, and MAF-facing logic services |
-| `src/Services/LeanKernel.Gateway` | ASP.NET host, OpenAI-compatible endpoint mapping, auth/session middleware, document upload/multipart ingestion, GBrain integration, and agent state wiring |
+| `src/Services/LeanKernel.Services.Gateway` | ASP.NET host, OpenAI-compatible endpoint mapping, auth/session middleware, document upload/multipart ingestion, GBrain integration, and agent state wiring |
 | `src/Terminals/LeanKernel.Channels.Common` | Shared terminal runtime helpers for gateway communication, health responses, and sender binding resolution |
 | `src/Terminals/LeanKernel.Channels.Signal` | Signal terminal edge process using the `signal-cli` JSON-RPC sidecar |
 | `src/Terminals/LeanKernel.Channels.Teams` | Teams Bot Framework terminal edge process |
@@ -75,7 +75,7 @@ Reference: [`docs/getting-started/quick-start.md`](docs/getting-started/quick-st
 ### Run The Gateway Directly
 
 ```bash
-dotnet run --project src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj --urls "http://127.0.0.1:5080"
+dotnet run --project src/Services/LeanKernel.Services.Gateway/LeanKernel.Gateway.csproj --urls "http://127.0.0.1:5080"
 ```
 
 Direct local runs use the gateway appsettings defaults, which point at SQLite unless you override connection strings.

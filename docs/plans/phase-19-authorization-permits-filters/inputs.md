@@ -5,19 +5,19 @@
 | Input | Source | Owner |
 |---|---|---|
 | Existing `IPermit` (non-generic) interface | `src/Common/LeanKernel.Core/Interfaces/IPermit.cs` | Repository |
-| `RequestContextPermit` implementation | `src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs` | Repository |
+| `RequestContextPermit` implementation | `src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs` | Repository |
 | `Operation` enum | `src/Common/LeanKernel.Core/Operation.cs` | Repository |
 | `IRecyclable` (soft-delete) interface | `src/Common/LeanKernel.Core/Interfaces/IRecyclable.cs` | Repository |
 | `IAuditable` interface | `src/Common/LeanKernel.Core/Interfaces/IAuditable.cs` | Repository |
 | `EntityContext` with all `DbSet<>` properties | `src/Common/LeanKernel.Data/EntityContext.cs` | Repository |
 | Entity class definitions | `src/Common/LeanKernel.Core/Entities/*.cs` | Repository |
 | Famorize reference implementation | `~/source/repos/famorize/src/` | Reference project |
-| Existing options/configuration binding pattern | `src/Services/LeanKernel.Gateway/Programs.cs` | Repository |
+| Existing options/configuration binding pattern | `src/Services/LeanKernel.Services.Gateway/Programs.cs` | Repository |
 | Existing `IOptions<T>` defaults pattern | `src/Common/LeanKernel.Logic/Providers/ChannelMemoryPolicyResolver.cs:42-44` | Reads from `agentSettings.Value.Channels.MemoryPolicyDefaults` at runtime |
 
 ## Optional Inputs
 - Famorize test implementations (`MockPermit`, `MockFilter`) for test pattern inspiration.
-- Existing ad-hoc query consumers in `src/Common/LeanKernel.Logic/Providers/`, `src/Common/LeanKernel.Logic/Telemetry/`, `src/Services/LeanKernel.Gateway/Sessions/`.
+- Existing ad-hoc query consumers in `src/Common/LeanKernel.Logic/Providers/`, `src/Common/LeanKernel.Logic/Telemetry/`, `src/Services/LeanKernel.Services.Gateway/Sessions/`.
 
 ## Input Validation Checklist
 - [x] `IPermit` exists with the 8 partitioning properties.

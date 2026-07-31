@@ -11,7 +11,7 @@ This document summarizes the architectural, security, and quality findings from 
 - **Integration Tests**: **28 Passed** (0 Failed, 0 Skipped).
 - **Playwright Tests**: **5 Passed** (0 Failed, 0 Skipped).
 
-All existing and newly added tests pass cleanly across [LeanKernel.Core](../../../src/Common/LeanKernel.Core/LeanKernel.Core.csproj), [LeanKernel.Logic](../../../src/Common/LeanKernel.Logic/LeanKernel.Logic.csproj), [LeanKernel.Data](../../../src/Common/LeanKernel.Data/LeanKernel.Data.csproj), and [LeanKernel.Gateway](../../../src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj).
+All existing and newly added tests pass cleanly across [LeanKernel.Core](../../../src/Common/LeanKernel.Core/LeanKernel.Core.csproj), [LeanKernel.Logic](../../../src/Common/LeanKernel.Logic/LeanKernel.Logic.csproj), [LeanKernel.Data](../../../src/Common/LeanKernel.Data/LeanKernel.Data.csproj), and [LeanKernel.Gateway](../../../src/Services/LeanKernel.Services.Gateway/LeanKernel.Services.Gateway.csproj).
 
 ---
 
@@ -22,8 +22,8 @@ All existing and newly added tests pass cleanly across [LeanKernel.Core](../../.
 **Status**: ✅ Resolved
 
 * **Severity**: **Critical**
-* **File/Module**: [RequestContextPermitOfT.cs](../../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermitOfT.cs#L64-L68)
-* **The Issue**: In `Can(Operation operation)`, `if (!IsAuthenticated) return false;` unconditionally denies access to unauthenticated requests. However, [TenantResolutionMiddleware](../../../src/Services/LeanKernel.Gateway/Providers/TenantResolutionMiddleware.cs#L151-L167) explicitly resolves anonymous requests to a valid guest `UserId` and host `TenantId`. Furthermore, the `RequireAuthentication` property on [EntityScopePolicy.cs](../../../src/Common/LeanKernel.Logic/Configuration/EntityScopePolicy.cs#L27) is never evaluated.
+* **File/Module**: [RequestContextPermitOfT.cs](../../../src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermitOfT.cs#L64-L68)
+* **The Issue**: In `Can(Operation operation)`, `if (!IsAuthenticated) return false;` unconditionally denies access to unauthenticated requests. However, [TenantResolutionMiddleware](../../../src/Services/LeanKernel.Services.Gateway/Providers/TenantResolutionMiddleware.cs#L151-L167) explicitly resolves anonymous requests to a valid guest `UserId` and host `TenantId`. Furthermore, the `RequireAuthentication` property on [EntityScopePolicy.cs](../../../src/Common/LeanKernel.Logic/Configuration/EntityScopePolicy.cs#L27) is never evaluated.
 * **Why Static Analysis Missed It**: Static analysis cannot correlate runtime middleware identity assignment (guest `UserId` synthesis) with generic authorization permit checks or unread configuration properties.
 * **Impact**: Under anonymous gateway mode, all domain code accessing entities via [IRepository<TEntity>](../../../src/Common/LeanKernel.Logic/Interfaces/IRepository.cs) (such as [DbChatHistoryProvider](../../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs)) will fail. Reads return empty queries (`e => false`) and writes throw `InvalidOperationException`.
 * **Recommended Fix**: Inspect the target entity's `EntityScopePolicy.RequireAuthentication`. If `RequireAuthentication` is `false`, allow anonymous requests with valid `UserId` and `TenantId` to perform scope-partitioned operations.

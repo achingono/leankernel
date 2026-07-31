@@ -1,5 +1,6 @@
 namespace LeanKernel.Services.Common.Memory;
 
+using System.Globalization;
 using System.Text.Json;
 
 using LeanKernel;
@@ -68,16 +69,29 @@ public sealed class GBrainDocumentStoreClient : IDocumentStoreClient
     {
         try
         {
-            var namespacePrefix = BuildNamespacePrefix(scope);
-            var result = await this._client.CallToolAsync("search", new { query, limit = maxResults, ns = namespacePrefix }, ct);
+            var result = await this._client.CallToolAsync("search", new { query, limit = maxResults * 3, ns = BuildNamespacePrefix(scope) }, ct);
 
             if (result is null)
             {
                 return [];
             }
 
-            var results = DeserializeSearchResults(result.Value);
-            return FilterByChannelIds(results, channelIds);
+            var results = DeserializeSearchResults(result.Value)
+                .Where(hit => IsReadable(scope, hit.Fingerprint, channelIds))
+                .ToList();
+
+            this._logger.LogDebug("Document search candidate set: {Candidates} hits before merge.", results.Count);
+
+            return results
+                .GroupBy(hit => GetFingerprintFromSlug(hit.Fingerprint), StringComparer.Ordinal)
+                .Select(group => group
+                    .OrderByDescending(hit => hit.Score)
+                    .ThenBy(hit => hit.Fingerprint, StringComparer.Ordinal)
+                    .First())
+                .OrderByDescending(hit => hit.Score)
+                .ThenBy(hit => hit.Fingerprint, StringComparer.Ordinal)
+                .Take(maxResults)
+                .ToList();
         }
         catch (GBrainException ex)
         {
@@ -95,16 +109,44 @@ public sealed class GBrainDocumentStoreClient : IDocumentStoreClient
     {
         try
         {
-            var namespacePrefix = BuildNamespacePrefix(scope);
-            var result = await this._client.CallToolAsync("search", new { query = string.Empty, limit, ns = namespacePrefix }, ct);
+            const int RemotePageLimit = 100;
+            var allResults = new List<DocumentCatalogEntry>();
+            var pagesToFetch = (int)Math.Ceiling((limit * 3.0) / RemotePageLimit);
 
-            if (result is null)
+            for (int page = 0; page < pagesToFetch; page++)
             {
-                return [];
+                var offset = page * RemotePageLimit;
+                var result = await this._client.CallToolAsync("list_pages", new { type = "document", sort = "updated_desc", limit = RemotePageLimit, offset }, ct);
+
+                if (result is null)
+                {
+                    break;
+                }
+
+                var pageResults = DeserializeListResults(result.Value)
+                    .Where(entry => IsReadable(scope, entry.Fingerprint, channelIds))
+                    .ToList();
+
+                allResults.AddRange(pageResults);
+
+                if (pageResults.Count < RemotePageLimit)
+                {
+                    break;
+                }
             }
 
-            var results = DeserializeListResults(result.Value);
-            return FilterCatalogByChannelIds(results, channelIds);
+            this._logger.LogDebug("Document list candidate set: {Candidates} pages before merge.", allResults.Count);
+
+            return allResults
+                .GroupBy(entry => GetFingerprintFromSlug(entry.Fingerprint), StringComparer.Ordinal)
+                .Select(group => group
+                    .OrderByDescending(entry => entry.IngestedAt)
+                    .ThenBy(entry => entry.Fingerprint, StringComparer.Ordinal)
+                    .First())
+                .OrderByDescending(entry => entry.IngestedAt)
+                .ThenBy(entry => entry.Fingerprint, StringComparer.Ordinal)
+                .Take(limit)
+                .ToList();
         }
         catch (GBrainException ex)
         {
@@ -177,56 +219,84 @@ public sealed class GBrainDocumentStoreClient : IDocumentStoreClient
     {
         var slug = item.TryGetProperty("slug", out var s) ? s.GetString() ?? string.Empty : string.Empty;
         var content = ExtractContent(item, ["compiled_truth", "content"]);
+        var parts = slug.Split('/');
 
-        var (channelId, userId) = ParseIdentityFromSlug(slug);
+        var tenantId = parts.Length > 1 && Guid.TryParse(parts[1], out var t) ? t : Guid.Empty;
+        var channelId = parts.Length > 3 && Guid.TryParse(parts[3], out var c) ? c : Guid.Empty;
+        var userId = parts.Length > 4 && Guid.TryParse(parts[4], out var u) ? u : Guid.Empty;
 
         return new DocumentCatalogEntry(
             slug,
             string.Empty,
             Constants.ContentTypes.ApplicationOctetStream,
             content ?? string.Empty,
-            Guid.Empty, userId, Guid.Empty, channelId,
-            DocumentAvailabilityScope.Channel,
-            DateTime.UtcNow);
+            tenantId, userId, Guid.Empty, channelId,
+            ParseAvailabilityScope(parts.Length > 2 ? parts[2] : string.Empty),
+            TryGetDateTime(item, "updated_at") ?? DateTime.UtcNow);
     }
 
-    private static (Guid ChannelId, Guid UserId) ParseIdentityFromSlug(string slug)
+    private static DocumentAvailabilityScope ParseAvailabilityScope(string scopePart)
+        => scopePart switch
+        {
+            "user" => DocumentAvailabilityScope.User,
+            "tenant" => DocumentAvailabilityScope.Tenant,
+            _ => DocumentAvailabilityScope.Channel,
+        };
+
+    private static bool IsReadable(DocumentScopeContext scope, string slug, IReadOnlyList<Guid>? channelIds)
     {
         var parts = slug.Split('/');
-        if (parts.Length >= 5 && Guid.TryParse(parts[3], out var cid) && Guid.TryParse(parts[4], out var uid))
+        if (parts.Length < 6 || !string.Equals(parts[0], "documents", StringComparison.Ordinal))
         {
-            return (cid, uid);
+            return false;
         }
 
-        return (Guid.Empty, Guid.Empty);
-    }
+        if (!Guid.TryParse(parts[1], out var tenantId) || tenantId != scope.TenantId)
+        {
+            return false;
+        }
 
-    private static IReadOnlyList<DocumentSearchHit> FilterByChannelIds(
-        IReadOnlyList<DocumentSearchHit> results,
-        IReadOnlyList<Guid>? channelIds)
-    {
+        if (string.Equals(parts[2], "user", StringComparison.OrdinalIgnoreCase))
+        {
+            return parts.Length >= 5
+                && Guid.TryParse(parts[4], out var userId)
+                && userId == scope.UserId;
+        }
+
+        if (!string.Equals(parts[2], "channel", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(parts[2], "tenant", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         if (channelIds == null || channelIds.Count == 0)
         {
-            return results;
+            return true;
         }
 
-        return results.Where(r =>
-        {
-            var parts = r.Fingerprint.Split('/');
-            return parts.Length >= 4 && Guid.TryParse(parts[3], out var cid) && channelIds.Contains(cid);
-        }).ToList();
+        return parts.Length >= 4
+            && Guid.TryParse(parts[3], out var channelId)
+            && channelIds.Contains(channelId);
     }
 
-    private static IReadOnlyList<DocumentCatalogEntry> FilterCatalogByChannelIds(
-        IReadOnlyList<DocumentCatalogEntry> results,
-        IReadOnlyList<Guid>? channelIds)
+    private static string GetFingerprintFromSlug(string slug)
     {
-        if (channelIds == null || channelIds.Count == 0)
+        var parts = slug.Split('/');
+        return parts.Length > 0 ? parts[^1] : slug;
+    }
+
+    private static DateTime? TryGetDateTime(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var prop) || prop.ValueKind != JsonValueKind.String)
         {
-            return results;
+            return null;
         }
 
-        return results.Where(r => channelIds.Contains(r.ChannelId)).ToList();
+        return DateTime.TryParse(
+            prop.GetString(),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var parsed) ? parsed : null;
     }
 
     private static string ExtractContent(JsonElement item, string[] propertyNames)

@@ -9,4 +9,4 @@
 | Build verification | `dotnet build src/Terminals/LeanKernel.Channels.Common/LeanKernel.Channels.Common.csproj` | Shared project builds successfully |
 | Build verification | `dotnet build src/Terminals/LeanKernel.Channels.Signal/LeanKernel.Channels.Signal.csproj` | Signal terminal builds with shared project |
 | Build verification | `dotnet build src/Terminals/LeanKernel.Channels.Teams/LeanKernel.Channels.Teams.csproj` | Teams terminal builds with shared project |
-| Build verification | `dotnet build src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj` | Gateway builds with shared helper migration |
+| Build verification | `dotnet build src/Services/LeanKernel.Services.Gateway/LeanKernel.Gateway.csproj` | Gateway builds with shared helper migration |

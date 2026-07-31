@@ -4,8 +4,8 @@
 
 | Input | Source | Owner |
 |---|---|---|
-| Current turn flow (MAF wiring, memory + history providers) | `src/Services/LeanKernel.Gateway/Programs.cs`, `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs`, `DbChatHistoryProvider.cs` | Rebuild maintainer |
-| Identity partitioning contracts | `src/Common/LeanKernel.Core/Interfaces/IPermit.cs`, `src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs`, `IdentityIsolationKeyProvider.cs` | Rebuild maintainer |
+| Current turn flow (MAF wiring, memory + history providers) | `src/Services/LeanKernel.Services.Gateway/Programs.cs`, `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs`, `DbChatHistoryProvider.cs` | Rebuild maintainer |
+| Identity partitioning contracts | `src/Common/LeanKernel.Core/Interfaces/IPermit.cs`, `src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs`, `IdentityIsolationKeyProvider.cs` | Rebuild maintainer |
 | Source turn pipeline reference | `~/source/repos/leankernel/src/LeanKernel.Agents/TurnPipeline.cs`, `ContinuationTurnPipeline.cs`, `TurnProgressBroker.cs` | Reviewer |
 | Source context gating reference | `~/source/repos/leankernel/src/LeanKernel.Context/ContextGatekeeper.cs`, `PromptAssembler.cs`, `History/*`, `Retrieval/*` | Reviewer |
 | Config shape constraints | `docs/configuration/index.md`, AGENTS.md working rules | Repository owner |

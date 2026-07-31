@@ -135,7 +135,7 @@ Both reuse `EgressValidator` for SSRF protection. `WebFetchTool` depends on `Tex
 5. `WebwrightException.cs` — browser-specific exception type
 
 **Files to modify:**
-- `src/Services/LeanKernel.Gateway/Extensions/IServiceCollectionExtensions.cs` — register `IWebwrightClient` + named `HttpClient` + health check
+- `src/Services/LeanKernel.Services.Gateway/Extensions/IServiceCollectionExtensions.cs` — register `IWebwrightClient` + named `HttpClient` + health check
 
 ### Step 8: Implement Document Ingestion (5 services)
 

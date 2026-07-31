@@ -20,7 +20,7 @@ dotnet build src/LeanKernel.sln
 
 ```bash
 dotnet build src/Common/LeanKernel.Logic/LeanKernel.Logic.csproj
-dotnet build src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj
+dotnet build src/Services/LeanKernel.Services.Gateway/LeanKernel.Gateway.csproj
 ```
 
 ## Test Projects

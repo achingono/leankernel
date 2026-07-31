@@ -14,12 +14,12 @@
 | Event spine contracts + generic `Emit<T>` | `src/Common/LeanKernel.Core/EventEnvelope.cs`, `src/Common/LeanKernel.Logic/Events/` | Flush-time event fan-out path for attachment ingestion |
 | `IHasEnvelope` marker interface | `src/Common/LeanKernel.Core/IHasEnvelope.cs` | Added in Phase 21 for generic envelope resolution |
 | Document-ingestion event contract | `src/Common/LeanKernel.Core/Events/DocumentIngestionRequestedEvent.cs` | Added in Phase 21; implements `IHasEnvelope` |
-| GBrain MCP client | `src/Services/LeanKernel.Gateway/Memory/GBrainMcpClient.cs` | Gateway transport |
-| GBrain memory client | `src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs` | Existing fan-out search pattern |
-| Gateway document transport implementation | `src/Services/LeanKernel.Gateway/Memory/GBrainDocumentStoreClient.cs` | Added in Phase 21 |
+| GBrain MCP client | `src/Services/LeanKernel.Services.Gateway/Memory/GBrainMcpClient.cs` | Gateway transport |
+| GBrain memory client | `src/Services/LeanKernel.Services.Gateway/Memory/GBrainMemoryClient.cs` | Existing fan-out search pattern |
+| Gateway document transport implementation | `src/Services/LeanKernel.Services.Gateway/Memory/GBrainDocumentStoreClient.cs` | Added in Phase 21 |
 | Durable queue fan-out | `src/Common/LeanKernel.Logic/Events/` (flush path in `DbChatHistoryProvider`) | Fans out to `IEventStore` + durable `IDocumentIngestionQueue` at flush time |
 | Durable job persistence | `src/Common/LeanKernel.Data/...` + `DocumentIngestionJobEntity` + queue repository | Queue of record with status/retry/lease metadata |
-| Gateway upload endpoint | `src/Services/LeanKernel.Gateway/.../Documents/UploadEndpoint.cs` | `POST /api/documents/upload` with required `channel_id` + optional `availability_scope` |
+| Gateway upload endpoint | `src/Services/LeanKernel.Services.Gateway/.../Documents/UploadEndpoint.cs` | `POST /api/documents/upload` with required `channel_id` + optional `availability_scope` |
 | Document library watcher config | `appsettings*.json` + `docs/configuration/appsettings-reference.md` | Watch-folder mapping for library sources |
 | Source ingestion reference | `~/source/repos/leankernel/src/LeanKernel.Tools/Document*Service*.cs` | Behavioral reference |
 | Source ingestion queue reference | `~/source/repos/leankernel/src/LeanKernel.Tools/DocumentIngestionQueue.cs` | Behavioral reference |

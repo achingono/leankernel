@@ -6,7 +6,7 @@ Contributor and coding-agent guide for this repository.
 
 - Full solution: [`LeanKernel.sln`](LeanKernel.sln)
 - App-only solution: [`src/LeanKernel.sln`](src/LeanKernel.sln)
-- Primary runtime app: [`src/Services/LeanKernel.Gateway`](src/Services/LeanKernel.Gateway)
+- Primary runtime app: [`src/Services/LeanKernel.Services.Gateway`](src/Services/LeanKernel.Services.Gateway)
 - Docs home: [`docs/index.md`](docs/index.md)
 
 Current implemented project map: [`docs/architecture/solution-structure.md`](docs/architecture/solution-structure.md)
@@ -28,7 +28,7 @@ Current implemented project map: [`docs/architecture/solution-structure.md`](doc
 ## Working Rules
 
 - Keep behavior feature-local to the owning project.
-- Keep transport, composition, and host concerns in `LeanKernel.Gateway`; keep reusable runtime logic in `src/Common`.
+- Keep transport, composition, and host concerns in `LeanKernel.Services.Gateway`; keep reusable runtime logic in `src/Common`.
 - Reuse existing contracts in `LeanKernel.Core.Interfaces`, `LeanKernel.Logic`, and `LeanKernel.Data` before adding new abstractions.
 - Preserve the current configuration shape: `ConnectionStrings`, `OpenAI`, `Agents`, `Identity`, `Files`, `Cors`, and `GBrain`.
 - Avoid broad exception swallowing; log actionable context.

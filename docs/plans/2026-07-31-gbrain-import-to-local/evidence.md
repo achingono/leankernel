@@ -1,0 +1,50 @@
+# Phase 2026-07-31 Evidence
+
+## Evidence Log
+
+| Item | Reference | Notes |
+| --- | --- | --- |
+| Remote secrets path | `~/source/repos/swarm/deploy/platform/secrets/` (`postgres_user.txt`, `postgres_password.txt`) | Present; used by path only, never displayed |
+| Remote connectivity | `192.168.*.*:5432` reachable; default compose creds rejected; swarm creds accepted; server Postgres 16.14 | Verified 2026-07-31 |
+| Remote DB layout | No separate `gbrain` database remotely; GBrain tables live in DB `leankernel` (owner `leankernel_app`) | Verified 2026-07-31 |
+| Remote inventory | `pages` 3,148 (`documents` 1,589, `concepts` 1,435, `wiki` 122, `notes` 2); `content_chunks` 5,261 (all embedded); `page_versions` 1,449; `tags` 1,942; `page_aliases` 94; `links`/`files`/`facts` 0; ops tables (`query_cache` 818, `ingest_log` 3,080, `search_telemetry` 103, `extract_rollup_7d` 66) excluded | Verified 2026-07-31 |
+| Remote slug shapes | `learning/facts/{remoteTenant}/{remotePerson}/{seq}` (1,434; 13 tenants; e.g. `learning/facts/1b4a6dbc-…/63122e61-…/01`); `doc/{title}` (1,589; e.g. `doc/zoom-in-zoom-out`); raw slugs (125; e.g. `what/budget`, `identity-user-default`, `learning/engagement-metrics`) | Sample queries 2026-07-31 |
+| Remote config | `config` row `embedding_model=openai:embedding-small`, dims 3072, `version 116` — **stale**; live swarm `.env` sets `GBRAIN_EMBEDDING_MODEL=openai:embedding` (`.env.example` still shows `embedding-small`); all 5,261 remote chunks stamped `zeroentropyai:zembed-1` | Remote DB + `~/source/repos/swarm/deploy/leankernel/.env` |
+| Local config | `embedding_model=openai:embedding`, dims 3072, `version 125`, `search.mode=tokenmax`; `Agents:Channels:MemoryPolicyDefaults Share/Access = ["*"]`; LiteLLM `embedding` route → Azure `text-embedding-3-large-1` (order 1) / `gemini-embedding-2` (fallback); local chunks stamped `openai:embedding` | Local `gbrain` `config` table + `config/litellm/config.yaml:229-244` |
+| Embedding incompatibility | Same 3072 dims ≠ same vector space: remote = ZeroEntropy zembed-1 (gbrain `DEFAULT_EMBEDDING_MODEL` per `postgres-engine.ts:2462`), local = OpenAI text-embedding-3-large. `searchVector` (`postgres-engine.ts:2126-2280`) does raw `cc.embedding <=> query` cosine with **no model guard** → silent garbage if mixed. Chunk `model` column is provenance only | gbrain source `src/core/postgres-engine.ts` |
+| Re-embed CLI | `gbrain migrate embeddings --to <p:model>` — handles dim changes, null embedding signatures (#3391), query cache, resume-after-kill, never re-embeds migrated chunks twice; `--dry-run`/`--json`/`--no-embed`/`embed --stale --include-null-signature` fallback | `gbrain migrate embeddings --help` in local container |
+| Schema parity | `pages`/`content_chunks` column sets identical local vs remote (ordinal order only differs); local triggers rebuild `search_vector` on INSERT/UPDATE | `information_schema` diff, 2026-07-31 |
+| Local identity | Tenant `e44ca455-2b3b-45f7-9ac1-3d77b6e66381`; person `7d1282a7-e183-4457-8d56-41a5a393a0b1` (user `0a6e0986-…`, Alfero); user `0a6e0986-9c59-469c-a65a-c22c11f513dd`; channels openai-http `9ff45fac-…`, signal `1d8ecc10-…`, teams `3d86fc69-…`; local memory pages use person `7d1282a7-…` under channel `9ff45fac-…` | Local `leankernel` DB |
+| Current conventions | `GBrainMemoryClient.BuildScopedSlug` → `memory/{tenant}/{person}/{channel}/{key}`; `GBrainDocumentStoreClient.BuildNamespacePrefix` → `documents/{tenant}/{scope}/{channel}/{user}`; fingerprint = lowercase hex SHA-256 | `src/Services/LeanKernel.Services.Common/Memory/` |
+| Runtime document tools | `document_search`/`document_list` derive readable channels from policy (tools unchanged); `GBrainDocumentStoreClient` now resolves document visibility client-side by slug shape — user-scope slugs (`documents/{t}/user/{ch-or-Guid.Empty}/{u}/{fp}`) pass for the requesting user regardless of channel, channel/tenant-scope slugs require channel membership, non-`documents/` shapes (memory pages, probe pages) are dropped; results merged by fingerprint (last slug segment) with deterministic ordering. Tools still return ≤200-char excerpts | `DocumentSearchTool.cs`, `DocumentListTool.cs`, `GBrainDocumentStoreClient.cs` |
+| **gbrain MCP `search` is brain-wide — `ns` is ignored** | Verified against deployed container (0.42.67.0) and source: `search` tool accepts only `query`/`limit`/`offset`/`mode`; the `ns` param passed by `GBrainDocumentStoreClient` and the `namespace_name` passed by `GBrainMemoryClient` are silently dropped (`validateParams` only checks declared params) → client-side filters are the real authorization gate, and `document_search` could previously return memory/probe pages | `tools/list` + `tools/call` against `localhost:8789`, 2026-07-31; `src/mcp/dispatch.ts:184-200` |
+| **`document_list` was broken** | `ListAsync` called `search` with `query=""`; gbrain search returns `[]` for empty queries → `document_list` always returned nothing. Fixed: `ListAsync` now calls `list_pages` (`sort=updated_desc`, remote cap 100, headroom 3×) and uses real `updated_at` as `IngestedAt` | `tools/call` search `query:""` → `[]`, 2026-07-31 |
+| **Search payload has no timestamps** | `search` items expose `slug`/`score`/`base_score`/`title`/`chunk_text`/`type`/`stale`/`effective_date`/… but no `updated_at`/`created_at` → search dedupe tie-break is score desc then slug asc (deterministic); `IngestedAt` in hits remains synthesized `UtcNow` (contract only) | `tools/call` search result keys, 2026-07-31 |
+| `list_pages` shape | Returns `slug`/`title`/`type`/`updated_at`/`source_id` per page; no content; supports `sort` (`updated_desc`/`updated_asc`/`created_desc`/`slug`), `type` filter, remote cap 100 | `tools/call` `list_pages`, 2026-07-31 |
+| GBrain CLI (local) | `gbrain 0.42.67.0`; `migrate embeddings --to <p:model>` available; `list`/`get`/`search`/`stats` available | `docker compose exec gbrain gbrain --help` |
+| Import mechanics | `pg_dump`/`psql` present in local `database` container; remote reachable from it; restore via data-only dump + `setval` sequence fixup; RLS bypassed by owner | Verified 2026-07-31 |
+| **Staging dry-run manifest** | 3,148 rows: `rewrite` 1,678, `merged_loser` 1,303, `merged_winner` 167 → 167 collision groups, 286 unique documents post-merge; types document 1,589 / concept 1,435 / wiki 122 / note 2; 0 duplicate `old_slug` on file/DB, 0 pre-existing collisions, 0 unclassified | `backups/manifests/rewrite-manifest-staging-20260731-102829.csv`, run 2026-07-31 |
+| **Staging apply** | Restore counts matched remote inventory exactly (3,148 pages / 5,261 chunks / 1,942 tags / 94 aliases); rewrite applied; validation green (legacy slugs 0, alias/tag orphans 0, fp mismatch 0, memory 1,559 / documents 286); re-embed 2,985/2,985 `openai:embedding`, embedding null 0 | Run 2026-07-31, `--staging --apply` |
+| **Real DB pre-import backup** | `backups/gbrain-pre-import-20260731-103734.sql.gz` written before the real run | 2026-07-31 |
+| **Real DB restore** | Remote dump (96 MB) loaded via temp tables + id offset (+1,000,000): pages 3,156 (3,148 remote + 8 local), chunks 5,269, aliases 94, versions 1,449, tags 1,942; `max(pages.id)` 1,004,905 | `restore-real.sql`, run 2026-07-31 |
+| **Real DB validation** | legacy `learning/facts` 0, legacy `doc/%` 0, legacy raw slugs 0; memory 1,566 / documents 286 (+ 1 `__lk_probe_write__` local page); alias orphans 0, tag orphans 0, fp mismatch 0, documents user-scope 286, memory channels `9ff45fac-…` 1,566 | `validate-import.sql` on `gbrain`, 2026-07-31 |
+| **Real DB re-embed** | 2,993/2,993 chunks → `openai:embedding` (3072d), remaining 0, embedding null 0; `gbrain get` on winner slug (01-mission) and `gbrain search "leadership"` (scores 0.84/0.58/0.40) return canonical `documents/…` slugs | `gbrain migrate embeddings` + smoke test, 2026-07-31 |
+| **Real DB post-import backup** | `backups/gbrain-post-import-20260731-reembed.sql.gz` (48 MB, embeddings included) | 2026-07-31 |
+| **Real-run gotchas fixed** | (1) Local `pages` column order differs from remote (trailing 8 columns) → `restore-real.sql` maps by name, not position; (2) gbrain container `~/.gbrain/config.json` still pointed at `gbrain_import_staging` from the staging session → real-mode re-embed silently planned 0 chunks; script now exports `GBRAIN_DATABASE_URL` pinned to `gbrain` in real mode | 2026-07-31 |
+
+- [x] Implementation-time entries appended: staging run results, real run results, rewrite manifest reference, validation output above. (Gate approval recorded in `exit-criteria.md`.)
+
+## Runtime Smoke Tests (Gateway Redeployed 2026-07-31)
+
+| Probe | Command | Result | Notes |
+|-------|---------|--------|-------|
+| Identity (bound user) | `curl /v1/responses "What is your name?"` | ✅ "Alfero Chingono" | Channel binding token resolves to user `0a6e0986-…` |
+| Memory Search Cat A | `curl /v1/responses "Search memory for Workwolf AI tools"` | ✅ Returns learning fact | Imported `memory/…/learning/facts/…` surfaced correctly |
+| Memory Search Cat C | `curl /v1/responses "What does network page say about relationships?"` | ✅ Returns network concept | Imported `memory/…/how/network` surfaced correctly |
+| Document List | `curl /v1/responses "List my documents with document_list"` | ✅ Returns 100 documents | Previously `[]`; fixed by adding `type="document"` filter + pagination in `ListAsync` |
+| Document Search | `curl /v1/responses "Search documents for mission"` | ✅ Returns only `documents/…` slugs | Best match "01-mission"; no memory/`__lk_probe_write__` leaks |
+
+### Root Cause: `document_list` Failure
+- **Cause**: `ListAsync` called `list_pages` without `type` filter → returned top-100 by `updated_desc` (99 memory + 1 probe page) → `IsReadable` dropped all.
+- **Fix**: `ListAsync` now calls `list_pages` with `type="document"` and paginates via `offset` (3 pages for 286 docs). See `GBrainDocumentStoreClient.cs:112`.
+- **Verification**: Direct gbrain `list_pages type=document` returns 100 user-scoped document pages per call.

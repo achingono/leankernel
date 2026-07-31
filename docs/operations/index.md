@@ -8,6 +8,7 @@ Operational guidance for the current local stack.
 - [Signal onboarding runbook](signal-onboarding-runbook.md)
 - [Health and observability](health-and-observability.md)
 - [Tool configuration](tool-configuration.md)
+- [GBrain embeddings: configuration and troubleshooting](gbrain-embeddings.md)
 
 Operationally relevant implementation areas also include document-ingestion hosted services and queue processing within the gateway runtime.
 

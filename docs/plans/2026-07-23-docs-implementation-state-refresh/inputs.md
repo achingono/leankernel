@@ -4,7 +4,7 @@
 
 | Input | Source | Owner |
 |---|---|---|
-| Current gateway endpoint mappings | `src/Services/LeanKernel.Gateway/Program.cs` and endpoint extension files | OpenCode |
+| Current gateway endpoint mappings | `src/Services/LeanKernel.Services.Gateway/Program.cs` and endpoint extension files | OpenCode |
 | Current feature implementation surface | `src/Common/*`, `src/Services/*`, `src/Terminals/*` | OpenCode |
 | Current configuration model | `appsettings*.json` + `Configuration/*Settings.cs` | OpenCode |
 | Current quality workflows | `scripts/quality/*.sh` | OpenCode |

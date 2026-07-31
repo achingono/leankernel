@@ -138,7 +138,7 @@ public enum ScopeDimension
 ### Activity 6: Add `RequestContextPermit<TEntity>`
 
 **Files**
-- `src/Services/LeanKernel.Gateway/Providers/RequestContextPermitOfT.cs` (new)
+- `src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermitOfT.cs` (new)
 
 **Work**
 1. Inject existing scoped `IPermit` and `IPrincipalAccessor`.
@@ -173,8 +173,8 @@ public interface IRepository<TEntity> where TEntity : class, IEntity
 
 **Files**
 - `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs`
-- `src/Services/LeanKernel.Gateway/Extensions/IServiceCollectionExtensions.cs`
-- `src/Services/LeanKernel.Gateway/Programs.cs`
+- `src/Services/LeanKernel.Services.Gateway/Extensions/IServiceCollectionExtensions.cs`
+- `src/Services/LeanKernel.Services.Gateway/Programs.cs`
 
 **Work**
 1. Keep existing `services.AddScoped<IPermit, RequestContextPermit>();` registration.
@@ -192,9 +192,9 @@ public interface IRepository<TEntity> where TEntity : class, IEntity
 3. `src/Common/LeanKernel.Logic/Telemetry/TelemetryExportService.cs`
 
 **Not in this phase**
-- `src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs` (string PK)
+- `src/Services/LeanKernel.Services.Gateway/Sessions/DbAgentStateStore.cs` (string PK)
 - `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` (uses `GBrainMemoryClient` transport)
-- `src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs` (vector store integration)
+- `src/Services/LeanKernel.Services.Gateway/Memory/GBrainMemoryClient.cs` (vector store integration)
 
 **Migration Implementation Details**
 - `DbChatHistoryProvider`: Replace direct `IDbContextFactory<EntityContext>` usage with constructor-injected `IRepository<SessionEntity>`, `IRepository<TurnEntity>`, and `IRepository<TurnTelemetryEntity>`.

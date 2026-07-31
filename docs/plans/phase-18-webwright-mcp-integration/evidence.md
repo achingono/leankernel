@@ -10,7 +10,7 @@
 | Community Webwright MCP Package | `docker-compose.yml` Webwright service + `config/webwright/` runtime | Community-maintained browser automation service |
 | Approved MCP Endpoint List | `docker-compose.yml` and `src/Common/LeanKernel.Logic/Configuration/McpSettings.cs` | Initial rollout limited to pre-configured HTTP/SSE endpoints |
 | Playwright MCP Server | `@anthropic-ai/playwright-mcp` npm package | Contingency reference for potential future phase |
-| GBrain MCP Client | `src/Services/LeanKernel.Gateway/Memory/GBrainMcpClient.cs` | Existing MCP client pattern |
+| GBrain MCP Client | `src/Services/LeanKernel.Services.Gateway/Memory/GBrainMcpClient.cs` | Existing MCP client pattern |
 | Tool Registry Interface | `src/Common/LeanKernel.Logic/Tools/IToolRegistry.cs` | Tool registration mechanism |
 | Webwright MCP Adapter Layer | `src/Common/LeanKernel.Logic/Mcp/` | LeanKernel-owned discovery and invocation adapters |
 | Current Browser-Specific Playwright Tool Implementations | Removed from the runtime | Replaced by Webwright MCP tools |

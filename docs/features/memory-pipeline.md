@@ -43,4 +43,4 @@ The logic layer is provider-agnostic.
 - memory pages are passed to the transport with scope-relative keys and materialized as `memory/{tenantId}/{personId}/{channelId}/{key}`
 - agent-session isolation is a separate runtime concern and is not controlled by `IdentityIsolationKeyProvider` on the memory path
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs`](../../src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs)
+Reference: [`../../src/Services/LeanKernel.Services.Common/Memory/GBrainMemoryClient.cs`](../../src/Services/LeanKernel.Services.Common/Memory/GBrainMemoryClient.cs)

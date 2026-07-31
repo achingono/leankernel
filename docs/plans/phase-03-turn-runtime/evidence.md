@@ -23,7 +23,7 @@
 | TurnProgressBroker | `src/Common/LeanKernel.Logic/TurnRuntime/TurnProgressBroker.cs` | Done |
 | TurnPipelineSettings | `src/Common/LeanKernel.Logic/Configuration/TurnPipelineSettings.cs` | Done |
 | DI registration | `src/Common/LeanKernel.Logic/TurnRuntime/TurnPipelineServiceExtensions.cs` | Done |
-| Gateway wiring | `src/Services/LeanKernel.Gateway/Programs.cs:172` | Done |
+| Gateway wiring | `src/Services/LeanKernel.Services.Gateway/Programs.cs:172` | Done |
 | Unit tests | `test/LeanKernel.Tests.Unit/TurnRuntime/` (4 files, 21 tests) | Done |
 | ScopedRetrievalStage | `src/Common/LeanKernel.Logic/TurnRuntime/ScopedRetrievalStage.cs` | Done |
 | Unit tests (retrieval) | `test/LeanKernel.Tests.Unit/TurnRuntime/ScopedRetrievalStageTests.cs` (9 tests) | Done |

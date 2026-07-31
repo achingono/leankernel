@@ -8,7 +8,7 @@
 | Identity partitioning plan and implementation state | `docs/plans/phase-10-cross-channel-memory/`, `docs/plans/phase-15-channel-identity-mapping/`, `docs/plans/phase-16-identity-claims-context/` | Repository |
 | Authorization/permit implementation | `docs/plans/phase-19-authorization-permits-filters/` | Repository |
 | Telemetry implementation and schema | `docs/plans/phase-17-model-telemetry-chat-history/` | Repository |
-| Current Gateway composition root | `src/Services/LeanKernel.Gateway/Program.cs` | Repository |
+| Current Gateway composition root | `src/Services/LeanKernel.Services.Gateway/Program.cs` | Repository |
 | Current logic-layer policy and context providers | `src/Common/LeanKernel.Logic/Providers/`, `src/Common/LeanKernel.Logic/TurnRuntime/` | Repository |
 | Current entity model and EF context | `src/Common/LeanKernel.Core/Entities/`, `src/Common/LeanKernel.Data/EntityContext.cs` | Repository |
 | Current transcript and telemetry persistence behavior | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs`, `src/Common/LeanKernel.Core/Entities/{SessionEntity,TurnEntity,TurnTelemetryEntity}.cs` | Repository |

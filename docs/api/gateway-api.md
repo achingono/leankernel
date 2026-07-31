@@ -15,7 +15,7 @@ The composition root currently maps:
 - `GET /health`
 - `MapDevUI()` in Development only
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
+Reference: [`../../src/Services/LeanKernel.Services.Gateway/Program.cs`](../../src/Services/LeanKernel.Services.Gateway/Program.cs)
 
 ## Health Endpoint
 
@@ -52,7 +52,7 @@ The gateway currently registers the `Bearer` authentication scheme and ASP.NET a
 
 Uploads are staged and enqueued for asynchronous ingestion. The endpoint returns `202 Accepted` when a job is queued.
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs)
+Reference: [`../../src/Services/LeanKernel.Services.Gateway/Program.cs`](../../src/Services/LeanKernel.Services.Gateway/Program.cs)
 
 ## CORS
 

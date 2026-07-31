@@ -4,7 +4,7 @@ Run: deep-review sub-agent
 
 ### Critical
 
-**File/Module:** `src/Common/LeanKernel.Logic/Tools/ToolGovernancePolicy.cs`, `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs:175`, `src/Services/LeanKernel.Gateway/Programs.cs:206`
+**File/Module:** `src/Common/LeanKernel.Logic/Tools/ToolGovernancePolicy.cs`, `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs:175`, `src/Services/LeanKernel.Services.Gateway/Programs.cs:206`
 
 **The Issue:** The current tool control plane is an allowlist-at-registration model only; there is no runtime autonomy/approval interception or durable action audit path in the execution pipeline, despite Phase 14’s trust-boundary intent. Write-capable tools can run once exposed to the model.
 
@@ -36,7 +36,7 @@ Run: deep-review sub-agent
 
 **Recommended Fix:** Carry channel message identity (`ActivityId`/Signal message id) into `/v1/responses` as a stable operation key and thread it through chat-history + memory persistence as the dedup authority.
 
-**File/Module:** `src/Services/LeanKernel.Gateway/Providers/TenantResolutionMiddleware.cs:86`, `src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs:176`, `src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs:570`
+**File/Module:** `src/Services/LeanKernel.Services.Gateway/Providers/TenantResolutionMiddleware.cs:86`, `src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs:176`, `src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs:570`
 
 **The Issue:** Channel-authenticated requests call `ResolveUserAsync` every turn, and profile application rewrites several fields to empty defaults when sparse channel tokens omit claims (roles/groups/custom claims/locale/timezone/org). This causes profile erosion plus write amplification.
 
@@ -46,7 +46,7 @@ Run: deep-review sub-agent
 
 **Recommended Fix:** Apply partial updates only for claims actually present, keep prior values for missing claims, and add change detection so `SaveChangesAsync` runs only when effective profile data changed.
 
-**File/Module:** `src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs:102`, `src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs:119`
+**File/Module:** `src/Services/LeanKernel.Services.Gateway/Sessions/DbAgentStateStore.cs:102`, `src/Services/LeanKernel.Services.Gateway/Sessions/DbAgentStateStore.cs:119`
 
 **The Issue:** `SaveSessionAsync` handles concurrency by reloading and overwriting (last-writer-wins), and broadly catches `DbUpdateException` as if it were duplicate insert. Non-duplicate failures can be misclassified, and one branch can exit without persisting or surfacing a clear failure signal.
 

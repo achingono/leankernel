@@ -38,7 +38,7 @@ This partition is enforced through `IPermit` resolution and then applied in chat
 Code anchors:
 
 - [`../../src/Common/LeanKernel.Core/Interfaces/IPermit.cs`](../../src/Common/LeanKernel.Core/Interfaces/IPermit.cs)
-- [`../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs`](../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs)
+- [`../../src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs`](../../src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs)
 - [`../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs`](../../src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs)
 
 ## Transcript Persistence
@@ -79,7 +79,7 @@ Provider selection is currently ordered as:
 2. `SqlServer`
 3. `Sqlite`
 
-Reference: [`../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs`](../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs)
+Reference: [`../../src/Services/LeanKernel.Services.Common/Extensions/DbContextOptionsBuilderExtensions.cs`](../../src/Services/LeanKernel.Services.Common/Extensions/DbContextOptionsBuilderExtensions.cs)
 
 In practice:
 

@@ -4,10 +4,10 @@
 
 | Input | Source | Owner |
 |---|---|---|
-| Gateway startup and agent registration path | `src/Services/LeanKernel.Gateway/Programs.cs`, `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs` | OpenCode |
-| Current runtime configuration shape | `src/Services/LeanKernel.Gateway/appsettings.json`, `src/Services/LeanKernel.Gateway/appsettings.Development.json`, `docker-compose.yml` | OpenCode |
+| Gateway startup and agent registration path | `src/Services/LeanKernel.Services.Gateway/Programs.cs`, `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs` | OpenCode |
+| Current runtime configuration shape | `src/Services/LeanKernel.Services.Gateway/appsettings.json`, `src/Services/LeanKernel.Services.Gateway/appsettings.Development.json`, `docker-compose.yml` | OpenCode |
 | Observed runtime failure evidence | `docker logs 5f90d40eaa6a7142b838f478c681d69aa75641d48948abf5ca9971b77d8b2978` | OpenCode |
-| Current GBrain memory-only integration | `src/Services/LeanKernel.Gateway/Providers/GBrainMemoryClient.cs`, `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` | OpenCode |
+| Current GBrain memory-only integration | `src/Services/LeanKernel.Services.Gateway/Providers/GBrainMemoryClient.cs`, `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` | OpenCode |
 | Current GBrain callable capability validation | Current gateway logs plus explicit MCP capability check for read/list-style knowledge operations | OpenCode |
 | Older LeanKernel tool runtime reference | `~/source/repos/leankernel/src/LeanKernel.Tools/*`, `~/source/repos/leankernel/src/LeanKernel.Plugins/BuiltIn/Skills/*`, `~/source/repos/leankernel/src/LeanKernel.Agents/*` | OpenCode |
 | Older GBrain knowledge-service reference | `~/source/repos/leankernel/src/LeanKernel.Knowledge/GBrainKnowledgeService.cs`, `~/source/repos/leankernel/src/LeanKernel.Abstractions/Interfaces/IKnowledgeService.cs`, `~/source/repos/leankernel/src/LeanKernel.Tools/BuiltIn/Knowledge/*` | OpenCode |

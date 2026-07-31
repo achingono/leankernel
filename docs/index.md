@@ -44,7 +44,7 @@ This docs set describes the implementation that actually exists today:
 - `src/Common/LeanKernel.Core`
 - `src/Common/LeanKernel.Data`
 - `src/Common/LeanKernel.Logic`
-- `src/Services/LeanKernel.Gateway`
+- `src/Services/LeanKernel.Services.Gateway`
 - `src/Terminals/LeanKernel.Channels.Common`
 - `src/Terminals/LeanKernel.Channels.Signal`
 - `src/Terminals/LeanKernel.Channels.Teams`
@@ -59,7 +59,7 @@ Current implementation highlights:
 
 ## Code Anchors
 
-- Gateway composition root: [`../src/Services/LeanKernel.Gateway/Program.cs`](../src/Services/LeanKernel.Gateway/Program.cs)
+- Gateway composition root: [`../src/Services/LeanKernel.Services.Gateway/Program.cs`](../src/Services/LeanKernel.Services.Gateway/Program.cs)
 - Solution file: [`../src/LeanKernel.sln`](../src/LeanKernel.sln)
 - Local stack: [`../docker-compose.yml`](../docker-compose.yml)
 - ADRs: [`decisions/index.md`](decisions/index.md)

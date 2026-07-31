@@ -7,7 +7,7 @@
 | Official MCP C# SDK package and docs | `ModelContextProtocol` NuGet 1.4.0 + SDK documentation | Development Team |
 | MCP package selection decision | `ModelContextProtocol` chosen; `ModelContextProtocol.Core` not required | Architecture Review |
 | Community Webwright MCP package details | Webwright MCP service/container in `docker-compose.yml` and runtime config | Development Team |
-| Current GBrain MCP client implementation | `src/Services/LeanKernel.Gateway/Memory/GBrainMcpClient.cs` | Gateway Team |
+| Current GBrain MCP client implementation | `src/Services/LeanKernel.Services.Gateway/Memory/GBrainMcpClient.cs` | Gateway Team |
 | LeanKernel tool registry interface | `src/Common/LeanKernel.Logic/Tools/IToolRegistry.cs` | Logic Team |
 | Current browser-specific Playwright tool implementations | Replaced by Webwright MCP adapters under `src/Common/LeanKernel.Logic/Mcp/` | Logic Team |
 | Docker compose configuration | `docker-compose.yml` | DevOps Team |

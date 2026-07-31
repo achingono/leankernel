@@ -11,3 +11,4 @@ __pycache__/
 sonar-reports/
 scripts/db/seed.sql
 Library/
+scripts/gbrain/backups/

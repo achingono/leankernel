@@ -15,7 +15,7 @@ The PRD is thorough and well-structured. It correctly identifies the 12 build/de
 
 **Reality**: [`IPermit`](../../src/Common/LeanKernel.Core/Interfaces/IPermit.cs) already exists in `LeanKernel.Core` with `Id`, `Badge`, and `HostName` — exactly the shape the PRD proposes for `RequestPermit`. There's also an [`IPermit<TEntity>`](../../src/Common/LeanKernel.Core/Interfaces/IPermit.cs#L31-L39) generic variant with `Can(Operation)`.
 
-Furthermore, the current rebuild already registers [`RequestContextPermit`](../../src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs) as the concrete `IPermit` in [`Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs#L63):
+Furthermore, the current rebuild already registers [`RequestContextPermit`](../../src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs) as the concrete `IPermit` in [`Program.cs`](../../src/Services/LeanKernel.Services.Gateway/Program.cs#L63):
 
 ```csharp
 builder.Services.AddScoped<IPermit, RequestContextPermit>();
@@ -27,11 +27,11 @@ builder.Services.AddScoped<IPermit, RequestContextPermit>();
 
 > **PRD D10** states the interfaces are in namespace `LeanKernel.Requests`.
 
-**Reality**: The actual namespace is `LeanKernel.Gateway.Requests` (see [IPrincipalAccessor.cs](../../src/Services/LeanKernel.Gateway/Requests/IPrincipalAccessor.cs#L3)). This is important because `Program.cs` line 2 does `using LeanKernel.Requests;` — a namespace that **does not exist** — which is itself an additional build error the PRD missed.
+**Reality**: The actual namespace is `LeanKernel.Gateway.Requests` (see [IPrincipalAccessor.cs](../../src/Services/LeanKernel.Services.Gateway/Requests/IPrincipalAccessor.cs#L3)). This is important because `Program.cs` line 2 does `using LeanKernel.Requests;` — a namespace that **does not exist** — which is itself an additional build error the PRD missed.
 
 ### 1.3 `PrincipalAccessor` is registered as **Singleton**, not Scoped
 
-**PRD** implies accessor registrations are fine and only the interfaces need moving. But [Program.cs:24](../../src/Services/LeanKernel.Gateway/Program.cs#L24) registers:
+**PRD** implies accessor registrations are fine and only the interfaces need moving. But [Program.cs:24](../../src/Services/LeanKernel.Services.Gateway/Program.cs#L24) registers:
 
 ```csharp
 builder.Services.TryAddSingleton<IPrincipalAccessor, PrincipalAccessor>();
@@ -81,11 +81,11 @@ The PRD correctly identifies the singleton/scoped mismatch (R1) and prescribes `
 
 ### 2.4 `AddAuthentication` references undefined types `IdentitySettings` and `FileSettings`
 
-[`AddAuthentication`](../../src/Services/LeanKernel.Gateway/Extensions/IServiceCollectionExtensions.cs#L55-L60) takes `IdentitySettings` and `FileSettings` parameters — **neither class exists in the codebase**. This is an additional build error on top of Logic's errors. `Program.cs` doesn't call `AddAuthentication()`, so it doesn't surface until auth is wired — but the PRD doesn't mention these missing types at all, and they'll need to be defined before auth works.
+[`AddAuthentication`](../../src/Services/LeanKernel.Services.Gateway/Extensions/IServiceCollectionExtensions.cs#L55-L60) takes `IdentitySettings` and `FileSettings` parameters — **neither class exists in the codebase**. This is an additional build error on top of Logic's errors. `Program.cs` doesn't call `AddAuthentication()`, so it doesn't surface until auth is wired — but the PRD doesn't mention these missing types at all, and they'll need to be defined before auth works.
 
 ### 2.5 Cookie name hardcoded to "Famorize.Auth"
 
-[Line 171 of IServiceCollectionExtensions.cs](../../src/Services/LeanKernel.Gateway/Extensions/IServiceCollectionExtensions.cs#L171) has `options.Cookie.Name = "Famorize.Auth"`. This appears to be a leftover from another project. The PRD doesn't mention this.
+[Line 171 of IServiceCollectionExtensions.cs](../../src/Services/LeanKernel.Services.Gateway/Extensions/IServiceCollectionExtensions.cs#L171) has `options.Cookie.Name = "Famorize.Auth"`. This appears to be a leftover from another project. The PRD doesn't mention this.
 
 ### 2.6 No `Hosting` package reference in Logic where `AgentSessionStore` would live
 
@@ -95,7 +95,7 @@ The PRD places `DbAgentSessionStore : AgentSessionStore` in `LeanKernel.Logic` (
 
 ### 2.7 `MapOpenAIResponses()` (no-arg) vs. `MapOpenAIResponses("leankernel")`
 
-[Program.cs:92](../../src/Services/LeanKernel.Gateway/Program.cs#L92) calls `app.MapOpenAIResponses()` (no agent name). The PRD says to change this to `app.MapOpenAIResponses("leankernel")` to route to the named agent. However, the PRD also notes the agent is registered via `AddAIAgent("leankernel", factory)`, but the current code uses `TryAddScoped<AIAgent>(...)` (unnamed). The PRD correctly identifies this as D7, but the implementation plan doesn't address that `AddAIAgent` and `TryAddScoped<AIAgent>` live in **different extension method classes** — the plan needs to explicitly call out removing the old `AddAgent` method in the Gateway extensions.
+[Program.cs:92](../../src/Services/LeanKernel.Services.Gateway/Program.cs#L92) calls `app.MapOpenAIResponses()` (no agent name). The PRD says to change this to `app.MapOpenAIResponses("leankernel")` to route to the named agent. However, the PRD also notes the agent is registered via `AddAIAgent("leankernel", factory)`, but the current code uses `TryAddScoped<AIAgent>(...)` (unnamed). The PRD correctly identifies this as D7, but the implementation plan doesn't address that `AddAIAgent` and `TryAddScoped<AIAgent>` live in **different extension method classes** — the plan needs to explicitly call out removing the old `AddAgent` method in the Gateway extensions.
 
 ---
 
@@ -122,11 +122,11 @@ This is a **build error not listed in §4.2**. The namespace is `LeanKernel.Gate
 
 ### 3.5 `Program.cs` line 95 — `builder.Environment` vs `app.Environment`
 
-The PRD notes (§5.7): *"gate on `app.Environment`, not `builder.Environment`"*. [Line 95](../../src/Services/LeanKernel.Gateway/Program.cs#L95) uses `builder.Environment.IsDevelopment()` after `app` has been built. While `builder.Environment` and `app.Environment` reference the same underlying object in the default `WebApplicationBuilder`, the PRD's own guidance contradicts the current code. However, this isn't listed in the numbered defects (B1–B3, D1–D12) and could be lost.
+The PRD notes (§5.7): *"gate on `app.Environment`, not `builder.Environment`"*. [Line 95](../../src/Services/LeanKernel.Services.Gateway/Program.cs#L95) uses `builder.Environment.IsDevelopment()` after `app` has been built. While `builder.Environment` and `app.Environment` reference the same underlying object in the default `WebApplicationBuilder`, the PRD's own guidance contradicts the current code. However, this isn't listed in the numbered defects (B1–B3, D1–D12) and could be lost.
 
 ### 3.6 `AddChatClient` double-registration
 
-[Logic extensions](../../src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs#L15-L26) registers `DbChatHistoryProvider` **twice** — once in `AddContextProviders()` and again in `AddChatHistoryProviders()`. Both are called from [Program.cs:66-67](../../src/Services/LeanKernel.Gateway/Program.cs#L66-L67). The PRD doesn't call out this redundancy.
+[Logic extensions](../../src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs#L15-L26) registers `DbChatHistoryProvider` **twice** — once in `AddContextProviders()` and again in `AddChatHistoryProviders()`. Both are called from [Program.cs:66-67](../../src/Services/LeanKernel.Services.Gateway/Program.cs#L66-L67). The PRD doesn't call out this redundancy.
 
 ### 3.7 Missing `Hosting` package in Logic project not flagged
 
@@ -177,7 +177,7 @@ The PRD's `MemoryProvider` injects all retrieved memories as a single `ChatMessa
 |---|-------|----------|
 | M1 | PRD references `LeanKernel.Requests` namespace; actual is `LeanKernel.Gateway.Requests` | §5.2, §4.2 |
 | M2 | PRD says `RequestPermit : IPermit` should be created; `ClaimsPermit` already exists and fulfills this role | §5.2 |
-| M3 | Cookie name "Famorize.Auth" is a leftover from another project | [Line 171](../../src/Services/LeanKernel.Gateway/Extensions/IServiceCollectionExtensions.cs#L171) |
+| M3 | Cookie name "Famorize.Auth" is a leftover from another project | [Line 171](../../src/Services/LeanKernel.Services.Gateway/Extensions/IServiceCollectionExtensions.cs#L171) |
 | M4 | `AddChatAgent` in Logic extensions registers `ChatClientAgent` as scoped — dead code not mentioned | [Line 42-46](../../src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs#L42-L46) |
 | M5 | `MemoryProvider` calls `_memoryClient.LoadMemoriesAsync()` with `x.Text` — `ChatMessage.Text` may be null for multi-content messages | [Line 31](../../src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs#L31) |
 | M6 | `Terminals/` directory exists but is empty — PRD doesn't mention cleaning it up | Project structure |

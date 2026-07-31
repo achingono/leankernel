@@ -13,8 +13,8 @@
 | `IDocumentStoreClient` (new) | `src/Common/LeanKernel.Logic/...` (to be introduced in this phase) | Rebuild |
 | Event spine contracts (`EventEnvelope`, `IEventCollector` with generic `Emit<T>`, `IEventStore`) | `src/Common/LeanKernel.Core/EventEnvelope.cs`, `src/Common/LeanKernel.Logic/Events/*` | Rebuild |
 | `IHasEnvelope` marker interface (new) | `src/Common/LeanKernel.Core/` (to be introduced in this phase) | Rebuild |
-| `IGBrainMcpClient` | `src/Services/LeanKernel.Gateway/Memory/GBrainMcpClient.cs` | Rebuild |
-| `GBrainMemoryClient` | `src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs` | Rebuild |
+| `IGBrainMcpClient` | `src/Services/LeanKernel.Services.Gateway/Memory/GBrainMcpClient.cs` | Rebuild |
+| `GBrainMemoryClient` | `src/Services/LeanKernel.Services.Gateway/Memory/GBrainMemoryClient.cs` | Rebuild |
 | `IMemoryClient` | `src/Common/LeanKernel.Logic/Providers/IMemoryClient.cs` | Rebuild |
 | Durable ingestion job persistence pattern | `src/Common/LeanKernel.Data/*` + existing EF Core entity/repository conventions | Rebuild |
 | `IPermit` / `RequestContextPermit` | Phase 19/20 | Rebuild |

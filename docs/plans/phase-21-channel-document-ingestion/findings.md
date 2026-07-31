@@ -7,19 +7,19 @@ concerns already covered by SonarQube.
 ## Critical
 
 ### C1 - Scope isolation and channel filtering gaps
-- **File/Module:** `src/Services/LeanKernel.Gateway/Memory/GBrainDocumentStoreClient.cs`
+- **File/Module:** `src/Services/LeanKernel.Services.Gateway/Memory/GBrainDocumentStoreClient.cs`
 - **The Issue:** Document partitioning and retrieval do not fully enforce user/channel scope dimensions; `channelIds` is not enforced in search/list behavior.
 - **Impact:** Cross-user or cross-channel document visibility can occur within a tenant.
 - **Recommendation:** Include full identity scope in storage partitioning keys and enforce channel filtering before returning results.
 
 ### C2 - Unvalidated `channel_id` trust boundary
-- **File/Module:** `src/Services/LeanKernel.Gateway/Requests/DocumentUploadEndpoint.cs`, `src/Services/LeanKernel.Gateway/Providers/AttachmentIngestionMiddleware.cs`
+- **File/Module:** `src/Services/LeanKernel.Services.Gateway/Requests/DocumentUploadEndpoint.cs`, `src/Services/LeanKernel.Services.Gateway/Providers/AttachmentIngestionMiddleware.cs`
 - **The Issue:** Client-provided `channel_id` can be accepted/overridden without explicit authorization validation against channel policy.
 - **Impact:** Authenticated callers may inject documents into unauthorized channels.
 - **Recommendation:** Validate requested channel against resolved policy/permit context and reject unauthorized values with `403`.
 
 ### C3 - Path traversal risk in filename handling
-- **File/Module:** `src/Services/LeanKernel.Gateway/Providers/AttachmentIngestionMiddleware.cs`, `src/Services/LeanKernel.Gateway/Requests/DocumentUploadEndpoint.cs`, `src/Common/LeanKernel.Logic/Tools/DocumentIngestion/DocumentLibraryService.cs`
+- **File/Module:** `src/Services/LeanKernel.Services.Gateway/Providers/AttachmentIngestionMiddleware.cs`, `src/Services/LeanKernel.Services.Gateway/Requests/DocumentUploadEndpoint.cs`, `src/Common/LeanKernel.Logic/Tools/DocumentIngestion/DocumentLibraryService.cs`
 - **The Issue:** Filenames are used in path composition without strict canonicalization/safe-name enforcement.
 - **Impact:** Traversal or absolute-path filename abuse can escape intended roots and overwrite files.
 - **Recommendation:** Normalize with `Path.GetFileName`, reject separators/control characters, and enforce full-path root boundary checks.
@@ -33,7 +33,7 @@ concerns already covered by SonarQube.
 ## Major
 
 ### M1 - Event flush lifecycle coupling can drop ingestion events
-- **File/Module:** `src/Services/LeanKernel.Gateway/Providers/AttachmentIngestionMiddleware.cs`, `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs`
+- **File/Module:** `src/Services/LeanKernel.Services.Gateway/Providers/AttachmentIngestionMiddleware.cs`, `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs`
 - **The Issue:** Ingestion event capture is request-scoped, but fan-out/flush appears coupled to chat persistence paths.
 - **Impact:** Non-chat multipart flows can silently lose ingestion events.
 - **Recommendation:** Add deterministic request-end flush or outbox-based delivery independent of chat-history persistence.
@@ -65,7 +65,7 @@ concerns already covered by SonarQube.
 ## Suggestions
 
 ### S1 - Durable job correlation in API response
-- **File/Module:** `src/Services/LeanKernel.Gateway/Requests/DocumentUploadEndpoint.cs`
+- **File/Module:** `src/Services/LeanKernel.Services.Gateway/Requests/DocumentUploadEndpoint.cs`
 - **The Issue:** Accepted response does not return a durable persisted job identifier.
 - **Impact:** Clients cannot reliably query ingestion status.
 - **Recommendation:** Return queue job id from enqueue operation and provide job-status endpoint.

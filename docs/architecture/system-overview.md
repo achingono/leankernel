@@ -9,7 +9,7 @@ The current LeanKernel implementation is a .NET 10 gateway-centered microservice
 - `LeanKernel.Data` owns EF Core persistence.
 - `LeanKernel.Core` holds shared entities and contracts.
 
-The composition root is [`../../src/Services/LeanKernel.Gateway/Program.cs`](../../src/Services/LeanKernel.Gateway/Program.cs).
+The composition root is [`../../src/Services/LeanKernel.Services.Gateway/Program.cs`](../../src/Services/LeanKernel.Services.Gateway/Program.cs).
 
 ## Runtime Topology
 
@@ -116,14 +116,14 @@ This deployment view is derived directly from `docker-compose.yml` and shows the
 
 | Component | Responsibility | Code anchor |
 |---|---|---|
-| Gateway host | DI, auth, session middleware, endpoint mapping, startup migrations, and development/testing seed helpers | `src/Services/LeanKernel.Gateway/Program.cs` |
-| Request permit | Resolve tenant, user, channel, and guest fallback for the current request | `src/Services/LeanKernel.Gateway/Providers/RequestContextPermit.cs` |
-| Agent session store | Persist MAF session state blobs | `src/Services/LeanKernel.Gateway/Sessions/DbAgentStateStore.cs` |
+| Gateway host | DI, auth, session middleware, endpoint mapping, startup migrations, and development/testing seed helpers | `src/Services/LeanKernel.Services.Gateway/Program.cs` |
+| Request permit | Resolve tenant, user, channel, and guest fallback for the current request | `src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermit.cs` |
+| Agent session store | Persist MAF session state blobs | `src/Services/LeanKernel.Services.Gateway/Sessions/DbAgentStateStore.cs` |
 | Policy core | Evaluate identity-aware domain policies that compose with permit/filter enforcement | `src/Common/LeanKernel.Logic/Policy/` |
 | Chat history provider | Persist and retrieve transcript turns through EF Core | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs` |
 | Event spine | Collect and durably append runtime events to `Events` | `src/Common/LeanKernel.Logic/Events/` |
 | Memory provider | Retrieve memory context and persist normalized facts | `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` |
-| Memory backend | GBrain-backed `IMemoryClient` implementation | `src/Services/LeanKernel.Gateway/Memory/GBrainMemoryClient.cs` |
+| Memory backend | GBrain-backed `IMemoryClient` implementation | `src/Services/LeanKernel.Services.Gateway/Memory/GBrainMemoryClient.cs` |
 | Document ingestion | Upload/multipart staging, durable queue, hosted workers, and watch-folder ingestion | `src/Common/LeanKernel.Logic/Tools/DocumentIngestion/` |
 | MCP browser tools | Webwright MCP discovery, tool adapter registration, and per-call invocation | `src/Common/LeanKernel.Logic/Mcp/` |
 

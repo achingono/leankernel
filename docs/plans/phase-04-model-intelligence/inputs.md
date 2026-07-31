@@ -5,7 +5,7 @@
 | Input | Source | Owner |
 |---|---|---|
 | Phase 03 turn pipeline | `docs/plans/phase-03-turn-runtime/`, merged `LeanKernel.Logic` pipeline | Rebuild maintainer |
-| Current agent wiring / model aliases | `src/Services/LeanKernel.Gateway/Programs.cs`, `OpenAISettings.cs`, `AgentSettings.cs` | Rebuild maintainer |
+| Current agent wiring / model aliases | `src/Services/LeanKernel.Services.Gateway/Programs.cs`, `OpenAISettings.cs`, `AgentSettings.cs` | Rebuild maintainer |
 | Source routing reference | `~/source/repos/leankernel/src/LeanKernel.Agents/Routing/*` | Reviewer |
 | Source quality/enhancement reference | `~/source/repos/leankernel/src/LeanKernel.Agents/Quality/*`, `Enhancement/*` | Reviewer |
 | Source orchestration/resilience reference | `~/source/repos/leankernel/src/LeanKernel.Agents/Orchestration/*`, `Resilience/*`, `Health/LiteLlmHealthProbe.cs` | Reviewer |

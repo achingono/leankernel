@@ -4,7 +4,7 @@
 
 | Input | Source | Owner |
 |---|---|---|
-| Memory pipeline + knowledge service | `src/Common/LeanKernel.Logic/Memory/*`, `src/Services/LeanKernel.Gateway/Providers/GBrainKnowledgeService.cs` | Rebuild maintainer |
+| Memory pipeline + knowledge service | `src/Common/LeanKernel.Logic/Memory/*`, `src/Services/LeanKernel.Services.Gateway/Providers/GBrainKnowledgeService.cs` | Rebuild maintainer |
 | Turn-completion hook | Phase 03 pipeline event emission | Rebuild maintainer |
 | Identity partitioning | `src/Common/LeanKernel.Logic/Providers/IdentityResolver.cs`, `IdentityIsolationKeyProvider.cs` | Rebuild maintainer |
 | Source learning pipeline | `~/source/repos/leankernel/src/LeanKernel.Learning/*` | Reviewer |

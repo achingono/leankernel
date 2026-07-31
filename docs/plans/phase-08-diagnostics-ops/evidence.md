@@ -21,6 +21,6 @@ LeanKernel consumes LiteLLM's built-in telemetry rather than rebuilding it:
 | Health aggregation | Composite endpoint PostgreSQL + GBrain + LiteLLM | Probes LiteLLM `/health/services` |
 | Gateway hardening | Correlation-ID middleware + API-key/open-mode | No custom rate limiting |
 | Lifecycle telemetry | Ingest/enrich/Dream/retrieval spans + gap counters | LeanKernel-specific correlation |
-| Rebuild health/auth | `src/Services/LeanKernel.Gateway/HealthChecks/*`, `Programs.cs` | Integration point |
+| Rebuild health/auth | `src/Services/LeanKernel.Services.Gateway/HealthChecks/*`, `Programs.cs` | Integration point |
 | Dream orchestration diagnostics dependency | `docs/plans/phase-07-learning-scheduler/` | Lifecycle metrics source |
 | Memory evaluation dependency | `docs/plans/phase-23-memory-eval-replay-harness/` | Baseline/threshold source for alert tuning |

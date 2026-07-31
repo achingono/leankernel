@@ -8,10 +8,10 @@
 | Identity partitioning baseline | `docs/plans/phase-10-cross-channel-memory/`, `docs/plans/phase-15-channel-identity-mapping/`, `docs/plans/phase-16-identity-claims-context/` | Current identity and channel boundaries |
 | Authorization baseline | `docs/plans/phase-19-authorization-permits-filters/` | Existing permit/filter/repository model |
 | Telemetry baseline | `docs/plans/phase-17-model-telemetry-chat-history/` | Existing turn telemetry spine |
-| Gateway composition root | `src/Services/LeanKernel.Gateway/Program.cs` | Host boundary to keep thin |
+| Gateway composition root | `src/Services/LeanKernel.Services.Gateway/Program.cs` | Host boundary to keep thin |
 | First-adopter candidate paths | `src/Common/LeanKernel.Logic/Providers/`, `src/Common/LeanKernel.Logic/Telemetry/` | Likely early migration surfaces |
 | Current history persistence model | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs`, `src/Common/LeanKernel.Core/Entities/{SessionEntity,TurnEntity,TurnTelemetryEntity}.cs` | Existing session/turn/telemetry behavior the event spine must coexist with |
-| Current permit/filter enforcement model | `src/Common/LeanKernel.Logic/Repositories/EntityRepository.cs`, `src/Common/LeanKernel.Logic/Filters/ScopeDrivenFilter.cs`, `src/Services/LeanKernel.Gateway/Providers/RequestContextPermitOfT.cs` | Existing fail-closed path the policy core must compose with |
+| Current permit/filter enforcement model | `src/Common/LeanKernel.Logic/Repositories/EntityRepository.cs`, `src/Common/LeanKernel.Logic/Filters/ScopeDrivenFilter.cs`, `src/Services/LeanKernel.Services.Gateway/Providers/RequestContextPermitOfT.cs` | Existing fail-closed path the policy core must compose with |
 | Canonical identity model | `src/Common/LeanKernel.Core/IdentityContext.cs` | Immutable identity context record |
 | Event envelope | `src/Common/LeanKernel.Core/EventEnvelope.cs` | Universal event envelope with partitioning/correlation metadata |
 | Turn event contract | `src/Common/LeanKernel.Core/Events/TurnEvent.cs` | Append-only turn event record |
@@ -27,7 +27,7 @@
 | Event spine migration | `src/Common/LeanKernel.Data/Migrations/20260722183902_AddEvents.cs` | Creates `Events` table and indexes |
 | First-adopter migration | `src/Common/LeanKernel.Logic/Providers/DbChatHistoryProvider.cs` | Emits turn and telemetry events alongside current persistence |
 | DI registrations | `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs` | `AddEventSpine()` and `AddPolicyCore()` |
-| Gateway wiring | `src/Services/LeanKernel.Gateway/Program.cs` | Calls `AddEventSpine()` and `AddPolicyCore()` |
+| Gateway wiring | `src/Services/LeanKernel.Services.Gateway/Program.cs` | Calls `AddEventSpine()` and `AddPolicyCore()` |
 | Gateway guardrail tests | `test/LeanKernel.Tests.Unit/Gateway/GatewayGuardrailTests.cs` | Verifies Gateway stays thin |
 | Policy core tests | `test/LeanKernel.Tests.Unit/Policy/IdentityContextTests.cs`, `test/LeanKernel.Tests.Unit/Policy/PolicyEvaluatorTests.cs`, `test/LeanKernel.Tests.Unit/Policy/IdentityLinkingPolicyTests.cs`, `test/LeanKernel.Tests.Unit/Policy/BudgetCheckPolicyTests.cs` | Policy evaluation contract tests |
 | Event spine tests | `test/LeanKernel.Tests.Unit/Events/EventCollectorTests.cs`, `test/LeanKernel.Tests.Unit/Events/EventEnvelopeTests.cs` | Event emission and envelope behavior |

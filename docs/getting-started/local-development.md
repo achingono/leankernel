@@ -8,7 +8,7 @@ From the repository root:
 
 ```bash
 dotnet build src/Common/LeanKernel.Logic/LeanKernel.Logic.csproj
-dotnet build src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj
+dotnet build src/Services/LeanKernel.Services.Gateway/LeanKernel.Gateway.csproj
 ```
 
 The active solution file is [`../../src/LeanKernel.sln`](../../src/LeanKernel.sln).
@@ -16,7 +16,7 @@ The active solution file is [`../../src/LeanKernel.sln`](../../src/LeanKernel.sl
 ## Run the Gateway Directly
 
 ```bash
-dotnet run --project src/Services/LeanKernel.Gateway/LeanKernel.Gateway.csproj --urls "http://127.0.0.1:5080"
+dotnet run --project src/Services/LeanKernel.Services.Gateway/LeanKernel.Gateway.csproj --urls "http://127.0.0.1:5080"
 ```
 
 This is the most useful loop for endpoint and integration work.
@@ -25,17 +25,17 @@ This is the most useful loop for endpoint and integration work.
 
 Without environment overrides, the gateway reads:
 
-- `src/Services/LeanKernel.Gateway/appsettings.json`
-- `src/Services/LeanKernel.Gateway/appsettings.Development.json`
+- `src/Services/LeanKernel.Services.Gateway/appsettings.json`
+- `src/Services/LeanKernel.Services.Gateway/appsettings.Development.json`
 
 Those files default to SQLite for local persistence.
 
 Code paths:
 
-- [`../../src/Services/LeanKernel.Gateway/appsettings.json`](../../src/Services/LeanKernel.Gateway/appsettings.json)
-- [`../../src/Services/LeanKernel.Gateway/appsettings.Development.json`](../../src/Services/LeanKernel.Gateway/appsettings.Development.json)
+- [`../../src/Services/LeanKernel.Services.Gateway/appsettings.json`](../../src/Services/LeanKernel.Services.Gateway/appsettings.json)
+- [`../../src/Services/LeanKernel.Services.Gateway/appsettings.Development.json`](../../src/Services/LeanKernel.Services.Gateway/appsettings.Development.json)
 - [`../../src/Common/LeanKernel.Data/Extensions/IConfigurationExtensions.cs`](../../src/Common/LeanKernel.Data/Extensions/IConfigurationExtensions.cs)
-- [`../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs`](../../src/Services/LeanKernel.Gateway/Extensions/DbContextOptionsBuilderExtensions.cs)
+- [`../../src/Services/LeanKernel.Services.Common/Extensions/DbContextOptionsBuilderExtensions.cs`](../../src/Services/LeanKernel.Services.Common/Extensions/DbContextOptionsBuilderExtensions.cs)
 
 ## Docker Override Behavior
 

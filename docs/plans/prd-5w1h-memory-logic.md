@@ -47,7 +47,7 @@ The intended result is that `LeanKernel.Logic` owns the page-shaping, dimension 
 - Implemented in `src/Common/LeanKernel.Logic/Memory`: `FactExtractionService`, `MemoryPageParser`, `MemoryPageRenderer`, `MemoryPageNormalizer`, `MemoryDimensionClassifier`, `MemoryPageLinker`, `MemoryGraphReasoner`, `MemoryFieldRepairService`, `MemoryPageKeyBuilder`, `DisabledChatClient`, `ReasoningModel`, and core records.
 - Integrated into `MemoryProvider` write/read flow in `src/Common/LeanKernel.Logic/Providers/MemoryProvider.cs` (fact extraction -> normalization -> scope-relative save key; compact summary retrieval; fallback raw save on failure).
 - Added model-tier configuration and keyed clients: `MemorySettings`, `FactExtractionSettings`, and DI registration in `src/Common/LeanKernel.Logic/Extensions/IServiceCollectionExtensions.cs`.
-- Kept transport boundary intact: GBrain implementation remains in `src/Services/LeanKernel.Gateway/Providers`, while Logic only depends on `IMemoryClient` abstractions.
+- Kept transport boundary intact: GBrain implementation remains in `src/Services/LeanKernel.Services.Gateway/Providers`, while Logic only depends on `IMemoryClient` abstractions.
 - Test status: memory-focused unit suites exist and pass; coverage for memory pipeline namespace exceeds 80% in latest runs.
 
 ---

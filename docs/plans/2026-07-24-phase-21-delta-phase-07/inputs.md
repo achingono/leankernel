@@ -10,7 +10,7 @@
 | `IEventCollector`, `IEventSubscriber`, `DbEventStore` | `src/Common/LeanKernel.Logic/Events/` | Phase 20/21 |
 | `DocumentIngestionHostedService` | `src/Common/LeanKernel.Logic/Tools/DocumentIngestion/` | Phase 21 |
 | `IDocumentIngestionQueue` | `src/Common/LeanKernel.Logic/Tools/DocumentIngestion/` | Phase 21 |
-| `IGBrainMcpClient` | `src/Services/LeanKernel.Gateway/Memory/` | Phase 18/21 |
+| `IGBrainMcpClient` | `src/Services/LeanKernel.Services.Gateway/Memory/` | Phase 18/21 |
 | `IPermit`, `IdentityContext` | `src/Common/LeanKernel.Core/` | Phase 20 |
 | `IChannelMemoryPolicyResolver` | `src/Common/LeanKernel.Core/Interfaces/` | Phase 10/15 |
 | Turn pipeline (Phase 03) | `src/Common/LeanKernel.Logic/TurnRuntime/` | Phase 03 |
