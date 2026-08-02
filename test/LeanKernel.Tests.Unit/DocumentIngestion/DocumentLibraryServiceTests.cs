@@ -1,3 +1,5 @@
+using System.IO.Compression;
+
 using FluentAssertions;
 
 using LeanKernel.Logic.Configuration;
@@ -215,6 +217,102 @@ public sealed class DocumentLibraryServiceTests : IDisposable
         capturedEntry.Should().NotBeNull();
         capturedEntry!.ExtractedText.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task IngestDocumentAsync_DocxFile_ExtractsTextViaTextExtractionHelper()
+    {
+        var file = CreateDocxFile("This is docx");
+        var job = CreateJob(file);
+
+        _storeMock
+            .Setup(s => s.ExistsAsync(It.IsAny<DocumentScopeContext>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        DocumentCatalogEntry? capturedEntry = null;
+        _storeMock
+            .Setup(s => s.UpsertAsync(It.IsAny<DocumentScopeContext>(), It.IsAny<string>(), It.IsAny<DocumentCatalogEntry>(), It.IsAny<CancellationToken>()))
+            .Callback<DocumentScopeContext, string, DocumentCatalogEntry, CancellationToken>((_, _, e, _) => capturedEntry = e)
+            .Returns(Task.CompletedTask);
+
+        await _service.IngestDocumentAsync(job);
+
+        capturedEntry.Should().NotBeNull();
+        capturedEntry!.ExtractedText.Should().Contain("This is docx");
+    }
+
+    [Fact]
+    public async Task IngestDocumentAsync_XlsxFile_ExtractsText()
+    {
+        var file = CreateXlsxFile("xlsx value 42");
+        var job = CreateJob(file);
+
+        _storeMock
+            .Setup(s => s.ExistsAsync(It.IsAny<DocumentScopeContext>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        DocumentCatalogEntry? capturedEntry = null;
+        _storeMock
+            .Setup(s => s.UpsertAsync(It.IsAny<DocumentScopeContext>(), It.IsAny<string>(), It.IsAny<DocumentCatalogEntry>(), It.IsAny<CancellationToken>()))
+            .Callback<DocumentScopeContext, string, DocumentCatalogEntry, CancellationToken>((_, _, e, _) => capturedEntry = e)
+            .Returns(Task.CompletedTask);
+
+        await _service.IngestDocumentAsync(job);
+
+        capturedEntry.Should().NotBeNull();
+        capturedEntry!.ExtractedText.Should().Contain("xlsx value 42");
+    }
+
+    [Fact]
+    public async Task IngestDocumentAsync_PythonUnavailable_ReturnsEmptyText()
+    {
+        var library = CreateLibraryWithPythonExecutable("nonexistent-python-binary");
+        var file = CreateDocxFile("This is docx");
+        var job = CreateJob(file);
+
+        _storeMock
+            .Setup(s => s.ExistsAsync(It.IsAny<DocumentScopeContext>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        DocumentCatalogEntry? capturedEntry = null;
+        _storeMock
+            .Setup(s => s.UpsertAsync(It.IsAny<DocumentScopeContext>(), It.IsAny<string>(), It.IsAny<DocumentCatalogEntry>(), It.IsAny<CancellationToken>()))
+            .Callback<DocumentScopeContext, string, DocumentCatalogEntry, CancellationToken>((_, _, e, _) => capturedEntry = e)
+            .Returns(Task.CompletedTask);
+
+        await library.IngestDocumentAsync(job);
+
+        capturedEntry.Should().NotBeNull();
+        capturedEntry!.ExtractedText.Should().BeEmpty();
+    }
+
+    private string CreateDocxFile(string text)
+    {
+        var path = Path.Combine(_tempRoot, $"{Guid.NewGuid():N}.docx");
+        using var zip = ZipFile.Open(path, ZipArchiveMode.Create);
+        var entry = zip.CreateEntry("word/document.xml");
+        using var writer = new StreamWriter(entry.Open());
+        writer.Write($$"""<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>{{text}}</w:t></w:r></w:p></w:body></w:document>""");
+        return path;
+    }
+
+    private string CreateXlsxFile(string value)
+    {
+        var path = Path.Combine(_tempRoot, $"{Guid.NewGuid():N}.xlsx");
+        using var zip = ZipFile.Open(path, ZipArchiveMode.Create);
+        var entry = zip.CreateEntry("xl/worksheets/sheet1.xml");
+        using var writer = new StreamWriter(entry.Open());
+        writer.Write($$"""<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>{{value}}</t></is></c></row></sheetData></worksheet>""");
+        return path;
+    }
+
+    private DocumentLibraryService CreateLibraryWithPythonExecutable(string pythonExecutable)
+        => new(
+            _storeMock.Object,
+            Options.Create(new FileSettings
+            {
+                RootPath = _tempRoot,
+                PythonExecutable = pythonExecutable,
+            }));
 
     private string CreateTempFile(string content, string extension = ".txt")
     {

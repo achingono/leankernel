@@ -227,7 +227,26 @@ public static class FileSystemSupport
 
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync(ct);
+        try
+        {
+            await process.WaitForExitAsync(ct);
+        }
+        catch
+        {
+            if (!process.HasExited)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Process already exited between the check and the kill; nothing more to do.
+                }
+            }
+
+            throw;
+        }
 
         stdout.Append(await outputTask);
         stderr.Append(await errorTask);

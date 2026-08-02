@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text;
 
 using FluentAssertions;
@@ -757,6 +758,313 @@ public sealed class AttachmentIngestionMiddlewareTests
 
         invoked.Should().BeTrue();
         eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ChatCompletionsWithFilePart_InjectsExtractedTextIntoRewrittenBody()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-attachment-tests-{Guid.NewGuid():N}");
+        var content = "# Talk track\nThis meeting is about onboarding.";
+        var json = BuildChatCompletionsJson(
+            "talk.md",
+            CreateDataUrl("text/markdown", content));
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        var invoked = false;
+        string? forwardedBody = null;
+        var middleware = new AttachmentIngestionMiddleware(c =>
+        {
+            invoked = true;
+            forwardedBody = ReadBody(c.Request);
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            await middleware.InvokeAsync(
+                context,
+                CreatePermit(),
+                Options.Create(new FileSettings { RootPath = tempRoot, PythonExecutable = "python3" }),
+                eventCollector.Object,
+                Mock.Of<IChannelMemoryPolicyResolver>(),
+                NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+            invoked.Should().BeTrue();
+            eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Once);
+            forwardedBody.Should().NotBeNull();
+            forwardedBody.Should().Contain("[Attached file: talk.md]");
+            forwardedBody.Should().Contain("This meeting is about onboarding.");
+            forwardedBody.Should().NotContain("file_data");
+            forwardedBody.Should().NotContain("data:");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ChatCompletionsWithDocxFilePart_InjectsExtractedTextAndInvokesNext()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-attachment-tests-{Guid.NewGuid():N}");
+        var dataUrl = CreateDocxDataUrl("This is docx");
+        var json = $"{{ \"model\": \"medium\", \"messages\": [ {{ \"role\": \"user\", \"content\": [ {{ \"type\": \"file\", \"file\": {{ \"filename\": \"talk.docx\", \"file_data\": \"{dataUrl}\" }} }} ] }} ] }}";
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        var invoked = false;
+        string? forwardedBody = null;
+        var middleware = new AttachmentIngestionMiddleware(c =>
+        {
+            invoked = true;
+            forwardedBody = ReadBody(c.Request);
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            await middleware.InvokeAsync(
+                context,
+                CreatePermit(),
+                Options.Create(new FileSettings { RootPath = tempRoot, PythonExecutable = "python3" }),
+                eventCollector.Object,
+                Mock.Of<IChannelMemoryPolicyResolver>(),
+                NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+            invoked.Should().BeTrue();
+            eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Once);
+            forwardedBody.Should().NotBeNull();
+            forwardedBody.Should().Contain("[Attached file: talk.docx]");
+            forwardedBody.Should().Contain("This is docx");
+            forwardedBody.Should().NotContain("data:");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ChatCompletionsWithTruncatedText_InjectsFallbackNotification()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-attachment-tests-{Guid.NewGuid():N}");
+        var longContent = new string('a', 500);
+        var json = BuildChatCompletionsJson(
+            "notes.txt",
+            CreateDataUrl("text/plain", longContent));
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        var invoked = false;
+        string? forwardedBody = null;
+        var middleware = new AttachmentIngestionMiddleware(c =>
+        {
+            invoked = true;
+            forwardedBody = ReadBody(c.Request);
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            await middleware.InvokeAsync(
+                context,
+                CreatePermit(),
+                Options.Create(new FileSettings
+                {
+                    RootPath = tempRoot,
+                    PythonExecutable = "python3",
+                    MaxExtractedCharacters = 50,
+                }),
+                eventCollector.Object,
+                Mock.Of<IChannelMemoryPolicyResolver>(),
+                NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+            invoked.Should().BeTrue();
+            forwardedBody.Should().NotBeNull();
+            forwardedBody.Should().Contain("use the document_search tool to retrieve it after ingestion completes.");
+            forwardedBody.Should().NotContain("[Attached file:");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ResponsesApiWithInputFile_InjectsInputTextPart()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-attachment-tests-{Guid.NewGuid():N}");
+        var json = BuildResponsesJson(
+            "notes.txt",
+            CreateDataUrl("text/plain", "Talk track for today"));
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        var invoked = false;
+        string? forwardedBody = null;
+        var middleware = new AttachmentIngestionMiddleware(c =>
+        {
+            invoked = true;
+            forwardedBody = ReadBody(c.Request);
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            await middleware.InvokeAsync(
+                context,
+                CreatePermit(),
+                Options.Create(new FileSettings { RootPath = tempRoot, PythonExecutable = "python3" }),
+                eventCollector.Object,
+                Mock.Of<IChannelMemoryPolicyResolver>(),
+                NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+            invoked.Should().BeTrue();
+            forwardedBody.Should().NotBeNull();
+            forwardedBody.Should().Contain("input_text");
+            forwardedBody.Should().Contain("[Attached file: notes.txt]");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ImageUrlPart_IsPreservedUnchanged()
+    {
+        var json = """
+        {
+          "model": "medium",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                { "type": "text", "text": "What is in this image?" },
+                { "type": "image_url", "image_url": { "url": "data:image/png;base64,SGVsbG8=" } }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        var invoked = false;
+        string? forwardedBody = null;
+        var middleware = new AttachmentIngestionMiddleware(c =>
+        {
+            invoked = true;
+            forwardedBody = ReadBody(c.Request);
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(
+            context,
+            CreatePermit(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath(), PythonExecutable = "python3" }),
+            eventCollector.Object,
+            Mock.Of<IChannelMemoryPolicyResolver>(),
+            NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+        invoked.Should().BeTrue();
+        eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Never);
+        forwardedBody.Should().Contain("data:image/png;base64,SGVsbG8=");
+        forwardedBody.Should().NotContain("[Attached file:");
+    }
+
+    private static string BuildChatCompletionsJson(string fileName, string dataUrl)
+        => $$"""
+        {
+          "model": "medium",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                { "type": "text", "text": "Commit this to memory." },
+                {
+                  "type": "file",
+                  "file": {
+                    "filename": "{{fileName}}",
+                    "file_data": "{{dataUrl}}"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+    private static string BuildResponsesJson(string fileName, string dataUrl)
+        => $$"""
+        {
+          "model": "medium",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                { "type": "input_text", "text": "Commit this to memory." },
+                {
+                  "type": "input_file",
+                  "file_data": "{{dataUrl}}",
+                  "filename": "{{fileName}}"
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+    private static string CreateDataUrl(string contentType, string content)
+        => $"data:{contentType};base64,{Convert.ToBase64String(Encoding.UTF8.GetBytes(content))}";
+
+    private static string CreateDocxDataUrl(string text)
+    {
+        using var stream = new MemoryStream();
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var entry = zip.CreateEntry("word/document.xml");
+            using var writer = new StreamWriter(entry.Open());
+            writer.Write($$"""<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>{{text}}</w:t></w:r></w:p></w:body></w:document>""");
+        }
+
+        return "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,"
+            + Convert.ToBase64String(stream.ToArray());
+    }
+
+    private static string ReadBody(HttpRequest request)
+    {
+        request.Body.Position = 0;
+        using var reader = new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true);
+        return reader.ReadToEnd();
     }
 
     private static DefaultHttpContext CreateMultipartContext(

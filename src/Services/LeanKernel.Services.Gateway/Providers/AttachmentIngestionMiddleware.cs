@@ -1,13 +1,17 @@
 namespace LeanKernel.Services.Gateway.Providers;
 
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using LeanKernel;
 using LeanKernel.Entities;
 using LeanKernel.Events;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Events;
+using LeanKernel.Logic.Tools.BuiltIn;
 
 using Microsoft.Extensions.Options;
 
@@ -126,10 +130,12 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         var attachments = attachmentEnvelope?.Attachments ?? [];
         var channelIdHint = attachmentEnvelope?.ChannelId;
         var availabilityScope = attachmentEnvelope?.AvailabilityScope;
+        var isOpenAiContentPartRequest = false;
 
         if (attachments.Count == 0)
         {
             attachments = await TryReadOpenAiContentPartsAsync(context, logger) ?? [];
+            isOpenAiContentPartRequest = attachments.Count > 0;
             channelIdHint = null;
             availabilityScope = null;
         }
@@ -169,7 +175,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
 
         Directory.CreateDirectory(stagingDir);
 
-        await StageFromJsonEnvelopeAsync(
+        var staged = await StageFromJsonEnvelopeAsync(
             attachments,
             stagingDir,
             new IngestionContext(scope, permit.TenantId, permit.UserId, permit.PersonId, channelId),
@@ -177,6 +183,11 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
             eventCollector,
             logger,
             context.RequestAborted);
+
+        if (isOpenAiContentPartRequest && staged.Count > 0)
+        {
+            await InjectExtractedPartsAsync(context, staged, fileSettings.Value, logger, context.RequestAborted);
+        }
 
         await next(context);
     }
@@ -512,7 +523,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         => !string.IsNullOrWhiteSpace(value)
             && value.StartsWith("data:", StringComparison.OrdinalIgnoreCase);
 
-    private static async Task StageFromJsonEnvelopeAsync(
+    private static async Task<IReadOnlyList<StagedAttachment>> StageFromJsonEnvelopeAsync(
         IReadOnlyList<JsonAttachmentPayload> attachments,
         string stagingDir,
         IngestionContext ingestion,
@@ -521,6 +532,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         ILogger<AttachmentIngestionMiddleware> logger,
         CancellationToken ct)
     {
+        var staged = new List<StagedAttachment>();
         foreach (var attachment in attachments)
         {
             if (string.IsNullOrWhiteSpace(attachment.FileDataUrl)
@@ -583,8 +595,273 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
                 ChannelId = ingestion.ChannelId,
             });
 
+            staged.Add(new StagedAttachment(safeName, stagedPath, attachment.FileDataUrl, resolvedContentType));
             logger.LogDebug("Staged JSON attachment for ingestion: {FileName}", safeName);
         }
+
+        return staged;
+    }
+
+    private static async Task InjectExtractedPartsAsync(
+        HttpContext context,
+        IReadOnlyList<StagedAttachment> staged,
+        FileSettings settings,
+        ILogger<AttachmentIngestionMiddleware> logger,
+        CancellationToken ct)
+    {
+        var replacements = await BuildInlineReplacementsAsync(staged, settings, logger, ct);
+        if (replacements.Count == 0)
+        {
+            return;
+        }
+
+        var body = await TryReadJsonObjectAsync(context, ct);
+        if (body is null)
+        {
+            return;
+        }
+
+        var containers = new List<(JsonArray Items, string PartType)>();
+        if (TryGetCaseInsensitive(body, "messages", out var messagesNode)
+            && messagesNode is JsonArray chatItems)
+        {
+            containers.Add((chatItems, "text"));
+        }
+
+        if (TryGetCaseInsensitive(body, "input", out var inputNode)
+            && inputNode is JsonArray inputItems)
+        {
+            containers.Add((inputItems, "input_text"));
+        }
+
+        var rewritten = false;
+        foreach (var (items, partType) in containers)
+        {
+            foreach (var item in items.OfType<JsonObject>())
+            {
+                if (!TryGetCaseInsensitive(item, "content", out var contentNode, out var contentKey))
+                {
+                    continue;
+                }
+
+                if (contentNode is JsonArray contentArray)
+                {
+                    for (var i = 0; i < contentArray.Count; i++)
+                    {
+                        if (contentArray[i] is JsonObject part
+                            && TryGetPartDataUrl(part, out var dataUrl)
+                            && replacements.TryGetValue(dataUrl, out var replacement))
+                        {
+                            contentArray[i] = BuildTextPart(partType, replacement);
+                            rewritten = true;
+                        }
+                    }
+                }
+                else if (contentNode is JsonValue contentValue
+                    && contentValue.TryGetValue<string>(out var contentString)
+                    && replacements.TryGetValue(contentString, out var replacement))
+                {
+                    item[contentKey] = new JsonArray(BuildTextPart(partType, replacement));
+                    rewritten = true;
+                }
+            }
+        }
+
+        if (!rewritten)
+        {
+            context.Request.Body.Position = 0;
+            return;
+        }
+
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(body);
+        context.Request.Body = new MemoryStream(bytes);
+        context.Request.ContentLength = bytes.Length;
+    }
+
+    private static async Task<Dictionary<string, string>> BuildInlineReplacementsAsync(
+        IReadOnlyList<StagedAttachment> staged,
+        FileSettings settings,
+        ILogger<AttachmentIngestionMiddleware> logger,
+        CancellationToken ct)
+    {
+        var replacements = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var attachment in staged)
+        {
+            var text = await ExtractInlineTextAsync(attachment, settings, logger, ct);
+            var replacement = string.IsNullOrWhiteSpace(text) || IsTruncated(text, settings.MaxExtractedCharacters)
+                ? $"[Attached document \"{attachment.FileName}\" was uploaded to the document library. Ingestion is in progress — use the document_search tool to retrieve it after ingestion completes.]"
+                : $"[Attached file: {attachment.FileName}]\n{text}";
+
+            replacements[attachment.DataUrl] = replacement;
+        }
+
+        return replacements;
+    }
+
+    private static async Task<string> ExtractInlineTextAsync(
+        StagedAttachment attachment,
+        FileSettings settings,
+        ILogger<AttachmentIngestionMiddleware> logger,
+        CancellationToken ct)
+    {
+        if (!ShouldExtractInline(attachment))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return await TextExtractionHelper.ExtractAsync(
+                attachment.StagedPath,
+                settings.ScratchRoot,
+                settings.PythonExecutable,
+                settings.MaxExtractedCharacters,
+                ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or Win32Exception)
+        {
+            logger.LogWarning(ex, "Failed to extract inline text for attachment {FileName}.", attachment.FileName);
+            return string.Empty;
+        }
+    }
+
+    private static bool ShouldExtractInline(StagedAttachment attachment)
+    {
+        if (attachment.ResolvedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (attachment.ResolvedContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
+            || attachment.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(attachment.StagedPath);
+        if (string.IsNullOrEmpty(extension))
+        {
+            return false;
+        }
+
+        return FileSystemSupport.IsTextLikeExtension(attachment.StagedPath)
+            || FileSystemSupport.IsWordOpenXmlCandidate(attachment.StagedPath)
+            || FileSystemSupport.IsSpreadsheetOpenXmlCandidate(attachment.StagedPath)
+            || FileSystemSupport.IsPresentationOpenXmlCandidate(attachment.StagedPath)
+            || FileSystemSupport.IsEpubCandidate(attachment.StagedPath)
+            || FileSystemSupport.IsLegacyOfficeBinaryCandidate(attachment.StagedPath);
+    }
+
+    private static bool IsTruncated(string text, int maxExtractedCharacters)
+        => text.Contains("[Content truncated to ", StringComparison.Ordinal)
+            || text.Length > maxExtractedCharacters;
+
+    private static JsonObject BuildTextPart(string type, string text)
+        => new()
+        {
+            ["type"] = type,
+            ["text"] = text,
+        };
+
+    private static bool TryGetPartDataUrl(JsonObject part, [NotNullWhen(true)] out string? dataUrl)
+    {
+        if (TryGetCaseInsensitive(part, "image_url", out var imageUrlNode))
+        {
+            if (imageUrlNode is JsonObject imageUrlObject
+                && TryGetCaseInsensitive(imageUrlObject, "url", out var urlNode)
+                && urlNode is JsonValue urlValue
+                && urlValue.TryGetValue<string>(out var url)
+                && IsDataUrl(url))
+            {
+                dataUrl = url;
+                return true;
+            }
+
+            if (imageUrlNode is JsonValue imageUrlValue
+                && imageUrlValue.TryGetValue<string>(out var urlString)
+                && IsDataUrl(urlString))
+            {
+                dataUrl = urlString;
+                return true;
+            }
+        }
+
+        if (TryGetCaseInsensitive(part, "file", out var fileNode) && fileNode is JsonObject fileObject)
+        {
+            foreach (var propertyName in new[] { "file_data", "fileData", "data" })
+            {
+                if (TryGetCaseInsensitive(fileObject, propertyName, out var fileDataNode)
+                    && fileDataNode is JsonValue fileDataValue
+                    && fileDataValue.TryGetValue<string>(out var fileData)
+                    && IsDataUrl(fileData))
+                {
+                    dataUrl = fileData;
+                    return true;
+                }
+            }
+        }
+
+        foreach (var propertyName in new[] { "file_data", "fileData", "data", "url" })
+        {
+            if (TryGetCaseInsensitive(part, propertyName, out var flatNode)
+                && flatNode is JsonValue flatValue
+                && flatValue.TryGetValue<string>(out var flat)
+                && IsDataUrl(flat))
+            {
+                dataUrl = flat;
+                return true;
+            }
+        }
+
+        dataUrl = null;
+        return false;
+    }
+
+    private static bool TryGetCaseInsensitive(JsonObject obj, string propertyName, out JsonNode? value)
+        => TryGetCaseInsensitive(obj, propertyName, out value, out _);
+
+    private static bool TryGetCaseInsensitive(JsonObject obj, string propertyName, out JsonNode? value, out string matchedKey)
+    {
+        foreach (var (name, node) in obj)
+        {
+            if (string.Equals(name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = node;
+                matchedKey = name;
+                return true;
+            }
+        }
+
+        value = null;
+        matchedKey = propertyName;
+        return false;
+    }
+
+    private static async Task<JsonObject?> TryReadJsonObjectAsync(HttpContext context, CancellationToken ct)
+    {
+        context.Request.Body.Position = 0;
+        JsonNode? node;
+        try
+        {
+            node = await JsonNode.ParseAsync(context.Request.Body, cancellationToken: ct);
+        }
+        catch (JsonException)
+        {
+            context.Request.Body.Position = 0;
+            return null;
+        }
+
+        if (node is JsonObject obj)
+        {
+            return obj;
+        }
+
+        context.Request.Body.Position = 0;
+        return null;
     }
 
     private static bool TryDecodeDataUrl(
@@ -676,7 +953,16 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
             name = name.Replace(c, '_');
         }
 
-        return name;
+        // Strip control characters (e.g. newlines and tabs) so untrusted file names cannot
+        // break out of structured log entries or the prompt annotation rendered next to
+        // extracted document text.
+        var builder = new StringBuilder(name.Length);
+        foreach (var c in name)
+        {
+            builder.Append(char.IsControl(c) ? '_' : c);
+        }
+
+        return builder.ToString();
     }
 
     private static bool IsMultipartRequest(HttpRequest request)
@@ -711,6 +997,12 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         string ContentType,
         string FileName,
         string FileDataUrl);
+
+    private sealed record StagedAttachment(
+        string FileName,
+        string StagedPath,
+        string DataUrl,
+        string ResolvedContentType);
 
     private sealed record IngestionContext(
         DocumentAvailabilityScope Scope,
