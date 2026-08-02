@@ -74,6 +74,64 @@ public class ChatCompletionsProxyTests
         executed.Body.Should().Contain("\"choices\"");
     }
 
+    [Theory]
+    [InlineData(typeof(TaskCanceledException), StatusCodes.Status504GatewayTimeout, "timed out")]
+    [InlineData(typeof(HttpRequestException), StatusCodes.Status502BadGateway, "could not be reached")]
+    [InlineData(typeof(InvalidOperationException), StatusCodes.Status500InternalServerError, "unexpected error")]
+    public async Task HandleChatCompletionsRequestAsync_UpstreamException_ReturnsHelpfulOpenAiError(
+        Type exceptionType,
+        int expectedStatusCode,
+        string expectedMessageFragment)
+    {
+        var thrownException = (Exception)Activator.CreateInstance(exceptionType, "upstream failure")!;
+        var httpFactory = new FakeHttpClientFactory(new StubHttpMessageHandler(_ =>
+            throw thrownException));
+
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = "http";
+        context.Request.Host = new HostString("localhost:8080");
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(
+            """{"model":"test-model","messages":[{"content":"hello","role":"user"}]}"""));
+
+        var result = await IEndpointRouteBuilderExtensions.HandleChatCompletionsRequestAsync(
+            "/v1/internal/completions",
+            context,
+            httpFactory,
+            Mock.Of<ILogger<HttpContext>>());
+
+        using var executed = await ExecuteResultAsync(result);
+        executed.Response.StatusCode.Should().Be(expectedStatusCode);
+
+        using var document = JsonDocument.Parse(executed.Body);
+        var error = document.RootElement.GetProperty("error");
+        error.GetProperty("message").GetString()!.ToLowerInvariant().Should().Contain(expectedMessageFragment);
+        error.GetProperty("type").GetString().Should().Be("server_error");
+        error.GetProperty("code").GetString().Should().Be("server_error");
+        error.GetProperty("param").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task HandleChatCompletionsRequestAsync_ClientAborted_PropagatesCancellation()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = "http";
+        context.Request.Host = new HostString("localhost:8080");
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(
+            """{"model":"test-model","messages":[{"content":"hello","role":"user"}]}"""));
+        context.RequestAborted = cts.Token;
+
+        var act = () => IEndpointRouteBuilderExtensions.HandleChatCompletionsRequestAsync(
+            "/v1/internal/completions",
+            context,
+            new FakeHttpClientFactory(new StubHttpMessageHandler(_ => Task.FromResult(new HttpResponseMessage()))),
+            Mock.Of<ILogger<HttpContext>>());
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
     [Fact]
     public void MapProxiedOpenAIChatCompletions_RegistersPublicAndInternalRoutes()
     {

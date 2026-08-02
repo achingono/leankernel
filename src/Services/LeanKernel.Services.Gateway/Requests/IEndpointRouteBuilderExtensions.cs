@@ -106,7 +106,7 @@ public static class IEndpointRouteBuilderExtensions
             var rewrittenJson = ReconstructMessage(rawJson);
 
             var selfUrl = $"{context.Request.Scheme}://{context.Request.Host}{internalPath}";
-            var client = httpClientFactory.CreateClient();
+            var client = httpClientFactory.CreateClient(Constants.HttpClientNames.ChatCompletionsProxy);
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, selfUrl)
             {
                 Content = new StringContent(rewrittenJson, System.Text.Encoding.UTF8, Constants.ContentTypes.Json),
@@ -120,7 +120,7 @@ public static class IEndpointRouteBuilderExtensions
                 }
             }
 
-            var responseMessage = await client.SendAsync(requestMessage);
+            var responseMessage = await client.SendAsync(requestMessage, context.RequestAborted);
             var responseStream = await responseMessage.Content.ReadAsStreamAsync();
             var contentType = responseMessage.Content.Headers.ContentType?.ToString() ?? Constants.ContentTypes.Json;
 
@@ -134,11 +134,82 @@ public static class IEndpointRouteBuilderExtensions
             logger.LogWarning("Chat completions proxy returned {StatusCode}: {Body}", (int)responseMessage.StatusCode, errorBody);
             return Results.Content(errorBody, contentType, statusCode: (int)responseMessage.StatusCode);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            logger.LogDebug("Chat completions proxy aborted by the caller before the internal agent handler completed.");
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            return MapProxyFailure(internalPath, ex, logger);
+        }
+        catch (HttpRequestException ex)
+        {
+            return MapProxyFailure(internalPath, ex, logger);
+        }
         catch (JsonException)
         {
             return Results.BadRequest("Invalid JSON format sent by client.");
         }
+        catch (Exception ex)
+        {
+            return MapProxyFailure(internalPath, ex, logger);
+        }
     }
+
+    /// <summary>
+    /// Maps a proxy failure to a helpful OpenAI-compatible error result.
+    /// </summary>
+    /// <param name="internalPath">The internal MAF route that was being awaited.</param>
+    /// <param name="exception">The exception thrown while proxying.</param>
+    /// <param name="logger">The logger used for proxy diagnostics.</param>
+    /// <returns>The mapped error result.</returns>
+    internal static IResult MapProxyFailure(
+        string internalPath,
+        Exception exception,
+        ILogger<HttpContext> logger)
+    {
+        switch (exception)
+        {
+            case HttpRequestException:
+                logger.LogError(exception, "Chat completions proxy could not reach the internal agent route at {InternalPath}.", internalPath);
+                return OpenAiErrorResult(
+                    StatusCodes.Status502BadGateway,
+                    "The agent runtime could not be reached. Please try again.");
+
+            case OperationCanceledException:
+                logger.LogWarning(exception, "Chat completions proxy timed out while awaiting the internal agent route at {InternalPath}.", internalPath);
+                return OpenAiErrorResult(
+                    StatusCodes.Status504GatewayTimeout,
+                    "The chat request timed out while processing. Please try again.");
+
+            default:
+                logger.LogError(exception, "Unexpected error while proxying chat completions through {InternalPath}.", internalPath);
+                return OpenAiErrorResult(
+                    StatusCodes.Status500InternalServerError,
+                    "An unexpected error occurred while processing the chat request.");
+        }
+    }
+
+    /// <summary>
+    /// Produces an OpenAI-compatible error result so standard OpenAI clients can parse the failure.
+    /// </summary>
+    /// <param name="statusCode">The HTTP status code to return.</param>
+    /// <param name="message">The user-facing error message.</param>
+    /// <returns>The JSON error result.</returns>
+    private static IResult OpenAiErrorResult(int statusCode, string message)
+        => Results.Json(
+            new
+            {
+                error = new
+                {
+                    message,
+                    type = "server_error",
+                    param = (string?)null,
+                    code = "server_error",
+                },
+            },
+            statusCode: statusCode);
 
     /// <summary>
     /// Re-orders each chat message object so role appears before content.

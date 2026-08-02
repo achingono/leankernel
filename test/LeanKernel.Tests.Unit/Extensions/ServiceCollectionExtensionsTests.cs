@@ -1,5 +1,6 @@
 using FluentAssertions;
 
+using LeanKernel;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Mcp;
 using LeanKernel.Logic.Memory;
@@ -156,6 +157,22 @@ public class ServiceCollectionExtensionsTests
         sp.GetServices<LeanKernel.Logic.Tools.IProviderHealthProbe>()
             .Should()
             .ContainSingle(probe => probe is McpServersHealthProbe);
+    }
+
+    [Fact]
+    public void AddToolRegistry_RegistersChatCompletionsProxyClientWithExtendedTimeout()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddOptions();
+
+        services.AddToolRegistry();
+
+        using var sp = services.BuildServiceProvider();
+        var factory = sp.GetRequiredService<IHttpClientFactory>();
+        var client = factory.CreateClient(Constants.HttpClientNames.ChatCompletionsProxy);
+
+        client.Timeout.Should().BeGreaterThan(TimeSpan.FromSeconds(100));
     }
 
     [Fact]

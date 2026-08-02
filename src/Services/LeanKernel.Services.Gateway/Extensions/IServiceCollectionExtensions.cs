@@ -39,6 +39,11 @@ public static class IServiceCollectionExtensions
         services.AddHttpClient("web-search");
         services.AddHttpClient("dynamic-skill");
 
+        // Named HTTP client for chat completions proxy with extended timeout
+        // The internal MAF handler can take longer than the default 100s HttpClient timeout
+        services.AddHttpClient(Constants.HttpClientNames.ChatCompletionsProxy)
+            .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromMinutes(5));
+
         return services;
     }
 }

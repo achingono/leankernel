@@ -113,6 +113,12 @@ public static class Constants
         /// The HTTP client name for the Signal API.
         /// </summary>
         public const string SignalApi = "signal-api";
+
+        /// <summary>
+        /// The HTTP client name used by the gateway to proxy requests to
+        /// the internal chat-completions MAF handler.
+        /// </summary>
+        public const string ChatCompletionsProxy = "chat-completions-proxy";
     }
 
     /// <summary>
