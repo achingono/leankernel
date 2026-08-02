@@ -37,12 +37,15 @@ Reference: [`../../docker-compose.yml`](../../docker-compose.yml)
 
 | Variable | Purpose |
 |---|---|
+| `GBRAIN_CHAT_MODEL` | Default model for GBrain chat/synthesis operations (e.g. `gbrain think`, subagent dream cycles). Resolves through the gbrain 6-tier model precedence chain: CLI flag → `models.chat` config → `models.default` → `models.tier.reasoning` → this env var → tier default → hardcoded fallback. Default in this stack: `openai:medium`. |
+| `GBRAIN_EXPANSION_MODEL` | Default model for GBrain query expansion in hybrid search (used by `gbrain search` / `gbrain query` to expand user queries into multiple sub-queries for better retrieval). Resolves through the same 6-tier precedence chain as `GBRAIN_CHAT_MODEL` but maps to the `utility` tier. Default in this stack: `openai:medium`. |
 | `GBRAIN_EMBEDDING_MODEL` | Embedding model used for chunk vectors (e.g. `openai:embedding`). Resolution and staleness caveats: see [`gbrain-embeddings.md`](../operations/gbrain-embeddings.md). |
 | `GBRAIN_EMBEDDING_DIMENSIONS` | Embedding vector dimensions (3072 locally). |
 | `GBRAIN_DB_URL` | Optional full Postgres URL for GBrain. When unset, `start-gbrain.sh` resolves the database from `POSTGRES_DB` (default `leankernel` — see [`gbrain-embeddings.md`](../operations/gbrain-embeddings.md)). |
 | `GBRAIN_POSTGRES_DB` | Compose override for the GBrain database name (default `gbrain`). |
 | `GBRAIN_POSTGRES_USER` | Compose override for the database user (default `leankernel`). |
 | `GBRAIN_POSTGRES_PASSWORD` | Compose override for the database password (default `leankernel-dev-password`). |
+| `GBRAIN_ADMIN_BOOTSTRAP_TOKEN` | **Critical for admin access.** Sets a deterministic bootstrap token for the GBrain admin dashboard at `/admin/#login`. If unset, a random token is generated at startup and hidden from logs (non-TTY guard). Must be set to a known value in any deployment where you need admin dashboard access. See [GBrain Admin Access](../operations/gbrain-admin-access.md). |
 
 ## Signal Terminal
 
