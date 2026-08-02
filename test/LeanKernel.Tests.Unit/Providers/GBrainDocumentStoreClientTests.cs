@@ -32,6 +32,26 @@ public sealed class GBrainDocumentStoreClientTests
     }
 
     [Fact]
+    public async Task ExistsAsync_PageNotFoundErrorFromGBrain_ReturnsFalse()
+    {
+        var mcp = new Mock<IGBrainMcpClient>();
+        mcp.Setup(c => c.CallToolAsync("get_page", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new GBrainException(
+                """
+                {
+                  "error": "page_not_found",
+                  "message": "Page not found: documents/tenant/user/fp-1",
+                  "suggestion": "Page may be soft-deleted; pass include_deleted: true to verify"
+                }
+                """));
+        var sut = CreateSut(mcp.Object);
+
+        var exists = await sut.ExistsAsync(CreateScope(), "fp-1");
+
+        exists.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task SearchAsync_MapsAndFiltersResultsByChannelIds()
     {
         var channelA = Guid.NewGuid();

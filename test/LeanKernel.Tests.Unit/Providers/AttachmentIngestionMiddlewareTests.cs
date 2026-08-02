@@ -480,6 +480,285 @@ public sealed class AttachmentIngestionMiddlewareTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
     }
 
+    [Fact]
+    public async Task InvokeAsync_ChatCompletionsWithImageUrlDataUrlPart_StagesFileEmitsEventAndInvokesNext()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-attachment-tests-{Guid.NewGuid():N}");
+        var permit = CreatePermit();
+        var json = """
+        {
+          "model": "medium",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                { "type": "text", "text": "Here's the talk track. Commit it to memory." },
+                { "type": "image_url", "image_url": { "url": "data:application/pdf;base64,SGVsbG8=" } }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        DocumentIngestionRequestedEvent? emitted = null;
+        eventCollector.Setup(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()))
+            .Callback<DocumentIngestionRequestedEvent>(e => emitted = e);
+
+        var invoked = false;
+        var middleware = new AttachmentIngestionMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            await middleware.InvokeAsync(
+                context,
+                permit,
+                Options.Create(new FileSettings { RootPath = tempRoot }),
+                eventCollector.Object,
+                Mock.Of<IChannelMemoryPolicyResolver>(),
+                NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+            invoked.Should().BeTrue();
+            eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Once);
+            emitted.Should().NotBeNull();
+            emitted!.FileName.Should().NotBeNullOrWhiteSpace();
+            File.Exists(emitted.StagedFilePath).Should().BeTrue();
+            (await File.ReadAllTextAsync(emitted.StagedFilePath)).Should().Be("Hello");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ChatCompletionsWithFilePart_StagesFileEmitsEventAndInvokesNext()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-attachment-tests-{Guid.NewGuid():N}");
+        var permit = CreatePermit();
+        var json = """
+        {
+          "model": "medium",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                { "type": "text", "text": "Commit this to memory." },
+                {
+                  "type": "file",
+                  "file": {
+                    "filename": "talk-track.md",
+                    "file_data": "data:text/markdown;base64,IyBUYWxrIHRyYWNr"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        DocumentIngestionRequestedEvent? emitted = null;
+        eventCollector.Setup(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()))
+            .Callback<DocumentIngestionRequestedEvent>(e => emitted = e);
+
+        var invoked = false;
+        var middleware = new AttachmentIngestionMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            await middleware.InvokeAsync(
+                context,
+                permit,
+                Options.Create(new FileSettings { RootPath = tempRoot }),
+                eventCollector.Object,
+                Mock.Of<IChannelMemoryPolicyResolver>(),
+                NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+            invoked.Should().BeTrue();
+            eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Once);
+            emitted.Should().NotBeNull();
+            emitted!.FileName.Should().Be("talk-track.md");
+            File.Exists(emitted.StagedFilePath).Should().BeTrue();
+            (await File.ReadAllTextAsync(emitted.StagedFilePath)).Should().Be("# Talk track");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ResponsesApiInputFileDataPart_StagesFileEmitsEventAndInvokesNext()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-attachment-tests-{Guid.NewGuid():N}");
+        var permit = CreatePermit();
+        var json = """
+        {
+          "model": "medium",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                { "type": "input_text", "text": "Commit this to memory." },
+                {
+                  "type": "input_file",
+                  "file_data": "data:text/plain;base64,VGFsayB0cmFjaw==",
+                  "filename": "notes.txt"
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        DocumentIngestionRequestedEvent? emitted = null;
+        eventCollector.Setup(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()))
+            .Callback<DocumentIngestionRequestedEvent>(e => emitted = e);
+
+        var invoked = false;
+        var middleware = new AttachmentIngestionMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            await middleware.InvokeAsync(
+                context,
+                permit,
+                Options.Create(new FileSettings { RootPath = tempRoot }),
+                eventCollector.Object,
+                Mock.Of<IChannelMemoryPolicyResolver>(),
+                NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+            invoked.Should().BeTrue();
+            eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Once);
+            emitted.Should().NotBeNull();
+            emitted!.FileName.Should().Be("notes.txt");
+            File.Exists(emitted.StagedFilePath).Should().BeTrue();
+            (await File.ReadAllTextAsync(emitted.StagedFilePath)).Should().Be("Talk track");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_OpenAiRequestWithoutDataUrlParts_PassesThroughWithoutEvent()
+    {
+        var json = """
+        {
+          "model": "medium",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                { "type": "text", "text": "Just a text message, no attachment." }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        var invoked = false;
+        var middleware = new AttachmentIngestionMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(
+            context,
+            CreatePermit(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath() }),
+            eventCollector.Object,
+            Mock.Of<IChannelMemoryPolicyResolver>(),
+            NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+        invoked.Should().BeTrue();
+        eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_OpenAiImageUrlPart_DoesNotEmitIngestionEvent()
+    {
+        var json = """
+        {
+          "model": "medium",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                { "type": "text", "text": "What is in this image?" },
+                { "type": "image_url", "image_url": { "url": "data:image/png;base64,SGVsbG8=" } }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var context = new DefaultHttpContext();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        var eventCollector = new Mock<IEventCollector>();
+        var invoked = false;
+        var middleware = new AttachmentIngestionMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(
+            context,
+            CreatePermit(),
+            Options.Create(new FileSettings { RootPath = Path.GetTempPath() }),
+            eventCollector.Object,
+            Mock.Of<IChannelMemoryPolicyResolver>(),
+            NullLogger<AttachmentIngestionMiddleware>.Instance);
+
+        invoked.Should().BeTrue();
+        eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Never);
+    }
+
     private static DefaultHttpContext CreateMultipartContext(
         IFormFile file,
         Dictionary<string, Microsoft.Extensions.Primitives.StringValues>? formValues = null)

@@ -44,7 +44,7 @@ public sealed class GBrainDocumentStoreClient : IDocumentStoreClient
             var result = await this._client.CallToolAsync("get_page", new { slug }, ct);
             return result is not null;
         }
-        catch (GBrainException ex) when (ex.ErrorCode == -32601)
+        catch (GBrainException ex) when (ex.ErrorCode == -32601 || ex.Message.Contains("page_not_found", StringComparison.Ordinal))
         {
             return false;
         }

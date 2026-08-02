@@ -15,7 +15,9 @@ using Microsoft.Extensions.Options;
 /// Middleware that intercepts inbound requests with potential file attachments,
 /// stages them to disk, and emits <see cref="DocumentIngestionRequestedEvent"/>
 /// for asynchronous ingestion via the event subscriber pipeline.
-/// Processes multipart/form-data uploads and channel JSON attachment envelopes.
+/// Processes multipart/form-data uploads, channel JSON attachment envelopes,
+/// and OpenAI-compatible content parts (chat completions <c>messages[].content</c>
+/// and responses <c>input[].content</c>).
 /// Must run after <see cref="TenantResolutionMiddleware"/> so that identity is available.
 /// </summary>
 public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
@@ -121,13 +123,24 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         ILogger<AttachmentIngestionMiddleware> logger)
     {
         var attachmentEnvelope = await TryReadJsonEnvelopeAsync(context, logger);
-        if (attachmentEnvelope is null || attachmentEnvelope.Attachments.Count == 0)
+        var attachments = attachmentEnvelope?.Attachments ?? [];
+        var channelIdHint = attachmentEnvelope?.ChannelId;
+        var availabilityScope = attachmentEnvelope?.AvailabilityScope;
+
+        if (attachments.Count == 0)
+        {
+            attachments = await TryReadOpenAiContentPartsAsync(context, logger) ?? [];
+            channelIdHint = null;
+            availabilityScope = null;
+        }
+
+        if (attachments.Count == 0)
         {
             await next(context);
             return;
         }
 
-        var scope = ResolveAvailabilityScope(attachmentEnvelope.AvailabilityScope);
+        var scope = ResolveAvailabilityScope(availabilityScope);
         if (scope == DocumentAvailabilityScope.Tenant && !permit.IsAuthenticated)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -135,7 +148,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         }
 
         var (authorized, channelId) = await ResolveChannelAsync(
-            attachmentEnvelope.ChannelId,
+            channelIdHint,
             permit,
             policyResolver,
             context.RequestAborted);
@@ -157,7 +170,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         Directory.CreateDirectory(stagingDir);
 
         await StageFromJsonEnvelopeAsync(
-            attachmentEnvelope.Attachments,
+            attachments,
             stagingDir,
             new IngestionContext(scope, permit.TenantId, permit.UserId, permit.PersonId, channelId),
             fileSettings.Value.MaxDownloadBytes,
@@ -370,6 +383,135 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         }
     }
 
+    private static async Task<IReadOnlyList<JsonAttachmentPayload>?> TryReadOpenAiContentPartsAsync(
+        HttpContext context,
+        ILogger<AttachmentIngestionMiddleware> logger)
+    {
+        try
+        {
+            context.Request.EnableBuffering();
+
+            using var document = await JsonDocument.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var root = document.RootElement;
+            if ((!TryReadProperty(root, "messages", out var itemsElement)
+                && !TryReadProperty(root, "input", out itemsElement))
+                || itemsElement.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            var attachments = new List<JsonAttachmentPayload>();
+            foreach (var item in itemsElement.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object
+                    || !TryReadProperty(item, "content", out var contentElement))
+                {
+                    continue;
+                }
+
+                if (contentElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var part in contentElement.EnumerateArray())
+                    {
+                        var payload = ReadOpenAiContentPart(part);
+                        if (payload is not null)
+                        {
+                            attachments.Add(payload);
+                        }
+                    }
+                }
+                else if (contentElement.ValueKind == JsonValueKind.String
+                    && IsDataUrl(contentElement.GetString()))
+                {
+                    attachments.Add(new JsonAttachmentPayload(string.Empty, string.Empty, contentElement.GetString()!));
+                }
+            }
+
+            return attachments.Count > 0 ? attachments : null;
+        }
+        catch (JsonException ex)
+        {
+            logger.LogDebug(ex, "Failed to parse OpenAI content parts from request body.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed reading OpenAI content parts for attachment ingestion middleware.");
+            return null;
+        }
+        finally
+        {
+            if (context.Request.Body.CanSeek)
+            {
+                context.Request.Body.Position = 0;
+            }
+        }
+    }
+
+    private static JsonAttachmentPayload? ReadOpenAiContentPart(JsonElement part)
+    {
+        if (part.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var fileName = ReadStringProperty(part, "filename")
+            ?? ReadStringProperty(part, "file_name")
+            ?? ReadStringProperty(part, "name");
+
+        // image_url part: { "type": "image_url", "image_url": { "url": "data:..." } } (chat completions)
+        //              or: { "type": "input_image", "image_url": "data:..." }          (responses)
+        if (TryReadProperty(part, "image_url", out var imageUrlElement))
+        {
+            var url = imageUrlElement.ValueKind == JsonValueKind.Object
+                ? ReadStringProperty(imageUrlElement, "url")
+                : imageUrlElement.ValueKind == JsonValueKind.String
+                    ? imageUrlElement.GetString()
+                    : null;
+
+            if (IsDataUrl(url))
+            {
+                return new JsonAttachmentPayload(string.Empty, fileName ?? string.Empty, url!);
+            }
+        }
+
+        // file part: { "type": "file", "file": { "file_data": "data:...", "filename": "..." } } (chat completions)
+        // input_file parts carrying a file_id reference are skipped (no server-side file store to resolve them).
+        if (TryReadProperty(part, "file", out var fileElement) && fileElement.ValueKind == JsonValueKind.Object)
+        {
+            var fileData = ReadStringProperty(fileElement, "file_data")
+                ?? ReadStringProperty(fileElement, "fileData")
+                ?? ReadStringProperty(fileElement, "data");
+            var nestedFileName = ReadStringProperty(fileElement, "filename")
+                ?? ReadStringProperty(fileElement, "file_name")
+                ?? fileName;
+            if (IsDataUrl(fileData))
+            {
+                return new JsonAttachmentPayload(string.Empty, nestedFileName ?? string.Empty, fileData!);
+            }
+        }
+
+        var dataUrl = ReadStringProperty(part, "file_data")
+            ?? ReadStringProperty(part, "fileData")
+            ?? ReadStringProperty(part, "data")
+            ?? ReadStringProperty(part, "url");
+        if (IsDataUrl(dataUrl))
+        {
+            return new JsonAttachmentPayload(string.Empty, fileName ?? string.Empty, dataUrl!);
+        }
+
+        return null;
+    }
+
+    private static bool IsDataUrl(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+            && value.StartsWith("data:", StringComparison.OrdinalIgnoreCase);
+
     private static async Task StageFromJsonEnvelopeAsync(
         IReadOnlyList<JsonAttachmentPayload> attachments,
         string stagingDir,
@@ -390,6 +532,12 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
             if (!TryDecodeDataUrl(attachment.FileDataUrl, attachment.ContentType, out var bytes, out var resolvedContentType))
             {
                 logger.LogDebug("Skipping malformed attachment data URL for file {FileName}.", attachment.FileName);
+                continue;
+            }
+
+            if (resolvedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogDebug("Skipping image attachment for document ingestion: {FileName}.", attachment.FileName);
                 continue;
             }
 
