@@ -1,6 +1,5 @@
 using FluentAssertions;
 
-using LeanKernel;
 using LeanKernel.Logic.Configuration;
 using LeanKernel.Logic.Mcp;
 using LeanKernel.Logic.Memory;

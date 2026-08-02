@@ -37,41 +37,41 @@ public sealed class TerminalService(
 
                 try
                 {
-                var attachmentHints = AttachmentParser.ParseAttachmentHints(inbound.Text);
-                var input = AttachmentParser.BuildGatewayInput(inbound.Text, inbound.Attachments, attachmentHints);
+                    var attachmentHints = AttachmentParser.ParseAttachmentHints(inbound.Text);
+                    var input = AttachmentParser.BuildGatewayInput(inbound.Text, inbound.Attachments, attachmentHints);
 
-                await using var typingKeepAlive = TypingIndicatorKeepAlive.Start(
-                    transport,
-                    inbound.Account,
-                    inbound.Sender,
-                    signalSettings.Value,
-                    logger,
-                    stoppingToken);
+                    await using var typingKeepAlive = TypingIndicatorKeepAlive.Start(
+                        transport,
+                        inbound.Account,
+                        inbound.Sender,
+                        signalSettings.Value,
+                        logger,
+                        stoppingToken);
 
-                var output = await gatewayClient.RunTurnAsync(input, inbound.BearerToken, inbound.Attachments, stoppingToken);
+                    var output = await gatewayClient.RunTurnAsync(input, inbound.BearerToken, inbound.Attachments, stoppingToken);
 
-                var attachmentCount = inbound.Attachments.Count > 0
-                    ? inbound.Attachments.Count
-                    : attachmentHints.Count;
+                    var attachmentCount = inbound.Attachments.Count > 0
+                        ? inbound.Attachments.Count
+                        : attachmentHints.Count;
 
-                if (attachmentCount > 0)
-                {
-                    output = output with
+                    if (attachmentCount > 0)
                     {
-                        Text = $"{output.Text}\n\n(attachments={attachmentCount})"
-                    };
-                }
+                        output = output with
+                        {
+                            Text = $"{output.Text}\n\n(attachments={attachmentCount})"
+                        };
+                    }
 
-                await transport.SendAsync(inbound.Account, inbound.Sender, output.Text, output.TextStyles, stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Signal message processing failed for sender {Sender}; continuing.", inbound.Sender);
-            }
+                    await transport.SendAsync(inbound.Account, inbound.Sender, output.Text, output.TextStyles, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Signal message processing failed for sender {Sender}; continuing.", inbound.Sender);
+                }
             }
             catch (OperationCanceledException)
             {

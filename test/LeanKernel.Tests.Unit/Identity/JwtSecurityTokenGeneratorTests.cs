@@ -8,7 +8,6 @@ using LeanKernel.Services.Gateway.Configuration;
 using LeanKernel.Services.Gateway.Providers;
 
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 
 using Xunit;
 

@@ -1,0 +1,24 @@
+<Project>
+  <PropertyGroup>
+    <DotNetCliHome>$(MSBuildThisFileDirectory).dotnet</DotNetCliHome>
+    <DotNetTempDir>$(MSBuildThisFileDirectory).tmp</DotNetTempDir>
+  </PropertyGroup>
+
+  <Target Name="RestoreAndRunDotnetFormat" BeforeTargets="BeforeBuild" Condition="'$(DesignTimeBuild)' != 'true' and '$(MSBuildProjectName)' == 'LeanKernel.Services.Gateway' and '$(DotNetToolRestoreEnabled)' != 'false'">
+    <MakeDir Directories="$(DotNetCliHome);$(DotNetTempDir)" />
+
+    <Exec Command="dotnet --info" WorkingDirectory="$(MSBuildThisFileDirectory)" EnvironmentVariables="DOTNET_CLI_HOME=$(DotNetCliHome);TMPDIR=$(DotNetTempDir)" IgnoreExitCode="true" ConsoleToMSBuild="true">
+      <Output TaskParameter="ExitCode" PropertyName="DotNetInfoExitCode" />
+    </Exec>
+
+    <Exec Condition="'$(DotNetInfoExitCode)' != '0'" Command="echo Skipping dotnet format because dotnet is unavailable or the environment is not suitable for tool restore." WorkingDirectory="$(MSBuildThisFileDirectory)" />
+    <Exec Condition="'$(DotNetInfoExitCode)' != '0'" Command="exit 0" />
+
+    <Exec Command="dotnet tool restore" WorkingDirectory="$(MSBuildThisFileDirectory)" EnvironmentVariables="DOTNET_CLI_HOME=$(DotNetCliHome);TMPDIR=$(DotNetTempDir)" IgnoreExitCode="true" ConsoleToMSBuild="true">
+      <Output TaskParameter="ExitCode" PropertyName="DotNetToolRestoreExitCode" />
+    </Exec>
+
+    <Exec Condition="'$(DotNetToolRestoreExitCode)' != '0'" Command="echo Skipping dotnet format because tool restore failed." WorkingDirectory="$(MSBuildThisFileDirectory)" />
+    <Exec Condition="'$(DotNetToolRestoreExitCode)' == '0'" Command="dotnet format &quot;$(MSBuildProjectFullPath)&quot;" WorkingDirectory="$(MSBuildThisFileDirectory)" EnvironmentVariables="DOTNET_CLI_HOME=$(DotNetCliHome);TMPDIR=$(DotNetTempDir)" IgnoreExitCode="true" />
+  </Target>
+</Project>
