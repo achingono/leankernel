@@ -12,6 +12,10 @@ is created, governance-filtered tools are adapted to MAF `AITool` instances via
 `.UseFunctionInvocation()` pipeline then executes them locally regardless of the upstream
 provider behind LiteLLM.
 
+The adapter publishes each tool's JSON schema directly from declared `ToolParameter` metadata.
+At invocation time, function-call arguments are forwarded directly to the tool handler dictionary
+without wrapper fields.
+
 Reference: [`../../src/Common/LeanKernel.Logic/Tools/`](../../src/Common/LeanKernel.Logic/Tools/)
 
 ## Tool Categories
@@ -75,6 +79,9 @@ Reference: [`../../src/Common/LeanKernel.Logic/Tools/DocumentIngestion/`](../../
 
 HTTP and CLI tools loaded at startup from `SKILL.md` files. Each declared operation becomes
 one agent-visible tool named `{skillName}_{operationId}`.
+
+Function-call argument shape is direct object mapping. For example, a no-parameter operation is
+invoked with `{}` (not `{"argsJson":"{}"}`).
 
 Reference: [`../../samples/skills/`](../../samples/skills/)
 
@@ -144,21 +151,19 @@ operations:
         publish: "--publish"
         setupToken: null
     parameters:
-      type: object
-      properties:
-        title:
-          type: string
-          description: Draft title
-        body:
-          type: string
-          description: Draft body
-        publish:
-          type: boolean
-          description: Publish immediately
-        setupToken:
-          type: string
-          description: Bare positional token
-      required: [title]
+      title:
+        type: string
+        description: Draft title
+        required: true
+      body:
+        type: string
+        description: Draft body
+      publish:
+        type: boolean
+        description: Publish immediately
+      setupToken:
+        type: string
+        description: Bare positional token
 ---
 ```
 
@@ -172,6 +177,8 @@ operations:
   `egress.allowHosts` and the global `Agents:Tools:DynamicHttp:AllowHosts` when non-empty
 - HTTP operations declare `invoke.httpMethod` and `invoke.httpPath`; CLI operations declare
   `invoke.argv` (positional arguments) and optional `invoke.flags` mapping parameter names to flags
+- Parameter declarations should use the flat format (`parameters.<name>.{type,description,required}`);
+  JSON-schema `properties` format remains accepted for backward compatibility
 - CLI flag mapping rules: boolean parameters add the flag when true and omit it when false;
   null/empty flag mappings pass the parameter value as a bare positional argument
 - CLI startup performs binary resolution using `PATH`; missing binaries are warned and skipped
