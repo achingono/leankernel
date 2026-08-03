@@ -218,16 +218,17 @@ public sealed class GBrainDocumentStoreClient : IDocumentStoreClient
     private static DocumentCatalogEntry MapToCatalogEntry(JsonElement item)
     {
         var slug = item.TryGetProperty("slug", out var s) ? s.GetString() ?? string.Empty : string.Empty;
+        var title = item.TryGetProperty("title", out var t) ? t.GetString() ?? string.Empty : string.Empty;
         var content = ExtractContent(item, ["compiled_truth", "content"]);
         var parts = slug.Split('/');
 
-        var tenantId = parts.Length > 1 && Guid.TryParse(parts[1], out var t) ? t : Guid.Empty;
-        var channelId = parts.Length > 3 && Guid.TryParse(parts[3], out var c) ? c : Guid.Empty;
-        var userId = parts.Length > 4 && Guid.TryParse(parts[4], out var u) ? u : Guid.Empty;
+        var tenantId = parts.Length > 1 && Guid.TryParse(parts[1], out var tId) ? tId : Guid.Empty;
+        var channelId = parts.Length > 3 && Guid.TryParse(parts[3], out var cId) ? cId : Guid.Empty;
+        var userId = parts.Length > 4 && Guid.TryParse(parts[4], out var uId) ? uId : Guid.Empty;
 
         return new DocumentCatalogEntry(
             slug,
-            string.Empty,
+            title,
             Constants.ContentTypes.ApplicationOctetStream,
             content ?? string.Empty,
             tenantId, userId, Guid.Empty, channelId,
