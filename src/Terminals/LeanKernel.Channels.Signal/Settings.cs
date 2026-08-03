@@ -26,9 +26,24 @@ public sealed class SignalSettings
     public int ReceiveTimeoutSeconds { get; set; } = 20;
 
     /// <summary>
+    /// Gets or sets the client-side receive deadline in seconds.
+    /// </summary>
+    public int ReceiveClientDeadlineSeconds { get; set; } = 25;
+
+    /// <summary>
     /// Gets or sets the delay in seconds before reconnecting after a WebSocket failure.
     /// </summary>
     public int ReconnectDelaySeconds { get; set; } = 1;
+
+    /// <summary>
+    /// Gets or sets the account refresh interval in seconds.
+    /// </summary>
+    public int AccountRefreshSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the max number of pending inbound messages kept in memory.
+    /// </summary>
+    public int InboundQueueCapacity { get; set; } = 100;
 
     /// <summary>
     /// Gets or sets the maximum number of image attachments to forward per message.

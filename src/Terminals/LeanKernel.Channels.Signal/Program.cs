@@ -51,7 +51,10 @@ builder.Services.AddDbContextFactory<EntityContext>(options =>
 
     throw new InvalidOperationException($"Unsupported database provider '{connectionStringName}'.");
 });
-builder.Services.AddSingleton<ITransportClient, SocketTransportClient>();
+builder.Services.AddSingleton<ISignalReceiveClient, WebSocketSignalReceiveClient>();
+builder.Services.AddSingleton<SocketTransportClient>();
+builder.Services.AddSingleton<ITransportClient>(static provider => provider.GetRequiredService<SocketTransportClient>());
+builder.Services.AddHostedService(static provider => provider.GetRequiredService<SocketTransportClient>());
 builder.Services.AddSingleton<IChannelCredentialProvider, DatabaseChannelCredentialProvider>();
 builder.Services.AddHostedService<TerminalService>();
 

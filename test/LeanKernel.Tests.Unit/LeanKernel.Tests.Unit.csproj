@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\src\Services\LeanKernel.Services.Common\LeanKernel.Services.Common.csproj" />
     <ProjectReference Include="..\..\src\Services\LeanKernel.Services.Learning\LeanKernel.Services.Learning.csproj" />
     <ProjectReference Include="..\..\src\Terminals\LeanKernel.Channels.Common\LeanKernel.Channels.Common.csproj" />
+    <ProjectReference Include="..\..\src\Terminals\LeanKernel.Channels.Signal\LeanKernel.Channels.Signal.csproj" />
   </ItemGroup>
 
 </Project>

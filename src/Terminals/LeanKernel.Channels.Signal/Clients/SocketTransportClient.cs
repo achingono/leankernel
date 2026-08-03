@@ -1,5 +1,4 @@
 using System.Net.WebSockets;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -14,102 +13,159 @@ public sealed class SocketTransportClient(
     IHttpClientFactory httpClientFactory,
     IOptions<SignalSettings> settings,
     IChannelCredentialProvider credentials,
-    ILogger<SocketTransportClient> logger) : ITransportClient
+    ISignalReceiveClient signalReceiveClient,
+    ILogger<SocketTransportClient> logger) : ITransportClient, IHostedService, IAsyncDisposable
 {
+    private sealed record AccountWorker(CancellationTokenSource Cancellation, Task Task);
+
+    private readonly object _sync = new();
     private readonly Queue<InboundMessage> _pending = new();
-    private readonly Queue<string> _accounts = new();
-    private DateTimeOffset _lastAccountRefreshUtc = DateTimeOffset.MinValue;
+    private readonly SemaphoreSlim _pendingSignal = new(0);
+    private readonly Dictionary<string, AccountWorker> _workers = new(StringComparer.OrdinalIgnoreCase);
+
+    private CancellationTokenSource? _lifecycleCts;
+    private Task? _managerTask;
+    private bool _started;
+    private bool _disposed;
 
     /// <summary>
-    /// Receives the next inbound Signal message, fetching from the WebSocket if the pending queue is empty.
+    /// Starts account worker management.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        lock (_sync)
+        {
+            if (_started)
+            {
+                return Task.CompletedTask;
+            }
+
+            _lifecycleCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _managerTask = Task.Run(() => ManageWorkersAsync(_lifecycleCts.Token), CancellationToken.None);
+            _started = true;
+        }
+
+        logger.LogInformation("Signal transport started.");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Stops account worker management and disposes active worker loops.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        Task? managerTask;
+        CancellationTokenSource? lifecycleCts;
+
+        lock (_sync)
+        {
+            if (!_started)
+            {
+                return;
+            }
+
+            _started = false;
+            managerTask = _managerTask;
+            _managerTask = null;
+
+            lifecycleCts = _lifecycleCts;
+            _lifecycleCts = null;
+        }
+
+        lifecycleCts?.Cancel();
+
+        if (managerTask is not null)
+        {
+            await WaitForTaskAsync(managerTask, cancellationToken);
+        }
+
+        lifecycleCts?.Dispose();
+        logger.LogInformation("Signal transport stopped.");
+    }
+
+    /// <summary>
+    /// Receives the next inbound Signal message from the bounded in-memory queue.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The next inbound message, or <c>null</c> if no message is available.</returns>
+    /// <returns>The next inbound message, or <c>null</c> when canceled.</returns>
     public async Task<InboundMessage?> ReceiveAsync(CancellationToken ct)
     {
-        if (_pending.Count > 0)
+        while (!ct.IsCancellationRequested)
         {
-            return _pending.Dequeue();
-        }
-
-        await EnsureAccountsLoadedAsync(ct);
-        if (_accounts.Count == 0)
-        {
-            logger.LogWarning("No Signal accounts were discovered from signal-cli /v1/accounts.");
-            await Task.Delay(TimeSpan.FromSeconds(settings.Value.ReconnectDelaySeconds), ct);
-            return null;
-        }
-
-        var account = _accounts.Dequeue();
-        _accounts.Enqueue(account);
-
-        var payload = await ReceiveViaWebSocketAsync(account, ct);
-        if (string.IsNullOrWhiteSpace(payload))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(payload);
-            var root = document.RootElement;
-
-            if (root.ValueKind == JsonValueKind.Array)
+            if (TryDequeueInbound(out var inbound))
             {
-                foreach (var item in root.EnumerateArray())
-                {
-                    await EnqueueInboundIfValidAsync(item, account, ct);
-                }
+                return inbound;
             }
-            else
-            {
-                await EnqueueInboundIfValidAsync(root, account, ct);
-            }
-        }
-        catch (JsonException ex)
-        {
-            logger.LogWarning(ex, "Signal receive returned non-JSON payload for account {Account}: {Payload}", account, payload);
+
+            await _pendingSignal.WaitAsync(ct);
         }
 
-        return _pending.Count > 0 ? _pending.Dequeue() : null;
+        return null;
     }
 
     /// <summary>
     /// Sends a text message with optional text styles to a Signal recipient.
     /// </summary>
-    /// <param name="account">The Signal account number sending the message.</param>
-    /// <param name="recipient">The recipient Signal number.</param>
+    /// <param name="account">The sending account identifier.</param>
+    /// <param name="recipient">The recipient identifier.</param>
     /// <param name="text">The message text.</param>
-    /// <param name="textStyles">The text styles to apply to the message.</param>
+    /// <param name="textStyles">The text styles to apply.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    public async Task SendAsync(string account, string recipient, string text, IReadOnlyList<SignalTextStyle> textStyles, CancellationToken ct)
+    /// <returns><c>true</c> when send succeeded; otherwise <c>false</c>.</returns>
+    public async Task<bool> SendAsync(string account, string recipient, string text, IReadOnlyList<SignalTextStyle> textStyles, CancellationToken ct)
     {
-        var httpClient = httpClientFactory.CreateClient(Constants.HttpClientNames.SignalApi);
-        var payload = new
+        try
         {
-            number = account,
-            recipients = new[] { recipient },
-            message = text,
-            textStyles = textStyles.Count > 0 ? textStyles : null
-        };
+            var httpClient = httpClientFactory.CreateClient(Constants.HttpClientNames.SignalApi);
+            var payload = new
+            {
+                number = account,
+                recipients = new[] { recipient },
+                message = text,
+                textStyles = textStyles.Count > 0 ? textStyles : null
+            };
 
-        using var response = await httpClient.PostAsJsonAsync("/v2/send", payload, ct);
-        if (!response.IsSuccessStatusCode)
+            using var response = await httpClient.PostAsJsonAsync("/v2/send", payload, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning(
+                    "Signal send failed for account {Account} recipient {Recipient} with status {StatusCode}.",
+                    account,
+                    recipient,
+                    response.StatusCode);
+                return false;
+            }
+
+            return true;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             logger.LogWarning(
-                "Signal send failed for account {Account} recipient {Recipient} with status {StatusCode}.",
+                "Signal send timed out for account {Account} recipient {Recipient}.",
                 account,
-                recipient,
-                response.StatusCode);
+                recipient);
+            return false;
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Signal send failed due to HTTP error for account {Account} recipient {Recipient}.",
+                account,
+                recipient);
+            return false;
         }
     }
 
     /// <summary>
     /// Sends a typing indicator start notification to the recipient.
     /// </summary>
-    /// <param name="account">The Signal account number.</param>
-    /// <param name="recipient">The recipient Signal number.</param>
+    /// <param name="account">The sending account identifier.</param>
+    /// <param name="recipient">The recipient identifier.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     public Task StartTypingAsync(string account, string recipient, CancellationToken ct) =>
@@ -118,29 +174,262 @@ public sealed class SocketTransportClient(
     /// <summary>
     /// Sends a typing indicator stop notification to the recipient.
     /// </summary>
-    /// <param name="account">The Signal account number.</param>
-    /// <param name="recipient">The recipient Signal number.</param>
+    /// <param name="account">The sending account identifier.</param>
+    /// <param name="recipient">The recipient identifier.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     public Task StopTypingAsync(string account, string recipient, CancellationToken ct) =>
         SendTypingIndicatorAsync(account, recipient, stop: true, ct);
 
-    private async Task<string?> ReceiveViaWebSocketAsync(string account, CancellationToken ct)
+    /// <summary>
+    /// Disposes transport resources.
+    /// </summary>
+    /// <returns>A task representing the asynchronous dispose operation.</returns>
+    public async ValueTask DisposeAsync()
     {
-        var wsUri = BuildReceiveUri(account);
-        using var webSocket = new ClientWebSocket();
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
 
         try
         {
-            await webSocket.ConnectAsync(wsUri, ct);
-            return await ReadSingleMessageAsync(webSocket, ct);
+            await StopAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Signal transport failed to stop during dispose.");
+        }
+
+        _pendingSignal.Dispose();
+    }
+
+    private async Task ManageWorkersAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await RefreshWorkersAsync(ct);
+                await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, settings.Value.AccountRefreshSeconds)), ct);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Signal account worker manager failed.");
+        }
+        finally
+        {
+            await StopAllWorkersAsync();
+        }
+    }
+
+    private async Task RefreshWorkersAsync(CancellationToken ct)
+    {
+        var discovered = await DiscoverConfiguredAccountsAsync(ct);
+        var desiredAccounts = new HashSet<string>(
+            discovered.Where(IsAccountName),
+            StringComparer.OrdinalIgnoreCase);
+
+        if (desiredAccounts.Count == 0)
+        {
+            logger.LogWarning("No Signal accounts were discovered from signal-cli /v1/accounts.");
+        }
+
+        List<string> accountsToStart;
+        List<(string Account, AccountWorker Worker)> workersToStop;
+
+        lock (_sync)
+        {
+            workersToStop = _workers
+                .Where(pair => !desiredAccounts.Contains(pair.Key))
+                .Select(static pair => (pair.Key, pair.Value))
+                .ToList();
+
+            foreach (var (account, _) in workersToStop)
+            {
+                _workers.Remove(account);
+            }
+
+            accountsToStart = desiredAccounts
+                .Where(account => !_workers.ContainsKey(account))
+                .OrderBy(static account => account, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var account in accountsToStart)
+            {
+                var workerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var workerTask = Task.Run(() => RunAccountWorkerAsync(account, workerCts.Token), CancellationToken.None);
+                _workers[account] = new AccountWorker(workerCts, workerTask);
+            }
+        }
+
+        foreach (var (account, worker) in workersToStop)
+        {
+            logger.LogInformation("Stopping Signal account worker for {Account}.", account);
+            worker.Cancellation.Cancel();
+            await WaitForTaskAsync(worker.Task, CancellationToken.None);
+            worker.Cancellation.Dispose();
+        }
+
+        foreach (var account in accountsToStart)
+        {
+            logger.LogInformation("Started Signal account worker for {Account}.", account);
+        }
+    }
+
+    private async Task RunAccountWorkerAsync(string account, CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                var payload = await ReceiveViaWebSocketAsync(account, ct);
+                if (string.IsNullOrWhiteSpace(payload))
+                {
+                    await DelayReconnectAsync(ct);
+                    continue;
+                }
+
+                try
+                {
+                    using var document = JsonDocument.Parse(payload);
+                    var root = document.RootElement;
+
+                    if (root.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in root.EnumerateArray())
+                        {
+                            await EnqueueInboundIfValidAsync(item, account, ct);
+                        }
+                    }
+                    else
+                    {
+                        await EnqueueInboundIfValidAsync(root, account, ct);
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    logger.LogWarning(ex, "Signal receive returned non-JSON payload for account {Account}: {Payload}", account, payload);
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Signal account worker failed for {Account}; retrying.", account);
+                await DelayReconnectAsync(ct);
+            }
+        }
+    }
+
+    private async Task StopAllWorkersAsync()
+    {
+        List<AccountWorker> workers;
+
+        lock (_sync)
+        {
+            workers = _workers.Values.ToList();
+            _workers.Clear();
+        }
+
+        foreach (var worker in workers)
+        {
+            worker.Cancellation.Cancel();
+        }
+
+        foreach (var worker in workers)
+        {
+            await WaitForTaskAsync(worker.Task, CancellationToken.None);
+            worker.Cancellation.Dispose();
+        }
+    }
+
+    private bool TryDequeueInbound(out InboundMessage? inbound)
+    {
+        lock (_sync)
+        {
+            if (_pending.Count == 0)
+            {
+                inbound = null;
+                return false;
+            }
+
+            inbound = _pending.Dequeue();
+            return true;
+        }
+    }
+
+    private bool TryEnqueueInbound(InboundMessage inbound)
+    {
+        var queueCapacity = Math.Max(1, settings.Value.InboundQueueCapacity);
+
+        lock (_sync)
+        {
+            if (_pending.Count >= queueCapacity)
+            {
+                logger.LogWarning(
+                    "Dropping inbound Signal message for account {Account} sender {Sender}; reason=queue_full capacity={Capacity}.",
+                    inbound.Account,
+                    inbound.Sender,
+                    queueCapacity);
+                return false;
+            }
+
+            _pending.Enqueue(inbound);
+            _pendingSignal.Release();
+            return true;
+        }
+    }
+
+    private async Task<string?> ReceiveViaWebSocketAsync(string account, CancellationToken ct)
+    {
+        var wsUri = BuildReceiveUri(account);
+        using var receiveDeadlineCts = new CancellationTokenSource(GetClientReceiveDeadline());
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, receiveDeadlineCts.Token);
+
+        try
+        {
+            return await signalReceiveClient.ReceiveAsync(account, wsUri, linkedCts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested && receiveDeadlineCts.IsCancellationRequested)
+        {
+            logger.LogDebug(
+                "Signal receive deadline hit for account {Account} endpoint {Endpoint}; recycling receive loop.",
+                account,
+                wsUri);
+            return null;
         }
         catch (WebSocketException ex)
         {
             logger.LogWarning(ex, "Signal websocket receive failed for account {Account} using endpoint {Endpoint}.", account, wsUri);
-            await Task.Delay(TimeSpan.FromSeconds(settings.Value.ReconnectDelaySeconds), ct);
+            await DelayReconnectAsync(ct);
             return null;
         }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "Signal websocket connect failed for account {Account} using endpoint {Endpoint}.", account, wsUri);
+            await DelayReconnectAsync(ct);
+            return null;
+        }
+    }
+
+    private TimeSpan GetClientReceiveDeadline()
+    {
+        var configured = settings.Value.ReceiveClientDeadlineSeconds;
+        if (configured <= 0)
+        {
+            configured = settings.Value.ReceiveTimeoutSeconds + 5;
+        }
+
+        return TimeSpan.FromSeconds(Math.Max(1, configured));
     }
 
     private Uri BuildReceiveUri(string account)
@@ -153,38 +442,6 @@ public sealed class SocketTransportClient(
         };
 
         return builder.Uri;
-    }
-
-    private static async Task<string?> ReadSingleMessageAsync(ClientWebSocket webSocket, CancellationToken ct)
-    {
-        var buffer = new byte[16 * 1024];
-        var stream = new MemoryStream();
-
-        while (!ct.IsCancellationRequested)
-        {
-            var result = await webSocket.ReceiveAsync(buffer, ct);
-            if (result.MessageType == WebSocketMessageType.Close)
-            {
-                break;
-            }
-
-            if (result.Count > 0)
-            {
-                await stream.WriteAsync(buffer.AsMemory(0, result.Count), ct);
-            }
-
-            if (result.EndOfMessage)
-            {
-                break;
-            }
-        }
-
-        if (stream.Length == 0)
-        {
-            return null;
-        }
-
-        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     private async Task EnqueueInboundIfValidAsync(JsonElement item, string account, CancellationToken ct)
@@ -206,44 +463,7 @@ public sealed class SocketTransportClient(
         }
 
         var hydratedAttachments = await EnrichAttachmentsAsync(attachments, ct);
-        _pending.Enqueue(new InboundMessage(account, sender, text, token, hydratedAttachments));
-    }
-
-    private async Task EnsureAccountsLoadedAsync(CancellationToken ct)
-    {
-        var now = DateTimeOffset.UtcNow;
-        if (_accounts.Count > 0 && now - _lastAccountRefreshUtc < TimeSpan.FromSeconds(30))
-        {
-            return;
-        }
-
-        var discovered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var configuredAccounts = await DiscoverConfiguredAccountsAsync(ct);
-        foreach (var account in configuredAccounts.Where(IsAccountName))
-        {
-            discovered.Add(account);
-        }
-
-        if (discovered.Count == 0)
-        {
-            _lastAccountRefreshUtc = now;
-            return;
-        }
-
-        var existing = _accounts.ToArray();
-        if (existing.Length == discovered.Count && existing.All(discovered.Contains))
-        {
-            _lastAccountRefreshUtc = now;
-            return;
-        }
-
-        _accounts.Clear();
-        foreach (var account in discovered.OrderBy(static value => value, StringComparer.OrdinalIgnoreCase))
-        {
-            _accounts.Enqueue(account);
-        }
-
-        _lastAccountRefreshUtc = now;
+        _ = TryEnqueueInbound(new InboundMessage(account, sender, text, token, hydratedAttachments));
     }
 
     private async Task<IReadOnlyList<string>> DiscoverConfiguredAccountsAsync(CancellationToken ct)
@@ -579,6 +799,30 @@ public sealed class SocketTransportClient(
         {
             logger.LogDebug(ex, "Signal attachment download failed for id {AttachmentId} due to HTTP error.", attachment.AttachmentId);
             return string.Empty;
+        }
+    }
+
+    private async Task DelayReconnectAsync(CancellationToken ct)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, settings.Value.ReconnectDelaySeconds)), ct);
+    }
+
+    private async Task WaitForTaskAsync(Task task, CancellationToken ct)
+    {
+        try
+        {
+            await task.WaitAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogDebug("Task was canceled while being awaited during shutdown.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Task faulted while being awaited during shutdown.");
         }
     }
 }

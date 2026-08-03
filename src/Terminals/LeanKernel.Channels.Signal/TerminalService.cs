@@ -62,7 +62,14 @@ public sealed class TerminalService(
                         };
                     }
 
-                    await transport.SendAsync(inbound.Account, inbound.Sender, output.Text, output.TextStyles, stoppingToken);
+                    var sent = await transport.SendAsync(inbound.Account, inbound.Sender, output.Text, output.TextStyles, stoppingToken);
+                    if (!sent)
+                    {
+                        logger.LogWarning(
+                            "Signal send did not succeed for account {Account} sender {Sender}; continuing.",
+                            inbound.Account,
+                            inbound.Sender);
+                    }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {

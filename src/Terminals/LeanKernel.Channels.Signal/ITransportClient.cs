@@ -20,8 +20,8 @@ public interface ITransportClient
     /// <param name="text">The message text.</param>
     /// <param name="textStyles">The text styles to apply.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    Task SendAsync(string account, string recipient, string text, IReadOnlyList<SignalTextStyle> textStyles, CancellationToken ct);
+    /// <returns><c>true</c> when send succeeded; otherwise <c>false</c>.</returns>
+    Task<bool> SendAsync(string account, string recipient, string text, IReadOnlyList<SignalTextStyle> textStyles, CancellationToken ct);
 
     /// <summary>
     /// Sends a typing indicator start notification.
