@@ -1,5 +1,3 @@
-using System.Security.Claims;
-
 using LeanKernel.Entities;
 using LeanKernel.Services.Gateway.Requests;
 
@@ -16,8 +14,6 @@ public sealed class RequestContextPermit(
     IHostNameAccessor hostNameAccessor,
     IHttpContextAccessor httpContextAccessor) : IPermit
 {
-    private readonly Lazy<ClaimsPrincipal?> _claimsPrincipal = new(() => principalAccessor.Principal as ClaimsPrincipal);
-
     private HttpContext? Ctx => httpContextAccessor.HttpContext;
 
     /// <inheritdoc />
@@ -25,7 +21,7 @@ public sealed class RequestContextPermit(
 
     /// <inheritdoc />
     public bool IsAuthenticated =>
-        this._claimsPrincipal.Value?.Identity?.IsAuthenticated == true;
+        (principalAccessor.Principal ?? this.Ctx?.User)?.Identity?.IsAuthenticated == true;
 
     /// <inheritdoc />
     public string? SessionId => this.Ctx?.Session?.Id;

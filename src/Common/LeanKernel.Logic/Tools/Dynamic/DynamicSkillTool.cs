@@ -76,7 +76,7 @@ public static class DynamicSkillTool
                     string? bearerToken = null;
                     if (string.Equals(skill.Runtime.Auth.Type, Constants.Http.Headers.Bearer, StringComparison.OrdinalIgnoreCase))
                     {
-                        bearerToken = ResolveSecret(skill.Runtime.Auth.SecretRef, out var secretError);
+                        bearerToken = SkillSecretResolver.Resolve(skill.Runtime.Auth.SecretRef, out var secretError);
                         if (secretError is not null)
                         {
                             return new ToolResult { ToolName = toolName, Success = false, Error = secretError };
@@ -177,33 +177,5 @@ public static class DynamicSkillTool
         }
 
         return await client.SendAsync(request, ct).ConfigureAwait(false);
-    }
-
-    private static string? ResolveSecret(string? secretRef, out string? error)
-    {
-        error = null;
-        if (string.IsNullOrWhiteSpace(secretRef))
-        {
-            error = "auth.secretRef is required for bearer authentication but is not set.";
-            return null;
-        }
-
-        // Try /run/secrets/<ref> first
-        var filePath = $"/run/secrets/{secretRef}";
-        if (File.Exists(filePath))
-        {
-            return File.ReadAllText(filePath).Trim();
-        }
-
-        // Try SKILL__<REF_UPPER> env var
-        var envVar = $"SKILL__{secretRef.ToUpperInvariant().Replace('-', '_')}";
-        var envVal = Environment.GetEnvironmentVariable(envVar);
-        if (!string.IsNullOrWhiteSpace(envVal))
-        {
-            return envVal;
-        }
-
-        error = $"Secret '{secretRef}' not found in /run/secrets/{secretRef} or environment variable {envVar}.";
-        return null;
     }
 }

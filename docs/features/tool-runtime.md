@@ -73,8 +73,8 @@ Reference: [`../../src/Common/LeanKernel.Logic/Tools/DocumentIngestion/`](../../
 
 ### User-Defined Dynamic Tools
 
-HTTP tools loaded at startup from `SKILL.md` files. Each declared operation becomes one
-agent-visible tool named `{skillName}_{operationId}`.
+HTTP and CLI tools loaded at startup from `SKILL.md` files. Each declared operation becomes
+one agent-visible tool named `{skillName}_{operationId}`.
 
 Reference: [`../../samples/skills/`](../../samples/skills/)
 
@@ -115,14 +115,70 @@ operations:
 ---
 ```
 
+CLI runtime example:
+
+```yaml
+---
+name: blog
+description: Blog drafting commands
+metadata:
+  category: ops
+runtime:
+  type: cli
+  command: blog-cli
+  timeoutSeconds: 30
+  auth:
+    type: bearer
+    secretRef: blog_token
+  egress:
+    allowHosts:
+      - api.blog.example.com
+operations:
+  - id: create_draft
+    summary: Create a draft
+    invoke:
+      argv: [create, draft]
+      flags:
+        title: "--title"
+        body: "--body"
+        publish: "--publish"
+        setupToken: null
+    parameters:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Draft title
+        body:
+          type: string
+          description: Draft body
+        publish:
+          type: boolean
+          description: Publish immediately
+        setupToken:
+          type: string
+          description: Bare positional token
+      required: [title]
+---
+```
+
 ### Rules
 
-- `runtime.type` must be `http` (`cli` is rejected)
+- `runtime.type` must be `http` or `cli`
 - Duplicate tool names (against built-ins or other skills) are rejected at startup
 - Bearer secrets are resolved from `auth.secretRef` mapped to `/run/secrets/<ref>` or
   `SKILL__<REF>` environment variables -- never inline in the manifest
 - The effective outbound-host policy is the intersection of the skill-local
   `egress.allowHosts` and the global `Agents:Tools:DynamicHttp:AllowHosts` when non-empty
+- HTTP operations declare `invoke.httpMethod` and `invoke.httpPath`; CLI operations declare
+  `invoke.argv` (positional arguments) and optional `invoke.flags` mapping parameter names to flags
+- CLI flag mapping rules: boolean parameters add the flag when true and omit it when false;
+  null/empty flag mappings pass the parameter value as a bare positional argument
+- CLI startup performs binary resolution using `PATH`; missing binaries are warned and skipped
+- `Agents:Tools:DynamicCli:MaxOutputChars` truncates returned text after process output is captured
+  (response-size ceiling, not a hard memory-pressure guardrail)
+- CLI `egress.allowHosts` is advisory only (logged warning) because subprocess network calls
+  are not intercepted by gateway HTTP egress validators
 
 ## Safety Boundaries
 

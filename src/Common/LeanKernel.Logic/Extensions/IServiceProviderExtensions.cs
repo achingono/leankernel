@@ -230,7 +230,7 @@ public static class IServiceProviderExtensions
         IServiceScopeFactory scopeFactory,
         ILogger logger)
     {
-        var parser = new SkillParser();
+        var parser = new SkillParser(logger);
 
         foreach (var basePath in settings.SkillBasePaths)
         {
@@ -272,6 +272,22 @@ public static class IServiceProviderExtensions
         if (skill is null)
         {
             logger.LogWarning("SKILL.md at {Path} is invalid or has no valid operations. Skipping.", filePath);
+            return;
+        }
+
+        // Branch by runtime type BEFORE HTTP-specific validation so CLI skills bypass
+        // BaseUrl requirements, host extraction, and bearer secretRef validation.
+        if (string.Equals(skill.Runtime.Type, "cli", StringComparison.OrdinalIgnoreCase))
+        {
+            LoadCliSkill(registry, scopeFactory, skill, filePath, logger);
+            return;
+        }
+
+        if (!string.Equals(skill.Runtime.Type, "http", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning(
+                "SKILL.md at {Path} uses unsupported runtime type '{RuntimeType}'. Skipping.",
+                filePath, skill.Runtime.Type);
             return;
         }
 
@@ -317,6 +333,52 @@ public static class IServiceProviderExtensions
             else
             {
                 logger.LogInformation("Dynamic tool '{Name}' registered from {Path}.", toolName, filePath);
+            }
+        }
+    }
+
+    private static void LoadCliSkill(
+        IToolRegistry registry,
+        IServiceScopeFactory scopeFactory,
+        SkillDefinition skill,
+        string filePath,
+        ILogger logger)
+    {
+        var command = skill.Runtime.Command;
+
+        // Binary resolution: standard PATH lookup. A missing binary logs a warning and
+        // skips the skill without crashing startup.
+        var resolved = BinaryPathResolver.Resolve(command);
+        if (resolved is null)
+        {
+            logger.LogWarning(
+                "CLI tool '{Name}' command '{Command}' not found on PATH. Skipping.",
+                skill.Name, command);
+            return;
+        }
+
+        logger.LogDebug("CLI tool '{Name}' resolved to binary at {BinaryPath}.", skill.Name, resolved);
+
+        if (skill.AllowedHosts.Count > 0)
+        {
+            logger.LogWarning(
+                "CLI tool '{Name}' declares egress.allowHosts; enforcement is advisory (gateway cannot intercept subprocess network calls).",
+                skill.Name);
+        }
+
+        foreach (var op in skill.Operations)
+        {
+            var toolName = $"{skill.Name}_{op.Id}";
+            var tool = DynamicCliTool.Create(skill, op, scopeFactory);
+            if (!registry.TryRegister(tool))
+            {
+                logger.LogWarning(
+                    "Duplicate tool name '{Name}' from skill '{Skill}' operation '{Op}'. Skipping.",
+                    toolName, skill.Name, op.Id);
+            }
+            else
+            {
+                logger.LogInformation("CLI tool '{Name}' registered from {Path}.", toolName, filePath);
             }
         }
     }

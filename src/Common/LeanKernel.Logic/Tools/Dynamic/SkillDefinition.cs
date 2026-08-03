@@ -1,7 +1,8 @@
 namespace LeanKernel.Logic.Tools.Dynamic;
 
 /// <summary>
-/// Represents a parsed SKILL.md manifest defining one or more HTTP tool operations.
+/// Represents a parsed SKILL.md manifest defining one or more tool operations
+/// (HTTP or CLI based on the runtime type).
 /// </summary>
 public sealed class SkillDefinition
 {

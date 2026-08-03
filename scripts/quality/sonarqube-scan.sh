@@ -59,8 +59,18 @@ docker run --rm \
   mcr.microsoft.com/dotnet/sdk:10.0 \
   bash -lc '
     set -euo pipefail
-    apt-get update
-    apt-get install -y --no-install-recommends nodejs openjdk-17-jre-headless python3
+    mkdir -p /scan
+    tar -cf - -C /workspace \
+      LeanKernel.sln \
+      src \
+      test \
+      scripts \
+      docker-compose.sonar.yml \
+      | tar -xf - -C /scan
+    cd /scan
+    apt-get update || apt-get update -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true
+    apt-get install -y --no-install-recommends nodejs openjdk-17-jre-headless python3 \
+      || apt-get install -y --allow-unauthenticated --no-install-recommends nodejs openjdk-17-jre-headless python3
     rm -rf /var/lib/apt/lists/*
     dotnet tool install --global dotnet-sonarscanner
     export PATH="$PATH:/root/.dotnet/tools"
@@ -70,9 +80,10 @@ docker run --rm \
       /d:sonar.token="$SONAR_TOKEN" \
       /d:sonar.scm.disabled=true \
       /d:sonar.sourceEncoding="UTF-8" \
-      /d:sonar.exclusions="**/bin/**,**/obj/**,**/.playwright/**,test/test/**,coverage-results/**,sonar-reports/**,src/Terminals/LeanKernel.Channels.Signal/**,src/Terminals/LeanKernel.Channels.Teams/**" \
+      /d:sonar.exclusions="**/bin/**,**/obj/**,**/.playwright/**,**/.tmp/**,test/test/**,coverage-results/**,sonar-reports/**,src/Terminals/LeanKernel.Channels.Signal/**,src/Terminals/LeanKernel.Channels.Teams/**" \
       /d:sonar.qualitygate.wait=true \
       /d:sonar.python.version=3.12 \
+      /d:sonar.python.coverage.reportPaths="coverage-results/sonar/python-coverage.xml" \
       /d:sonar.cs.opencover.reportsPaths="coverage-results/sonar/coverage.opencover.xml,coverage-results/sonar/**/coverage.opencover.xml" \
       /d:sonar.cpd.exclusions="test/**,config/webwright/**/*.py,src/LeanKernel.Tools/BuiltIn/Browser/BrowserToolDefinitions.cs,src/LeanKernel.Tools/BuiltIn/Data/*.cs,src/LeanKernel.Tools/BuiltIn/FileSystem/*.cs,src/LeanKernel.Host/Services/SelfConfigurationStep.cs,src/LeanKernel.Host/Services/UserConfigurationStep.cs,src/LeanKernel.Host/Templates/*.template" \
       /d:sonar.coverage.exclusions=".github/actions/test-reporter/report-tests.js,scripts/**/*.py,config/litellm/*.py,config/webwright/**/*.py,**/LeanKernel.Tests.*/*,**/obj/**/*.cs,**/*.g.cs,**/*.Designer.cs,**/*.razor,**/Program.cs,**/Programs.cs,**/Migrations/*.cs,**/Data/Migrations/*.cs,**/HealthChecks/*.cs,**/LeanKernel.Gateway/Extensions/IServiceCollectionExtensions.cs,**/LeanKernel.Data/Extensions/IServiceCollectionExtensions.cs,**/LeanKernel.Abstractions/Configuration/WebwrightConfig.cs,**/LeanKernel.Abstractions/Models/WebwrightModels.cs,**/LeanKernel.Gateway/Endpoints.cs,**/LeanKernel.Gateway/LeanKernelHardeningServiceCollectionExtensions.cs,**/LeanKernel.Gateway/Middleware/CorrelationIdDelegatingHandler.cs,**/LeanKernel.Gateway/Middleware/CorrelationIdMiddleware.cs,**/LeanKernel.Gateway/Models/ChatRequest.cs,**/LeanKernel.Gateway/Services/ChatService.cs,**/LeanKernel.Gateway/Services/DiagnosticsService.cs,**/LeanKernel.Gateway/Services/KnowledgeUiService.cs,**/LeanKernel.Gateway/Services/OnboardingService.cs,**/LeanKernel.Knowledge/GBrainKnowledgeService.cs,**/LeanKernel.Knowledge/Resilience/ResilientKnowledgeService.cs,**/LeanKernel.Persistence/DocumentIngestionJobRepository.cs,**/LeanKernel.Tools/DocumentFolderIngestionHostedService.cs,**/LeanKernel.Tools/DocumentIngestionHostedService.cs,**/LeanKernel.Tools/BuiltIn/Browser/WebwrightClient.cs,**/LeanKernel.Tools/BuiltIn/Browser/WebwrightHealthProbe.cs,**/LeanKernel.Tools/BuiltIn/Common/FileSystemSupport.cs,**/LeanKernel.Tools/BuiltIn/Common/ToolArgumentReader.cs,**/LeanKernel.Tools/BuiltIn/Data/*.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileCopyTool.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileDeleteTool.cs,**/LeanKernel.Tools/BuiltIn/FileSystem/FileMoveTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/HttpRequestTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/WebFetchTool.cs,**/LeanKernel.Tools/BuiltIn/Internet/WebSearchTool.cs,**/Services/Auth/AuthRegistration.cs,**/Services/Auth/OidcRegistration.cs,**/Services/Auth/BearerTokenAuthHandler.cs,**/Services/EngagementAuthorizationFilter.cs,**/Services/ChannelInitializationService.cs,**/Services/Skills/SkillHostedService.cs,**/Services/AttachmentTextExtractionService.cs,**/Services/EngagementRulesProvider.cs,**/LeanKernel.Commander/Adapters/SignalRestApiAdapter.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillTool.cs,**/LeanKernel.Plugins/BuiltIn/Skills/BinaryResolver.cs,**/LeanKernel.Plugins/BuiltIn/Skills/DynamicSkillToolFactory.cs,**/LeanKernel.Plugins/BuiltIn/Skills/EgressPolicy.cs,**/LeanKernel.Plugins/BuiltIn/Skills/RuntimeSkillRegistry.cs,**/LeanKernel.Generators/ToolRegistryGenerator.cs"

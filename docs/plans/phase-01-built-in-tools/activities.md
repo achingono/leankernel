@@ -19,12 +19,14 @@
    Support dynamic tool registration from user-managed `SKILL.md` definitions, using commit `5033dafcbe48a9b364941dc37383791bd99110a6` as the reference behavior. The Phase 01 agent-visible contract is one concrete LeanKernel tool per declared operation registered into the shared registry at startup, named `{skillName}_{operationId}`. The canonical manifest format is defined in Appendix A (YAML frontmatter with `runtime`, `egress`, `auth`, and `operations`). MAF skill-provider primitives may be used internally if helpful, but generic meta-tools such as skill-loading or script-running commands do not satisfy the phase objective by themselves.
 7. Lock the minimum dynamic-tool runtime surface.
    Phase 01 supports startup-time loading only, `SKILL.md` as the canonical manifest format, HTTP runtime operations only (`runtime.type: http`; `cli` is rejected in Phase 01), and duplicate-name rejection against both built-in tools and other user-defined tools. CLI-backed user-defined tools and dynamic reload are deferred.
+   - Historical baseline note: the sentence above is the original Phase 01 contract and is superseded for current runtime behavior by the Phase 25 extension below.
+   - Phase 25 extension: `runtime.type: cli` is now supported (startup-time only) with command resolution, `invoke.argv`/`invoke.flags`, timeout enforcement, and output truncation controls under `Agents:Tools:DynamicCli`.
 8. Add governance and safety boundaries.
    Introduce a minimal visibility/execution policy so only allowed built-in and dynamic tools are exposed to the agent, driven by `Agents:Tools:AllowedToolNames` / `Agents:Tools:AllowedCategories` (allowlist semantics: an empty list means the category gate is not applied; name allowlist takes precedence). Bound filesystem tools to `Files.RootPath` via root-confinement. Bound HTTP-based dynamic tools with per-skill `egress.allowHosts`, plus a hard block on loopback/private/link-local egress targets and a redirect policy that re-validates every hop (reference: `TryValidateEgressTarget` / `IsPrivateOrLoopbackHost` in `DynamicSkillTool.cs`). The effective dynamic-tool host allowlist is the intersection of the skill-local `egress.allowHosts` and `Agents:Tools:DynamicHttp:AllowHosts` when the global list is non-empty; when the global list is empty, the per-skill list is authoritative. Resolve dynamic-tool bearer secrets only from `runtime.auth.secretRef` mapped to `/run/secrets/<ref>` or `SKILL__<REF>` environment variables — never inline in the manifest (Appendix A). Keep GBrain-backed wiki tools behind the existing authenticated GBrain MCP transport and fail closed when GBrain is unavailable. The whole tool runtime is gated by `Agents:Tools:Enabled`, which also serves as the rollback lever back to the current no-tool chat path.
 9. Add configuration beneath the existing top-level shape.
    Extend existing sections with the concrete nested contract defined in Appendix B: `OpenAI:ToolModel` for model-provider routing only, `Agents:Tools:WebSearch:*`, `Agents:Tools:Enabled`, `Agents:Tools:AllowedToolNames`, `Agents:Tools:AllowedCategories`, `Agents:Tools:SkillBasePaths`, `Agents:Tools:DynamicHttp:AllowHosts`, `Agents:Tools:BuiltIns:Calculation:*`, `Files:RootPath` as the allowed filesystem boundary for built-in file tools, and reuse `GBrain:*` for callable wiki-tool transport settings. Do not add new top-level configuration sections.
 10. Add startup validation and actionable diagnostics.
-   Fail fast when dynamic tool definitions are malformed, declare a non-HTTP `runtime.type`, reference a missing egress allowlist for a non-loopback host, request an unresolvable `auth.secretRef`, collide on tool names, or violate built-in tool prerequisites (e.g. `Files.RootPath` missing). GBrain capability-precheck outcomes follow Appendix D rather than using a single fail-fast rule. Log which built-in and dynamic tools were registered, which were rejected and why, whether GBrain knowledge tools are active or degraded, whether calculation/aggregation helpers are active, and the selected `OpenAI:ToolModel` alias.
+    Fail fast when dynamic tool definitions are malformed, declare an unsupported `runtime.type` (Phase 25 allows `http` and `cli`), reference a missing egress allowlist for a non-loopback host, request an unresolvable `auth.secretRef`, collide on tool names, or violate built-in tool prerequisites (e.g. `Files.RootPath` missing). GBrain capability-precheck outcomes follow Appendix D rather than using a single fail-fast rule. Log which built-in and dynamic tools were registered, which were rejected and why, whether GBrain knowledge tools are active or degraded, whether calculation/aggregation helpers are active, and the selected `OpenAI:ToolModel` alias.
 11. Add focused tests.
    Cover registry behavior, tool-to-`AIFunction` adaptation, built-in tool execution, GBrain-backed wiki tool execution, startup-time dynamic loading, duplicate-name rejection, model-alias selection for tool-capable turns, and safety boundaries such as filesystem root enforcement and HTTP egress restrictions.
 12. Run manual verification through the current provider-agnostic path.
@@ -38,7 +40,7 @@
 - Deterministic calculation/aggregation helpers are added only where they close downstream capability gaps without introducing new external dependencies.
 - Safety boundaries for filesystem and HTTP-based custom tools are explicit enough to implement directly.
 
-## Appendix A: `SKILL.md` manifest schema (Phase 01)
+## Appendix A: `SKILL.md` manifest schema (Phase 01 baseline)
 
 A `SKILL.md` file begins with a YAML frontmatter block delimited by `---` lines, optionally followed by human-oriented Markdown that is ignored by the loader. Parsing is case-insensitive on keys via camelCase mapping, and unknown keys are ignored. Each declared operation becomes exactly one agent-visible tool named `{name}_{operation.id}`.
 
@@ -75,10 +77,49 @@ operations:
 
 Loader rules:
 - Argument mapping: `{placeholder}` path segments are substituted from matching arguments and URL-escaped; remaining declared parameters become query-string values for GET/DELETE or a JSON body for POST/PUT/PATCH.
-- A manifest with no valid operations, a missing `name`, or a non-`http` `runtime.type` is rejected with a logged reason.
+- Baseline Phase 01 rule: a manifest with no valid operations, a missing `name`, or a non-`http` `runtime.type` is rejected with a logged reason.
 - Duplicate resulting tool names (against built-ins or other skills) are rejected deterministically at startup.
 - The effective outbound-host policy is: if `Agents:Tools:DynamicHttp:AllowHosts` is non-empty, a request host must be allowed by both the global list and the skill-local `egress.allowHosts`; if the global list is empty, the skill-local list alone governs.
 - Reference implementation for behavior (not a code-copy target): `~/source/repos/leankernel/src/LeanKernel.Plugins/BuiltIn/Skills/{SkillParser,SkillDefinition,DynamicSkillTool}.cs`.
+
+### Appendix A Addendum: Phase 25 CLI runtime extensions
+
+Phase 25 extends the baseline schema to support CLI-backed dynamic tools while preserving the same `SKILL.md` frontmatter entry point and startup-time loading model.
+
+```yaml
+runtime:
+  type: cli
+  command: blog-cli
+  timeoutSeconds: 30
+  auth:
+    type: bearer
+    secretRef: blog_token
+operations:
+  - id: create_draft
+    summary: Create draft
+    invoke:
+      argv: [create, draft]
+      flags:
+        title: "--title"
+        publish: "--publish"
+        setupToken: null
+    parameters:
+      type: object
+      properties:
+        title: { type: string }
+        publish: { type: boolean }
+        setupToken: { type: string }
+      required: [title]
+```
+
+CLI-specific behavior:
+- `runtime.command` is validated at startup using process `PATH` (or direct path when separators are present).
+- Missing binaries are skipped with warnings rather than failing startup.
+- `invoke.argv` is emitted first; parameter-derived flags are appended in parameter order.
+- Boolean flags are emitted only when true.
+- Null/empty flag mappings pass values as bare positional arguments.
+- Bearer secrets are injected through `SKILL__<REF>` child-process environment variables.
+- `egress.allowHosts` is advisory for CLI runtime and logged as such.
 
 ## Appendix B: Configuration contract (nested under existing sections)
 

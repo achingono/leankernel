@@ -4,6 +4,8 @@ internal sealed class RawRuntime
 {
     public string? Type { get; set; }
 
+    public string? Command { get; set; }
+
     public string? BaseUrl { get; set; }
 
     public int TimeoutSeconds { get; set; }

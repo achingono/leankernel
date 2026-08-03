@@ -98,24 +98,161 @@ public class SkillParserTests
     }
 
     [Fact]
-    public void ParseContent_CliRuntimeType_ReturnsNull()
+    public void ParseContent_CliRuntimeType_ReturnsDefinition()
     {
         var content = """
             ---
             name: cli_skill
             description: CLI tool
+            metadata:
+              category: ops
             runtime:
               type: cli
-              command: /usr/bin/tool
+              command: blog-cli
+              timeoutSeconds: 60
             operations:
               - id: run
                 summary: Run tool
+                invoke:
+                  argv: [run, all]
+                  flags:
+                    title: "--title"
+                    verbose: "--verbose"
+                parameters:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                      description: Post title
+                    verbose:
+                      type: boolean
+                      description: Verbose output
+                  required: [title]
+            ---
+            """;
+
+        var result = _parser.ParseContent(content);
+
+        result.Should().NotBeNull();
+        result!.Name.Should().Be("cli_skill");
+        result.Category.Should().Be("ops");
+        result.Runtime.Type.Should().Be("cli");
+        result.Runtime.Command.Should().Be("blog-cli");
+        result.Runtime.TimeoutSeconds.Should().Be(60);
+        result.Operations.Should().HaveCount(1);
+
+        var op = result.Operations[0];
+        op.Argv.Should().Equal("run", "all");
+        op.Flags.Should().Contain("title", "--title");
+        op.Flags.Should().Contain("verbose", "--verbose");
+        op.Parameters.Should().HaveCount(2);
+        op.Parameters.Should().Contain(p => p.Name == "title" && p.Type == "string" && p.Required);
+        op.Parameters.Should().Contain(p => p.Name == "verbose" && p.Type == "boolean" && !p.Required);
+    }
+
+    [Fact]
+    public void ParseContent_CliWithoutCommand_ReturnsNull()
+    {
+        var content = """
+            ---
+            name: cli_no_cmd
+            description: No command
+            runtime:
+              type: cli
+            operations:
+              - id: run
+                summary: Run
             ---
             """;
 
         var result = _parser.ParseContent(content);
 
         result.Should().BeNull();
+    }
+
+    [Fact]
+    public void ParseContent_UnknownRuntimeType_ReturnsNull()
+    {
+        var content = """
+            ---
+            name: exotic
+            description: Exotic runtime
+            runtime:
+              type: docker
+            operations:
+              - id: run
+                summary: Run
+            ---
+            """;
+
+        var result = _parser.ParseContent(content);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void ParseContent_CliNullFlagValue_ParsesAsBarePositional()
+    {
+        var content = """
+            ---
+            name: sf
+            description: SimpleFin
+            runtime:
+              type: cli
+              command: simplefin-cli
+            operations:
+              - id: setup
+                summary: Exchange a setup token
+                invoke:
+                  argv: [setup]
+                  flags:
+                    token: null
+                parameters:
+                  token:
+                    type: string
+            ---
+            """;
+
+        var result = _parser.ParseContent(content);
+
+        result.Should().NotBeNull();
+        var op = result!.Operations[0];
+        op.Argv.Should().Equal("setup");
+        op.Flags.Should().ContainKey("token").WhoseValue.Should().BeNull();
+        op.Parameters.Should().Contain(p => p.Name == "token");
+    }
+
+    [Fact]
+    public void ParseContent_CliFlagForUndeclaredParameter_SkipsOperation()
+    {
+        var content = """
+            ---
+            name: sloppy
+            description: Sloppy skill
+            runtime:
+              type: cli
+              command: sloppy-cli
+            operations:
+              - id: bad
+                summary: References undeclared param
+                invoke:
+                  argv: [bad]
+                  flags:
+                    phantom: "--phantom"
+                parameters:
+                  type: object
+                  properties: {}
+              - id: good
+                summary: Valid op
+                invoke:
+                  argv: [good]
+            ---
+            """;
+
+        var result = _parser.ParseContent(content);
+
+        result.Should().NotBeNull();
+        result!.Operations.Select(o => o.Id).Should().Equal("good");
     }
 
     [Fact]

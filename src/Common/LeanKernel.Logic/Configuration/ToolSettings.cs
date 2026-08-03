@@ -38,6 +38,11 @@ public sealed class ToolSettings
     public DynamicHttpSettings DynamicHttp { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the global output limits for dynamic CLI tools.
+    /// </summary>
+    public DynamicCliSettings DynamicCli { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the built-in calculation and aggregation tool configuration.
     /// </summary>
     public BuiltInCalculationSettings BuiltIns { get; set; } = new();

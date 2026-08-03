@@ -100,6 +100,38 @@ means all registered tools are visible.
 
 For a working example, see [`../../samples/skills/weather.Skill.md`](../../samples/skills/weather.Skill.md).
 
+## Dynamic CLI Runtime
+
+CLI skills (`runtime.type: cli`) execute a local binary as a child process. Global runtime
+limits are configured under `Agents:Tools:DynamicCli`:
+
+```json
+{
+  "Agents": {
+    "Tools": {
+      "DynamicCli": {
+        "MaxOutputChars": 12000
+      }
+    }
+  }
+}
+```
+
+- `MaxOutputChars` truncates stdout/stderr returned to the model after capture
+  (it is a response-size control, not a hard process-memory cap)
+- Per-skill `runtime.timeoutSeconds` controls process timeout and process-tree kill behavior
+- Bearer `runtime.auth.secretRef` values are resolved from `/run/secrets/<ref>` or `SKILL__<REF>`
+  and injected into child process environment variables, never command-line arguments
+
+### PATH and Binary Resolution
+
+- CLI `runtime.command` is resolved at startup against the service process `PATH`
+- Absolute or relative paths containing a separator are used directly
+- If the binary is missing, startup logs a warning and skips the CLI skill instead of failing
+  gateway startup
+- After modifying `PATH` or deploying a new binary, restart the gateway (dynamic skills are
+  startup-loaded only)
+
 ## Egress Security
 
 Dynamic HTTP tools enforce a layered host allowlist:
@@ -134,3 +166,5 @@ error.
 | Tool execution returns "Access denied" | File path outside `Files:RootPath` | Ensure target files are within the allowed root |
 | MCP tools missing at startup | MCP endpoint unreachable or discovery failed | Verify `Agents:Tools:McpServers:*` config and MCP server health |
 | Webwright browser tool calls fail with cancellation | Gateway was built before the fresh-client MCP invocation fix or the container is stale | Rebuild and restart gateway, then retry the request |
+| CLI dynamic tool missing | `runtime.command` not found on `PATH` | Confirm binary is installed and visible to the gateway process, then restart |
+| CLI tool output truncated | `Agents:Tools:DynamicCli:MaxOutputChars` too low | Increase `MaxOutputChars` for the deployment |
