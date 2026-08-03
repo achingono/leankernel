@@ -67,6 +67,12 @@ Infrastructure improvements that enhance development experience and tool integra
 | 24 | [Anonymous Fallback Hardening](phase-24-anonymous-fallback-hardening/index.md) | Tenant resolution hardening; anonymous fallback requires explicit opt-in | **Complete** |
 | — | [GBrain Import To Local](2026-07-31-gbrain-import-to-local/index.md) | One-time GBrain data import into local DB with re-embed | **Complete** |
 
+## Focused Reliability Plans
+
+| Plan | Focus | Status |
+| --- | --- | --- |
+| [Signal Channel Reliability](2026-08-03-signal-channel-reliability/index.md) | Per-account receive isolation, transport correctness, reconnects, and end-to-end reply delivery | **Planned** |
+
 ## Intelligent Brain Completion
 
 Focused phases to move from ingestion + synthesis to measurable, conflict-aware, policy-safe memory intelligence.
