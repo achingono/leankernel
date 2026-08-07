@@ -1,6 +1,9 @@
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+
+using LeanKernel.Channels.Signal.HealthChecks;
 
 using Microsoft.Extensions.Options;
 
@@ -14,7 +17,7 @@ public sealed class SocketTransportClient(
     IOptions<SignalSettings> settings,
     IChannelCredentialProvider credentials,
     ISignalReceiveClient signalReceiveClient,
-    ILogger<SocketTransportClient> logger) : ITransportClient, IHostedService, IAsyncDisposable
+    ILogger<SocketTransportClient> logger) : ITransportClient, ISocketWorkerHealthProvider, IHostedService, IAsyncDisposable
 {
     private sealed record AccountWorker(CancellationTokenSource Cancellation, Task Task);
 
@@ -22,11 +25,15 @@ public sealed class SocketTransportClient(
     private readonly Queue<InboundMessage> _pending = new();
     private readonly SemaphoreSlim _pendingSignal = new(0);
     private readonly Dictionary<string, AccountWorker> _workers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, AccountWorkerHealthTracker> _workerHealth = new(StringComparer.OrdinalIgnoreCase);
 
     private CancellationTokenSource? _lifecycleCts;
     private Task? _managerTask;
     private bool _started;
     private bool _disposed;
+    private DateTime _startedUtc;
+    private int _consecutiveEmptyDiscoveryResults;
+    private volatile bool _initialDiscoveryCompleted;
 
     /// <summary>
     /// Starts account worker management.
@@ -45,6 +52,7 @@ public sealed class SocketTransportClient(
             _lifecycleCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             _managerTask = Task.Run(() => ManageWorkersAsync(_lifecycleCts.Token), CancellationToken.None);
             _started = true;
+            _startedUtc = DateTime.UtcNow;
         }
 
         logger.LogInformation("Signal transport started.");
@@ -206,22 +214,112 @@ public sealed class SocketTransportClient(
         _pendingSignal.Dispose();
     }
 
+    /// <summary>
+    /// Returns an immutable snapshot of per-account worker health state.
+    /// </summary>
+    /// <returns>A dictionary keyed by account number.</returns>
+    public IReadOnlyDictionary<string, SocketWorkerHealthState> GetWorkerStates()
+    {
+        lock (_sync)
+        {
+            var snapshot = new Dictionary<string, SocketWorkerHealthState>(_workerHealth.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in _workerHealth)
+            {
+                var tracker = pair.Value;
+                snapshot[pair.Key] = new SocketWorkerHealthState(
+                    pair.Key,
+                    tracker.State,
+                    tracker.LastSuccessfulReceiveUtc,
+                    tracker.LastWorkerLoopTickUtc,
+                    tracker.StartedUtc,
+                    tracker.ConsecutiveErrors,
+                    tracker.LastErrorUtc);
+            }
+
+            return snapshot;
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the initial account discovery completed successfully.
+    /// </summary>
+    public bool IsInitialDiscoveryCompleted => _initialDiscoveryCompleted;
+
+    /// <summary>
+    /// Gets the UTC timestamp when transport startup began.
+    /// </summary>
+    public DateTime StartedUtc
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _startedUtc;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the signal socket transport has been started.
+    /// </summary>
+    public bool IsTransportStarted
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _started;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the worker manager task is still running.
+    /// </summary>
+    public bool IsManagerRunning
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _started && _managerTask is { IsCompleted: false };
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns an atomic manager lifecycle snapshot.
+    /// </summary>
+    /// <returns>A tuple containing transport started and manager running values.</returns>
+    public (bool Started, bool Running) GetManagerState()
+    {
+        lock (_sync)
+        {
+            return (_started, _managerTask is { IsCompleted: false });
+        }
+    }
+
     private async Task ManageWorkersAsync(CancellationToken ct)
     {
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                await RefreshWorkersAsync(ct);
-                await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, settings.Value.AccountRefreshSeconds)), ct);
+                try
+                {
+                    await ManageWorkersCycleAsync(ct);
+                    return;
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Signal account worker manager crashed; restarting.");
+                    await DelayReconnectAsync(ct);
+                }
             }
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Signal account worker manager failed.");
         }
         finally
         {
@@ -229,12 +327,56 @@ public sealed class SocketTransportClient(
         }
     }
 
+    private async Task ManageWorkersCycleAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            await RefreshWorkersAsync(ct);
+            await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, settings.Value.AccountRefreshSeconds)), ct);
+        }
+    }
+
     private async Task RefreshWorkersAsync(CancellationToken ct)
     {
-        var discovered = await DiscoverConfiguredAccountsAsync(ct);
+        var (discoverySucceeded, discovered) = await DiscoverConfiguredAccountsAsync(ct);
+        if (!discoverySucceeded)
+        {
+            _consecutiveEmptyDiscoveryResults = 0;
+            logger.LogWarning("Signal account discovery failed; preserving existing workers.");
+            return;
+        }
+
+        _initialDiscoveryCompleted = true;
+
         var desiredAccounts = new HashSet<string>(
             discovered.Where(IsAccountName),
             StringComparer.OrdinalIgnoreCase);
+
+        var hasActiveWorkers = false;
+        lock (_sync)
+        {
+            hasActiveWorkers = _workers.Count > 0;
+        }
+
+        if (desiredAccounts.Count == 0 && hasActiveWorkers)
+        {
+            _consecutiveEmptyDiscoveryResults++;
+            if (_consecutiveEmptyDiscoveryResults < 2)
+            {
+                logger.LogWarning(
+                    "Signal account discovery returned no accounts while workers were active; preserving existing workers (streak={EmptyStreak}).",
+                    _consecutiveEmptyDiscoveryResults);
+                return;
+            }
+
+            logger.LogWarning(
+                "Signal account discovery returned no accounts for {EmptyStreak} consecutive refreshes; deprovisioning workers.",
+                _consecutiveEmptyDiscoveryResults);
+        }
+        else
+        {
+            _consecutiveEmptyDiscoveryResults = 0;
+        }
 
         if (desiredAccounts.Count == 0)
         {
@@ -254,6 +396,7 @@ public sealed class SocketTransportClient(
             foreach (var (account, _) in workersToStop)
             {
                 _workers.Remove(account);
+                _workerHealth.TryRemove(account, out _);
             }
 
             accountsToStart = desiredAccounts
@@ -263,6 +406,7 @@ public sealed class SocketTransportClient(
 
             foreach (var account in accountsToStart)
             {
+                _workerHealth[account] = new AccountWorkerHealthTracker();
                 var workerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 var workerTask = Task.Run(() => RunAccountWorkerAsync(account, workerCts.Token), CancellationToken.None);
                 _workers[account] = new AccountWorker(workerCts, workerTask);
@@ -287,6 +431,9 @@ public sealed class SocketTransportClient(
     {
         while (!ct.IsCancellationRequested)
         {
+            var tracker = GetHealthTracker(account);
+            tracker?.MarkLoopTick();
+
             try
             {
                 var payload = await ReceiveViaWebSocketAsync(account, ct);
@@ -300,22 +447,36 @@ public sealed class SocketTransportClient(
                 {
                     using var document = JsonDocument.Parse(payload);
                     var root = document.RootElement;
+                    var received = false;
 
                     if (root.ValueKind == JsonValueKind.Array)
                     {
                         foreach (var item in root.EnumerateArray())
                         {
-                            await EnqueueInboundIfValidAsync(item, account, ct);
+                            received |= await EnqueueInboundIfValidAsync(item, account, ct);
                         }
                     }
                     else
                     {
-                        await EnqueueInboundIfValidAsync(root, account, ct);
+                        received |= await EnqueueInboundIfValidAsync(root, account, ct);
+                    }
+
+                    tracker?.MarkRoundTripSuccess(settings.Value.WorkerConsecutiveErrorThreshold);
+
+                    if (received)
+                    {
+                        tracker?.MarkSuccessfulReceive();
                     }
                 }
                 catch (JsonException ex)
                 {
-                    logger.LogWarning(ex, "Signal receive returned non-JSON payload for account {Account}: {Payload}", account, payload);
+                    logger.LogWarning(
+                        ex,
+                        "Signal receive returned non-JSON payload for account {Account}: {Payload}",
+                        account,
+                        TruncateForLog(payload));
+                    RecordWorkerError(tracker);
+                    await DelayReconnectAsync(ct);
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -325,8 +486,19 @@ public sealed class SocketTransportClient(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Signal account worker failed for {Account}; retrying.", account);
+                RecordWorkerError(tracker);
+
                 await DelayReconnectAsync(ct);
             }
+        }
+    }
+
+    private void RecordWorkerError(AccountWorkerHealthTracker? tracker)
+    {
+        tracker?.MarkError();
+        if (tracker is not null && tracker.ConsecutiveErrors >= settings.Value.WorkerUnhealthyErrorThreshold)
+        {
+            tracker.State = SocketWorkerState.Faulted;
         }
     }
 
@@ -338,6 +510,7 @@ public sealed class SocketTransportClient(
         {
             workers = _workers.Values.ToList();
             _workers.Clear();
+            _workerHealth.Clear();
         }
 
         foreach (var worker in workers)
@@ -407,18 +580,6 @@ public sealed class SocketTransportClient(
                 wsUri);
             return null;
         }
-        catch (WebSocketException ex)
-        {
-            logger.LogWarning(ex, "Signal websocket receive failed for account {Account} using endpoint {Endpoint}.", account, wsUri);
-            await DelayReconnectAsync(ct);
-            return null;
-        }
-        catch (HttpRequestException ex)
-        {
-            logger.LogWarning(ex, "Signal websocket connect failed for account {Account} using endpoint {Endpoint}.", account, wsUri);
-            await DelayReconnectAsync(ct);
-            return null;
-        }
     }
 
     private TimeSpan GetClientReceiveDeadline()
@@ -444,7 +605,7 @@ public sealed class SocketTransportClient(
         return builder.Uri;
     }
 
-    private async Task EnqueueInboundIfValidAsync(JsonElement item, string account, CancellationToken ct)
+    private async Task<bool> EnqueueInboundIfValidAsync(JsonElement item, string account, CancellationToken ct)
     {
         if (!TryParseSignalMessage(item, out var sender, out var text, out var attachments, logger))
         {
@@ -452,21 +613,21 @@ public sealed class SocketTransportClient(
                 "Rejected Signal payload for account {Account}: {Payload}",
                 account,
                 BuildTracePayload(item));
-            return;
+            return false;
         }
 
         var token = await credentials.ResolveBearerTokenAsync(sender, ct);
         if (string.IsNullOrWhiteSpace(token))
         {
             logger.LogWarning("Rejecting Signal sender {Sender}; no binding token configured.", sender);
-            return;
+            return false;
         }
 
         var hydratedAttachments = await EnrichAttachmentsAsync(attachments, ct);
-        _ = TryEnqueueInbound(new InboundMessage(account, sender, text, token, hydratedAttachments));
+        return TryEnqueueInbound(new InboundMessage(account, sender, text, token, hydratedAttachments));
     }
 
-    private async Task<IReadOnlyList<string>> DiscoverConfiguredAccountsAsync(CancellationToken ct)
+    private async Task<(bool Success, IReadOnlyList<string> Accounts)> DiscoverConfiguredAccountsAsync(CancellationToken ct)
     {
         var httpClient = httpClientFactory.CreateClient(Constants.HttpClientNames.SignalApi);
 
@@ -475,14 +636,14 @@ public sealed class SocketTransportClient(
             using var response = await httpClient.GetAsync("/v1/accounts", ct);
             if (!response.IsSuccessStatusCode)
             {
-                return [];
+                return (false, Array.Empty<string>());
             }
 
             await using var payload = await response.Content.ReadAsStreamAsync(ct);
             using var document = await JsonDocument.ParseAsync(payload, cancellationToken: ct);
             if (document.RootElement.ValueKind != JsonValueKind.Array)
             {
-                return [];
+                return (false, Array.Empty<string>());
             }
 
             var accounts = new List<string>();
@@ -509,12 +670,12 @@ public sealed class SocketTransportClient(
                 }
             }
 
-            return accounts;
+            return (true, accounts);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogDebug(ex, "Signal account discovery from /v1/accounts failed.");
-            return [];
+            return (false, Array.Empty<string>());
         }
     }
 
@@ -681,15 +842,18 @@ public sealed class SocketTransportClient(
 
     private static string BuildTracePayload(JsonElement item)
     {
-        const int maxChars = 4000;
+        return TruncateForLog(item.GetRawText());
+    }
 
-        var raw = item.GetRawText();
-        if (raw.Length <= maxChars)
+    private static string TruncateForLog(string value)
+    {
+        const int maxChars = 4000;
+        if (value.Length <= maxChars)
         {
-            return raw;
+            return value;
         }
 
-        return $"{raw[..maxChars]}...(truncated)";
+        return $"{value[..maxChars]}...(truncated)";
     }
 
     private async Task<IReadOnlyList<InboundAttachment>> EnrichAttachmentsAsync(
@@ -807,6 +971,12 @@ public sealed class SocketTransportClient(
         await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, settings.Value.ReconnectDelaySeconds)), ct);
     }
 
+    private AccountWorkerHealthTracker? GetHealthTracker(string account)
+    {
+        _workerHealth.TryGetValue(account, out var tracker);
+        return tracker;
+    }
+
     private async Task WaitForTaskAsync(Task task, CancellationToken ct)
     {
         try
@@ -824,5 +994,72 @@ public sealed class SocketTransportClient(
         {
             logger.LogWarning(ex, "Task faulted while being awaited during shutdown.");
         }
+    }
+
+    private sealed class AccountWorkerHealthTracker
+    {
+        private long _lastSuccessfulReceiveTicks;
+        private long _lastWorkerLoopTickTicks;
+        private long _lastErrorTicks;
+        private int _consecutiveErrors;
+        private int _consecutiveSuccesses;
+        private int _state = (int)SocketWorkerState.Starting;
+
+        public DateTime StartedUtc { get; } = DateTime.UtcNow;
+
+        public SocketWorkerState State
+        {
+            get => (SocketWorkerState)Volatile.Read(ref _state);
+            set => Volatile.Write(ref _state, (int)value);
+        }
+
+        public int ConsecutiveErrors => Volatile.Read(ref _consecutiveErrors);
+
+        public DateTime? LastSuccessfulReceiveUtc => ToNullableUtc(Volatile.Read(ref _lastSuccessfulReceiveTicks));
+
+        public DateTime? LastWorkerLoopTickUtc => ToNullableUtc(Volatile.Read(ref _lastWorkerLoopTickTicks));
+
+        public DateTime? LastErrorUtc => ToNullableUtc(Volatile.Read(ref _lastErrorTicks));
+
+        public void MarkLoopTick()
+        {
+            Interlocked.Exchange(ref _lastWorkerLoopTickTicks, DateTime.UtcNow.Ticks);
+            if (State == SocketWorkerState.Starting)
+            {
+                State = SocketWorkerState.Running;
+            }
+        }
+
+        public void MarkRoundTripSuccess(int successesToClearFault)
+        {
+            var threshold = Math.Max(1, successesToClearFault);
+            if (State == SocketWorkerState.Faulted)
+            {
+                var successes = Interlocked.Increment(ref _consecutiveSuccesses);
+                if (successes < threshold)
+                {
+                    return;
+                }
+            }
+
+            Interlocked.Exchange(ref _consecutiveSuccesses, 0);
+            Interlocked.Exchange(ref _consecutiveErrors, 0);
+            State = SocketWorkerState.Running;
+        }
+
+        public void MarkSuccessfulReceive()
+        {
+            Interlocked.Exchange(ref _lastSuccessfulReceiveTicks, DateTime.UtcNow.Ticks);
+        }
+
+        public void MarkError()
+        {
+            Interlocked.Exchange(ref _consecutiveSuccesses, 0);
+            Interlocked.Increment(ref _consecutiveErrors);
+            Interlocked.Exchange(ref _lastErrorTicks, DateTime.UtcNow.Ticks);
+        }
+
+        private static DateTime? ToNullableUtc(long ticks) =>
+            ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc);
     }
 }

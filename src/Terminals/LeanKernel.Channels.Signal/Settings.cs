@@ -74,4 +74,29 @@ public sealed class SignalSettings
     /// Gets or sets the timeout in seconds for individual typing indicator requests.
     /// </summary>
     public int TypingRequestTimeoutSeconds { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the socket worker health check is enabled.
+    /// </summary>
+    public bool EnableWorkerHealthCheck { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the progress stall threshold in seconds before a worker is reported as Degraded.
+    /// </summary>
+    public int WorkerDegradedThresholdSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// Gets or sets the progress stall threshold in seconds before a worker is reported as Unhealthy.
+    /// </summary>
+    public int WorkerUnhealthyThresholdSeconds { get; set; } = 180;
+
+    /// <summary>
+    /// Gets or sets the consecutive loop error limit before a worker is reported as Degraded.
+    /// </summary>
+    public int WorkerConsecutiveErrorThreshold { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the consecutive loop error limit before a worker transitions to Faulted and is reported as Unhealthy.
+    /// </summary>
+    public int WorkerUnhealthyErrorThreshold { get; set; } = 10;
 }

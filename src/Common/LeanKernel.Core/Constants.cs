@@ -203,6 +203,11 @@ public static class Constants
         /// The name of the health check for the gateway.
         /// </summary>
         public const string Gateway = "gateway";
+
+        /// <summary>
+        /// The name of the health check for the Signal socket worker.
+        /// </summary>
+        public const string SocketWorker = "socket-worker";
     }
 
     /// <summary>

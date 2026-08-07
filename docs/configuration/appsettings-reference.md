@@ -96,6 +96,25 @@ learning and scheduler service.
 | `Scheduler:DreamLockTimeoutSeconds` | Per-scope Dream lock timeout | `300` |
 | `Scheduler:DefaultDreamMode` | Default Dream mode for scheduler runs | `full` |
 
+## Signal Terminal
+
+`src/Terminals/LeanKernel.Channels.Signal` reads the `Signal` section. Settings marked
+"validated" are enforced at startup by options validation and throw on startup when violated.
+
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `Signal:EnableWorkerHealthCheck` | Master switch for the `socket-worker` health check | `true` |
+| `Signal:WorkerDegradedThresholdSeconds` | Progress stall threshold before a worker reports Degraded | `60` |
+| `Signal:WorkerUnhealthyThresholdSeconds` | Progress stall threshold before a worker reports Unhealthy | `180` |
+| `Signal:WorkerConsecutiveErrorThreshold` | Consecutive loop error limit before Degraded | `3` |
+| `Signal:WorkerUnhealthyErrorThreshold` | Consecutive loop error limit before Faulted/Unhealthy | `10` |
+
+Validated constraints: `WorkerUnhealthyThresholdSeconds > WorkerDegradedThresholdSeconds`,
+`WorkerDegradedThresholdSeconds > (EffectiveReceiveDeadlineSeconds + ReconnectDelaySeconds)`
+where `EffectiveReceiveDeadlineSeconds` is `ReceiveClientDeadlineSeconds` when positive,
+otherwise `ReceiveTimeoutSeconds + 5`, `WorkerUnhealthyErrorThreshold > WorkerConsecutiveErrorThreshold`,
+and `WorkerConsecutiveErrorThreshold >= 1`.
+
 ## Files
 
 | Key | Purpose | Appsettings default |

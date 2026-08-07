@@ -11,7 +11,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<GatewaySettings>(builder.Configuration.GetSection("Gateway"));
-builder.Services.Configure<SignalSettings>(builder.Configuration.GetSection("Signal"));
+builder.Services.AddSignalWorkerHealthCheck(builder.Configuration);
 
 var gatewaySettings = builder.Configuration.GetSection("Gateway").Get<GatewaySettings>() ?? new GatewaySettings();
 var signalSettings = builder.Configuration.GetSection("Signal").Get<SignalSettings>() ?? new SignalSettings();
@@ -27,7 +27,12 @@ builder.Services.AddHttpClient<GatewayChannelClient>(client =>
 });
 builder.Services.AddHttpClient(Constants.HttpClientNames.SignalApi, client =>
 {
+    var receiveDeadlineSeconds = signalSettings.ReceiveClientDeadlineSeconds > 0
+        ? signalSettings.ReceiveClientDeadlineSeconds
+        : signalSettings.ReceiveTimeoutSeconds + 5;
+
     client.BaseAddress = new Uri($"http://{signalSettings.Host}:{signalSettings.Port}");
+    client.Timeout = TimeSpan.FromSeconds(Math.Max(5, receiveDeadlineSeconds));
 });
 
 var probeTimeout = TimeSpan.FromSeconds(5);

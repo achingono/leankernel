@@ -9,6 +9,7 @@ Feature documentation is organized by implemented capability area.
 - [Channels](channels.md)
 - [Document ingestion](document-ingestion.md)
 - [Enrichment pipeline](enrichment-pipeline.md)
+- [Health checks](health-checks.md)
 - [Identity partitioning](identity-partitioning.md)
 - [Identity, policy, and event spine](identity-policy-event-spine.md)
 - [Learning pipeline](learning-pipeline.md)

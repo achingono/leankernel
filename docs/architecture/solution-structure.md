@@ -19,7 +19,7 @@ Projects in the app-only solution:
 | `src/Services/LeanKernel.Services.Common` | Shared service-host plumbing: GBrain MCP/memory/document clients, health checks, DB provider options ext, and worker health state |
 | `src/Services/LeanKernel.Services.Gateway` | Web host, endpoint mapping, auth/session middleware, attachment ingestion, and composition of logic and common services |
 | `src/Services/LeanKernel.Services.Learning` | Background learning worker: turn-event processing, fact extraction, onboarding, cron scheduler, and dream cycle execution |
-| `src/Terminals/LeanKernel.Channels.Signal` | Signal channel terminal process (JSON-RPC socket transport to signal-cli sidecar) |
+| `src/Terminals/LeanKernel.Channels.Signal` | Signal channel terminal process (JSON-RPC socket transport to signal-cli sidecar), including per-account socket worker health tracking (`HealthChecks/ISocketWorkerHealthProvider`, `SocketWorkerHealthCheck`) |
 | `src/Terminals/LeanKernel.Channels.Teams` | Teams Bot Framework terminal process (webhook ingress + connector egress) |
 
 Test projects:

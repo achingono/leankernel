@@ -108,4 +108,140 @@ public class ToolDefinitionAIToolAdapterTests
         capturedArgs.Should().NotBeNull();
         capturedArgs.Should().BeEmpty();
     }
+
+    [Fact]
+    public void ToAITool_ExposesNameDescriptionAndSchema()
+    {
+        var tool = MakeTool("my_tool", new ToolResult { ToolName = "my_tool", Success = true, Output = "done" });
+
+        var aiTool = (AIFunction)ToolDefinitionAIToolAdapter.ToAITool(tool);
+
+        aiTool.Name.Should().Be("my_tool");
+        aiTool.Description.Should().Contain("Parameters:");
+        aiTool.JsonSchema.GetProperty("type").GetString().Should().Be("object");
+        aiTool.JsonSchema.GetProperty("required").EnumerateArray().Select(item => item.GetString()).Should().Equal("param");
+    }
+
+    [Fact]
+    public void ToAITool_DescriptionWithoutParameters_ReturnsRawDescription()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "plain",
+            Description = "Plain description",
+            Category = "test",
+            Parameters = []
+        };
+
+        var aiTool = (AIFunction)ToolDefinitionAIToolAdapter.ToAITool(tool);
+
+        aiTool.Description.Should().Be("Plain description");
+    }
+
+    [Fact]
+    public void ToAITool_DescriptionWithParameters_ListsTypesAndRequiredState()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "described",
+            Description = "Base description",
+            Category = "test",
+            Parameters =
+            [
+                new ToolParameter { Name = "req", Type = "integer", Description = "count", Required = true },
+                new ToolParameter { Name = "opt", Type = "boolean", Required = false }
+            ]
+        };
+
+        var aiTool = (AIFunction)ToolDefinitionAIToolAdapter.ToAITool(tool);
+        var description = aiTool.Description;
+
+        description.Should().StartWith("Base description");
+        description.Should().Contain("req (integer, required) - count");
+        description.Should().Contain("opt (boolean, optional)");
+    }
+
+    [Fact]
+    public void ToAITool_JsonSchema_NormalizesDeclaredTypes()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "typed",
+            Description = "Typed",
+            Category = "test",
+            Parameters =
+            [
+                new ToolParameter { Name = "a", Type = "array" },
+                new ToolParameter { Name = "b", Type = "boolean" },
+                new ToolParameter { Name = "c", Type = "integer" },
+                new ToolParameter { Name = "d", Type = "number" },
+                new ToolParameter { Name = "e", Type = "object" },
+                new ToolParameter { Name = "f", Type = "  Unknown " }
+            ]
+        };
+
+        var aiTool = (AIFunction)ToolDefinitionAIToolAdapter.ToAITool(tool);
+        var properties = aiTool.JsonSchema.GetProperty("properties");
+
+        properties.GetProperty("a").GetProperty("type").GetString().Should().Be("array");
+        properties.GetProperty("b").GetProperty("type").GetString().Should().Be("boolean");
+        properties.GetProperty("c").GetProperty("type").GetString().Should().Be("integer");
+        properties.GetProperty("d").GetProperty("type").GetString().Should().Be("number");
+        properties.GetProperty("e").GetProperty("type").GetString().Should().Be("object");
+        properties.GetProperty("f").GetProperty("type").GetString().Should().Be("string");
+        aiTool.JsonSchema.TryGetProperty("required", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WithoutHandler_ReturnsMissingHandlerMessage()
+    {
+        var tool = new ToolDefinition
+        {
+            Name = "ghost",
+            Description = "No handler",
+            Category = "test"
+        };
+
+        var aiTool = (AIFunction)ToolDefinitionAIToolAdapter.ToAITool(tool);
+
+        var result = await aiTool.InvokeAsync(new AIFunctionArguments());
+
+        result.Should().Be("Tool 'ghost' has no execution handler");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_FailedResult_ReturnsError()
+    {
+        var tool = MakeTool("failing", new ToolResult { ToolName = "failing", Success = false, Error = "boom" });
+
+        var aiTool = (AIFunction)ToolDefinitionAIToolAdapter.ToAITool(tool);
+
+        var result = await aiTool.InvokeAsync(new AIFunctionArguments());
+
+        result.Should().Be("boom");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_FailedResultWithoutError_ReturnsGenericMessage()
+    {
+        var tool = MakeTool("failing", new ToolResult { ToolName = "failing", Success = false });
+
+        var aiTool = (AIFunction)ToolDefinitionAIToolAdapter.ToAITool(tool);
+
+        var result = await aiTool.InvokeAsync(new AIFunctionArguments());
+
+        result.Should().Be("Tool 'failing' failed.");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_SuccessWithNullOutput_ReturnsEmptyString()
+    {
+        var tool = MakeTool("empty_out", new ToolResult { ToolName = "empty_out", Success = true });
+
+        var aiTool = (AIFunction)ToolDefinitionAIToolAdapter.ToAITool(tool);
+
+        var result = await aiTool.InvokeAsync(new AIFunctionArguments());
+
+        result.Should().Be(string.Empty);
+    }
 }
