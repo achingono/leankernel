@@ -73,6 +73,38 @@ public sealed class SignalChannelTransportTests
     }
 
     [Fact]
+    public async Task GatewayChannelClient_SendsStableSignalConversationId()
+    {
+        string? payload = null;
+        var gatewayClient = CreateGatewayClient(request =>
+        {
+            payload = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return JsonResponse("""
+                {
+                  "output": [
+                    {
+                      "content": [
+                        { "type": "output_text", "text": "ok" }
+                      ]
+                    }
+                  ]
+                }
+                """);
+        });
+
+        await gatewayClient.RunTurnAsync(
+            "hello",
+            "signal:+10000000001:+15550000001",
+            "token",
+            [],
+            CancellationToken.None);
+
+        using var document = JsonDocument.Parse(payload!);
+        document.RootElement.GetProperty("conversation").GetString()
+            .Should().Be("signal:+10000000001:+15550000001");
+    }
+
+    [Fact]
     public async Task SocketTransportClient_ReceivesFromSecondAccount_WhenFirstAccountStalls()
     {
         var signalClient = new ScriptedReceiveClient(async (account, ct) =>

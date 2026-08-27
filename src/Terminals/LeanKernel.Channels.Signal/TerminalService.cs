@@ -48,7 +48,12 @@ public sealed class TerminalService(
                         logger,
                         stoppingToken);
 
-                    var output = await gatewayClient.RunTurnAsync(input, inbound.BearerToken, inbound.Attachments, stoppingToken);
+                    var output = await gatewayClient.RunTurnAsync(
+                        input,
+                        inbound.ConversationId,
+                        inbound.BearerToken,
+                        inbound.Attachments,
+                        stoppingToken);
 
                     var attachmentCount = inbound.Attachments.Count > 0
                         ? inbound.Attachments.Count

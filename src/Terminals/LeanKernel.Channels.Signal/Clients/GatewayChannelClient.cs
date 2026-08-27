@@ -21,12 +21,14 @@ public sealed class GatewayChannelClient(
     /// Sends an input payload to the gateway agent and returns the parsed response.
     /// </summary>
     /// <param name="input">The gateway input payload.</param>
+    /// <param name="conversationId">The stable gateway conversation identifier for this Signal peer.</param>
     /// <param name="bearerToken">The bearer token for authentication.</param>
     /// <param name="attachments">Normalized channel attachments to forward alongside the turn payload.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The parsed turn result containing response text and text styles.</returns>
     public async Task<GatewayTurnResult> RunTurnAsync(
         object input,
+        string conversationId,
         string bearerToken,
         IReadOnlyList<ChannelAttachmentEnvelope> attachments,
         CancellationToken ct)
@@ -38,6 +40,7 @@ public sealed class GatewayChannelClient(
             {
                 model = settings.Value.Model,
                 input,
+                conversation = conversationId,
                 channel_attachments = attachments,
                 agent = new
                 {
