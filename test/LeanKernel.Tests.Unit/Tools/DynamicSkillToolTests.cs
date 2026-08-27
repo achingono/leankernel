@@ -43,12 +43,14 @@ public class DynamicSkillToolTests
 
     private IServiceScopeFactory BuildScopeFactory(
         HttpMessageHandler? handler = null,
-        IReadOnlyList<string>? globalAllowHosts = null)
+        IReadOnlyList<string>? globalAllowHosts = null,
+        IReadOnlyList<string>? globalAllowPrivateHosts = null)
     {
         var services = new ServiceCollection();
         services.Configure<AgentSettings>(opts =>
         {
             opts.Tools.DynamicHttp.AllowHosts = globalAllowHosts ?? [];
+            opts.Tools.DynamicHttp.AllowPrivateHosts = globalAllowPrivateHosts ?? [];
         });
 
         if (handler != null)
@@ -127,6 +129,34 @@ public class DynamicSkillToolTests
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("allowlist");
+    }
+
+    [Fact]
+    public async Task Handler_PrivateHostExplicitlyAllowed_ReturnsSuccess()
+    {
+        var mockHandler = new Mock<HttpMessageHandler>();
+        mockHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}")
+            });
+
+        var skill = MakeSkill("faithrow", "http://faithrow_worker:8080", ["faithrow_worker:8080"]);
+        var op = MakeOperation("audit_catalog", "GET", "/v1/audit/catalog");
+        var tool = DynamicSkillTool.Create(
+            skill,
+            op,
+            BuildScopeFactory(
+                mockHandler.Object,
+                globalAllowPrivateHosts: ["faithrow_worker"]));
+
+        var result = await tool.Handler(new Dictionary<string, object?>(), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
     }
 
     [Fact]

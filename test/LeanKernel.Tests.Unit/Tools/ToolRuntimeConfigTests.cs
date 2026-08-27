@@ -17,6 +17,7 @@ public class ToolRuntimeConfigTests
         settings.AllowedToolNames.Should().BeEmpty();
         settings.AllowedCategories.Should().BeEmpty();
         settings.DynamicHttp.AllowHosts.Should().BeEmpty();
+        settings.DynamicHttp.AllowPrivateHosts.Should().BeEmpty();
         settings.BuiltIns.Calculation.Enabled.Should().BeTrue();
         settings.BuiltIns.Calculation.MaxInputItems.Should().Be(1000);
     }

@@ -66,7 +66,10 @@ public static class DynamicSkillTool
 
                     // Egress validation
                     var egressError = EgressValidator.TryValidateEgressTarget(
-                        url!, skill.AllowedHosts, globalSettings.AllowHosts);
+                        url!,
+                        skill.AllowedHosts,
+                        globalSettings.AllowHosts,
+                        globalSettings.AllowPrivateHosts);
                     if (egressError is not null)
                     {
                         return new ToolResult { ToolName = toolName, Success = false, Error = egressError };

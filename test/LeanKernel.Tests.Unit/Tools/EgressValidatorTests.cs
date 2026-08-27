@@ -87,6 +87,17 @@ public class EgressValidatorTests
     }
 
     [Fact]
+    public void IsHostAllowed_SkillAllowListWithPort_MatchesHost()
+    {
+        var result = EgressValidator.IsHostAllowed(
+            "api.example.com",
+            ["api.example.com:443"],
+            []);
+
+        result.Should().BeTrue();
+    }
+
+    [Fact]
     public void IsHostAllowed_InSkillListButNotGlobalList_ReturnsFalse()
     {
         var result = EgressValidator.IsHostAllowed(
@@ -114,6 +125,29 @@ public class EgressValidatorTests
         var result = EgressValidator.IsHostAllowed(
             "localhost",
             ["localhost"],
+            []);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsHostAllowed_PrivateHostWithExplicitPrivateAllow_ReturnsTrue()
+    {
+        var result = EgressValidator.IsHostAllowed(
+            "10.1.2.3",
+            ["10.1.2.3"],
+            [],
+            ["10.1.2.3"]);
+
+        result.Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsHostAllowed_PrivateHostWithoutExplicitPrivateAllow_ReturnsFalse()
+    {
+        var result = EgressValidator.IsHostAllowed(
+            "10.1.2.3",
+            ["10.1.2.3"],
             []);
 
         result.Should().BeFalse();

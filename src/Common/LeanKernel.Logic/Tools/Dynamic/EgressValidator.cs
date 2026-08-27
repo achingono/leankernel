@@ -49,32 +49,33 @@ public static class EgressValidator
     /// <param name="host">The request host (without port).</param>
     /// <param name="skillAllowedHosts">Per-skill allowlist from <c>egress.allowHosts</c>.</param>
     /// <param name="globalAllowHosts">Global ceiling from <c>Agents:Tools:DynamicHttp:AllowHosts</c>.</param>
+    /// <param name="globalAllowPrivateHosts">Explicit private-host exceptions from <c>Agents:Tools:DynamicHttp:AllowPrivateHosts</c>.</param>
     /// <returns>True when the host is allowed; false otherwise.</returns>
     public static bool IsHostAllowed(
         string host,
         IReadOnlyList<string> skillAllowedHosts,
-        IReadOnlyList<string> globalAllowHosts)
+        IReadOnlyList<string> globalAllowHosts,
+        IReadOnlyList<string>? globalAllowPrivateHosts = null)
     {
-        if (IsPrivateOrLoopbackHost(host))
-        {
-            return false;
-        }
-
-        var inSkill = skillAllowedHosts.Any(h =>
-            string.Equals(h, host, StringComparison.OrdinalIgnoreCase));
+        var inSkill = MatchesHostInAllowList(host, skillAllowedHosts);
 
         if (!inSkill)
         {
             return false;
         }
 
-        if (globalAllowHosts.Count == 0)
+        var inGlobal = globalAllowHosts.Count == 0 || MatchesHostInAllowList(host, globalAllowHosts);
+        if (!inGlobal)
+        {
+            return false;
+        }
+
+        if (!IsPrivateOrLoopbackHost(host))
         {
             return true;
         }
 
-        return globalAllowHosts.Any(h =>
-            string.Equals(h, host, StringComparison.OrdinalIgnoreCase));
+        return MatchesHostInAllowList(host, globalAllowPrivateHosts ?? []);
     }
 
     /// <summary>
@@ -84,11 +85,13 @@ public static class EgressValidator
     /// <param name="url">The absolute URI to validate.</param>
     /// <param name="skillAllowedHosts">Per-skill allowlist from <c>egress.allowHosts</c>.</param>
     /// <param name="globalAllowHosts">Global ceiling from <c>Agents:Tools:DynamicHttp:AllowHosts</c>.</param>
+    /// <param name="globalAllowPrivateHosts">Explicit private-host exceptions from <c>Agents:Tools:DynamicHttp:AllowPrivateHosts</c>.</param>
     /// <returns>Null when valid, or an error message when rejected.</returns>
     public static string? TryValidateEgressTarget(
         string url,
         IReadOnlyList<string> skillAllowedHosts,
-        IReadOnlyList<string> globalAllowHosts)
+        IReadOnlyList<string> globalAllowHosts,
+        IReadOnlyList<string>? globalAllowPrivateHosts = null)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
@@ -101,7 +104,7 @@ public static class EgressValidator
         }
 
         var host = uri.Host;
-        if (!IsHostAllowed(host, skillAllowedHosts, globalAllowHosts))
+        if (!IsHostAllowed(host, skillAllowedHosts, globalAllowHosts, globalAllowPrivateHosts))
         {
             return $"Host '{host}' is not in the egress allowlist or is a private/loopback address.";
         }
@@ -126,4 +129,32 @@ public static class EgressValidator
         b.Length == 16 && (
             (b[0] == 0xfe && (b[1] & 0xc0) == 0x80) // fe80::/10 link-local
             || (b[0] & 0xfe) == 0xfc);               // fc00::/7 unique-local
+
+    private static bool MatchesHostInAllowList(string host, IReadOnlyList<string> allowHosts)
+        => allowHosts.Any(entry =>
+            string.Equals(NormalizeAllowHost(entry), host, StringComparison.OrdinalIgnoreCase));
+
+    private static string NormalizeAllowHost(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absoluteUri)
+            && (absoluteUri.Scheme is "http" or "https")
+            && !string.IsNullOrWhiteSpace(absoluteUri.Host))
+        {
+            return absoluteUri.Host;
+        }
+
+        var firstColon = trimmed.IndexOf(':');
+        if (firstColon > -1 && firstColon == trimmed.LastIndexOf(':'))
+        {
+            return trimmed[..firstColon];
+        }
+
+        return trimmed.Trim('[', ']');
+    }
 }
