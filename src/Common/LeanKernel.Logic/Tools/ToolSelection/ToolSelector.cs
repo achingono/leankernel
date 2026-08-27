@@ -1,12 +1,12 @@
-using System.Diagnostics;
-using System.Text.Json;
+using LeanKernel.Logic.Configuration;
 
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using LeanKernel.Logic.Configuration;
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace LeanKernel.Logic.Tools.ToolSelection;
 
@@ -20,6 +20,12 @@ public sealed class ToolSelector : IToolSelector
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ToolSelector> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ToolSelector"/> class.
+    /// </summary>
+    /// <param name="toolSettings">The tool settings.</param>
+    /// <param name="serviceProvider">The service provider.</param>
+    /// <param name="logger">The logger.</param>
     public ToolSelector(
         IOptions<ToolSettings> toolSettings,
         IServiceProvider serviceProvider,
@@ -30,6 +36,7 @@ public sealed class ToolSelector : IToolSelector
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<ToolDefinition>> SelectToolsAsync(
         string userMessage,
         IReadOnlyList<ToolDefinition> allTools,
