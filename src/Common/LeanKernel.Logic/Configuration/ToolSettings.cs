@@ -72,4 +72,12 @@ public sealed class ToolSettings
     /// Gets or sets the document ingestion configuration.
     /// </summary>
     public DocumentIngestionToolSettings DocumentIngestion { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the maximum number of tools to expose to the chat client.
+    /// When the filtered tool count exceeds this value, the runtime selects the most relevant subset.
+    /// Maps to <c>Agents:Tools:MaxTools</c> (env: <c>AGENTS__TOOLS__MAXTOOLS</c>).
+    /// Defaults to 128 to stay within Azure OpenAI's limit.
+    /// </summary>
+    public int MaxTools { get; set; } = 128;
 }
