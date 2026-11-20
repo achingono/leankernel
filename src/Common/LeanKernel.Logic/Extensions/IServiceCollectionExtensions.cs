@@ -332,71 +332,14 @@ public static class IServiceCollectionExtensions
         IConfiguration configuration)
     {
         services.Configure<AgentSettings>(configuration.GetSection("Agents"));
-        services.AddSingleton<IToolSelector, ToolSelector>();
+        services.AddScoped<IToolSelector, ToolSelector>();
 
         services.AddAIAgent(agentName, (sp, name) =>
         {
             var settings = sp.GetRequiredService<IOptions<AgentSettings>>().Value;
             var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("LeanKernel.Tools.ToolSelector");
 
-            // Resolve tools from the registry when the tool runtime is enabled
-            List<AITool> aiTools = [];
-            if (settings.Tools.Enabled)
-            {
-                var registry = sp.GetService<IToolRegistry>();
-                if (registry is not null)
-                {
-                    var policy = new ToolGovernancePolicy(settings.Tools);
-                    var filtered = policy.Filter(registry.Tools).ToList();
-
-                    // 90% threshold proactive warning
-                    var threshold = (int)(settings.Tools.MaxTools * 0.9);
-                    if (filtered.Count >= threshold && filtered.Count < settings.Tools.MaxTools)
-                    {
-                        logger.LogWarning(
-                            "Tool count {Count} is at {Percent}% of MaxTools ({Max}). Consider reducing tools or increasing MaxTools.",
-                            filtered.Count, (int)(filtered.Count * 100.0 / settings.Tools.MaxTools), settings.Tools.MaxTools);
-                    }
-
-                    if (filtered.Count > settings.Tools.MaxTools)
-                    {
-                        logger.LogWarning(
-                            "Tool count {Count} exceeds MaxTools ({Max}). Selecting relevant subset.",
-                            filtered.Count, settings.Tools.MaxTools);
-
-                        // Attempt smart selection via ToolSelector; fallback to first N on failure
-                        // Note: At agent creation time the user message is not yet available, so we use a placeholder.
-                        // The selector will fallback to first N when the small model is unavailable or returns no names.
-                        var selector = sp.GetService<IToolSelector>();
-                        if (selector is not null)
-                        {
-                            try
-                            {
-                                var selected = selector.SelectToolsAsync(
-                                    string.Empty, filtered, settings.Tools.MaxTools, CancellationToken.None)
-                                    .GetAwaiter().GetResult();
-
-                                logger.LogInformation(
-                                    "ToolSelector: selected {Selected} of {Total} tools (requested {Max}).",
-                                    selected.Count, filtered.Count, settings.Tools.MaxTools);
-
-                                filtered = selected.ToList();
-                            }
-                            catch (Exception ex)
-                            {
-                                logger.LogError(ex, "ToolSelector failed, falling back to first {Max} tools.", settings.Tools.MaxTools);
-                                filtered = filtered.Take(settings.Tools.MaxTools).ToList();
-                            }
-                        }
-                        else
-                        {
-                            filtered = filtered.Take(settings.Tools.MaxTools).ToList();
-                        }
-                    }
-
-                    aiTools = filtered.Select(ToolDefinitionAIToolAdapter.ToAITool).ToList();
-                }
-            }
+            var aiTools = ResolveAgentTools(sp, settings.Tools, logger);
 
             return new ChatClientAgent(
                 sp.GetRequiredService<IChatClient>(),
@@ -417,5 +360,53 @@ public static class IServiceCollectionExtensions
         }, ServiceLifetime.Scoped);
 
         return services;
+    }
+
+    private static List<AITool> ResolveAgentTools(IServiceProvider services, ToolSettings settings, ILogger logger)
+    {
+        if (!settings.Enabled || services.GetService<IToolRegistry>() is not { } registry)
+        {
+            return [];
+        }
+
+        var filtered = new ToolGovernancePolicy(settings).Filter(registry.Tools).ToList();
+        var threshold = (int)(settings.MaxTools * 0.9);
+        if (filtered.Count >= threshold && filtered.Count < settings.MaxTools)
+        {
+            logger.LogWarning(
+                "Tool count {Count} is at {Percent}% of MaxTools ({Max}). Consider reducing tools or increasing MaxTools.",
+                filtered.Count, (int)(filtered.Count * 100.0 / settings.MaxTools), settings.MaxTools);
+        }
+
+        if (filtered.Count > settings.MaxTools)
+        {
+            logger.LogWarning("Tool count {Count} exceeds MaxTools ({Max}). Selecting relevant subset.", filtered.Count, settings.MaxTools);
+            filtered = SelectAgentTools(services, filtered, settings.MaxTools, logger);
+        }
+
+        return filtered.Select(ToolDefinitionAIToolAdapter.ToAITool).ToList();
+    }
+
+    private static List<ToolDefinition> SelectAgentTools(
+        IServiceProvider services, List<ToolDefinition> filtered, int maxTools, ILogger logger)
+    {
+        var selector = services.GetService<IToolSelector>();
+        if (selector is null)
+        {
+            return filtered.Take(maxTools).ToList();
+        }
+
+        try
+        {
+            var selected = selector.SelectToolsAsync(string.Empty, filtered, maxTools, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            logger.LogInformation("ToolSelector: selected {Selected} of {Total} tools (requested {Max}).", selected.Count, filtered.Count, maxTools);
+            return selected.ToList();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ToolSelector failed, falling back to first {Max} tools.", maxTools);
+            return filtered.Take(maxTools).ToList();
+        }
     }
 }

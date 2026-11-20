@@ -1,12 +1,9 @@
 using System.Diagnostics;
 using System.Text.Json;
 
-using LeanKernel.Logic.Configuration;
-
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Logic.Tools.ToolSelection;
 
@@ -16,22 +13,18 @@ namespace LeanKernel.Logic.Tools.ToolSelection;
 /// </summary>
 public sealed class ToolSelector : IToolSelector
 {
-    private readonly IOptions<ToolSettings> _toolSettings;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ToolSelector> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ToolSelector"/> class.
     /// </summary>
-    /// <param name="toolSettings">The tool settings.</param>
     /// <param name="serviceProvider">The service provider.</param>
     /// <param name="logger">The logger.</param>
     public ToolSelector(
-        IOptions<ToolSettings> toolSettings,
         IServiceProvider serviceProvider,
         ILogger<ToolSelector> logger)
     {
-        _toolSettings = toolSettings;
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
@@ -43,6 +36,7 @@ public sealed class ToolSelector : IToolSelector
         int maxTools,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (allTools.Count <= maxTools)
         {
             return allTools;
@@ -139,9 +133,9 @@ public sealed class ToolSelector : IToolSelector
         {
             chatClient = _serviceProvider.GetKeyedService<IChatClient>("small-model") ?? _serviceProvider.GetService<IChatClient>();
         }
-        catch
+        catch (Exception ex)
         {
-            // ignore
+            _logger.LogWarning(ex, "ToolSelector: failed to resolve a chat client; using fallback.");
         }
 
         if (chatClient is null)
@@ -193,6 +187,10 @@ Return JSON array of tool names (max {maxTools}):";
 
             var names = JsonSerializer.Deserialize<string[]>(content, new JsonSerializerOptions { AllowTrailingCommas = true });
             return names;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (OperationCanceledException)
         {
