@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 
 using FluentAssertions;
 
 using Microsoft.Agents.AI;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
@@ -55,6 +57,53 @@ public class ChatCompletionsScopedAgentTests : IClassFixture<ChatCompletionsScop
         firstAgentId.Should().NotBe(secondAgentId);
     }
 
+    /// <summary>Verifies client tool definitions reach the real MAF JSON deserializer regardless of property order.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PostChatCompletions_ToolDiscriminatorAfterFunction_IsAccepted(bool stream)
+    {
+        var json = """{"model":"test-model","messages":[{"role":"user","content":"test"}],"tools":[{"function":{"name":"first","parameters":{"type":"object","properties":{}}},"type":"function"},{"type":"function","function":{"name":"second","parameters":{"type":"object","properties":{}}}}],"tool_choice":"none","stream":STREAM}""".Replace("STREAM", stream ? "true" : "false", StringComparison.Ordinal);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+        };
+
+        using var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    /// <summary>Accepts out-of-order polymorphic metadata in nested message content and tool choice.</summary>
+    [Fact]
+    public async Task PostChatCompletions_NestedDiscriminatorsAfterData_AreAccepted()
+    {
+        const string json = """{"model":"test-model","messages":[{"role":"user","content":[{"text":"test","type":"text"}]}],"tools":[{"type":"function","function":{"name":"first","parameters":{"type":"object","properties":{}}}}],"tool_choice":{"function":{"name":"first"},"type":"function"}}""";
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+        };
+
+        using var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    /// <summary>Accepts out-of-order input content discriminators on the responses endpoint.</summary>
+    [Fact]
+    public async Task PostResponses_InputDiscriminatorsAfterData_AreAccepted()
+    {
+        const string json = """{"model":"test-model","input":[{"role":"user","content":[{"text":"test","type":"input_text"}],"type":"message"}],"agent":{"name":"leankernel"}}""";
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+        };
+
+        using var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     private async Task<HttpResponseMessage> SendChatCompletionAsync(string requestId, string prompt)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions")
@@ -73,7 +122,7 @@ public class ChatCompletionsScopedAgentTests : IClassFixture<ChatCompletionsScop
             }),
         };
 
-        request.Headers.Add("X-Test-Request-Id", requestId);
+        request.Headers.Add("X-Correlation-ID", requestId);
 
         return await _client.SendAsync(request);
     }
@@ -104,6 +153,7 @@ public class ChatCompletionsScopedAgentTests : IClassFixture<ChatCompletionsScop
 
             builder.ConfigureTestServices(services =>
             {
+                services.AddTransient<IStartupFilter, TestServerLocalPortFilter>();
                 var keyedAgentDescriptors = services
                     .Where(descriptor => descriptor.ServiceType == typeof(AIAgent)
                                          && descriptor.IsKeyedService
@@ -132,6 +182,19 @@ public class ChatCompletionsScopedAgentTests : IClassFixture<ChatCompletionsScop
                     new LoopbackHttpClientFactory(() => Server.CreateHandler()));
             });
         }
+    }
+
+    private sealed class TestServerLocalPortFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (context, continuation) =>
+            {
+                context.Connection.LocalPort = 80;
+                await continuation();
+            });
+            next(app);
+        };
     }
 
     private sealed class TrackingAIAgent(IHttpContextAccessor httpContextAccessor) : AIAgent
@@ -179,7 +242,7 @@ public class ChatCompletionsScopedAgentTests : IClassFixture<ChatCompletionsScop
 
         private void CaptureRequest()
         {
-            var requestId = httpContextAccessor.HttpContext?.Request.Headers["X-Test-Request-Id"].ToString();
+            var requestId = httpContextAccessor.HttpContext?.Request.Headers["X-Correlation-ID"].ToString();
             if (!string.IsNullOrWhiteSpace(requestId))
             {
                 ScopedAgentRequestTracker.Record(requestId, _instanceId);

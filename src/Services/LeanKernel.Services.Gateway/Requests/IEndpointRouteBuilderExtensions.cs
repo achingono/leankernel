@@ -2,8 +2,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using LeanKernel.Services.Gateway.Configuration;
+
 using Microsoft.Agents.AI.Hosting.OpenAI;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace LeanKernel.Services.Gateway.Requests;
 
@@ -36,8 +40,10 @@ public static class IEndpointRouteBuilderExtensions
         endpoints.MapPost("/v1/chat/completions", async (
             HttpContext context,
             [FromServices] IHttpClientFactory httpClientFactory,
-            [FromServices] ILogger<HttpContext> logger) =>
-            await HandleChatCompletionsRequestAsync(routePath, context, httpClientFactory, logger));
+            [FromServices] ILogger<HttpContext> logger,
+            [FromServices] IOptions<SessionOptions> sessionOptions,
+            [FromServices] IOptions<HardeningSettings> hardeningOptions) =>
+            await HandleChatCompletionsRequestAsync(routePath, context, httpClientFactory, logger, sessionOptions, hardeningOptions));
 
         var effectiveMapOptions = mapOptions ?? new OpenAIChatCompletionsMapOptions
         {
@@ -86,12 +92,16 @@ public static class IEndpointRouteBuilderExtensions
     /// <param name="context">The active HTTP request context.</param>
     /// <param name="httpClientFactory">The factory used to create the loopback HTTP client.</param>
     /// <param name="logger">The logger used for proxy diagnostics.</param>
+    /// <param name="sessionOptions">The configured session cookie.</param>
+    /// <param name="hardeningOptions">The configured correlation header.</param>
     /// <returns>The proxied result from the internal MAF handler.</returns>
     public static async Task<IResult> HandleChatCompletionsRequestAsync(
         string internalPath,
         HttpContext context,
         IHttpClientFactory httpClientFactory,
-        ILogger<HttpContext> logger)
+        ILogger<HttpContext> logger,
+        IOptions<SessionOptions>? sessionOptions = null,
+        IOptions<HardeningSettings>? hardeningOptions = null)
     {
         using var reader = new StreamReader(context.Request.Body);
         var rawJson = await reader.ReadToEndAsync();
@@ -103,36 +113,59 @@ public static class IEndpointRouteBuilderExtensions
 
         try
         {
-            var rewrittenJson = ReconstructMessage(rawJson);
+            context.RequestAborted.ThrowIfCancellationRequested();
+            var rewrittenJson = ReconstructMessage(rawJson, out var invalidTool);
+            if (invalidTool is { } invalid)
+            {
+                return InvalidToolResult(invalid.Parameter, invalid.Message);
+            }
 
-            var selfUrl = $"{context.Request.Scheme}://{context.Request.Host}{internalPath}";
+            var localPort = context.Connection.LocalPort;
+            if (localPort <= 0)
+            {
+                throw new HttpRequestException("The local gateway listener port is unavailable.");
+            }
+
+            var transport = context.Features.Get<ITlsConnectionFeature>() is null ? "http" : "https";
+            var selfUrl = $"{transport}://localhost:{localPort}{internalPath}";
             var client = httpClientFactory.CreateClient(Constants.HttpClientNames.ChatCompletionsProxy);
-            var requestMessage = new HttpRequestMessage(HttpMethod.Post, selfUrl)
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, selfUrl)
             {
                 Content = new StringContent(rewrittenJson, System.Text.Encoding.UTF8, Constants.ContentTypes.Json),
             };
 
-            foreach (var header in context.Request.Headers)
+            requestMessage.Headers.Host = context.Request.Host.Value;
+            if (context.Request.Headers.TryGetValue("Authorization", out var authorization))
             {
-                if (!header.Key.StartsWith("Content-", StringComparison.OrdinalIgnoreCase))
-                {
-                    requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-                }
+                requestMessage.Headers.TryAddWithoutValidation("Authorization", authorization.ToArray());
             }
 
-            var responseMessage = await client.SendAsync(requestMessage, context.RequestAborted);
-            var responseStream = await responseMessage.Content.ReadAsStreamAsync();
-            var contentType = responseMessage.Content.Headers.ContentType?.ToString() ?? Constants.ContentTypes.Json;
-
-            if (responseMessage.IsSuccessStatusCode)
+            var cookieName = sessionOptions?.Value.Cookie.Name ?? ".AspNetCore.Session";
+            if (context.Request.Cookies.TryGetValue(cookieName, out var sessionCookie))
             {
-                return new SseToolCallFilteringResult(responseStream, contentType);
+                requestMessage.Headers.TryAddWithoutValidation("Cookie", $"{cookieName}={sessionCookie}");
             }
 
-            using var errorReader = new StreamReader(responseStream);
-            var errorBody = await errorReader.ReadToEndAsync();
-            logger.LogWarning("Chat completions proxy returned {StatusCode}: {Body}", (int)responseMessage.StatusCode, errorBody);
-            return Results.Content(errorBody, contentType, statusCode: (int)responseMessage.StatusCode);
+            var correlationHeader = hardeningOptions?.Value.CorrelationIdHeader ?? "X-Correlation-ID";
+            if (!string.Equals(correlationHeader, "Authorization", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(correlationHeader, "Cookie", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(correlationHeader, "Host", StringComparison.OrdinalIgnoreCase))
+            {
+                requestMessage.Headers.TryAddWithoutValidation(correlationHeader, context.TraceIdentifier);
+            }
+
+            var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+            timeout.CancelAfter(TimeSpan.FromMinutes(5));
+            try
+            {
+                var responseMessage = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+                return new SseToolCallFilteringResult(responseMessage, timeout, internalPath, logger);
+            }
+            catch
+            {
+                timeout.Dispose();
+                throw;
+            }
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
@@ -211,15 +244,35 @@ public static class IEndpointRouteBuilderExtensions
             },
             statusCode: statusCode);
 
+    private static IResult InvalidToolResult(string parameter, string message)
+        => Results.Json(
+            new
+            {
+                error = new
+                {
+                    message,
+                    type = "invalid_request_error",
+                    param = parameter,
+                    code = "invalid_value",
+                },
+            },
+            statusCode: StatusCodes.Status400BadRequest);
+
     /// <summary>
     /// Re-orders each chat message object so role appears before content.
     /// </summary>
     /// <param name="rawJson">Original request payload.</param>
+    /// <param name="invalidTool">Validation failure for a malformed tool, if present.</param>
     /// <returns>Rewritten payload with role-first message objects.</returns>
     [SuppressMessage("Critical Code Smell", "S3776", Justification = "JSON message reconstruction normalizes property order across chat messages.")]
-    internal static string ReconstructMessage(string rawJson)
+    internal static string ReconstructMessage(string rawJson, out (string Parameter, string Message)? invalidTool)
     {
         var rootNode = JsonNode.Parse(rawJson);
+        invalidTool = FindInvalidTool(rootNode);
+        if (invalidTool is not null)
+        {
+            return string.Empty;
+        }
 
         if (rootNode?["messages"] is JsonArray messagesArray)
         {
@@ -237,6 +290,42 @@ public static class IEndpointRouteBuilderExtensions
         }
 
         return rootNode!.ToJsonString();
+    }
+
+    private static (string Parameter, string Message)? FindInvalidTool(JsonNode? rootNode)
+    {
+        const string invalidMessage = "Each tool must be an object with a non-empty string type.";
+        var toolsNode = rootNode?["tools"];
+        if (toolsNode is not null && toolsNode is not JsonArray)
+        {
+            return ("tools", invalidMessage);
+        }
+
+        if (toolsNode is not JsonArray tools)
+        {
+            return null;
+        }
+
+        for (var i = 0; i < tools.Count; i++)
+        {
+            if (tools[i] is not JsonObject tool)
+            {
+                return ($"tools[{i}]", invalidMessage);
+            }
+
+            if (tool["type"] is not JsonValue type || !type.TryGetValue<string>(out var typeName) || string.IsNullOrWhiteSpace(typeName))
+            {
+                return ($"tools[{i}].type", invalidMessage);
+            }
+
+            // The MAF chat-completions Tool model currently supports these two discriminators.
+            if (typeName is not "function" and not "custom")
+            {
+                return ($"tools[{i}].type", "Tool type must be 'function' or 'custom'.");
+            }
+        }
+
+        return null;
     }
 
     private static JsonObject ReconstructSingleMessage(JsonObject msgObj)

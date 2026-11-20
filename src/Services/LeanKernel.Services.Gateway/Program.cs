@@ -37,6 +37,9 @@ var agentConfig = builder.Configuration.GetSection("Agents").Get<AgentSettings>(
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
     ConfigureForwardedHeaders(options, builder.Configuration));
 
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.AllowOutOfOrderMetadataProperties = true);
+
 builder.Services
     .AddOptions<OpenAISettings>()
     .BindConfiguration("OpenAI")

@@ -36,7 +36,20 @@ Current expectation:
 
 `/v1/chat/completions` and the internal `/v1/internal/completions` path are POST endpoints.
 
-Current implementation note: the chat-completions proxy path is currently forwarded to `http://localhost:8080` by the endpoint helper.
+HTTP JSON parsing accepts polymorphic metadata such as `type` or `role` in any
+property order. Chat tool definitions must still have a supported string `type`;
+malformed definitions receive an OpenAI-shaped 400 error.
+
+The chat-completions proxy forwards to the internal path on the local listener. It preserves
+the request host for tenant lookup and forwards the bearer token, session cookie and
+correlation ID. Redirects, pooled cookies and system proxies are disabled for this hop.
+For streaming responses it forwards complete SSE events as they arrive, removes server-side
+tool-call deltas, and adds the OpenAI `[DONE]` marker after a successful terminal event when
+the upstream omitted it. An incomplete or failed upstream stream is not marked successful.
+The upstream request and response body share a five-minute timeout.
+
+For a gateway listening directly over HTTPS, the listener certificate must also be trusted
+for `localhost`. HTTP listeners that redirect the internal hop to HTTPS are not supported.
 
 These endpoints are exercised by integration and Playwright tests under `test/`.
 
