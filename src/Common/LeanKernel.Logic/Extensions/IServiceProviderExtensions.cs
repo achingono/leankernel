@@ -291,32 +291,8 @@ public static class IServiceProviderExtensions
             return;
         }
 
-        // Validate egress configuration
-        foreach (var op in skill.Operations)
+        if (!ValidateHttpSkill(skill, logger))
         {
-            if (string.IsNullOrWhiteSpace(skill.Runtime.BaseUrl))
-            {
-                logger.LogWarning("Skill '{Name}' operation '{Op}' has no baseUrl. Skipping skill.", skill.Name, op.Id);
-                return;
-            }
-
-            var urlCheck = $"{skill.Runtime.BaseUrl.TrimEnd('/')}{op.HttpPath}";
-            var host = ExtractHost(urlCheck);
-            if (host is not null && EgressValidator.IsPrivateOrLoopbackHost(host) &&
-                !skill.AllowedHosts.Any(h => string.Equals(h, host, StringComparison.OrdinalIgnoreCase)))
-            {
-                logger.LogWarning(
-                    "Skill '{Name}' operation '{Op}' targets loopback/private host '{Host}'. Skipping skill.",
-                    skill.Name, op.Id, host);
-                return;
-            }
-        }
-
-        // auth.secretRef validation
-        if (string.Equals(skill.Runtime.Auth.Type, Constants.Http.Headers.Bearer, StringComparison.OrdinalIgnoreCase) &&
-            string.IsNullOrWhiteSpace(skill.Runtime.Auth.SecretRef))
-        {
-            logger.LogWarning("Skill '{Name}' uses bearer auth but has no secretRef. Skipping.", skill.Name);
             return;
         }
 
@@ -335,6 +311,39 @@ public static class IServiceProviderExtensions
                 logger.LogInformation("Dynamic tool '{Name}' registered from {Path}.", toolName, filePath);
             }
         }
+    }
+
+    private static bool ValidateHttpSkill(SkillDefinition skill, ILogger logger)
+    {
+        foreach (var op in skill.Operations)
+        {
+            if (string.IsNullOrWhiteSpace(skill.Runtime.BaseUrl))
+            {
+                logger.LogWarning("Skill '{Name}' operation '{Op}' has no baseUrl. Skipping skill.", skill.Name, op.Id);
+                return false;
+            }
+
+            var urlCheck = $"{skill.Runtime.BaseUrl.TrimEnd('/')}{op.HttpPath}";
+            var host = ExtractHost(urlCheck);
+            if (host is not null && EgressValidator.IsPrivateOrLoopbackHost(host) &&
+                !skill.AllowedHosts.Any(h => string.Equals(h, host, StringComparison.OrdinalIgnoreCase)))
+            {
+                logger.LogWarning(
+                    "Skill '{Name}' operation '{Op}' targets loopback/private host '{Host}'. Skipping skill.",
+                    skill.Name, op.Id, host);
+                return false;
+            }
+        }
+
+        // auth.secretRef validation
+        if (string.Equals(skill.Runtime.Auth.Type, Constants.Http.Headers.Bearer, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(skill.Runtime.Auth.SecretRef))
+        {
+            logger.LogWarning("Skill '{Name}' uses bearer auth but has no secretRef. Skipping.", skill.Name);
+            return false;
+        }
+
+        return true;
     }
 
     private static void LoadCliSkill(

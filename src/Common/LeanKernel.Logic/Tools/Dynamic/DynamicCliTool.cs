@@ -72,7 +72,7 @@ public static class DynamicCliTool
                     }
 
                     return await ExecuteCliAsync(
-                        toolName, command, skill, operation, args, bearerToken, maxOutputChars, ct)
+                        (toolName, command, skill, operation, bearerToken, maxOutputChars), args, ct)
                         .ConfigureAwait(false);
                 }
                 catch (Exception ex)
@@ -84,15 +84,11 @@ public static class DynamicCliTool
     }
 
     private static async Task<ToolResult> ExecuteCliAsync(
-        string toolName,
-        string command,
-        SkillDefinition skill,
-        SkillOperation operation,
+        (string ToolName, string Command, SkillDefinition Skill, SkillOperation Operation, string? BearerToken, int MaxOutputChars) invocation,
         IReadOnlyDictionary<string, object?> args,
-        string? bearerToken,
-        int maxOutputChars,
         CancellationToken ct)
     {
+        var (toolName, command, skill, operation, bearerToken, maxOutputChars) = invocation;
         if (string.IsNullOrWhiteSpace(command))
         {
             return Failed(toolName, "CLI tool has no command configured.");

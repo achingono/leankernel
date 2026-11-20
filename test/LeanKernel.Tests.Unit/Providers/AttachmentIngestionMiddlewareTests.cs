@@ -262,6 +262,7 @@ public sealed class AttachmentIngestionMiddlewareTests
     [Fact]
     public async Task InvokeAsync_JsonEnvelope_ChannelNotReadable_ReturnsForbiddenWithoutInvokingNext()
     {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"leankernel-denied-attachment-{Guid.NewGuid():N}");
         var permit = CreatePermit();
         var requestedChannel = Guid.NewGuid();
         var json = $$"""
@@ -292,6 +293,7 @@ public sealed class AttachmentIngestionMiddlewareTests
             });
 
         var invoked = false;
+        var eventCollector = new Mock<IEventCollector>();
         var middleware = new AttachmentIngestionMiddleware(_ =>
         {
             invoked = true;
@@ -301,13 +303,15 @@ public sealed class AttachmentIngestionMiddlewareTests
         await middleware.InvokeAsync(
             context,
             permit,
-            Options.Create(new FileSettings { RootPath = Path.GetTempPath() }),
-            Mock.Of<IEventCollector>(),
+            Options.Create(new FileSettings { RootPath = tempRoot }),
+            eventCollector.Object,
             policyResolver.Object,
             NullLogger<AttachmentIngestionMiddleware>.Instance);
 
         context.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
         invoked.Should().BeFalse();
+        Directory.Exists(tempRoot).Should().BeFalse();
+        eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Never);
     }
 
     [Fact]
@@ -796,10 +800,12 @@ public sealed class AttachmentIngestionMiddlewareTests
             invoked.Should().BeTrue();
             eventCollector.Verify(c => c.Emit(It.IsAny<DocumentIngestionRequestedEvent>()), Times.Once);
             forwardedBody.Should().NotBeNull();
+            forwardedBody.Should().Contain("Commit this to memory.");
             forwardedBody.Should().Contain("[Attached file: talk.md]");
             forwardedBody.Should().Contain("This meeting is about onboarding.");
             forwardedBody.Should().NotContain("file_data");
             forwardedBody.Should().NotContain("data:");
+            context.Request.ContentLength.Should().Be(Encoding.UTF8.GetByteCount(forwardedBody!));
         }
         finally
         {

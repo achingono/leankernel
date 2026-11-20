@@ -34,10 +34,17 @@ public static class ToolDefinitionAIToolAdapter
         return tools.Select(ToAITool);
     }
 
-    private sealed class ToolDefinitionAIFunction(ToolDefinition tool) : AIFunction
+    private sealed class ToolDefinitionAIFunction : AIFunction
     {
-        private readonly ToolDefinition _tool = tool ?? throw new ArgumentNullException(nameof(tool));
-        private readonly JsonElement _jsonSchema = BuildJsonSchema(tool.Parameters);
+        private readonly ToolDefinition _tool;
+        private readonly JsonElement _jsonSchema;
+
+        public ToolDefinitionAIFunction(ToolDefinition tool)
+        {
+            ArgumentNullException.ThrowIfNull(tool);
+            _tool = tool;
+            _jsonSchema = BuildJsonSchema(tool.Parameters);
+        }
 
         public override string Name => _tool.Name;
 

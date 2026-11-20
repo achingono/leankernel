@@ -12,7 +12,7 @@ public sealed class LearningWorkerHealthCheck(WorkerHealthState state) : IHealth
     /// <inheritdoc />
     public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
         var age = state.LearningWorkerHeartbeatAge;
         if (age == TimeSpan.MaxValue)

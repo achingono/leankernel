@@ -167,11 +167,13 @@ public sealed class LearningBackgroundWorker : BackgroundService
 
         if (enqueuedCount > 0)
         {
-            checkpoint.LastProcessedCreatedOnUtc = lastEventId.HasValue
-                ? (replayBatch.Last().CreatedOn > _lastCheckpointCreatedOnUtc
-                    ? replayBatch.Last().CreatedOn
-                    : _lastCheckpointCreatedOnUtc)
-                : _lastCheckpointCreatedOnUtc;
+            var lastCreatedOn = _lastCheckpointCreatedOnUtc;
+            if (lastEventId.HasValue && replayBatch.Last().CreatedOn > _lastCheckpointCreatedOnUtc)
+            {
+                lastCreatedOn = replayBatch.Last().CreatedOn;
+            }
+
+            checkpoint.LastProcessedCreatedOnUtc = lastCreatedOn;
             checkpoint.LastProcessedEventRowId = lastEventId;
             checkpoint.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);

@@ -160,12 +160,9 @@ public sealed partial class SkillParser
             var invoke = o.Invoke ?? new RawInvoke();
             var parameters = ConvertParameters(o.Parameters);
 
-            if (runtimeType == "cli")
+            if (runtimeType == "cli" && !ValidateCliOperation(raw.Name!, o.Id!, invoke, parameters, sourcePath))
             {
-                if (!ValidateCliOperation(raw.Name!, o.Id!, invoke, parameters, sourcePath))
-                {
-                    continue;
-                }
+                continue;
             }
 
             operations.Add(new SkillOperation
@@ -225,41 +222,51 @@ public sealed partial class SkillParser
         // JSON-schema style: {type: object, properties: {...}, required: [...]}
         if (dict.TryGetValue("properties", out var propsObj) && propsObj is Dictionary<object, object?> props)
         {
-            var required = new HashSet<string>(StringComparer.Ordinal);
-            if (dict.TryGetValue("required", out var requiredObj) && requiredObj is IEnumerable<object> requiredList)
-            {
-                foreach (var r in requiredList)
-                {
-                    if (r is string s)
-                    {
-                        required.Add(s);
-                    }
-                }
-            }
-
-            var schemaParameters = new List<SkillOperationParameter>();
-            foreach (var prop in props)
-            {
-                var name = prop.Key?.ToString() ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    continue;
-                }
-
-                var (type, description) = ParseParameterMetadata(prop.Value);
-                schemaParameters.Add(new SkillOperationParameter
-                {
-                    Name = name,
-                    Type = type,
-                    Description = description,
-                    Required = required.Contains(name)
-                });
-            }
-
-            return schemaParameters;
+            return ConvertSchemaParameters(dict, props);
         }
 
-        // Flat format: {name: {type, description, required}}
+        return ConvertFlatParameters(dict);
+    }
+
+    private static List<SkillOperationParameter> ConvertSchemaParameters(
+        Dictionary<object, object?> dict, Dictionary<object, object?> props)
+    {
+        var required = new HashSet<string>(StringComparer.Ordinal);
+        if (dict.TryGetValue("required", out var requiredObj) && requiredObj is IEnumerable<object> requiredList)
+        {
+            foreach (var r in requiredList)
+            {
+                if (r is string s)
+                {
+                    required.Add(s);
+                }
+            }
+        }
+
+        var schemaParameters = new List<SkillOperationParameter>();
+        foreach (var prop in props)
+        {
+            var name = prop.Key?.ToString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            var (type, description) = ParseParameterMetadata(prop.Value);
+            schemaParameters.Add(new SkillOperationParameter
+            {
+                Name = name,
+                Type = type,
+                Description = description,
+                Required = required.Contains(name)
+            });
+        }
+
+        return schemaParameters;
+    }
+
+    private static List<SkillOperationParameter> ConvertFlatParameters(Dictionary<object, object?> dict)
+    {
         var parameters = new List<SkillOperationParameter>();
         foreach (var kvp in dict)
         {

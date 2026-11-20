@@ -416,33 +416,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
                 return null;
             }
 
-            var attachments = new List<JsonAttachmentPayload>();
-            foreach (var item in itemsElement.EnumerateArray())
-            {
-                if (item.ValueKind != JsonValueKind.Object
-                    || !TryReadProperty(item, "content", out var contentElement))
-                {
-                    continue;
-                }
-
-                if (contentElement.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var part in contentElement.EnumerateArray())
-                    {
-                        var payload = ReadOpenAiContentPart(part);
-                        if (payload is not null)
-                        {
-                            attachments.Add(payload);
-                        }
-                    }
-                }
-                else if (contentElement.ValueKind == JsonValueKind.String
-                    && IsDataUrl(contentElement.GetString()))
-                {
-                    attachments.Add(new JsonAttachmentPayload(string.Empty, string.Empty, contentElement.GetString()!));
-                }
-            }
-
+            var attachments = CollectOpenAiAttachments(itemsElement);
             return attachments.Count > 0 ? attachments : null;
         }
         catch (JsonException ex)
@@ -464,6 +438,39 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         }
     }
 
+    private static List<JsonAttachmentPayload> CollectOpenAiAttachments(JsonElement items)
+    {
+        var attachments = new List<JsonAttachmentPayload>();
+        foreach (var item in items.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.Object && TryReadProperty(item, "content", out var content))
+            {
+                CollectOpenAiContent(content, attachments);
+            }
+        }
+
+        return attachments;
+    }
+
+    private static void CollectOpenAiContent(JsonElement content, List<JsonAttachmentPayload> attachments)
+    {
+        if (content.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var part in content.EnumerateArray())
+            {
+                var payload = ReadOpenAiContentPart(part);
+                if (payload is not null)
+                {
+                    attachments.Add(payload);
+                }
+            }
+        }
+        else if (content.ValueKind == JsonValueKind.String && IsDataUrl(content.GetString()))
+        {
+            attachments.Add(new JsonAttachmentPayload(string.Empty, string.Empty, content.GetString()!));
+        }
+    }
+
     private static JsonAttachmentPayload? ReadOpenAiContentPart(JsonElement part)
     {
         if (part.ValueKind != JsonValueKind.Object)
@@ -479,11 +486,12 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         //              or: { "type": "input_image", "image_url": "data:..." }          (responses)
         if (TryReadProperty(part, "image_url", out var imageUrlElement))
         {
-            var url = imageUrlElement.ValueKind == JsonValueKind.Object
-                ? ReadStringProperty(imageUrlElement, "url")
-                : imageUrlElement.ValueKind == JsonValueKind.String
-                    ? imageUrlElement.GetString()
-                    : null;
+            var url = imageUrlElement.ValueKind switch
+            {
+                JsonValueKind.Object => ReadStringProperty(imageUrlElement, "url"),
+                JsonValueKind.String => imageUrlElement.GetString(),
+                _ => null,
+            };
 
             if (IsDataUrl(url))
             {
@@ -535,36 +543,8 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         var staged = new List<StagedAttachment>();
         foreach (var attachment in attachments)
         {
-            if (string.IsNullOrWhiteSpace(attachment.FileDataUrl)
-                || attachment.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            if (!TryPrepareJsonAttachment(attachment, maxDownloadBytes, logger, out var bytes, out var resolvedContentType))
             {
-                continue;
-            }
-
-            if (!TryDecodeDataUrl(attachment.FileDataUrl, attachment.ContentType, out var bytes, out var resolvedContentType))
-            {
-                logger.LogDebug("Skipping malformed attachment data URL for file {FileName}.", attachment.FileName);
-                continue;
-            }
-
-            if (resolvedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            {
-                logger.LogDebug("Skipping image attachment for document ingestion: {FileName}.", attachment.FileName);
-                continue;
-            }
-
-            if (bytes.Length == 0)
-            {
-                continue;
-            }
-
-            if (maxDownloadBytes > 0 && bytes.Length > maxDownloadBytes)
-            {
-                logger.LogInformation(
-                    "Skipping JSON attachment {FileName}: size {SizeBytes} exceeds limit {LimitBytes}.",
-                    attachment.FileName,
-                    bytes.Length,
-                    maxDownloadBytes);
                 continue;
             }
 
@@ -600,6 +580,51 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         }
 
         return staged;
+    }
+
+    private static bool TryPrepareJsonAttachment(
+        JsonAttachmentPayload attachment,
+        long maxDownloadBytes,
+        ILogger<AttachmentIngestionMiddleware> logger,
+        out byte[] bytes,
+        out string resolvedContentType)
+    {
+        bytes = [];
+        resolvedContentType = string.Empty;
+        if (string.IsNullOrWhiteSpace(attachment.FileDataUrl)
+            || attachment.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (!TryDecodeDataUrl(attachment.FileDataUrl, attachment.ContentType, out bytes, out resolvedContentType))
+        {
+            logger.LogDebug("Skipping malformed attachment data URL for file {FileName}.", attachment.FileName);
+            return false;
+        }
+
+        if (resolvedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogDebug("Skipping image attachment for document ingestion: {FileName}.", attachment.FileName);
+            return false;
+        }
+
+        if (bytes.Length == 0)
+        {
+            return false;
+        }
+
+        if (maxDownloadBytes > 0 && bytes.Length > maxDownloadBytes)
+        {
+            logger.LogInformation(
+                "Skipping JSON attachment {FileName}: size {SizeBytes} exceeds limit {LimitBytes}.",
+                attachment.FileName,
+                bytes.Length,
+                maxDownloadBytes);
+            return false;
+        }
+
+        return true;
     }
 
     private static async Task InjectExtractedPartsAsync(
@@ -639,31 +664,7 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         {
             foreach (var item in items.OfType<JsonObject>())
             {
-                if (!TryGetCaseInsensitive(item, "content", out var contentNode, out var contentKey))
-                {
-                    continue;
-                }
-
-                if (contentNode is JsonArray contentArray)
-                {
-                    for (var i = 0; i < contentArray.Count; i++)
-                    {
-                        if (contentArray[i] is JsonObject part
-                            && TryGetPartDataUrl(part, out var dataUrl)
-                            && replacements.TryGetValue(dataUrl, out var replacement))
-                        {
-                            contentArray[i] = BuildTextPart(partType, replacement);
-                            rewritten = true;
-                        }
-                    }
-                }
-                else if (contentNode is JsonValue contentValue
-                    && contentValue.TryGetValue<string>(out var contentString)
-                    && replacements.TryGetValue(contentString, out var replacement))
-                {
-                    item[contentKey] = new JsonArray(BuildTextPart(partType, replacement));
-                    rewritten = true;
-                }
+                rewritten |= RewriteAttachmentContent(item, partType, replacements);
             }
         }
 
@@ -676,6 +677,41 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
         var bytes = JsonSerializer.SerializeToUtf8Bytes(body);
         context.Request.Body = new MemoryStream(bytes);
         context.Request.ContentLength = bytes.Length;
+    }
+
+    private static bool RewriteAttachmentContent(JsonObject item, string partType, Dictionary<string, string> replacements)
+    {
+        if (!TryGetCaseInsensitive(item, "content", out var contentNode, out var contentKey))
+        {
+            return false;
+        }
+
+        if (contentNode is JsonArray contentArray)
+        {
+            var rewritten = false;
+            for (var i = 0; i < contentArray.Count; i++)
+            {
+                if (contentArray[i] is JsonObject part
+                    && TryGetPartDataUrl(part, out var dataUrl)
+                    && replacements.TryGetValue(dataUrl, out var replacement))
+                {
+                    contentArray[i] = BuildTextPart(partType, replacement);
+                    rewritten = true;
+                }
+            }
+
+            return rewritten;
+        }
+
+        if (contentNode is JsonValue contentValue
+            && contentValue.TryGetValue<string>(out var contentString)
+            && replacements.TryGetValue(contentString, out var text))
+        {
+            item[contentKey] = new JsonArray(BuildTextPart(partType, text));
+            return true;
+        }
+
+        return false;
     }
 
     private static async Task<Dictionary<string, string>> BuildInlineReplacementsAsync(
@@ -769,45 +805,51 @@ public sealed class AttachmentIngestionMiddleware(RequestDelegate next)
 
     private static bool TryGetPartDataUrl(JsonObject part, [NotNullWhen(true)] out string? dataUrl)
     {
-        if (TryGetCaseInsensitive(part, "image_url", out var imageUrlNode))
+        if (TryGetCaseInsensitive(part, "image_url", out var imageUrlNode)
+            && TryGetImageDataUrl(imageUrlNode, out dataUrl))
         {
-            if (imageUrlNode is JsonObject imageUrlObject
-                && TryGetCaseInsensitive(imageUrlObject, "url", out var urlNode)
-                && urlNode is JsonValue urlValue
-                && urlValue.TryGetValue<string>(out var url)
-                && IsDataUrl(url))
-            {
-                dataUrl = url;
-                return true;
-            }
-
-            if (imageUrlNode is JsonValue imageUrlValue
-                && imageUrlValue.TryGetValue<string>(out var urlString)
-                && IsDataUrl(urlString))
-            {
-                dataUrl = urlString;
-                return true;
-            }
+            return true;
         }
 
-        if (TryGetCaseInsensitive(part, "file", out var fileNode) && fileNode is JsonObject fileObject)
+        if (TryGetCaseInsensitive(part, "file", out var fileNode) && fileNode is JsonObject fileObject
+            && TryGetDataUrlProperty(fileObject, ["file_data", "fileData", "data"], out dataUrl))
         {
-            foreach (var propertyName in new[] { "file_data", "fileData", "data" })
-            {
-                if (TryGetCaseInsensitive(fileObject, propertyName, out var fileDataNode)
-                    && fileDataNode is JsonValue fileDataValue
-                    && fileDataValue.TryGetValue<string>(out var fileData)
-                    && IsDataUrl(fileData))
-                {
-                    dataUrl = fileData;
-                    return true;
-                }
-            }
+            return true;
         }
 
-        foreach (var propertyName in new[] { "file_data", "fileData", "data", "url" })
+        return TryGetDataUrlProperty(part, ["file_data", "fileData", "data", "url"], out dataUrl);
+    }
+
+    private static bool TryGetImageDataUrl(JsonNode? imageUrlNode, [NotNullWhen(true)] out string? dataUrl)
+    {
+        if (imageUrlNode is JsonObject imageUrlObject
+            && TryGetCaseInsensitive(imageUrlObject, "url", out var urlNode)
+            && urlNode is JsonValue urlValue
+            && urlValue.TryGetValue<string>(out var url)
+            && IsDataUrl(url))
         {
-            if (TryGetCaseInsensitive(part, propertyName, out var flatNode)
+            dataUrl = url;
+            return true;
+        }
+
+        if (imageUrlNode is JsonValue imageUrlValue
+            && imageUrlValue.TryGetValue<string>(out var urlString)
+            && IsDataUrl(urlString))
+        {
+            dataUrl = urlString;
+            return true;
+        }
+
+        dataUrl = null;
+        return false;
+    }
+
+    private static bool TryGetDataUrlProperty(
+        JsonObject obj, IEnumerable<string> propertyNames, [NotNullWhen(true)] out string? dataUrl)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (TryGetCaseInsensitive(obj, propertyName, out var flatNode)
                 && flatNode is JsonValue flatValue
                 && flatValue.TryGetValue<string>(out var flat)
                 && IsDataUrl(flat))
