@@ -122,6 +122,15 @@ Run the local Sonar scan with quality-gate wait:
 scripts/quality/sonarqube-scan.sh
 ```
 
+The script defaults to SonarScanner for .NET 11.3.0 for compatibility with the local
+SonarQube 9.9 server; set `SONAR_SCANNER_VERSION` to select another compatible version.
+It disables the test artifact-directory permission check only inside its disposable SDK
+container, where Docker Desktop may return errno 22 for that check. Tests and coverage
+collection still run and must succeed.
+Set `SONAR_SCAN_DIR` to an existing empty absolute directory outside the repository to
+place temporary scan files on another filesystem. The caller owns that directory and
+should retain any needed scan evidence before removing it.
+
 ## Current Note About Full Solution Verification
 
 The app projects build cleanly. If full-solution verification fails, inspect the unit test project first for stale namespace references before assuming the runtime projects are broken.

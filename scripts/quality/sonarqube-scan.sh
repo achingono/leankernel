@@ -7,9 +7,36 @@ SONAR_HOST_URL="${SONAR_HOST_URL:-http://localhost:9000}"
 SONAR_PROJECT_KEY="${SONAR_PROJECT_KEY:-LeanKernel}"
 SONAR_LOGIN="${SONAR_LOGIN:-admin}"
 SONAR_PASSWORD="${SONAR_PASSWORD:-admin}"
+# Scanner 12 drops support for the SonarQube 9.9 LTS server used by this stack.
+SONAR_SCANNER_VERSION="${SONAR_SCANNER_VERSION:-11.3.0}"
 
 if [[ -z "${SONAR_SCANNER_HOST_URL:-}" ]]; then
   SONAR_SCANNER_HOST_URL="http://host.docker.internal:9000"
+fi
+
+scan_mount=()
+if [[ -n "${SONAR_SCAN_DIR:-}" ]]; then
+  if [[ "$SONAR_SCAN_DIR" != /* || ! -d "$SONAR_SCAN_DIR" || ! -w "$SONAR_SCAN_DIR" ]]; then
+    echo "SONAR_SCAN_DIR must be an existing, writable absolute directory." >&2
+    exit 1
+  fi
+  scan_dir="$(cd "$SONAR_SCAN_DIR" && pwd -P)"
+  root_dir_real="$(cd "$ROOT_DIR" && pwd -P)"
+  if [[ "$scan_dir" == / ]]; then
+    echo "SONAR_SCAN_DIR cannot be the filesystem root." >&2
+    exit 1
+  fi
+  case "$root_dir_real/" in
+    "$scan_dir/"*) echo "SONAR_SCAN_DIR cannot be the repository or an ancestor." >&2; exit 1 ;;
+  esac
+  case "$scan_dir/" in
+    "$root_dir_real/"*) echo "SONAR_SCAN_DIR cannot be inside the repository." >&2; exit 1 ;;
+  esac
+  if [[ "$scan_dir" == *:* || -n "$(ls -A "$scan_dir")" ]]; then
+    echo "SONAR_SCAN_DIR must be empty and its path cannot contain a colon." >&2
+    exit 1
+  fi
+  scan_mount=(-v "$scan_dir:/scan")
 fi
 
 docker compose -f "$COMPOSE_FILE" up -d sonarqube
@@ -48,19 +75,24 @@ if [[ -d "$ROOT_DIR/coverage-results/sonar" ]]; then
 fi
 mkdir -p "$ROOT_DIR/coverage-results/sonar"
 
+# Docker Desktop may report errno 22 while checking the disposable test artifact directory.
 docker run --rm \
   --add-host=host.docker.internal:host-gateway \
+  -e VSTEST_DISABLE_ARTIFACTS_DIRECTORY_VERIFICATION=1 \
   -e "SONAR_PROJECT_KEY=$SONAR_PROJECT_KEY" \
   -e "SONAR_HOST_URL=$SONAR_SCANNER_HOST_URL" \
   -e "SONAR_TOKEN=$token" \
+  -e "SONAR_SCANNER_VERSION=$SONAR_SCANNER_VERSION" \
   -v "$ROOT_DIR:/workspace" \
   -v "LeanKernel-nuget-cache:/root/.nuget/packages" \
+  "${scan_mount[@]}" \
   -w /workspace \
   mcr.microsoft.com/dotnet/sdk:10.0 \
   bash -lc '
     set -euo pipefail
     mkdir -p /scan
     tar -cf - -C /workspace \
+      .editorconfig \
       LeanKernel.sln \
       src \
       test \
@@ -72,7 +104,7 @@ docker run --rm \
     apt-get install -y --no-install-recommends nodejs openjdk-17-jre-headless python3 \
       || apt-get install -y --allow-unauthenticated --no-install-recommends nodejs openjdk-17-jre-headless python3
     rm -rf /var/lib/apt/lists/*
-    dotnet tool install --global dotnet-sonarscanner
+    dotnet tool install --global dotnet-sonarscanner --version "$SONAR_SCANNER_VERSION"
     export PATH="$PATH:/root/.dotnet/tools"
     dotnet sonarscanner begin \
       /k:"$SONAR_PROJECT_KEY" \
